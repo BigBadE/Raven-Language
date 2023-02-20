@@ -1,0 +1,21 @@
+{
+  parserClass="bigbade.raven.ravenintellijplugin.parsing.RavenParser"
+
+  extends="com.intellij.extapi.psi.ASTWrapperPsiElement"
+
+  psiClassPrefix="Raven"
+  psiImplClassSuffix="Impl"
+  psiPackage="bigbade.raven.ravenintellijplugin.psi"
+  psiImplPackage="bigbade.raven.ravenintellijplugin.psi.impl"
+
+  elementTypeHolderClass="bigbade.raven.ravenintellijplugin.psi.RavenTypes"
+  elementTypeClass="bigbade.raven.ravenintellijplugin.parsing.RavenElementType"
+  tokenTypeClass="bigbade.raven.ravenintellijplugin.parsing.RavenTokenType"
+
+  extends(".*expr")=expr
+  extends(".*elem")=elem
+}
+
+ravenFile ::= elem*
+
+struct_elem ::=

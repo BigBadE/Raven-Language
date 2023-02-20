@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+    "language/ast",
+    "language/compiler",
+    "language/parser",
+]

@@ -1,0 +1,41 @@
+element = _{ (structure | function)* }
+
+WHITESPACE = _{ (" " | "\n" | "\r" | "\t")+ }
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+ident = { ASCII_ALPHA+ }
+
+public = { "pub" }
+static_mod = { "static" }
+extern_mod = { "extern" }
+modifiers = _{ (public) ~ (static_mod) ~ (extern_mod) }
+
+structure = { "struct" ~ ident ~ "{" ~ (struct_field|function)* ~ "}"}
+struct_field = { modifiers ~ field ~ ";" }
+
+field = { ident ~ ":" ~ ident }
+fields = { (field ~ ",")* ~ field? }
+function = { modifiers ~ "fn" ~ ident ~ "(" ~ fields ~ ")" ~ code_block }
+
+code_block = { "{" ~ expression* ~ "}" }
+
+expression = { effect ~ ";" }
+effect = { math | method | string | number }
+
+method = { ident ~ "(" ~ (arguments) ~ ")" }
+argument = { effect }
+arguments = { (argument ~ ",")* ~ argument? }
+
+string = @{ "\"" ~ ANY+ ~ "\"" }
+integer = @{ ("-") ~ ASCII_DIGIT+ }
+float = @{ ("-") ~ (ASCII_DIGIT+) ~ (".") ~ ASCII_DIGIT+ }
+
+number = { integer | float }
+addition = { number ~ "+" ~ number}
+subtraction = { number ~ "-" ~ number}
+multiplication = { number ~ "*" ~ number}
+division = { number ~ "/" ~ number}
+
+operation = { addition | subtraction | multiplication | division }
+math_expression = { math ~ (operation ~ math)* }
+math = _{ number | "(" ~ math_expression ~ ")" }
