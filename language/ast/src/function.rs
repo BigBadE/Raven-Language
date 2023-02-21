@@ -8,16 +8,18 @@ pub struct Function {
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
-    pub name: Ident,
+    pub return_type: Option<Ident>,
+    pub name: Ident
 }
 
 impl Function {
-    pub fn new(modifiers: &[Modifier], fields: Vec<Field>, code: CodeBody, name: Ident) -> Self {
+    pub fn new(modifiers: &[Modifier], fields: Vec<Field>, code: CodeBody, return_type: Option<Ident>, name: Ident) -> Self {
         return Self {
             modifiers: get_modifier(modifiers),
             fields,
             code,
-            name,
+            return_type,
+            name
         };
     }
 }
@@ -50,8 +52,11 @@ impl CodeBody {
 
 impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} fn {}({}) {}", display(&to_modifiers(self.modifiers)), self.name, display(&self.fields), self.code)?;
-        return Ok(());
+        write!(f, "{} fn {}({}) ", display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
+        if self.return_type.is_some() {
+            write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
+        }
+        return write!(f, "{}", self.code);
     }
 }
 

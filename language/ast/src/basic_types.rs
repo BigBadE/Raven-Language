@@ -14,7 +14,6 @@ impl Ident {
 
 impl Display for Ident {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.value.as_str())?;
-        return Ok(());
+        return write!(f, "{}", self.value);
     }
 }

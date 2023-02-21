@@ -15,16 +15,22 @@ struct_field = { modifiers ~ field ~ ";" }
 
 field = { ident ~ ":" ~ ident }
 fields = { (field ~ ",")* ~ field? }
-function = { modifiers ~ "fn" ~ ident ~ "(" ~ fields ~ ")" ~ code_block }
+return_type = _{ "->" ~ ident }
+function = { modifiers ~ "fn" ~ ident ~ "(" ~ fields ~ ")" ~ return_type? ~ code_block }
 
 code_block = { "{" ~ line* ~ "}" }
 
-line = _{ expression ~ ";" }
+line = _{ returning? ~ expression ~ ";" }
 expression = { term ~ effect* }
 
-effect = _{ method | math | term | "(" ~ effect ~ ")" }
-term = _{ string | number | ident | assign | returning }
+// Wrapped for some parsing cases
+wrapped_effect = { effect }
 
+effect = _{ method | math | index | "(" ~ effect ~ ")" | term }
+term = _{ string | number | assign | ident }
+
+equals = { "=" }
+index = { "[" ~ effect ~ (".." ~ equals? ~ effect)? ~ "]"}
 assign = { "let" ~ ident ~ "=" ~ effect }
 returning = { "return" }
 
@@ -32,15 +38,18 @@ method = { "."? ~ ident ~ arguments }
 
 arguments = { "(" ~ (expression ~ ",")* ~ expression? ~ ")" }
 
-string = @{ "\"" ~ ANY+ ~ "\"" }
-integer = @{ ("-") ~ ASCII_DIGIT+ }
-float = @{ ("-") ~ (ASCII_DIGIT+) ~ (".") ~ ASCII_DIGIT+ }
+negative = @{"-"}
 
-number = { integer | float }
+string = @{ "\"" ~ ANY+ ~ "\"" }
+digits = @{ ASCII_DIGIT+ }
+integer = @{ negative? ~ digits }
+float = @{ negative? ~ digits ~ "." ~ digits }
+
+number = _{ integer | float }
 addition = { "+" }
 subtraction = { "-" }
 multiplication = { "*" }
 division = { "/" }
 
 operation = _{ addition | subtraction | multiplication | division }
-math = { operation ~ effect }
+math = { operation ~ wrapped_effect }
