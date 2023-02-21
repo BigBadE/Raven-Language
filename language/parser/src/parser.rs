@@ -1,10 +1,11 @@
 extern crate pest;
 
-use pest::iterators::Pair;
+use pest::iterators::Pairs;
 use pest::Parser;
 use ast::basic_types::Ident;
-use ast::class_type::{ClassType, TypeMember};
-use ast::function_type::{CodeBody, Function};
+use ast::code::Effect;
+use ast::r#struct::{Struct, TypeMember};
+use ast::function::{CodeBody, Function};
 use ast::TopElement;
 
 #[derive(Parser)]
@@ -12,48 +13,50 @@ use ast::TopElement;
 struct LanguageParser;
 
 pub fn parse(input: String) -> Vec<TopElement> {
-    let mut output: Vec<TopElement> = Vec::new();
-
-    match LanguageParser::parse(Rule::element, input.as_str()) {
-        Ok(result) => {
-            for element in result {
-                match element.as_rule() {
-                    Rule::structure => output.push(TopElement::Struct(parse_structure(element))),
-                    Rule::function => output.push(TopElement::Function(parse_function(element))),
-                    _ => panic!("Unimplemented rule!: {}", element)
-                }
-            }
-        },
-        Err(errors) => {
-            panic!("\n{}", errors);
-        }
-    }
+    let output = match LanguageParser::parse(Rule::element, input.as_str()) {
+        Ok(result) => Vec::parse(result),
+        Err(errors) => panic!("\n{}", errors)
+    };
 
     return output;
 }
 
-fn parse_structure(structure: Pair<Rule>) -> ClassType {
-    let mut members: Vec<Box<dyn TypeMember>> = Vec::new();
-    let mut name = String::new();
-
-    for element in structure.into_inner() {
-        match element.as_rule() {
-            Rule::ident => name = element.as_str().to_string(),
-            Rule::struct_field => {},
-            Rule::function => members.push(Box::new(parse_function(element))),
-            _ => panic!("Unimplemented rule!: {}", element)
-        }
-    }
-    return ClassType::new(members, &[],Ident::new(name));
+pub trait Parsable {
+    fn parse(rules: Pairs<Rule>) -> Self;
 }
 
-fn parse_function(function: Pair<Rule>) -> Function {
-    let code = Vec::new();
-    let name = String::new();
+pub trait EffectParsable {
+    fn parse(last: Option<Box<dyn Effect>>, rules: Pairs<Rule>) -> Self;
+}
 
-    match function.clone().into_inner() {
-        _ => panic!("Unimplemented rule!: {}", function)
+impl Parsable for Vec<TopElement> {
+    fn parse(rules: Pairs<Rule>) -> Self {
+        let mut output = Vec::new();
+        for element in rules {
+            match element.as_rule() {
+                Rule::structure => output.push(TopElement::Struct(Struct::parse(element.into_inner()))),
+                Rule::function => output.push(TopElement::Function(Function::parse(element.into_inner()))),
+                Rule::EOI => {},
+                _ => panic!("Unimplemented rule!: {}", element)
+            }
+        }
+        return output;
     }
+}
 
-    return Function::new(&[], CodeBody::new(code), Ident::new(name));
+impl Parsable for Struct {
+    fn parse(rules: Pairs<Rule>) -> Self {
+        let mut members: Vec<Box<dyn TypeMember>> = Vec::new();
+        let mut name = String::new();
+
+        for element in rules {
+            match element.as_rule() {
+                Rule::ident => name = element.as_str().to_string(),
+                Rule::struct_field => {},
+                Rule::function => members.push(Box::new(Function::parse(element.into_inner()))),
+                _ => panic!("Unimplemented rule!: {}", element)
+            }
+        }
+        return Struct::new(members, &[], Ident::new(name));
+    }
 }

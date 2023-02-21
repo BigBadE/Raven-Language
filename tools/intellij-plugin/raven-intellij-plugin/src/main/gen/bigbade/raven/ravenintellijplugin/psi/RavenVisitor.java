@@ -7,7 +7,11 @@ import com.intellij.psi.PsiElement;
 
 public class RavenVisitor extends PsiElementVisitor {
 
-  public void visitProperty(@NotNull RavenProperty o) {
+  public void visitModifier(@NotNull RavenModifier o) {
+    visitPsiElement(o);
+  }
+
+  public void visitStructure(@NotNull RavenStructure o) {
     visitPsiElement(o);
   }
 

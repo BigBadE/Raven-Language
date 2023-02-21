@@ -10,19 +10,20 @@ import bigbade.raven.ravenintellijplugin.psi.impl.*;
 
 public interface RavenTypes {
 
-  IElementType PROPERTY = new RavenElementType("PROPERTY");
+  IElementType MODIFIER = new RavenElementType("MODIFIER");
+  IElementType STRUCTURE = new RavenElementType("STRUCTURE");
 
-  IElementType COMMENT = new RavenTokenType("COMMENT");
-  IElementType CRLF = new RavenTokenType("CRLF");
-  IElementType KEY = new RavenTokenType("KEY");
-  IElementType SEPARATOR = new RavenTokenType("SEPARATOR");
-  IElementType VALUE = new RavenTokenType("VALUE");
+  IElementType FUNCTION = new RavenTokenType("function");
+  IElementType STRUCT = new RavenTokenType("struct");
 
   class Factory {
     public static PsiElement createElement(ASTNode node) {
       IElementType type = node.getElementType();
-      if (type == PROPERTY) {
-        return new RavenPropertyImpl(node);
+      if (type == MODIFIER) {
+        return new RavenModifierImpl(node);
+      }
+      else if (type == STRUCTURE) {
+        return new RavenStructureImpl(node);
       }
       throw new AssertionError("Unknown element type: " + type);
     }

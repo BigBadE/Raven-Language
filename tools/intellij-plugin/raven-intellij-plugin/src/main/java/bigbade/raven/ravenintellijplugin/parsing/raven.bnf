@@ -12,10 +12,36 @@
   elementTypeClass="bigbade.raven.ravenintellijplugin.parsing.RavenElementType"
   tokenTypeClass="bigbade.raven.ravenintellijplugin.parsing.RavenTokenType"
 
-  extends(".*expr")=expr
-  extends(".*elem")=elem
+  tokens = [
+    STRUCT="struct"
+    FUNC = "fn"
+    RBRACKET = "}"
+    LBRACKET = "{"
+    RPAREN = ")"
+    LPAREN = "("
+    COLON = ":"
+    SEMICOLON = ";"
+    space='regexp:\s+'
+    number='regexp:\d+(\.\d*)?'
+    ident='regexp:\p{Alpha}\w*'
+  ]
 }
 
-ravenFile ::= elem*
+ravenFile ::= item_*
 
-struct_elem ::=
+private item_ ::= (structure|elem_)
+
+modifier ::= "pub " | "static "
+structure ::= modifier* STRUCT LBRACKET elem_* RBRACKET
+
+private elem_ ::= (function|struct_field)
+
+struct_field ::= modifier* ident COLON ident SEMICOLON
+
+function ::= modifier* FUNC LPAREN RPAREN code
+
+code ::= LBRACKET expr_* RBRACKET
+
+private expr_ ::= effect_ SEMICOLON
+
+private effect_ ::= ()

@@ -2,13 +2,13 @@ use std::fmt::{Display, Formatter};
 use crate::basic_types::Ident;
 use crate::{get_modifier, is_modifier, Modifier, TopElement};
 
-pub struct ClassType {
+pub struct Struct {
     pub modifiers: u8,
     pub members: Vec<Box<dyn TypeMember>>,
     pub name: Ident
 }
 
-impl ClassType {
+impl Struct {
     pub fn new(members: Vec<Box<dyn TypeMember>>, modifiers: &[Modifier], name: Ident) -> Self {
         return Self {
             modifiers: get_modifier(modifiers),
@@ -18,7 +18,7 @@ impl ClassType {
     }
 }
 
-impl Display for ClassType {
+impl Display for Struct {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if is_modifier(self.modifiers, Modifier::Public) {
             write!(f, "pub ")?;

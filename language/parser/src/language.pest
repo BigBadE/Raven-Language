@@ -1,14 +1,14 @@
-element = _{ (structure | function)* }
+element = _{ SOI ~ (structure | function)* ~ EOI }
 
 WHITESPACE = _{ (" " | "\n" | "\r" | "\t")+ }
 COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
-ident = { ASCII_ALPHA+ }
+ident = { ASCII_ALPHANUMERIC+ }
 
 public = { "pub" }
 static_mod = { "static" }
 extern_mod = { "extern" }
-modifiers = _{ (public) ~ (static_mod) ~ (extern_mod) }
+modifiers = { public? ~ static_mod? ~ extern_mod? }
 
 structure = { "struct" ~ ident ~ "{" ~ (struct_field|function)* ~ "}"}
 struct_field = { modifiers ~ field ~ ";" }
@@ -17,25 +17,30 @@ field = { ident ~ ":" ~ ident }
 fields = { (field ~ ",")* ~ field? }
 function = { modifiers ~ "fn" ~ ident ~ "(" ~ fields ~ ")" ~ code_block }
 
-code_block = { "{" ~ expression* ~ "}" }
+code_block = { "{" ~ line* ~ "}" }
 
-expression = { effect ~ ";" }
-effect = { math | method | string | number }
+line = _{ expression ~ ";" }
+expression = { term ~ effect* }
 
-method = { ident ~ "(" ~ (arguments) ~ ")" }
-argument = { effect }
-arguments = { (argument ~ ",")* ~ argument? }
+effect = _{ method | math | term | "(" ~ effect ~ ")" }
+term = _{ string | number | ident | assign | returning }
+
+assign = { "let" ~ ident ~ "=" ~ effect }
+returning = { "return" }
+
+method = { "."? ~ ident ~ arguments }
+
+arguments = { "(" ~ (expression ~ ",")* ~ expression? ~ ")" }
 
 string = @{ "\"" ~ ANY+ ~ "\"" }
 integer = @{ ("-") ~ ASCII_DIGIT+ }
 float = @{ ("-") ~ (ASCII_DIGIT+) ~ (".") ~ ASCII_DIGIT+ }
 
 number = { integer | float }
-addition = { number ~ "+" ~ number}
-subtraction = { number ~ "-" ~ number}
-multiplication = { number ~ "*" ~ number}
-division = { number ~ "/" ~ number}
+addition = { "+" }
+subtraction = { "-" }
+multiplication = { "*" }
+division = { "/" }
 
-operation = { addition | subtraction | multiplication | division }
-math_expression = { math ~ (operation ~ math)* }
-math = _{ number | "(" ~ math_expression ~ ")" }
+operation = _{ addition | subtraction | multiplication | division }
+math = { operation ~ effect }
