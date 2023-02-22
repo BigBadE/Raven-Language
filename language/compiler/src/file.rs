@@ -1,5 +1,4 @@
 use std::fs;
-use std::fs::FileType;
 use std::path::PathBuf;
 use parser::FileStructure;
 

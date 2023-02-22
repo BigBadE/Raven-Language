@@ -3,7 +3,7 @@ extern crate pest;
 use pest::iterators::Pairs;
 use pest::Parser;
 use ast::basic_types::Ident;
-use ast::code::Effect;
+use ast::code::Effects;
 use ast::r#struct::{Struct, TypeMembers};
 use ast::function::Function;
 use ast::TopElement;
@@ -26,7 +26,7 @@ pub trait Parsable {
 }
 
 pub trait EffectParsable {
-    fn parse(last: Option<Box<dyn Effect>>, rules: Pairs<Rule>) -> Self;
+    fn parse(last: Option<Effects>, rules: Pairs<Rule>) -> Self;
 }
 
 fn parse_root(name: &String, rules: Pairs<Rule>) -> Vec<TopElement> {
@@ -42,13 +42,7 @@ fn parse_root(name: &String, rules: Pairs<Rule>) -> Vec<TopElement> {
 
     for element in &mut output {
         match element {
-            TopElement::Struct(structure) => {
-                structure.name = Ident::new(name.clone() + "::" + structure.name.value.as_str());
-
-                for member in &structure.members {
-
-                }
-            },
+            TopElement::Struct(structure) => structure.name = Ident::new(name.clone() + "::" + structure.name.value.as_str()),
             TopElement::Function(function) => function.name = Ident::new(name.clone() + "::" + function.name.value.as_str())
         }
     }

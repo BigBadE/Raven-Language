@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::fmt::{Debug, Display};
 use pest::iterators::Pairs;
 use ast::basic_types::Ident;
-use ast::code::{Effect, Expression, Field, MathEffect, MathOperator, NumberEffect, ReturnEffect, VariableLoad};
+use ast::code::{Effects, Expression, Field, MathEffect, MathOperator, NumberEffect, ReturnEffect, VariableLoad};
 use ast::function::{CodeBody, Function};
 use ast::Modifier;
 use crate::parser::{EffectParsable, Parsable, Rule};
@@ -45,7 +45,7 @@ impl Parsable for CodeBody {
                 Rule::expression => {
                     let mut expression = Expression::parse(element.into_inner());
                     if returning {
-                        expression = Expression::new(Box::new(ReturnEffect::new(expression.effect)));
+                        expression = Expression::new(Effects::ReturnEffect(Box::new(ReturnEffect::new(expression.effect))));
                         returning = false;
                     }
                     expressions.push(expression);
@@ -63,14 +63,14 @@ impl Parsable for Expression {
         let mut last = None;
         for element in rules {
             match element.as_rule() {
-                Rule::effect => last = Some(Box::parse(last, element.into_inner())),
+                Rule::effect => last = Some(Effects::parse(last, element.into_inner())),
                 Rule::ident => {
                     println!("Loading a{}a", element.as_str());
-                    last = Some(Box::new(VariableLoad::new(Ident::new(element.as_str().to_string()))))
+                    last = Some(Effects::VariableLoad(Box::new(VariableLoad::new(Ident::new(element.as_str().to_string())))))
                 }
-                Rule::math => last = Some(Box::new(MathEffect::parse(last, element.into_inner()))),
-                Rule::float => last = Some(Box::new(parse_number::<f64>(element.as_str()))),
-                Rule::integer => last = Some(Box::new(parse_number::<u64>(element.as_str()))),
+                Rule::math => last = Some(Effects::MathEffect(Box::new(MathEffect::parse(last, element.into_inner())))),
+                Rule::float => last = Some(Effects::FloatEffect(Box::new(parse_number::<f64>(element.as_str())))),
+                Rule::integer => last = Some(Effects::IntegerEffect(Box::new(parse_number::<u64>(element.as_str())))),
                 _ => panic!("Unimplemented rule!: {}", element)
             }
         }
@@ -88,7 +88,7 @@ fn parse_number<T>(number: &str) -> NumberEffect<T> where T: Display + FromStr, 
 }
 
 impl EffectParsable for MathEffect {
-    fn parse(last: Option<Box<dyn Effect>>, rules: Pairs<Rule>) -> Self {
+    fn parse(last: Option<Effects>, rules: Pairs<Rule>) -> Self {
         let mut operation = MathOperator::PLUS;
         for element in rules {
             match element.as_rule() {
