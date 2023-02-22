@@ -1,3 +1,0 @@
-pub fn test(field: u8) -> String {
-    return 1 + 2;
-}

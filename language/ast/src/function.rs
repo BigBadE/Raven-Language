@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use crate::basic_types::Ident;
 use crate::r#struct::TypeMember;
 use crate::code::{Expression, Field};
-use crate::{get_modifier, is_modifier, Modifier, to_modifiers};
+use crate::{get_modifier, Modifier, to_modifiers};
 
 pub struct Function {
     pub modifiers: u8,

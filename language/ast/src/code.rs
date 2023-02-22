@@ -7,8 +7,8 @@ pub struct Expression {
 }
 
 pub struct Field {
-    name: Ident,
-    field_type: Ident
+    pub name: Ident,
+    pub field_type: Ident
 }
 
 impl Expression {
