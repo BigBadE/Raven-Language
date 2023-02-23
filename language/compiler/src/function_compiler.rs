@@ -1,13 +1,12 @@
 use std::collections::HashMap;
-use inkwell::types::{AsTypeRef, FunctionType, IntType};
-use inkwell::values::{BasicValue, FunctionValue, IntValue};
-use inkwell::values::AnyValueEnum::IntValue;
+use inkwell::types::{AsTypeRef, FunctionType};
+use inkwell::values::FunctionValue;
 use llvm_sys::core::LLVMFunctionType;
 use llvm_sys::prelude::LLVMTypeRef;
-use ast::code::{Effects, MathOperator};
+use ast::code::Effects;
 use ast::function::Function;
 use crate::compiler::Compiler;
-use crate::types::{Type, TypeManager, Value};
+use crate::types::{TypeManager, Value};
 
 pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) -> FunctionValue<'ctx> {
     let return_type = match &function.return_type {
@@ -34,27 +33,34 @@ pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) ->
     return fn_value;
 }
 
-pub fn compile_block<'ctx>(function: &Function, variables: &HashMap<String, Box<dyn BasicValue<'ctx>>>, compiler: &Compiler<'ctx>) {
+pub fn compile_block<'ctx>(function: &Function, types: &TypeManager, variables: &HashMap<String, Value<'ctx>>, compiler: &Compiler<'ctx>) {
     for line in &function.code.expressions {
-        compile_effect(function, compiler, variables, &line.effect);
+        compile_effect(function, compiler, types, variables, &line.effect);
     }
 }
 
-pub fn compile_effect<'ctx>(function: &Function, compiler: &Compiler<'ctx>, types: TypeManager,
+pub fn compile_effect<'ctx>(function: &Function, compiler: &Compiler<'ctx>, types: &TypeManager,
                             variables: &HashMap<String, Value<'ctx>>, effect: &Effects) -> Value<'ctx> {
     return match effect {
         Effects::IntegerEffect(effect) =>
-            Value::new(types.get_type("i64").unwrap(),
-                       compiler.context.i64_type().const_int(effect.number, true)),
+            Value::new(types.get_type("i64").unwrap().as_ref(),
+                       Box::new(compiler.context.i64_type().const_int(effect.number, true))),
         Effects::FloatEffect(effect) =>
-            Value::new(types.get_type("f64").unwrap(),
-                       compiler.context.f64_type().const_float(effect.number)),
+            Value::new(types.get_type("f64").unwrap().as_ref(),
+                       Box::new(compiler.context.f64_type().const_float(effect.number))),
         Effects::MethodCall(effect) => panic!("Method calls not implemented yet!"),
         Effects::VariableLoad(effect) =>
-            variables.get(&effect.name.value).expect("Unknown variable called " + effect.name.value),
-        Effects::ReturnEffect(effect) =>
-            Value::new(types.get_type("void").unwrap(),
-                       compiler.builder.build_return(Some(compile_effect(function, compiler, types, variables, &effect.effect).as_ref()))),
-        Effects::MathEffect(effect) =>
+            variables.get(&effect.name.value).expect(format!("Unknown variable called {}", effect.name.value).as_str()).clone(),
+        Effects::ReturnEffect(effect) => {
+            let value = compile_effect(function, compiler, types, variables, &effect.effect);
+            compiler.builder.build_return(Some(value.value.as_ref()));
+
+            value
+        },
+        Effects::MathEffect(effect) => {
+            let value = compile_effect(function, compiler, types, variables, &effect.effect);
+            value.value_type.math_operation(effect.operator, compiler, value,
+                                            compile_effect(function, compiler, types, variables, &effect.target))
+        }
     };
 }

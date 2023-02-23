@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use inkwell::values::BasicValue;
+use inkwell::values::{BasicValue, BasicValueEnum, FloatValue};
 use ast::code::{Effects, MathOperator};
 use crate::compiler::Compiler;
 
@@ -20,24 +20,28 @@ impl TypeManager {
 }
 
 pub trait Type {
-    fn math_operation(operation: MathOperator, compiler: &Compiler, target: Effects);
-
+    fn math_operation<'ctx>(&self, operation: MathOperator, compiler: &Compiler, current: Value, target: Value) -> Value<'ctx>;
 }
 
 pub struct Value<'ctx> {
-    value_type: &'ctx dyn Type,
-    value: Box<dyn BasicValue<'ctx>>,
+    pub value_type: &'ctx dyn Type,
+    pub value: Box<dyn BasicValue<'ctx>>,
 }
 
 impl<'ctx> Value<'ctx> {
-    pub fn new(value_type: &'ctx dyn Type, value: dyn BasicValue<'ctx>) -> Self {
+    pub fn new(value_type: &'ctx dyn Type, value: Box<dyn BasicValue<'ctx>>) -> Self {
         return Self {
             value_type,
-            value: Box::new(value)
+            value
         }
     }
+}
 
-    pub fn value(&self) -> &dyn BasicValue<'ctx> {
-        return self.value.as_ref();
+impl<'ctx> Clone for Value<'ctx> {
+    fn clone(&self) -> Self {
+        return Value {
+            value_type: self.value_type,
+            value: Box::new(Value::new(self.value.as_value_ref()))
+        }
     }
 }
