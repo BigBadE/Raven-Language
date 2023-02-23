@@ -11,8 +11,8 @@ use crate::function_compiler::compile_function;
 
 type Main = unsafe extern "C" fn();
 
-pub struct Compiler<'ctx> {
-    pub context: &'ctx Context,
+pub struct Compiler {
+    pub context: Context,
     pub module: Module<'ctx>,
     pub builder: Builder<'ctx>,
     execution_engine: ExecutionEngine<'ctx>,
@@ -20,7 +20,7 @@ pub struct Compiler<'ctx> {
     pub types: HashMap<String, LLVMTypeRef>
 }
 
-impl<'ctx> Compiler<'ctx> {
+impl Compiler {
     pub fn new(context: &'ctx Context) -> Self {
         let module = context.create_module("main");
         let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
