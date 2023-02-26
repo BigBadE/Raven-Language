@@ -1,11 +1,12 @@
 use alloc::ffi::CString;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use inkwell::module::Module;
-use llvm_sys::core::{LLVMContextCreate, LLVMCreateBuilderInContext, LLVMModuleCreateWithNameInContext};
+use std::ops::Deref;
+use llvm_sys::core::{LLVMAddFunction, LLVMContextCreate, LLVMCreateBuilderInContext, LLVMModuleCreateWithNameInContext, LLVMSetLinkage};
 use llvm_sys::LLVMLinkage;
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMTypeRef};
-use crate::types::Type;
+use ast::code::Field;
+use crate::types::{FunctionType, Type};
 
 pub struct Context {
     pub context: LLVMContextRef,
@@ -35,7 +36,16 @@ impl Context {
         return types;
     }
 
-    pub fn add_function(name: &str, return_type: Box<dyn Type>, linkage: LLVMLinkage) -> Box<dyn Type> {
+    pub fn add_function(&self, name: &str, return_type: &Box<dyn Type>, params: &Vec<Field>, linkage: Option<LLVMLinkage>) -> FunctionType {
+        unsafe {
+            let function =
+                LLVMAddFunction(self.module, Cow::from(CString::new(name).unwrap()).as_ptr(), return_type.get_type());
 
+            if linkage.is_some() {
+                LLVMSetLinkage(function, linkage.unwrap());
+            }
+
+            return function;
+        }
     }
 }

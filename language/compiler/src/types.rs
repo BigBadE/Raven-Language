@@ -3,11 +3,19 @@ use ast::code::MathOperator;
 use crate::compiler::Compiler;
 
 pub trait Type {
-    fn math_operation(&self, operation: MathOperator, compiler: &Compiler, current: Value, target: Value) -> Value;
+    fn math_operation(&self, operation: MathOperator, compiler: &Compiler, current: Value, target: Value) -> Option<Value>;
 
     fn get_type(&self) -> LLVMTypeRef;
     
     fn clone(&self) -> Box<dyn Type>;
+}
+
+pub struct FunctionType {
+
+}
+
+impl FunctionType for Type {
+
 }
 
 pub struct Value {

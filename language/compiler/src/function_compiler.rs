@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use inkwell::types::{AsTypeRef, FunctionType};
+use inkwell::types::FunctionType;
 use llvm_sys::core::LLVMFunctionType;
 use llvm_sys::prelude::LLVMTypeRef;
-use ast::code::Effects;
+use ast::code::{Effects, Field};
 use ast::function::Function;
 use crate::compiler::Compiler;
 use crate::types::{Type, Value};
@@ -13,12 +13,10 @@ pub fn compile_function(function: &Function, compiler: &Compiler) -> Box<dyn Typ
         None => compiler.get_type(&"void".to_string())
     };
 
-    let mut params: Vec<LLVMTypeRef> = function.fields.iter().map(|field| compiler.get_type(&field.field_type.value).get_type()).collect();
+    let fn_type = unsafe {
+        LLVMFunctionType(return_type.get_type(), params.as_mut_ptr(), params.len() as u32, false as i32) };
 
-    let fn_type = unsafe { FunctionType::new(
-        LLVMFunctionType(return_type.get_type(), params.as_mut_ptr(), params.len() as u32, false as i32)) };
-
-    let fn_value = compiler.context.add_function(function.name.value.as_str(), fn_type, None);
+    let fn_value = compiler.context.add_function(function.name.value.as_str(), return_type, &function.fields, None);
 
     let block = compiler.context.append_basic_block(fn_value, "entry");
     compiler.builder.position_at_end(block);
