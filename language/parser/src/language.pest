@@ -27,7 +27,7 @@ expression = { term ~ effect* }
 wrapped_effect = { effect }
 
 effect = _{ method | math | index | "(" ~ effect ~ ")" | term }
-term = _{ string | number | assign | ident }
+term = _{ string | number | assign | ident | term_math }
 
 equals = { "=" }
 index = { "[" ~ effect ~ (".." ~ equals? ~ effect)? ~ "]"}
@@ -51,5 +51,7 @@ subtraction = { "-" }
 multiplication = { "*" }
 division = { "/" }
 
+negate = { subtraction ~ number }
 operation = _{ addition | subtraction | multiplication | division }
 math = { operation ~ wrapped_effect }
+term_math = { (negate) ~ term }

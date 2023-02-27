@@ -13,12 +13,18 @@ pub enum TopElement {
     Function(Function)
 }
 
+impl DisplayIndented for TopElement {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return match self {
+            TopElement::Struct(class_type) => class_type.format(indent, f),
+            TopElement::Function(function) => function.format(indent, f)
+        }
+    }
+}
+
 impl Display for TopElement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return match self {
-            TopElement::Struct(class_type) => Display::fmt(class_type, f),
-            TopElement::Function(function) => Display::fmt(function, f)
-        }
+        return self.format("", f);
     }
 }
 
@@ -55,4 +61,8 @@ fn to_modifiers(from: u8) -> Vec<Modifier> {
         modifiers.push(Modifier::Public)
     }
     return modifiers;
+}
+
+pub trait DisplayIndented {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
 }

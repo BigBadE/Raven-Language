@@ -96,7 +96,7 @@ impl EffectParsable for MathEffect {
                 Rule::subtraction => operation = MathOperator::MINUS,
                 Rule::division => operation = MathOperator::DIVIDE,
                 Rule::multiplication => operation = MathOperator::MULTIPLY,
-                Rule::wrapped_effect => return MathEffect::new(last.unwrap(), operation,
+                Rule::wrapped_effect => return MathEffect::new(last, operation,
                                                                Expression::parse(element.into_inner()).effect),
                 _ => panic!("Unimplemented rule! {}", element)
             }

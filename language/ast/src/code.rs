@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use crate::basic_types::Ident;
-use crate::function::Arguments;
+use crate::{DisplayIndented, to_modifiers};
+use crate::function::{Arguments, display};
 
 pub struct Expression {
     pub effect: Effects
@@ -9,6 +10,17 @@ pub struct Expression {
 pub struct Field {
     pub name: Ident,
     pub field_type: Ident
+}
+
+pub struct MemberField {
+    pub modifiers: u8,
+    pub field: Field
+}
+
+impl DisplayIndented for MemberField {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "{}{} {}", indent, display(&to_modifiers(self.modifiers)), self.field);
+    }
 }
 
 impl Expression {
@@ -28,9 +40,9 @@ impl Field {
     }
 }
 
-impl Display for Expression {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{};\n", self.effect.unwrap());
+impl DisplayIndented for Expression {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "{}{};\n", indent, self.effect.unwrap());
     }
 }
 
@@ -68,7 +80,7 @@ impl Effects {
 
 impl Display for Effects {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return Display::fmt(self.unwrap(), f);
+        return self.unwrap().fmt(f);
     }
 }
 
@@ -149,12 +161,12 @@ impl Display for VariableLoad {
 }
 
 pub struct MathEffect {
-    pub target: Effects,
+    pub target: Option<Effects>,
     pub operator: MathOperator,
     pub effect: Effects
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum MathOperator {
     PLUS = '+' as isize,
     MINUS = '-' as isize,
@@ -163,7 +175,7 @@ pub enum MathOperator {
 }
 
 impl MathEffect {
-    pub fn new(target: Effects, operator: MathOperator, effect: Effects) -> Self {
+    pub fn new(target: Option<Effects>, operator: MathOperator, effect: Effects) -> Self {
         return Self {
             target,
             operator,
@@ -180,7 +192,10 @@ impl Effect for MathEffect {
 
 impl Display for MathEffect {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{} {} {}", self.target, self.operator.clone() as u8 as char, self.effect);
+        return match &self.target {
+            Some(target) => write!(f, "{} {} {}", target, self.operator.clone() as u8 as char, self.effect),
+            None => write!(f, "{}{}", self.operator.clone() as u8 as char, self.effect)
+        }
     }
 }
 

@@ -36,7 +36,7 @@ impl Parsable for Arguments {
     fn parse(rules: Pairs<Rule>) -> Self {
         let mut effects = Vec::new();
         for element in rules {
-            effects.push(Expression::parse(element.into_inner()));
+            effects.push(Expression::parse(element.into_inner()).effect);
         }
 
         return Arguments::new(effects);

@@ -3,6 +3,9 @@ use std::path::PathBuf;
 use inkwell::context::Context;
 use crate::compiler::Compiler;
 use crate::file::FileStructureImpl;
+use crate::types::TypeManager;
+
+pub mod instructions;
 
 pub mod compiler;
 pub mod file;
@@ -14,8 +17,9 @@ pub fn main() {
     let directory = FileStructureImpl::new(PathBuf::from(args.get(1).unwrap()));
 
     let context = Context::create();
-    match Compiler::new(&context).compile(directory) {
-        Some(main) => unsafe { main.call() },
+    let types = TypeManager::new(&context);
+    match Compiler::new(&context, &types).compile(directory) {
+        Some(main) => unsafe { println!("Output: {}", main.call()) },
         None => panic!("Couldn't find main!")
     };
 }

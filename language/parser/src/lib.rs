@@ -18,13 +18,12 @@ pub fn parse(input: Box<dyn FileStructure>) -> Program {
         let name = file.to_str().unwrap()[root_offset..file.to_str().unwrap().len() - 3].to_string();
         let elements = parser::parse(&name, fs::read_to_string(&file).unwrap());
         for element in elements {
+            println!("{}", element);
             match element {
                 TopElement::Function(function) => {
-                    println!("{}", function);
                     output.static_functions.insert(function.name.value.clone(), function);
                 }
                 TopElement::Struct(structure) => {
-                    println!("{}", structure);
                     output.elem_types.insert(structure.name.value.clone(), structure);
                 }
             }

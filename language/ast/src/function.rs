@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 use crate::basic_types::Ident;
 use crate::r#struct::TypeMember;
-use crate::code::{Expression, Field};
-use crate::{get_modifier, Modifier, to_modifiers};
+use crate::code::{Effects, Expression, Field};
+use crate::{DisplayIndented, get_modifier, Modifier, to_modifiers};
 
 pub struct Function {
     pub modifiers: u8,
@@ -26,11 +26,11 @@ impl Function {
 
 #[derive(Default)]
 pub struct Arguments {
-    pub arguments: Vec<Expression>,
+    pub arguments: Vec<Effects>,
 }
 
 impl Arguments {
-    pub fn new(arguments: Vec<Expression>) -> Self {
+    pub fn new(arguments: Vec<Effects>) -> Self {
         return Self {
             arguments
         };
@@ -50,21 +50,21 @@ impl CodeBody {
     }
 }
 
-impl Display for Function {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} fn {}({}) ", display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
+impl DisplayIndented for Function {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{} fn {}({}) ", indent, display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
-        return write!(f, "{}", self.code);
+        return self.code.format((indent.to_string() + "    ").as_str(), f);
     }
 }
 
-impl Display for CodeBody {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl DisplayIndented for CodeBody {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{\n")?;
         for expression in &self.expressions {
-            Display::fmt(expression, f)?;
+            expression.format(indent, f)?;
         }
         write!(f, "}}\n")?;
         return Ok(());
@@ -77,7 +77,7 @@ impl Display for Arguments {
     }
 }
 
-fn display<T>(input: &Vec<T>) -> String where T : Display {
+pub fn display<T>(input: &Vec<T>) -> String where T : Display {
     if input.is_empty() {
         return "()".to_string();
     }
