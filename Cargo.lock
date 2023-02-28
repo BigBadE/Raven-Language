@@ -203,6 +203,7 @@ name = "parser"
 version = "0.1.0"
 dependencies = [
  "ast",
+ "lazy_static",
  "pest",
  "pest_derive",
 ]

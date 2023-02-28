@@ -37,6 +37,14 @@ impl Expression {
             effect
         }
     }
+
+    pub fn is_return(&self) -> bool {
+        return if let ExpressionType::Return = self.expression_type {
+            true
+        } else {
+            return self.effect.unwrap().is_return();
+        }
+    }
 }
 
 impl Field {
@@ -75,9 +83,9 @@ impl Display for Field {
 }
 
 pub trait Effect: DisplayIndented {
-    fn is_return(&self) -> bool;
-
     fn return_type(&self) -> Option<String>;
+
+    fn is_return(&self) -> bool;
 }
 
 pub enum Effects {
@@ -141,15 +149,15 @@ impl BreakEffect {
 }
 
 impl Effect for BreakEffect {
-    fn is_return(&self) -> bool {
-        false
-    }
-
     fn return_type(&self) -> Option<String> {
         return match &self.effect {
             Some(effect) => effect.unwrap().return_type(),
             None => Some("void".to_string())
         }
+    }
+
+    fn is_return(&self) -> bool {
+        false
     }
 }
 
@@ -161,19 +169,6 @@ impl DisplayIndented for BreakEffect {
                 value.format(indent, f)
             },
             None => write!(f, "break")
-        }
-    }
-}
-
-impl Effect for ReturnEffect {
-    fn is_return(&self) -> bool {
-        return true;
-    }
-
-    fn return_type(&self) -> Option<String> {
-        return match &self.effect {
-            Some(value) => value.unwrap().return_type(),
-            None => Some("void".to_string())
         }
     }
 }
@@ -207,12 +202,12 @@ impl MethodCall {
 }
 
 impl Effect for MethodCall {
-    fn is_return(&self) -> bool {
-        return false;
-    }
-
     fn return_type(&self) -> Option<String> {
         return self.calling.unwrap().return_type();
+    }
+
+    fn is_return(&self) -> bool {
+        false
     }
 }
 
@@ -236,12 +231,12 @@ impl VariableLoad {
 }
 
 impl Effect for VariableLoad {
-    fn is_return(&self) -> bool {
-        return false;
-    }
-
     fn return_type(&self) -> Option<String> {
         return None;
+    }
+
+    fn is_return(&self) -> bool {
+        false
     }
 }
 
@@ -276,12 +271,12 @@ impl MathEffect {
 }
 
 impl Effect for MathEffect {
-    fn is_return(&self) -> bool {
-        return false;
-    }
-
     fn return_type(&self) -> Option<String> {
         return self.effect.unwrap().return_type();
+    }
+
+    fn is_return(&self) -> bool {
+        false
     }
 }
 
@@ -327,12 +322,12 @@ impl Typed for i64 {
 }
 
 impl<T> Effect for NumberEffect<T> where T : Display + Typed {
-    fn is_return(&self) -> bool {
-        return false;
-    }
-
     fn return_type(&self) -> Option<String> {
         return Some(T::get_type());
+    }
+
+    fn is_return(&self) -> bool {
+        false
     }
 }
 
@@ -359,12 +354,12 @@ impl AssignVariable {
 }
 
 impl Effect for AssignVariable {
-    fn is_return(&self) -> bool {
-        return false;
-    }
-
     fn return_type(&self) -> Option<String> {
         return self.effect.unwrap().return_type();
+    }
+
+    fn is_return(&self) -> bool {
+        false
     }
 }
 

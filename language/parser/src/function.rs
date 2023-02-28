@@ -4,7 +4,7 @@ use pest::iterators::Pairs;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, Field, MathEffect, MathOperator, NumberEffect, VariableLoad};
 use ast::function::{CodeBody, Function};
 use ast::Modifier;
-use crate::parser::{EffectParsable, Parsable, Rule};
+use crate::parser::{EffectParsable, EXPRESSION_PARSER, Parsable, Rule};
 
 impl Parsable for Function {
     fn parse(function: Pairs<Rule>) -> Function {
@@ -70,6 +70,15 @@ impl Parsable for CodeBody {
 impl Parsable for Expression {
     fn parse(rules: Pairs<Rule>) -> Expression {
         let mut last = None;
+        EXPRESSION_PARSER.map_primary(|primary| match primary.as_rule() {
+            _ => panic!("Unimplemented rule!: {}", primary)
+        }).map_infix(|lhs, op, rhs| {
+            match op.as_rule() {
+                _ => panic!("Unimplemented rule!: {}", op)
+            }
+        }).parse(rules);
+
+        /*
         for element in rules {
             match element.as_rule() {
                 Rule::effect => last = Some(Effects::parse(last, element.into_inner())),
@@ -80,7 +89,7 @@ impl Parsable for Expression {
                 Rule::assign => last = Some(Effects::AssignVariable(Box::new(AssignVariable::parse(element.into_inner())))),
                 _ => panic!("Unimplemented rule!: {}", element)
             }
-        }
+        }*/
 
         return Expression::new(ExpressionType::Line, last.unwrap());
     }

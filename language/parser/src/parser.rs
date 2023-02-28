@@ -1,7 +1,9 @@
 extern crate pest;
 
+use lazy_static::lazy_static;
 use pest::iterators::Pairs;
 use pest::Parser;
+use pest::pratt_parser::{Assoc, Op, PrattParser};
 use ast::code::Effects;
 use ast::r#struct::{Struct, TypeMembers};
 use ast::function::Function;
@@ -10,6 +12,16 @@ use ast::TopElement;
 #[derive(Parser)]
 #[grammar = "language.pest"]
 struct LanguageParser;
+
+lazy_static! {
+    pub static ref EXPRESSION_PARSER: PrattParser<Rule> = PrattParser::new()
+            .op(Op::infix(Rule::terms, Assoc::Left))
+            .op(Op::infix(Rule::assign, Assoc::Left));
+
+    pub static ref MATH_PARSER: PrattParser<Rule> = PrattParser::new()
+            .op(Op::infix(Rule::multiplication, Assoc::Left) | Op::infix(Rule::division, Assoc::Left))
+            .op(Op::infix(Rule::addition, Assoc::Left) | Op::infix(Rule::subtraction, Assoc::Left));
+}
 
 pub fn parse(name: &String, input: String) -> Vec<TopElement> {
     let output = match LanguageParser::parse(Rule::element, input.as_str()) {

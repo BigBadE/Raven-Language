@@ -31,8 +31,11 @@ for_statement = { "for" ~ ident ~ "in" ~ expression ~ code_block }
 // Wrapped for some parsing cases
 wrapped_effect = { effect }
 
-effect = _{ method | math | index | block | range | "(" ~ effect ~ ")" | term }
-term = _{ string | number | assign | ident | term_math }
+effect = _{ method | math | index | block | range | paren_effect }
+term = { assign | terms }
+
+terms = { string | number | ident | term_math }
+paren_effect = _{ "(" ~ effect ~ ")" }
 
 equals = { "=" }
 range = { term ~ effect* ~ ".." ~ effect }
