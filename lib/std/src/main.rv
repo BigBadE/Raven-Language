@@ -1,4 +1,4 @@
 pub fn main() -> i64 {
-    let variable = 1 + 2;
+    let variable = 1 + 2 + 3 + 4 + 5;
     return variable;
 }

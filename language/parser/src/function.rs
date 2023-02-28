@@ -50,15 +50,13 @@ impl Parsable for CodeBody {
                                 expressions.push(
                                     Expression::new(expression_type, Expression::parse(element.into_inner()).effect));
                                 continue 'outer;
-                            },
+                            }
                             _ => panic!("Unimplemented rule!: {}", element)
                         }
                     }
                     expressions.push(Expression::new(expression_type, Effects::NOP()));
-                },
-                Rule::block => {
-
                 }
+                Rule::block => {}
                 _ => panic!("Unimplemented rule!: {}", element)
             }
         }
@@ -70,6 +68,7 @@ impl Parsable for CodeBody {
 impl Parsable for Expression {
     fn parse(rules: Pairs<Rule>) -> Expression {
         let mut last = None;
+        let mut assign = None;
         for element in rules {
             match element.as_rule() {
                 Rule::effect => last = Some(Effects::parse(last, element.into_inner())),
@@ -77,12 +76,23 @@ impl Parsable for Expression {
                 Rule::math => last = Some(Effects::MathEffect(Box::new(MathEffect::parse(last, element.into_inner())))),
                 Rule::float => last = Some(Effects::FloatEffect(Box::new(parse_number::<f64>(element.as_str())))),
                 Rule::integer => last = Some(Effects::IntegerEffect(Box::new(parse_number::<i64>(element.as_str())))),
-                Rule::assign => last = Some(Effects::AssignVariable(Box::new(AssignVariable::parse(element.into_inner())))),
+                Rule::assign => {
+                    let found = AssignVariable::parse(element.into_inner());
+                    assign = Some((found.variable, found.given_type));
+                    last = Some(found.effect);
+                }
                 _ => panic!("Unimplemented rule!: {}", element)
             }
         }
 
-        return Expression::new(ExpressionType::Line, last.unwrap());
+        //Assigns must be parsed last
+        return match assign {
+            Some((name, found_type)) => {
+                let assign = AssignVariable::new(name, found_type, last.unwrap());
+                Expression::new(ExpressionType::Line, Effects::AssignVariable(Box::new(assign)))
+            }
+            None => Expression::new(ExpressionType::Line, last.unwrap())
+        };
     }
 }
 
@@ -107,7 +117,7 @@ impl Parsable for AssignVariable {
                 _ => panic!("Unimplemented rule! {}", element)
             }
         }
-        return AssignVariable::new(variable, given_type, effects.unwrap())
+        return AssignVariable::new(variable, given_type, effects.unwrap());
     }
 }
 
