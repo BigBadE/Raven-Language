@@ -37,6 +37,14 @@ impl Expression {
             effect
         }
     }
+
+    pub fn is_return(&self) -> bool {
+        return if let ExpressionType::Return = self.expression_type {
+            true
+        } else {
+            self.effect.unwrap().is_return()
+        }
+    }
 }
 
 impl Field {

@@ -58,6 +58,10 @@ impl CodeBody {
             return_type
         };
     }
+
+    pub fn is_return(&self) -> bool {
+        return self.expressions.iter().find(|expression| expression.is_return()).is_some()
+    }
 }
 
 impl DisplayIndented for Function {

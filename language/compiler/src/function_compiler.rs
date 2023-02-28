@@ -27,9 +27,9 @@ pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) ->
     compiler.builder.position_at_end(block);
     compile_block(function, &mut HashMap::new(), &compiler);
 
-    if !function.code.expressions.last().map_or(false, |expression| expression.effect.unwrap().is_return()) {
+    if !function.code.is_return() {
         match &function.return_type {
-            Some(return_type) => panic!("Missing return type {} for function {}", return_type, function.name),
+            Some(return_type) => panic!("Missing return ({}) for function {}", return_type, function.name),
             None => compiler.builder.build_return(None)
         };
     }
