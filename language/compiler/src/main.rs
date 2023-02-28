@@ -1,9 +1,9 @@
 use std::env;
 use std::path::PathBuf;
 use inkwell::context::Context;
+use crate::types::type_manager::TypeManager;
 use crate::compiler::Compiler;
 use crate::file::FileStructureImpl;
-use crate::types::TypeManager;
 
 pub mod instructions;
 

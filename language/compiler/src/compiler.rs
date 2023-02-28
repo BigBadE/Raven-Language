@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::task::Waker;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
@@ -7,8 +8,8 @@ use inkwell::OptimizationLevel;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::FunctionValue;
 use crate::file::FileStructureImpl;
-use crate::function_compiler::compile_function;
-use crate::types::TypeManager;
+use crate::function_compiler::{compile_function, get_function_value};
+use crate::types::type_manager::TypeManager;
 
 type Main = unsafe extern "C" fn() -> i64;
 
@@ -17,8 +18,9 @@ pub struct Compiler<'ctx> {
     pub module: Module<'ctx>,
     pub builder: Builder<'ctx>,
     execution_engine: ExecutionEngine<'ctx>,
-    pub functions: HashMap<String, FunctionValue<'ctx>>,
-    pub types: &'ctx TypeManager<'ctx>
+    pub functions: HashMap<String, (Option<String>, FunctionValue<'ctx>)>,
+    pub types: &'ctx TypeManager<'ctx>,
+    pub waiting: HashMap<String, Waker>
 }
 
 impl<'ctx> Compiler<'ctx> {
@@ -31,7 +33,8 @@ impl<'ctx> Compiler<'ctx> {
             builder: context.create_builder(),
             execution_engine,
             functions: HashMap::new(),
-            types
+            types,
+            waiting: HashMap::new()
         };
     }
 
@@ -42,10 +45,18 @@ impl<'ctx> Compiler<'ctx> {
     pub fn compile(&mut self, content: FileStructureImpl) -> Option<JitFunction<Main>> {
         let program = parser::parse(Box::new(content));
 
+        //Add them to functions for type resolving
+        for (name, function) in &program.static_functions {
+            self.functions.insert(name.clone(), (function.return_type.clone(), get_function_value(function, &self)));
+        }
+
+        //Compile
+        for (_name, function) in &program.static_functions {
+            compile_function(function, &self);
+        }
+
         match program.main {
-            Some(main) => {
-                let function = program.static_functions.get(main.as_str()).unwrap();
-                self.functions.insert(function.name.clone(), compile_function(function, &self));
+            Some(_main) => {
                 let function =  unsafe { self.execution_engine.get_function("main::main") };
                 return match function {
                     Ok(value) => Some(value),

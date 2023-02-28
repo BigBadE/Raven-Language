@@ -38,24 +38,13 @@ impl Arguments {
 
 #[derive(Default)]
 pub struct CodeBody {
-    pub expressions: Vec<Expression>,
-    pub return_type: Option<String>
+    pub expressions: Vec<Expression>
 }
 
 impl CodeBody {
     pub fn new(expressions: Vec<Expression>) -> Self {
-        let mut return_type = None;
-        for expression in &expressions {
-            match expression.effect {
-                Effects::NOP() => {},
-                _ => if expression.effect.unwrap().is_return() {
-                    return_type = expression.effect.unwrap().return_type();
-                }
-            }
-        }
         return Self {
-            expressions,
-            return_type
+            expressions
         };
     }
 

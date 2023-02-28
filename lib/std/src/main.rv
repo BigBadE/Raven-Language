@@ -1,4 +1,10 @@
 pub fn main() -> i64 {
-    let variable = 1 + 2 + 3 + 4 + 5;
-    return variable;
+    let variable = 1 + 2 + 3 + 4 + 5 - 10/2;
+    let other: i64 = variable + 2 + main::second();
+    return other;
+}
+
+pub fn second() -> i64 {
+    let testing = 3 + 2;
+    return testing;
 }

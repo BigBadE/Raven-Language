@@ -7,6 +7,7 @@ pub mod r#struct;
 pub mod code;
 pub mod function;
 pub mod program;
+pub mod type_resolver;
 
 pub enum TopElement {
     Struct(Struct),

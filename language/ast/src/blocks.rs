@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 use crate::code::{Effect, Effects};
 use crate::DisplayIndented;
 use crate::function::CodeBody;
+use crate::type_resolver::TypeResolver;
 
 pub struct ForStatement {
     pub variable: String,
@@ -27,7 +28,7 @@ impl Effect for ForStatement {
         return false;
     }
 
-    fn return_type(&self) -> Option<String> {
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<String> {
         todo!()
     }
 }

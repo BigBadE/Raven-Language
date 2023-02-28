@@ -12,7 +12,9 @@ pub fn math_operation<'ctx>(operation: MathOperator, compiler: &Compiler<'ctx>,
             BasicValueEnum::IntValue(first) => match second {
                 BasicValueEnum::IntValue(second) => BasicValueEnum::IntValue(match operation {
                     MathOperator::PLUS => compiler.builder.build_int_add(first, second, "wtf?"),
-                    _ => todo!()
+                    MathOperator::MINUS => compiler.builder.build_int_sub(first, second, "wtf?"),
+                    MathOperator::MULTIPLY => compiler.builder.build_int_mul(first, second, "wtf?"),
+                    MathOperator::DIVIDE => compiler.builder.build_int_signed_div(first, second, "wtf?")
                 }),
                 BasicValueEnum::StructValue(_struct_type) => todo!(),
                 BasicValueEnum::FloatValue(_float) => todo!(),

@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use crate::{DisplayIndented, to_modifiers};
 use crate::function::{Arguments, display};
+use crate::type_resolver::TypeResolver;
 
 pub struct Expression {
     pub expression_type: ExpressionType,
@@ -85,7 +86,7 @@ impl Display for Field {
 pub trait Effect: DisplayIndented {
     fn is_return(&self) -> bool;
 
-    fn return_type(&self) -> Option<String>;
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String>;
 }
 
 pub enum Effects {
@@ -153,9 +154,9 @@ impl Effect for BreakEffect {
         false
     }
 
-    fn return_type(&self) -> Option<String> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
         return match &self.effect {
-            Some(effect) => effect.unwrap().return_type(),
+            Some(effect) => effect.unwrap().return_type(type_resolver),
             None => Some("void".to_string())
         }
     }
@@ -178,9 +179,9 @@ impl Effect for ReturnEffect {
         return true;
     }
 
-    fn return_type(&self) -> Option<String> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
         return match &self.effect {
-            Some(value) => value.unwrap().return_type(),
+            Some(value) => value.unwrap().return_type(type_resolver),
             None => Some("void".to_string())
         }
     }
@@ -199,13 +200,13 @@ impl DisplayIndented for ReturnEffect {
 }
 
 pub struct MethodCall {
-    pub calling: Effects,
+    pub calling: Option<Effects>,
     pub method: String,
     pub arguments: Arguments
 }
 
 impl MethodCall {
-    pub fn new(calling: Effects, method: String, arguments: Arguments) -> Self {
+    pub fn new(calling: Option<Effects>, method: String, arguments: Arguments) -> Self {
         return Self {
             calling,
             method,
@@ -219,15 +220,18 @@ impl Effect for MethodCall {
         return false;
     }
 
-    fn return_type(&self) -> Option<String> {
-        return self.calling.unwrap().return_type();
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
+        return type_resolver.get_method_type(&self.method, &self.calling, &self.arguments);
     }
 }
 
 impl DisplayIndented for MethodCall {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.calling.format(indent, f)?;
-        return write!(f, ".{}{}", self.method, self.arguments);
+        if let Some(value) = &self.calling {
+            value.format(indent, f)?;
+            write!(f, ".")?;
+        }
+        return write!(f, "{}{}", self.method, self.arguments);
     }
 }
 
@@ -248,7 +252,7 @@ impl Effect for VariableLoad {
         return false;
     }
 
-    fn return_type(&self) -> Option<String> {
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<String> {
         return None;
     }
 }
@@ -288,8 +292,8 @@ impl Effect for MathEffect {
         return false;
     }
 
-    fn return_type(&self) -> Option<String> {
-        return self.effect.unwrap().return_type();
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
+        return self.effect.unwrap().return_type(type_resolver);
     }
 }
 
@@ -339,7 +343,7 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
         return false;
     }
 
-    fn return_type(&self) -> Option<String> {
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<String> {
         return Some(T::get_type());
     }
 }
@@ -371,8 +375,8 @@ impl Effect for AssignVariable {
         return false;
     }
 
-    fn return_type(&self) -> Option<String> {
-        return self.effect.unwrap().return_type();
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
+        return self.effect.unwrap().return_type(type_resolver);
     }
 }
 
