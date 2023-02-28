@@ -19,4 +19,8 @@ impl<'ctx> TypeManager<'ctx> {
     pub fn get_type(&self, name: &str) -> Option<&BasicTypeEnum> {
         return self.types.get(name);
     }
+
+    pub fn get_type_err(&self, name: &str) -> &BasicTypeEnum {
+        return self.types.get(name).expect(format!("Unknown type {}", name).as_str());
+    }
 }

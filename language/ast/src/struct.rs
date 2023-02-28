@@ -1,5 +1,4 @@
 use std::fmt::Formatter;
-use crate::basic_types::Ident;
 use crate::{DisplayIndented, get_modifier, is_modifier, Modifier};
 use crate::code::MemberField;
 use crate::function::Function;
@@ -7,11 +6,11 @@ use crate::function::Function;
 pub struct Struct {
     pub modifiers: u8,
     pub members: Vec<TypeMembers>,
-    pub name: Ident
+    pub name: String
 }
 
 impl Struct {
-    pub fn new(members: Vec<TypeMembers>, modifiers: &[Modifier], name: Ident) -> Self {
+    pub fn new(members: Vec<TypeMembers>, modifiers: &[Modifier], name: String) -> Self {
         return Self {
             modifiers: get_modifier(modifiers),
             members,

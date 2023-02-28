@@ -1,5 +1,4 @@
 use pest::iterators::Pairs;
-use ast::basic_types::Ident;
 use ast::code::{Effects, Expression, MethodCall};
 use ast::function::Arguments;
 use crate::parser::{EffectParsable, Parsable, Rule};
@@ -28,7 +27,7 @@ impl EffectParsable for MethodCall {
                 _ => panic!("Unimplemented rule!: {}", element)
             }
         }
-        return MethodCall::new(last.unwrap(), Ident::new(method), argument)
+        return MethodCall::new(last.unwrap(), method, argument)
     }
 }
 

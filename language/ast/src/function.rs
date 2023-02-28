@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter};
-use crate::basic_types::Ident;
 use crate::r#struct::TypeMember;
 use crate::code::{Effects, Expression, Field};
 use crate::{DisplayIndented, get_modifier, Modifier, to_modifiers};
@@ -8,12 +7,12 @@ pub struct Function {
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
-    pub return_type: Option<Ident>,
-    pub name: Ident
+    pub return_type: Option<String>,
+    pub name: String
 }
 
 impl Function {
-    pub fn new(modifiers: &[Modifier], fields: Vec<Field>, code: CodeBody, return_type: Option<Ident>, name: Ident) -> Self {
+    pub fn new(modifiers: &[Modifier], fields: Vec<Field>, code: CodeBody, return_type: Option<String>, name: String) -> Self {
         return Self {
             modifiers: get_modifier(modifiers),
             fields,
@@ -40,19 +39,30 @@ impl Arguments {
 #[derive(Default)]
 pub struct CodeBody {
     pub expressions: Vec<Expression>,
+    pub return_type: Option<String>
 }
 
 impl CodeBody {
     pub fn new(expressions: Vec<Expression>) -> Self {
+        let mut return_type = None;
+        for expression in &expressions {
+            match expression.effect {
+                Effects::NOP() => {},
+                _ => if expression.effect.unwrap().is_return() {
+                    return_type = expression.effect.unwrap().return_type();
+                }
+            }
+        }
         return Self {
-            expressions
+            expressions,
+            return_type
         };
     }
 }
 
 impl DisplayIndented for Function {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} fn {}({}) ", indent, display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
+        write!(f, "{}{} fn {}{} ", indent, display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
@@ -88,6 +98,5 @@ pub fn display<T>(input: &Vec<T>) -> String where T : Display {
     }
     return (&output[..output.len() - 2]).to_string();
 }
-
 
 impl TypeMember for Function {}

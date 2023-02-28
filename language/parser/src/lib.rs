@@ -17,14 +17,26 @@ pub fn parse(input: Box<dyn FileStructure>) -> Program {
     for file in input.get_files() {
         let name = file.to_str().unwrap()[root_offset..file.to_str().unwrap().len() - 3].to_string();
         let elements = parser::parse(&name, fs::read_to_string(&file).unwrap());
+        if name == "main" {
+            match elements.iter().find(|element| {
+                if let TopElement::Function(function) = element {
+                    function.name == "main::main"
+                } else {
+                    false
+                }
+            }) {
+                Some(_main) => output.main = Some("main::main".to_string()),
+                None => {}
+            }
+        }
         for element in elements {
             println!("{}", element);
             match element {
                 TopElement::Function(function) => {
-                    output.static_functions.insert(function.name.value.clone(), function);
+                    output.static_functions.insert(function.name.clone(), function);
                 }
                 TopElement::Struct(structure) => {
-                    output.elem_types.insert(structure.name.value.clone(), structure);
+                    output.elem_types.insert(structure.name.clone(), structure);
                 }
             }
         }

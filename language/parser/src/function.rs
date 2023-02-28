@@ -1,8 +1,7 @@
 use std::str::FromStr;
 use std::fmt::{Debug, Display};
 use pest::iterators::Pairs;
-use ast::basic_types::Ident;
-use ast::code::{Effects, Expression, Field, MathEffect, MathOperator, NumberEffect, ReturnEffect, VariableLoad};
+use ast::code::{AssignVariable, Effects, Expression, ExpressionType, Field, MathEffect, MathOperator, NumberEffect, VariableLoad};
 use ast::function::{CodeBody, Function};
 use ast::Modifier;
 use crate::parser::{EffectParsable, Parsable, Rule};
@@ -22,7 +21,7 @@ impl Parsable for Function {
                     if name.is_empty() {
                         name = element.as_str().to_string();
                     } else {
-                        return_type = Some(Ident::new(element.as_str().to_string()));
+                        return_type = Some(element.as_str().to_string());
                     }
                 }
                 Rule::fields => fields = Vec::parse(element.into_inner()),
@@ -31,24 +30,34 @@ impl Parsable for Function {
             }
         }
 
-        return Function::new(modifiers.as_slice(), fields, code, return_type, Ident::new(name));
+        return Function::new(modifiers.as_slice(), fields, code, return_type, name);
     }
 }
 
 impl Parsable for CodeBody {
     fn parse(rules: Pairs<Rule>) -> Self {
         let mut expressions = Vec::new();
-        let mut returning = false;
-        for element in rules {
+        'outer: for element in rules {
             match element.as_rule() {
-                Rule::returning => returning = true,
-                Rule::expression => {
-                    let mut expression = Expression::parse(element.into_inner());
-                    if returning {
-                        expression = Expression::new(Effects::ReturnEffect(Box::new(ReturnEffect::new(expression.effect))));
-                        returning = false;
+                Rule::expression => expressions.push(Expression::parse(element.into_inner())),
+                Rule::escape_statement => {
+                    let mut expression_type = ExpressionType::Line;
+                    for element in element.into_inner() {
+                        match element.as_rule() {
+                            Rule::returning => expression_type = ExpressionType::Return,
+                            Rule::block_return => expression_type = ExpressionType::Break,
+                            Rule::wrapped_effect => {
+                                expressions.push(
+                                    Expression::new(expression_type, Expression::parse(element.into_inner()).effect));
+                                continue 'outer;
+                            },
+                            _ => panic!("Unimplemented rule!: {}", element)
+                        }
                     }
-                    expressions.push(expression);
+                    expressions.push(Expression::new(expression_type, Effects::NOP()));
+                },
+                Rule::block => {
+
                 }
                 _ => panic!("Unimplemented rule!: {}", element)
             }
@@ -64,18 +73,16 @@ impl Parsable for Expression {
         for element in rules {
             match element.as_rule() {
                 Rule::effect => last = Some(Effects::parse(last, element.into_inner())),
-                Rule::ident => {
-                    println!("Loading a{}a", element.as_str());
-                    last = Some(Effects::VariableLoad(Box::new(VariableLoad::new(Ident::new(element.as_str().to_string())))))
-                }
+                Rule::ident => last = Some(Effects::VariableLoad(Box::new(VariableLoad::new(element.as_str().to_string())))),
                 Rule::math => last = Some(Effects::MathEffect(Box::new(MathEffect::parse(last, element.into_inner())))),
                 Rule::float => last = Some(Effects::FloatEffect(Box::new(parse_number::<f64>(element.as_str())))),
-                Rule::integer => last = Some(Effects::IntegerEffect(Box::new(parse_number::<u64>(element.as_str())))),
+                Rule::integer => last = Some(Effects::IntegerEffect(Box::new(parse_number::<i64>(element.as_str())))),
+                Rule::assign => last = Some(Effects::AssignVariable(Box::new(AssignVariable::parse(element.into_inner())))),
                 _ => panic!("Unimplemented rule!: {}", element)
             }
         }
 
-        return Expression::new(last.unwrap());
+        return Expression::new(ExpressionType::Line, last.unwrap());
     }
 }
 
@@ -85,6 +92,23 @@ fn parse_number<T>(number: &str) -> NumberEffect<T> where T: Display + FromStr, 
         Ok(numb) => NumberEffect::new(numb),
         Err(error) => panic!("Error parsing number \"{}\": {}", number, error)
     };
+}
+
+impl Parsable for AssignVariable {
+    fn parse(rules: Pairs<Rule>) -> Self {
+        let mut variable = String::new();
+        let mut effects = None;
+        let mut given_type = None;
+        for element in rules {
+            match element.as_rule() {
+                Rule::ident => variable = element.as_str().to_string(),
+                Rule::assign_type => given_type = Some(element.into_inner().last().unwrap().as_str().to_string()),
+                Rule::wrapped_effect => effects = Some(Expression::parse(element.into_inner()).effect),
+                _ => panic!("Unimplemented rule! {}", element)
+            }
+        }
+        return AssignVariable::new(variable, given_type, effects.unwrap())
+    }
 }
 
 impl EffectParsable for MathEffect {
@@ -141,7 +165,7 @@ impl Parsable for Field {
                     if name.is_empty() {
                         name = element.as_str().to_string();
                     } else {
-                        return Field::new(Ident::new(name), Ident::new(element.as_str().to_string()));
+                        return Field::new(name, element.as_str().to_string());
                     }
                 }
                 _ => panic!("Unimplemented rule!: {}", element)

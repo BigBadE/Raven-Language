@@ -2,7 +2,6 @@ extern crate pest;
 
 use pest::iterators::Pairs;
 use pest::Parser;
-use ast::basic_types::Ident;
 use ast::code::Effects;
 use ast::r#struct::{Struct, TypeMembers};
 use ast::function::Function;
@@ -42,8 +41,8 @@ fn parse_root(name: &String, rules: Pairs<Rule>) -> Vec<TopElement> {
 
     for element in &mut output {
         match element {
-            TopElement::Struct(structure) => structure.name = Ident::new(name.clone() + "::" + structure.name.value.as_str()),
-            TopElement::Function(function) => function.name = Ident::new(name.clone() + "::" + function.name.value.as_str())
+            TopElement::Struct(structure) => structure.name = name.clone() + "::" + structure.name.as_str(),
+            TopElement::Function(function) => function.name = name.clone() + "::" + function.name.as_str()
         }
     }
 
@@ -63,6 +62,7 @@ impl Parsable for Struct {
                 _ => panic!("Unimplemented rule!: {}", element)
             }
         }
-        return Struct::new(members, &[], Ident::new(name));
+
+        return Struct::new(members, &[], name);
     }
 }

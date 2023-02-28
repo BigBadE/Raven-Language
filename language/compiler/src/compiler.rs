@@ -45,7 +45,7 @@ impl<'ctx> Compiler<'ctx> {
         match program.main {
             Some(main) => {
                 let function = program.static_functions.get(main.as_str()).unwrap();
-                self.functions.insert(function.name.value.clone(), compile_function(function, &self));
+                self.functions.insert(function.name.clone(), compile_function(function, &self));
                 let function =  unsafe { self.execution_engine.get_function("main::main") };
                 return match function {
                     Ok(value) => Some(value),

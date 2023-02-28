@@ -1,15 +1,22 @@
 use std::fmt::{Display, Formatter};
-use crate::basic_types::Ident;
 use crate::{DisplayIndented, to_modifiers};
 use crate::function::{Arguments, display};
 
 pub struct Expression {
+    pub expression_type: ExpressionType,
     pub effect: Effects
 }
 
+#[derive(Clone, Copy)]
+pub enum ExpressionType {
+    Break,
+    Return,
+    Line
+}
+
 pub struct Field {
-    pub name: Ident,
-    pub field_type: Ident
+    pub name: String,
+    pub field_type: String
 }
 
 pub struct MemberField {
@@ -24,15 +31,16 @@ impl DisplayIndented for MemberField {
 }
 
 impl Expression {
-    pub fn new(effect: Effects) -> Self {
+    pub fn new(expression_type: ExpressionType, effect: Effects) -> Self {
         return Self {
+            expression_type,
             effect
         }
     }
 }
 
 impl Field {
-    pub fn new(name: Ident, field_type: Ident) -> Self {
+    pub fn new(name: String, field_type: String) -> Self {
         return Self {
             name,
             field_type
@@ -42,7 +50,21 @@ impl Field {
 
 impl DisplayIndented for Expression {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}{};\n", indent, self.effect.unwrap());
+        write!(f, "{}", indent)?;
+        match self.expression_type {
+            ExpressionType::Return => write!(f, "return")?,
+            ExpressionType::Break => write!(f, "break")?,
+            _ => {}
+        }
+        if let Effects::NOP() = self.effect {
+            return write!(f, ";\n");
+        } else if let ExpressionType::Line = self.expression_type {
+            //Only add a space for returns
+        } else {
+            write!(f, " ")?;
+        }
+        self.effect.format(indent, f)?;
+        return write!(f, ";\n");
     }
 }
 
@@ -52,46 +74,93 @@ impl Display for Field {
     }
 }
 
-pub trait Effect: Display {
+pub trait Effect: DisplayIndented {
     fn is_return(&self) -> bool;
+
+    fn return_type(&self) -> Option<String>;
 }
 
 pub enum Effects {
-    ReturnEffect(Box<ReturnEffect>),
+    NOP(),
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
     MathEffect(Box<MathEffect>),
     FloatEffect(Box<NumberEffect<f64>>),
-    IntegerEffect(Box<NumberEffect<u64>>),
+    IntegerEffect(Box<NumberEffect<i64>>),
+    AssignVariable(Box<AssignVariable>)
 }
 
 impl Effects {
     pub fn unwrap(&self) -> &dyn Effect {
         return match self {
-            Effects::ReturnEffect(effect) => effect.as_ref(),
+            Effects::NOP() => panic!("Tried to unwrap a NOP!"),
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
             Effects::MathEffect(effect) => effect.as_ref(),
             Effects::FloatEffect(effect) => effect.as_ref(),
-            Effects::IntegerEffect(effect) => effect.as_ref()
+            Effects::IntegerEffect(effect) => effect.as_ref(),
+            Effects::AssignVariable(effect) => effect.as_ref()
         };
     }
 }
 
 impl Display for Effects {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return self.unwrap().fmt(f);
+        return self.format("", f);
+    }
+}
+
+impl DisplayIndented for Effects {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return self.unwrap().format(indent, f);
     }
 }
 
 pub struct ReturnEffect {
-    pub effect: Effects
+    pub effect: Option<Effects>
 }
 
 impl ReturnEffect {
-    pub fn new(effect: Effects) -> Self {
+    pub fn new(effect: Option<Effects>) -> Self {
         return Self {
             effect
+        }
+    }
+}
+
+pub struct BreakEffect {
+    pub effect: Option<Effects>
+}
+
+impl BreakEffect {
+    pub fn new(effect: Option<Effects>) -> Self {
+        return Self {
+            effect
+        }
+    }
+}
+
+impl Effect for BreakEffect {
+    fn is_return(&self) -> bool {
+        false
+    }
+
+    fn return_type(&self) -> Option<String> {
+        return match &self.effect {
+            Some(effect) => effect.unwrap().return_type(),
+            None => Some("void".to_string())
+        }
+    }
+}
+
+impl DisplayIndented for BreakEffect {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return match &self.effect {
+            Some(value) => {
+                write!(f, "break ")?;
+                value.format(indent, f)
+            },
+            None => write!(f, "break")
         }
     }
 }
@@ -100,22 +169,35 @@ impl Effect for ReturnEffect {
     fn is_return(&self) -> bool {
         return true;
     }
+
+    fn return_type(&self) -> Option<String> {
+        return match &self.effect {
+            Some(value) => value.unwrap().return_type(),
+            None => Some("void".to_string())
+        }
+    }
 }
 
-impl Display for ReturnEffect {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "return {}", self.effect)
+impl DisplayIndented for ReturnEffect {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return match &self.effect {
+            Some(value) => {
+                write!(f, "return ")?;
+                value.format(indent, f)
+            },
+            None => write!(f, "return")
+        }
     }
 }
 
 pub struct MethodCall {
     pub calling: Effects,
-    pub method: Ident,
+    pub method: String,
     pub arguments: Arguments
 }
 
 impl MethodCall {
-    pub fn new(calling: Effects, method: Ident, arguments: Arguments) -> Self {
+    pub fn new(calling: Effects, method: String, arguments: Arguments) -> Self {
         return Self {
             calling,
             method,
@@ -128,20 +210,25 @@ impl Effect for MethodCall {
     fn is_return(&self) -> bool {
         return false;
     }
+
+    fn return_type(&self) -> Option<String> {
+        return self.calling.unwrap().return_type();
+    }
 }
 
-impl Display for MethodCall {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}.{}{}", self.calling, self.method, self.arguments);
+impl DisplayIndented for MethodCall {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.calling.format(indent, f)?;
+        return write!(f, ".{}{}", self.method, self.arguments);
     }
 }
 
 pub struct VariableLoad {
-    pub name: Ident
+    pub name: String
 }
 
 impl VariableLoad {
-    pub fn new(name: Ident) -> Self {
+    pub fn new(name: String) -> Self {
         return Self {
             name
         }
@@ -152,10 +239,14 @@ impl Effect for VariableLoad {
     fn is_return(&self) -> bool {
         return false;
     }
+
+    fn return_type(&self) -> Option<String> {
+        return None;
+    }
 }
 
-impl Display for VariableLoad {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl DisplayIndented for VariableLoad {
+    fn format(&self, _indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", self.name);
     }
 }
@@ -188,14 +279,22 @@ impl Effect for MathEffect {
     fn is_return(&self) -> bool {
         return false;
     }
+
+    fn return_type(&self) -> Option<String> {
+        return self.effect.unwrap().return_type();
+    }
 }
 
-impl Display for MathEffect {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return match &self.target {
-            Some(target) => write!(f, "{} {} {}", target, self.operator.clone() as u8 as char, self.effect),
-            None => write!(f, "{}{}", self.operator.clone() as u8 as char, self.effect)
-        }
+impl DisplayIndented for MathEffect {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.target {
+            Some(target) => {
+                target.format(indent, f)?;
+                write!(f, " {} ", self.operator.clone() as u8 as char)
+            },
+            None => write!(f, "{}", self.operator.clone() as u8 as char)
+        }?;
+        return self.effect.format(indent, f);
     }
 }
 
@@ -211,14 +310,71 @@ impl<T> NumberEffect<T> where T : Display {
     }
 }
 
-impl<T> Effect for NumberEffect<T> where T : Display {
-    fn is_return(&self) -> bool {
-        return false;
+pub trait Typed {
+    fn get_type() -> String;
+}
+
+impl Typed for f64 {
+    fn get_type() -> String {
+        return "f64".to_string();
     }
 }
 
-impl<T> Display for NumberEffect<T> where T : Display {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Typed for i64 {
+    fn get_type() -> String {
+        return "i64".to_string();
+    }
+}
+
+impl<T> Effect for NumberEffect<T> where T : Display + Typed {
+    fn is_return(&self) -> bool {
+        return false;
+    }
+
+    fn return_type(&self) -> Option<String> {
+        return Some(T::get_type());
+    }
+}
+
+impl<T> DisplayIndented for NumberEffect<T> where T : Display {
+    fn format(&self, _indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", self.number);
+    }
+}
+
+pub struct AssignVariable {
+    pub variable: String,
+    pub given_type: Option<String>,
+    pub effect: Effects
+}
+
+impl AssignVariable {
+    pub fn new(variable: String, given_type: Option<String>, effect: Effects) -> Self {
+        return Self {
+            variable,
+            given_type,
+            effect
+        }
+    }
+}
+
+impl Effect for AssignVariable {
+    fn is_return(&self) -> bool {
+        return false;
+    }
+
+    fn return_type(&self) -> Option<String> {
+        return self.effect.unwrap().return_type();
+    }
+}
+
+impl DisplayIndented for AssignVariable {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "let {}", self.variable)?;
+        if self.given_type.is_some() {
+            write!(f, ": {}", self.given_type.as_ref().unwrap())?;
+        }
+        write!(f, " = ")?;
+        return self.effect.format(indent, f);
     }
 }

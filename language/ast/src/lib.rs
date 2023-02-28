@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use crate::r#struct::Struct;
 use crate::function::Function;
 
-pub mod basic_types;
+pub mod blocks;
 pub mod r#struct;
 pub mod code;
 pub mod function;
