@@ -1,6 +1,5 @@
 use std::mem;
-use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, VariableLoad};
-use ast::function::Arguments;
+use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
 use ast::program::Program;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
 use crate::parser::ParseInfo;
@@ -10,15 +9,15 @@ use crate::util::{find_if_first, parse_arguments};
 pub fn parse_expression(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo) -> Option<Expression> {
     return if parsing.matching("return") {
         Some(Expression::new(ExpressionType::Return,
-                             parse_effect(program, type_manager, parsing, &[b';'])
+                             parse_effect(program, type_manager, parsing, &[b';', b'}'])
                                  .unwrap_or(Effects::NOP())))
     } else if parsing.matching("break") {
         Some(Expression::new(ExpressionType::Break,
-                             parse_effect(program, type_manager, parsing, &[b';'])
+                             parse_effect(program, type_manager, parsing, &[b';', b'}'])
                                  .unwrap_or(Effects::NOP())))
     } else {
         Some(Expression::new(ExpressionType::Line,
-                             parse_effect(program, type_manager, parsing, &[b';'])?))
+                             parse_effect(program, type_manager, parsing, &[b';', b'}'])?))
     };
 }
 
@@ -73,10 +72,14 @@ pub fn parse_effect(program: &Program, type_manager: &ParsingTypeResolver, parsi
             }
             _ => {
                 parsing.index -= 1;
-                match parse_operator(program, type_manager, parsing, &last, escape) {
+                match parse_operator(program, type_manager, parsing, &mut last, escape) {
                     Some(operator) => last = Some(match last {
-                        Some(mut found) => assign_with_priority(&mut found, operator),
-                        None => operator
+                        Some(found) => match found {
+                            Effects::OperatorEffect(last_found) =>
+                                Effects::OperatorEffect(assign_with_priority(last_found, operator)),
+                            _ => Effects::OperatorEffect(operator)
+                        },
+                        None => Effects::OperatorEffect(operator)
                     }),
                     None => continue
                 }
@@ -94,12 +97,31 @@ pub fn parse_effect(program: &Program, type_manager: &ParsingTypeResolver, parsi
     };
 }
 
-fn parse_operator(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo, last: &Option<Effects>, escape: &[u8]) -> Option<Effects> {
+fn parse_operator(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo,
+                  last: &mut Option<Effects>, escape: &[u8]) -> Option<Box<OperatorEffect>> {
     for (operation, name) in &program.operations {
-        if parsing.clone().matching(operation.as_str()) {
+        let location = parsing.loc();
+        if parsing.matching(operation.as_str()) {
             let function = &program.static_functions;
             let found = function.get(name).unwrap();
-            let location = parsing.loc();
+
+            match found.attributes.get("right_sided") {
+                Some(_attribute) => {
+                    match last.as_mut() {
+                        Some(last) => {
+                            let mut temp = Effects::NOP();
+                            mem::swap(last, &mut temp);
+                            return Some(Box::new(
+                                OperatorEffect::new(&operation, found, Some(temp), None, parsing.loc())));
+                        },
+                        None => {
+                            continue
+                        }
+                    }
+                },
+                None => {}
+            }
+
             let effect = match parse_effect(program, type_manager, parsing, escape) {
                 Some(effect) => effect,
                 None => {
@@ -108,24 +130,23 @@ fn parse_operator(program: &Program, type_manager: &ParsingTypeResolver, parsing
                 }
             };
 
-            return match last {
-                Some(found_last) => {
-                    if !found.check_args(type_manager, &vec!(found_last, &effect)) {
+            return match last.as_mut() {
+                Some(last) => {
+                    let mut temp = Effects::NOP();
+                    mem::swap(last, &mut temp);
+                    if !found.check_args(type_manager, &vec!(&temp, &effect)) {
                         continue
                     }
-                    Some(Effects::MethodCall(
-                        Box::new(MethodCall::new(None, name.clone(),
-                                                 Arguments::new(vec!(Effects::NOP(), effect)),
-                                                 location))))
+
+                    Some(Box::new(OperatorEffect::new(operation, found,
+                                                 Some(temp), Some(effect), location)))
                 },
                 None => {
                     if !found.check_args(type_manager, &vec!(&effect)) {
                         continue
                     }
-                    Some(Effects::MethodCall(
-                        Box::new(MethodCall::new(None, name.clone(),
-                                                 Arguments::new(vec!(effect)),
-                                                 location))))
+                    Some(Box::new(OperatorEffect::new(operation, found, None,
+                                                      Some(effect), location)))
                 }
             }
         }
@@ -134,22 +155,24 @@ fn parse_operator(program: &Program, type_manager: &ParsingTypeResolver, parsing
     return None;
 }
 
-fn assign_with_priority(lhs: &mut Effects, mut rhs: Effects) -> Effects {
-    let mut temp = Effects::NOP();
-    mem::swap(&mut temp, lhs);
-    let unwrapped = temp.unwrap_mut();
+fn assign_with_priority(mut lhs: Box<OperatorEffect>, mut rhs: Box<OperatorEffect>) -> Box<OperatorEffect> {
     //If the left side is higher priority or equal and parse left, add the lhs to the left of the rhs
-    return if unwrapped.priority() > unwrapped.priority() ||
-        (unwrapped.priority() == unwrapped.priority() && unwrapped.parse_left_first()) {
-        rhs.unwrap_mut().swap(true, lhs);
+    return if lhs.priority > rhs.priority ||
+        (lhs.priority == rhs.priority && rhs.parse_left) {
+        mem::swap(rhs.rhs.as_mut().unwrap(), &mut Effects::OperatorEffect(lhs));
         rhs
     } else {
         //If not, swap the right value of the lhs into the left value of the rhs
         //and put the rhs as the right value of the lhs
+        // 1 + 2, {} / 3
         let mut swapping = Effects::NOP();
-        unwrapped.swap(true, &mut swapping);
-        rhs.unwrap_mut().swap(false, &mut swapping);
-        unwrapped.swap(true, &mut rhs);
-        temp
+        // 1 + {}, 2, {} / 3
+        mem::swap(lhs.rhs.as_mut().unwrap(), &mut swapping);
+        // 1 + {}, 2 / 3
+        mem::swap(rhs.lhs.as_mut().unwrap(), &mut swapping);
+        // 1 + (2 / 3)
+        mem::swap(lhs.rhs.as_mut().unwrap(), &mut Effects::OperatorEffect(rhs));
+
+        lhs
     };
 }

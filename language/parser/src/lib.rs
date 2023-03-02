@@ -22,7 +22,6 @@ pub fn parse(input: Box<dyn FileStructure>) -> Program {
         };
     }
 
-    println!("Second pass");
     for file in input.get_files() {
         let name = file.to_str().unwrap()[root_offset..file.to_str().unwrap().len() - 3].to_string();
         match parser::parse(&mut output, &name, fs::read_to_string(&file).unwrap(), false) {

@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
-use std::mem;
 use crate::{DisplayIndented, to_modifiers};
-use crate::function::{Arguments, display};
+use crate::function::{Arguments, display, Function};
 use crate::type_resolver::TypeResolver;
 
 pub struct Expression {
@@ -89,12 +88,6 @@ pub trait Effect: DisplayIndented {
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String>;
 
-    fn swap(&mut self, left: bool, swapping: &mut Effects);
-
-    fn priority(&self) -> i8;
-
-    fn parse_left_first(&self) -> bool;
-
     fn get_location(&self) -> (u32, u32);
 }
 
@@ -102,10 +95,10 @@ pub enum Effects {
     NOP(),
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
-    MathEffect(Box<MathEffect>),
     FloatEffect(Box<NumberEffect<f64>>),
     IntegerEffect(Box<NumberEffect<i64>>),
-    AssignVariable(Box<AssignVariable>)
+    AssignVariable(Box<AssignVariable>),
+    OperatorEffect(Box<OperatorEffect>)
 }
 
 impl Effects {
@@ -114,22 +107,10 @@ impl Effects {
             Effects::NOP() => panic!("Tried to unwrap a NOP!"),
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
-            Effects::MathEffect(effect) => effect.as_ref(),
             Effects::FloatEffect(effect) => effect.as_ref(),
             Effects::IntegerEffect(effect) => effect.as_ref(),
-            Effects::AssignVariable(effect) => effect.as_ref()
-        };
-    }
-
-    pub fn unwrap_mut(&mut self) -> &mut dyn Effect {
-        return match self {
-            Effects::NOP() => panic!("Tried to unwrap a NOP!"),
-            Effects::MethodCall(effect) => effect.as_mut(),
-            Effects::VariableLoad(effect) => effect.as_mut(),
-            Effects::MathEffect(effect) => effect.as_mut(),
-            Effects::FloatEffect(effect) => effect.as_mut(),
-            Effects::IntegerEffect(effect) => effect.as_mut(),
-            Effects::AssignVariable(effect) => effect.as_mut()
+            Effects::AssignVariable(effect) => effect.as_ref(),
+            Effects::OperatorEffect(effect) => effect.as_ref()
         };
     }
 }
@@ -143,71 +124,6 @@ impl Display for Effects {
 impl DisplayIndented for Effects {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return self.unwrap().format(indent, f);
-    }
-}
-
-pub struct ReturnEffect {
-    pub effect: Option<Effects>,
-    is_break: bool,
-    location: (u32, u32)
-}
-
-impl ReturnEffect {
-    pub fn new(effect: Option<Effects>, is_break: bool, location: (u32, u32)) -> Self {
-        return Self {
-            effect,
-            is_break,
-            location
-        }
-    }
-}
-
-impl Effect for ReturnEffect {
-    fn is_return(&self) -> bool {
-        return true;
-    }
-
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
-        return match &self.effect {
-            Some(value) => value.unwrap().return_type(type_resolver),
-            None => Some("void".to_string())
-        }
-    }
-
-    fn swap(&mut self, _left: bool, _swapping: &mut Effects) {
-        panic!("Unexpected reconstruct!");
-    }
-
-    fn priority(&self) -> i8 {
-        panic!("Unexpected priority!");
-    }
-
-    fn parse_left_first(&self) -> bool {
-        panic!("Unexpected parse left!");
-    }
-
-    fn get_location(&self) -> (u32, u32) {
-        return self.location;
-    }
-}
-
-impl DisplayIndented for ReturnEffect {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return match &self.effect {
-            Some(value) => {
-                if self.is_break {
-                    write!(f, "break ")
-                } else {
-                    write!(f, "return ")
-                }?;
-                value.format(indent, f)
-            },
-            None => if self.is_break {
-                write!(f, "break")
-            } else {
-                write!(f, "return")
-            }
-        }
     }
 }
 
@@ -236,18 +152,6 @@ impl Effect for MethodCall {
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
         return type_resolver.get_method_type(&self.method, &self.calling, &self.arguments);
-    }
-
-    fn swap(&mut self, _left: bool, _swapping: &mut Effects) {
-        panic!("Unexpected priority!");
-    }
-
-    fn priority(&self) -> i8 {
-        0
-    }
-
-    fn parse_left_first(&self) -> bool {
-        panic!("Unexpected parse left first!");
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -288,18 +192,6 @@ impl Effect for VariableLoad {
         return None;
     }
 
-    fn swap(&mut self, _left: bool, _swapping: &mut Effects) {
-        panic!("Unexpected reconstruct!");
-    }
-
-    fn priority(&self) -> i8 {
-        panic!("Unexpected priority!");
-    }
-
-    fn parse_left_first(&self) -> bool {
-        panic!("Unexpected parse left!");
-    }
-
     fn get_location(&self) -> (u32, u32) {
         return self.location;
     }
@@ -308,80 +200,6 @@ impl Effect for VariableLoad {
 impl DisplayIndented for VariableLoad {
     fn format(&self, _indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", self.name);
-    }
-}
-
-pub struct MathEffect {
-    pub target: Option<Effects>,
-    pub operator: MathOperator,
-    pub effect: Effects,
-    location: (u32, u32)
-}
-
-#[derive(Copy, Clone)]
-pub enum MathOperator {
-    PLUS = '+' as isize,
-    MINUS = '-' as isize,
-    DIVIDE = '/' as isize,
-    MULTIPLY = '*' as isize
-}
-
-impl MathEffect {
-    pub fn new(target: Option<Effects>, operator: MathOperator, effect: Effects, location: (u32, u32)) -> Self {
-        return Self {
-            target,
-            operator,
-            effect,
-            location
-        }
-    }
-}
-
-impl Effect for MathEffect {
-    fn is_return(&self) -> bool {
-        return false;
-    }
-
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<String> {
-        return self.effect.unwrap().return_type(type_resolver);
-    }
-
-    fn swap(&mut self, left: bool, swapping: &mut Effects) {
-        if left {
-            mem::swap(self.target.as_mut().unwrap(), swapping);
-        } else {
-            mem::swap(&mut self.effect, swapping);
-        }
-    }
-
-    fn priority(&self) -> i8 {
-        match self.operator {
-            MathOperator::PLUS => 0,
-            MathOperator::MINUS => 0,
-            MathOperator::MULTIPLY => 1,
-            MathOperator::DIVIDE => 1
-        }
-    }
-
-    fn parse_left_first(&self) -> bool {
-        true
-    }
-
-    fn get_location(&self) -> (u32, u32) {
-        return self.location;
-    }
-}
-
-impl DisplayIndented for MathEffect {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.target {
-            Some(target) => {
-                target.format(indent, f)?;
-                write!(f, " {} ", self.operator.clone() as u8 as char)
-            },
-            None => write!(f, "{}", self.operator.clone() as u8 as char)
-        }?;
-        return self.effect.format(indent, f);
     }
 }
 
@@ -422,18 +240,6 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
         return Some(T::get_type());
     }
 
-    fn swap(&mut self, _left: bool, _swapping: &mut Effects) {
-        panic!("Unexpected reconstruct!");
-    }
-
-    fn priority(&self) -> i8 {
-        panic!("Unexpected priority!");
-    }
-
-    fn parse_left_first(&self) -> bool {
-        panic!("Unexpected parse left!");
-    }
-
     fn get_location(&self) -> (u32, u32) {
         panic!("Unexpected get location!");
     }
@@ -472,18 +278,6 @@ impl Effect for AssignVariable {
         return self.effect.unwrap().return_type(type_resolver);
     }
 
-    fn swap(&mut self, _left: bool, _swapping: &mut Effects) {
-        panic!("Unexpected reconstruct!");
-    }
-
-    fn priority(&self) -> i8 {
-        panic!("Unexpected priority!");
-    }
-
-    fn parse_left_first(&self) -> bool {
-        panic!("Unexpected parse left!");
-    }
-
     fn get_location(&self) -> (u32, u32) {
         return self.location;
     }
@@ -497,5 +291,68 @@ impl DisplayIndented for AssignVariable {
         }
         write!(f, " = ")?;
         return self.effect.format(indent, f);
+    }
+}
+
+pub struct OperatorEffect {
+    pub operator: String,
+    pub operator_symbol: String,
+    pub lhs: Option<Effects>,
+    pub rhs: Option<Effects>,
+    pub priority: i8,
+    pub parse_left: bool,
+    return_type: Option<String>,
+    location: (u32, u32)
+}
+
+impl OperatorEffect {
+    pub fn new(operator: &String, function: &Function, lhs: Option<Effects>, rhs: Option<Effects>, location: (u32, u32)) -> Self {
+        return Self {
+            operator: function.name.clone(),
+            operator_symbol: operator.clone(),
+            lhs,
+            rhs,
+            //TODO attributes
+            priority: 0,
+            parse_left: false,
+            return_type: function.return_type.clone(),
+            location
+        }
+    }
+}
+
+impl Effect for OperatorEffect {
+    fn is_return(&self) -> bool {
+        return false;
+    }
+
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<String> {
+        return self.return_type.clone();
+    }
+
+    fn get_location(&self) -> (u32, u32) {
+        return self.location
+    }
+}
+
+impl DisplayIndented for OperatorEffect {
+    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return match &self.lhs {
+            Some(lhs) => match &self.rhs {
+                Some(rhs) => {
+                    lhs.format(indent, f)?;
+                    write!(f, " {} ", self.operator_symbol)?;
+                    rhs.format(indent, f)
+                },
+                None => {
+                    lhs.format(indent, f)?;
+                    write!(f, "{}", self.operator_symbol)
+                }
+            }
+            None => {
+                write!(f, "{}", self.operator_symbol)?;
+                self.rhs.as_ref().unwrap().format(indent, f)
+            }
+        }
     }
 }

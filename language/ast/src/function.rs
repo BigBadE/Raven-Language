@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use crate::r#struct::TypeMember;
 use crate::code::{Effects, Expression, Field};
-use crate::{DisplayIndented, get_modifier, Modifier, to_modifiers};
+use crate::{Attribute, DisplayIndented, to_modifiers};
 use crate::type_resolver::TypeResolver;
 
 pub struct Function {
+    pub attributes: HashMap<String, Attribute>,
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
@@ -13,9 +15,10 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(modifiers: &[Modifier], fields: Vec<Field>, code: CodeBody, return_type: Option<String>, name: String) -> Self {
+    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, code: CodeBody, return_type: Option<String>, name: String) -> Self {
         return Self {
-            modifiers: get_modifier(modifiers),
+            attributes,
+            modifiers,
             fields,
             code,
             return_type,
@@ -112,7 +115,7 @@ pub fn display<T>(input: &Vec<T>) -> String where T : Display {
     for element in input {
         output += &*format!("{}, ", element);
     }
-    return (&output[..output.len() - 2]).to_string();
+    return format!("({})", (&output[..output.len() - 2]).to_string());
 }
 
 impl TypeMember for Function {}

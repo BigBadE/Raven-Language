@@ -5,8 +5,9 @@ use llvm_sys::core::LLVMFunctionType;
 use llvm_sys::prelude::LLVMTypeRef;
 use ast::code::{Effects, ExpressionType};
 use ast::function::Function;
+use ast::{is_modifier, Modifier};
 use crate::compiler::Compiler;
-use crate::instructions::math::math_operation;
+use crate::instructions::compile_internal;
 use crate::types::type_resolver::FunctionTypeResolver;
 
 pub fn get_function_value<'ctx>(function: &Function, compiler: &Compiler<'ctx>) -> FunctionValue<'ctx> {
@@ -26,15 +27,20 @@ pub fn get_function_value<'ctx>(function: &Function, compiler: &Compiler<'ctx>) 
 }
 
 pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) {
-    let block = compiler.context.append_basic_block(compiler.functions.get(&function.name).unwrap().1, "entry");
+    let value = compiler.functions.get(&function.name).unwrap().1;
+    let block = compiler.context.append_basic_block(value, "entry");
     compiler.builder.position_at_end(block);
-    compile_block(function, &mut FunctionTypeResolver::new(&compiler), &compiler);
+    if is_modifier(function.modifiers, Modifier::Internal) {
+        compile_internal(compiler, &function.name, &function.fields, value);
+    } else if is_modifier(function.modifiers, Modifier::Extern) {} else {
+        compile_block(function, &mut FunctionTypeResolver::new(&compiler), &compiler);
 
-    if !function.code.is_return() {
-        match &function.return_type {
-            Some(return_type) => panic!("Missing return ({}) for function {}", return_type, function.name),
-            None => compiler.builder.build_return(None)
-        };
+        if !function.code.is_return() {
+            match &function.return_type {
+                Some(return_type) => panic!("Missing return ({}) for function {}", return_type, function.name),
+                None => compiler.builder.build_return(None)
+            };
+        }
     }
 }
 
@@ -49,17 +55,17 @@ pub fn compile_block<'com, 'ctx>(function: &Function, variables: &mut FunctionTy
                         compiler.builder.build_return(Some(&compile_effect(compiler, variables, &line.effect)));
                     }
                 }
-            },
+            }
             ExpressionType::Line => {
                 compile_effect(compiler, variables, &line.effect);
-            },
+            }
             ExpressionType::Break => todo!()
         }
     }
 }
 
 pub fn compile_effect<'com, 'ctx>(compiler: &Compiler<'ctx>, variables: &mut FunctionTypeResolver<'com, 'ctx>,
-                            effect: &Effects) -> BasicValueEnum<'ctx> {
+                                  effect: &Effects) -> BasicValueEnum<'ctx> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::IntegerEffect(effect) =>
@@ -70,22 +76,40 @@ pub fn compile_effect<'com, 'ctx>(compiler: &Compiler<'ctx>, variables: &mut Fun
             let arguments = Vec::new();
             //TODO args
             match compiler.builder.build_call(compiler.functions.get(&effect.method).unwrap().1,
-                                        arguments.as_slice(), effect.method.as_str()).try_as_basic_value() {
+                                              arguments.as_slice(), effect.method.as_str()).try_as_basic_value() {
                 Either::Left(value) => value,
                 //TODO figure this bs out
                 Either::Right(_) => compiler.context.i64_type().const_int(0xDEADBEEF, false).as_basic_value_enum()
             }
-        },
+        }
+        Effects::OperatorEffect(effect) => {
+            let mut arguments = Vec::new();
+            if effect.lhs.is_some() {
+                let lhs = effect.lhs.as_ref().unwrap().unwrap();
+                let return_type = match lhs.return_type(variables) {
+                    Some(return_type) => return_type,
+                    None => panic!("Unable to find type for effect!")
+                };
+                arguments.push(From::from(*variables.get(&return_type).unwrap()));
+            }
+            if effect.rhs.is_some() {
+                let rhs = effect.rhs.as_ref().unwrap().unwrap();
+                let return_type = match rhs.return_type(variables) {
+                    Some(return_type) => return_type,
+                    None => panic!("Unable to find type for effect!")
+                };
+                arguments.push(From::from(*variables.get(&return_type).unwrap()));
+            }
+
+            match compiler.builder.build_call(compiler.functions.get(&effect.operator).unwrap().1,
+                                              arguments.as_slice(), effect.operator.as_str()).try_as_basic_value() {
+                Either::Left(value) => value,
+                //TODO figure this bs out
+                Either::Right(_) => compiler.context.i64_type().const_int(0xDEADBEEF, false).as_basic_value_enum()
+            }
+        }
         Effects::VariableLoad(effect) =>
             variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone(),
-        Effects::MathEffect(effect) => {
-            let value = match &effect.target {
-                Some(effect) => Some(compile_effect(compiler, variables, effect)),
-                None => None
-            };
-            math_operation(effect.operator, compiler, value,
-                           compile_effect(compiler, variables, &effect.effect))
-        }
         Effects::AssignVariable(variable) => {
             let pointer = compiler.builder.build_alloca(*match variable.effect.unwrap().return_type(variables) {
                 Some(found_type) => compiler.types.get_type_err(found_type.as_str()),

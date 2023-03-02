@@ -32,18 +32,6 @@ impl Effect for ForStatement {
         todo!()
     }
 
-    fn swap(&mut self, _left: bool, _swapping: &mut Effects) {
-        panic!("Unexpected reconstruction!");
-    }
-
-    fn priority(&self) -> i8 {
-        panic!("Unexpected priority!");
-    }
-
-    fn parse_left_first(&self) -> bool {
-        panic!("Unexpected parse left first!");
-    }
-
     fn get_location(&self) -> (u32, u32) {
         panic!("Unexpected location!");
     }

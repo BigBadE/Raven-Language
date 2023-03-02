@@ -20,7 +20,7 @@ impl<'a> ParseInfo<'a> {
             len: buffer.len() as usize,
             buffer: buffer.as_bytes(),
             index: 0,
-            line: 0,
+            line: 1,
             line_index: 0
         }
     }
@@ -29,6 +29,40 @@ impl<'a> ParseInfo<'a> {
         return match self.next_included() {
             Some(found) => found == char,
             None => false
+        }
+    }
+
+    pub fn find_end(&mut self) {
+        while self.index < self.len {
+            self.index += 1;
+            match self.buffer[self.index] {
+                b'"' => self.find_end_str(),
+                b'{' => self.find_end(),
+                b'}' => {
+                    self.index += 1;
+                    return
+                },
+                _ => {}
+            }
+        }
+    }
+
+    pub fn find_end_str(&mut self) {
+        let mut ignoring = false;
+        while self.index < self.len {
+            self.index += 1;
+            match self.buffer[self.index] {
+                b'"' => if ignoring {
+                    ignoring = false
+                } else {
+                    self.index += 1;
+                    return;
+                },
+                b'\\' => ignoring = true,
+                _ => if ignoring {
+                    ignoring = false
+                }
+            }
         }
     }
 
@@ -43,6 +77,21 @@ impl<'a> ParseInfo<'a> {
         return None;
     }
 
+    pub fn parse_to_or_end(&mut self, char: u8, end: usize) -> Option<String> {
+        let mut output = String::new();
+        while self.index < end {
+            if let Some(character) = self.next_included() {
+                if character == char {
+                    return Some(output);
+                }
+                output.push(character as char);   
+            } else {
+                return None
+            }
+        }
+        return None;
+    }
+    
     pub fn next_included(&mut self) -> Option<u8> {
         while self.index < self.len {
             if !self.whitespace_next(self.buffer[self.index]) {

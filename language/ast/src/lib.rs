@@ -28,7 +28,7 @@ impl Display for Modifier {
     }
 }
 
-fn get_modifier(modifiers: &[Modifier]) -> u8 {
+pub fn get_modifier(modifiers: &[Modifier]) -> u8 {
     let mut sum = 0;
     for modifier in modifiers {
         sum += modifier.clone() as u8;
@@ -37,12 +37,13 @@ fn get_modifier(modifiers: &[Modifier]) -> u8 {
     return sum;
 }
 
-fn is_modifier(modifiers: u8, target: Modifier) -> bool {
+#[inline]
+pub fn is_modifier(modifiers: u8, target: Modifier) -> bool {
     let target = target as u8;
     return modifiers & target != 0;
 }
 
-fn to_modifiers(from: u8) -> Vec<Modifier> {
+pub fn to_modifiers(from: u8) -> Vec<Modifier> {
     let mut modifiers = Vec::new();
     if from & (Modifier::Public as u8) != 0 {
         modifiers.push(Modifier::Public)
@@ -52,4 +53,16 @@ fn to_modifiers(from: u8) -> Vec<Modifier> {
 
 pub trait DisplayIndented {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
+}
+
+pub struct Attribute {
+    pub value: String
+}
+
+impl Attribute {
+    pub fn new(value: String) -> Self {
+        return Self {
+            value
+        }
+    }
 }

@@ -35,7 +35,6 @@ pub fn parse_number(parsing: &mut ParseInfo) -> Option<Effects> {
     let mut float = false;
     loop {
         if parsing.len == parsing.index {
-            parsing.index += 1;
             break
         }
         //Negatives are handled separate
@@ -46,7 +45,6 @@ pub fn parse_number(parsing: &mut ParseInfo) -> Option<Effects> {
         }
         parsing.index += 1;
     }
-    parsing.index -= 1;
     return if parsing.index == start || parsing.index == start + 1 && float {
         None
     } else if float {

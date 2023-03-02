@@ -8,7 +8,7 @@ use crate::types::ParsingTypeResolver;
 pub fn parse_fields(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
-    while let Some(found) = parsing.clone().parse_to(b',') {
+    while let Some(found) = find_if_first(parsing, b',', b')') {
         output.push(parse_field(found, &mut info)?);
         info = parsing.clone();
     }
@@ -41,6 +41,15 @@ pub fn parse_code_block(program: &Program, type_manager: &ParsingTypeResolver, p
     let mut expressions = Vec::new();
     while let Some(expression) = parse_expression(program, type_manager, parsing) {
         expressions.push(expression);
+
+        match parsing.next_included() {
+            Some(found) => if found == b'}' {
+                break;
+            } else {
+                parsing.index -= 1;
+            }
+            None => break
+        }
     }
 
     return Some(CodeBody::new(expressions));
@@ -56,11 +65,10 @@ pub fn get_line(buffer: &[u8], start: usize) -> String {
 }
 
 pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<String> {
-    if let Some(found) = parsing.clone().parse_to(first) {
-        if let Some(testing) = parsing.clone().parse_to(second) {
-            if found.len() < testing.len() {
-                return Some(parsing.parse_to(first).unwrap());
-            }
+    let mut parse_clone = parsing.clone();
+    if let Some(_) = parse_clone.parse_to(second) {
+        if let Some(_) = parsing.clone().parse_to_or_end(first, parse_clone.index) {
+            return Some(parsing.parse_to(first).unwrap());
         }
     }
     return None;
