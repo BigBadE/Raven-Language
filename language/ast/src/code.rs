@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Pointer};
 use crate::{DisplayIndented, to_modifiers};
 use crate::function::{Arguments, display, Function};
 use crate::type_resolver::TypeResolver;
@@ -93,6 +93,7 @@ pub trait Effect: DisplayIndented {
 
 pub enum Effects {
     NOP(),
+    Wrapped(Box<Effects>),
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
     FloatEffect(Box<NumberEffect<f64>>),
@@ -105,6 +106,7 @@ impl Effects {
     pub fn unwrap(&self) -> &dyn Effect {
         return match self {
             Effects::NOP() => panic!("Tried to unwrap a NOP!"),
+            Effects::Wrapped(effect) => effect.unwrap(),
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
             Effects::FloatEffect(effect) => effect.as_ref(),
@@ -123,7 +125,15 @@ impl Display for Effects {
 
 impl DisplayIndented for Effects {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return self.unwrap().format(indent, f);
+        return match self {
+            Effects::Wrapped(effect) => {
+                write!(f, "(")?;
+                effect.format(indent, f)?;
+                write!(f, ")")
+            },
+            Effects::NOP() => write!(f, "{{}}"),
+            _ => self.unwrap().format(indent, f)
+        }
     }
 }
 
@@ -319,6 +329,12 @@ impl OperatorEffect {
             return_type: function.return_type.clone(),
             location
         }
+    }
+}
+
+impl Display for OperatorEffect {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return self.format("", f);
     }
 }
 

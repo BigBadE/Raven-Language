@@ -68,6 +68,7 @@ pub fn compile_effect<'com, 'ctx>(compiler: &Compiler<'ctx>, variables: &mut Fun
                                   effect: &Effects) -> BasicValueEnum<'ctx> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
+        Effects::Wrapped(effect) => compile_effect(compiler, variables, effect),
         Effects::IntegerEffect(effect) =>
             compiler.context.i64_type().const_int(effect.number as u64, false).as_basic_value_enum(),
         Effects::FloatEffect(effect) =>

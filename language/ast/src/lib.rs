@@ -5,6 +5,7 @@ pub mod r#struct;
 pub mod code;
 pub mod function;
 pub mod program;
+pub mod types;
 pub mod type_resolver;
 
 #[derive(Clone)]
