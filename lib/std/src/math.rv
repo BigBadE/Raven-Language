@@ -1,3 +1,17 @@
 pub internal operation +(first: i64, second: i64) -> i64 {
     return first + second;
 }
+
+pub internal operation -(first: i64, second: i64) -> i64 {
+    return first - second;
+}
+
+#[priority(1)]
+pub internal operation /(first: i64, second: i64) -> i64 {
+    return first / second;
+}
+
+#[priority(1)]
+pub internal operation *(first: i64, second: i64) -> i64 {
+    return first * second;
+}

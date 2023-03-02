@@ -312,9 +312,10 @@ impl OperatorEffect {
             operator_symbol: operator.clone(),
             lhs,
             rhs,
-            //TODO attributes
-            priority: 0,
-            parse_left: false,
+            priority: function.attributes.get("priority")
+                .map_or(0, |attrib| attrib.value.parse().expect("Expected numerical priority!")),
+            parse_left: function.attributes.get("parse_left")
+                .map_or(true, |attrib| attrib.value.parse().expect("Expected boolean parse_left!")),
             return_type: function.return_type.clone(),
             location
         }

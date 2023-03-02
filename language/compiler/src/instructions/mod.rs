@@ -11,7 +11,25 @@ pub fn compile_internal<'ctx>(compiler: &Compiler<'ctx>, name: &String, fields: 
                     let returning = compiler.builder.build_int_add(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "wtf?");
                     compiler.builder.build_return(Some(&returning));
                 }
-            },
+            }
+            "math::-" => {
+                if check_types(fields, vec!("i64", "i64")) {
+                    let returning = compiler.builder.build_int_sub(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "wtf?");
+                    compiler.builder.build_return(Some(&returning));
+                }
+            }
+            "math::/" => {
+                if check_types(fields, vec!("i64", "i64")) {
+                    let returning = compiler.builder.build_int_signed_div(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "wtf?");
+                    compiler.builder.build_return(Some(&returning));
+                }
+            }
+            "math::*" => {
+                if check_types(fields, vec!("i64", "i64")) {
+                    let returning = compiler.builder.build_int_mul(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "wtf?");
+                    compiler.builder.build_return(Some(&returning));
+                }
+            }
             _ => panic!("Unknown internal operation: {}", name)
         }
     }

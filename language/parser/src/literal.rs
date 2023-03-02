@@ -71,7 +71,6 @@ pub fn parse_ident(parsing: &mut ParseInfo) -> String {
         }
     }
 
-    parsing.index -= 1;
     return String::from_utf8_lossy(&parsing.buffer[start..parsing.index]).to_string();
 }
 

@@ -3,6 +3,7 @@ use ast::function::{CodeBody, Function};
 use ast::r#struct::Struct;
 use ast::{Attribute, get_modifier, is_modifier, Modifier};
 use ast::program::Program;
+use crate::literal::parse_ident;
 use crate::parser::ParseInfo;
 use crate::types::ParsingTypeResolver;
 use crate::util::{parse_code_block, parse_fields};
@@ -10,26 +11,26 @@ use crate::util::{parse_code_block, parse_fields};
 pub fn parse_top_elements(program: &mut Program, name: &String, parsing: &mut ParseInfo, parse_code: bool) {
     while let Some(_) = parsing.next_included() {
         parsing.index -= 1;
-        let attributes = parse_attributes(parsing);
+        let attributes = parse_attributes(parsing, false);
         let modifiers = get_modifier(parse_modifiers(parsing).as_slice());
         if parsing.matching("struct") {
             match parse_struct(program, name, modifiers, parsing, parse_code) {
                 Some(structure) => program.elem_types.insert(structure.name.clone(), structure),
                 None => None
             };
-            continue
+            continue;
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
             match parse_function(program, name, attributes, modifiers, parsing, parse_code) {
                 Some(function) => {
                     if is_modifier(modifiers, Modifier::Operation) {
                         //Add only the method name.
-                        program.operations.insert(function.name[name.len()+2..].to_string(), function.name.clone());
+                        program.operations.insert(function.name[name.len() + 2..].to_string(), function.name.clone());
                     }
                     program.static_functions.insert(function.name.clone(), function)
-                },
+                }
                 None => None
             };
-            continue
+            continue;
         }
 
         //Only error once for a big block of issues.
@@ -113,6 +114,39 @@ fn parse_modifier(parsing: &mut ParseInfo) -> Option<Modifier> {
     return None;
 }
 
-fn parse_attributes(parsing: &mut ParseInfo) -> HashMap<String, Attribute> {
-    return HashMap::new();
+fn parse_attributes(parsing: &mut ParseInfo, global: bool) -> HashMap<String, Attribute> {
+    let mut output = HashMap::new();
+    while parsing.matching("#") {
+        if global {
+            todo!()
+        } else {
+            if !parsing.matching("[") {
+                parsing.create_error("Expected attribute!".to_string());
+                continue;
+            }
+            let name = parse_ident(parsing);
+            match parsing.next_included() {
+                Some(value) => match value {
+                    b'(' => {
+                        match parsing.parse_to(b')') {
+                            Some(value) =>
+                                if !parsing.matching("]") {
+                                    parsing.create_error("Expected closing brace!".to_string());
+                                } else {
+                                    output.insert(name, Attribute::new(value));
+                                },
+                            None => parsing.create_error("Unexpected EOF".to_string())
+                        }
+                    }
+                    b']' => {}
+                    val => {
+                        println!("Value: {}", val as char);
+                        parsing.create_error("Expected value or end of attribute".to_string());
+                    }
+                }
+                None => parsing.create_error("Unexpected EOF".to_string())
+            }
+        }
+    }
+    return output;
 }
