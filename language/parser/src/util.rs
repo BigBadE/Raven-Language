@@ -42,6 +42,8 @@ pub fn parse_code_block(program: &Program, type_manager: &ParsingTypeResolver, p
     while let Some(expression) = parse_expression(program, type_manager, parsing) {
         expressions.push(expression);
 
+        //TODO figure out why parsing is too greedy
+        parsing.index -= 1;
         match parsing.next_included() {
             Some(found) => if found == b'}' {
                 break;

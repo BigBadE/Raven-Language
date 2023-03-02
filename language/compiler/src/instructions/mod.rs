@@ -6,7 +6,7 @@ pub fn compile_internal<'ctx>(compiler: &Compiler<'ctx>, name: &String, fields: 
     let params = value.get_params();
     if fields.len() == 2 {
         match name.as_str() {
-            "main::+" => {
+            "math::+" => {
                 if check_types(fields, vec!("i64", "i64")) {
                     let returning = compiler.builder.build_int_add(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "wtf?");
                     compiler.builder.build_return(Some(&returning));

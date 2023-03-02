@@ -85,20 +85,12 @@ pub fn compile_effect<'com, 'ctx>(compiler: &Compiler<'ctx>, variables: &mut Fun
         Effects::OperatorEffect(effect) => {
             let mut arguments = Vec::new();
             if effect.lhs.is_some() {
-                let lhs = effect.lhs.as_ref().unwrap().unwrap();
-                let return_type = match lhs.return_type(variables) {
-                    Some(return_type) => return_type,
-                    None => panic!("Unable to find type for effect!")
-                };
-                arguments.push(From::from(*variables.get(&return_type).unwrap()));
+                let lhs = effect.lhs.as_ref().unwrap();
+                arguments.push(From::from(compile_effect(compiler, variables, lhs)));
             }
             if effect.rhs.is_some() {
-                let rhs = effect.rhs.as_ref().unwrap().unwrap();
-                let return_type = match rhs.return_type(variables) {
-                    Some(return_type) => return_type,
-                    None => panic!("Unable to find type for effect!")
-                };
-                arguments.push(From::from(*variables.get(&return_type).unwrap()));
+                let rhs = effect.rhs.as_ref().unwrap();
+                arguments.push(From::from(compile_effect(compiler, variables, rhs)));
             }
 
             match compiler.builder.build_call(compiler.functions.get(&effect.operator).unwrap().1,
