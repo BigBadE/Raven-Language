@@ -6,7 +6,7 @@ pub struct Program {
     pub elem_types: HashMap<String, Struct>,
     pub static_functions: HashMap<String, Function>,
     pub package_name: Option<String>,
-    pub main: Option<String>
+    pub operations: HashMap<String, String>,
 }
 
 impl Program {
@@ -15,15 +15,7 @@ impl Program {
             elem_types: HashMap::new(),
             static_functions: HashMap::new(),
             package_name: None,
-            main: None
-        }
-    }
-
-    pub fn set_main(&mut self, main: String) {
-        if !self.main.is_some() {
-            self.main = Some(main);
-        } else {
-            panic!("Tried to set already-set main!");
+            operations: HashMap::new(),
         }
     }
 }

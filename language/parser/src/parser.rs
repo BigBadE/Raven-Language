@@ -1,20 +1,22 @@
 use std::fmt::{Display, Formatter};
-use ast::TopElement;
-use crate::top_elements::parse_top_element;
+use ast::program::Program;
+use crate::top_elements::{parse_top_elements};
 use crate::util::get_line;
 
 #[derive(Clone)]
 pub struct ParseInfo<'a> {
-    buffer: &'a [u8],
+    pub errors: Vec<ParseError>,
+    pub buffer: &'a [u8],
     pub index: usize,
-    len: usize,
-    line: u64,
+    pub len: usize,
+    line: u32,
     line_index: usize
 }
 
 impl<'a> ParseInfo<'a> {
     pub fn new(buffer: &'a String) -> Self {
         return Self {
+            errors: Vec::new(),
             len: buffer.len() as usize,
             buffer: buffer.as_bytes(),
             index: 0,
@@ -41,37 +43,19 @@ impl<'a> ParseInfo<'a> {
         return None;
     }
 
-    pub fn subparse(&mut self, ending_char: u8) -> Option<Self> {
-        let mut end = 0;
-        let mut temp = self.clone();
-        while let Some(character) = temp.next_included() {
-            if character == ending_char {
-                end = temp.index;
-                break;
-            }
-        }
-
-        if end == 0 {
-            return None;
-        }
-
-        return Some(Self {
-            buffer: &self.buffer[..end],
-            index: self.index,
-            len: end,
-            line: self.line,
-            line_index: self.line_index
-        });
-    }
-
     pub fn next_included(&mut self) -> Option<u8> {
         while self.index < self.len {
-            self.index += 1;
             if !self.whitespace_next(self.buffer[self.index]) {
+                self.index += 1;
                 return Some(self.buffer[self.index-1]);
             }
+            self.index += 1;
         }
         return None;
+    }
+
+    pub fn loc(&self) -> (u32, u32) {
+        return (self.line, (self.index - self.line_index) as u32);
     }
 
     pub fn matching(&mut self, matching: &str) -> bool {
@@ -90,13 +74,20 @@ impl<'a> ParseInfo<'a> {
         return true;
     }
 
-    pub fn create_error(&mut self, error: String) -> ParseError {
+    pub fn create_error(&mut self, error: String) {
+        self.errors.push(ParseError::new(self.line, (self.index-self.line_index) as u64,
+                               get_line(self.buffer, self.line_index), error));
+        self.skip_line();
+    }
+
+    pub fn skip_line(&mut self) {
         let line = self.line;
         while line == self.line {
-            self.next_included();
+            match self.next_included() {
+                Some(_) => {},
+                None => break
+            }
         }
-        return ParseError::new(self.line, (self.index-self.line_index) as u64,
-                               get_line(self.buffer, self.line_index), error);
     }
 
     fn whitespace_next(&mut self, char: u8) -> bool {
@@ -112,15 +103,16 @@ impl<'a> ParseInfo<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct ParseError {
-    pub row: u64,
+    pub row: u32,
     pub column: u64,
     pub line: String,
     pub error: String
 }
 
 impl ParseError {
-    pub fn new(row: u64, column: u64, line: String, error: String) -> Self {
+    pub fn new(row: u32, column: u64, line: String, error: String) -> Self {
         return Self {
             row,
             column,
@@ -132,21 +124,17 @@ impl ParseError {
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "Error at {} ({}:{}): {}", self.line, self.row, self.column, self.error);
+        return write!(f, "Error at line \"{}\" ({}:{}): {}", self.line, self.row, self.column, self.error);
     }
 }
 
-pub fn parse(name: &String, input: String) -> Result<Vec<TopElement>, Vec<ParseError>> {
-    let mut output = Vec::new();
+pub fn parse(program: &mut Program, name: &String, input: String, first_pass: bool) -> Result<(), Vec<ParseError>> {
     let mut parsing = ParseInfo::new(&input);
-    let mut errors = Vec::new();
 
-    while let Some(element) = parse_top_element(name, &mut errors, &mut parsing) {
-        output.push(element);
-    }
+    parse_top_elements(program, name, &mut parsing, !first_pass);
 
-    if !errors.is_empty() {
-        return Err(errors);
+    if !parsing.errors.is_empty() {
+        return Err(parsing.errors);
     }
-    return Ok(output);
+    return Ok(());
 }

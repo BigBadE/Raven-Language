@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 use crate::r#struct::TypeMember;
 use crate::code::{Effects, Expression, Field};
 use crate::{DisplayIndented, get_modifier, Modifier, to_modifiers};
+use crate::type_resolver::TypeResolver;
 
 pub struct Function {
     pub modifiers: u8,
@@ -20,6 +21,22 @@ impl Function {
             return_type,
             name
         };
+    }
+
+    pub fn check_args(&self, type_resolver: &dyn TypeResolver, target: &Vec<&Effects>) -> bool {
+        if target.len() != self.fields.len() {
+            return false;
+        }
+
+        for i in 0..target.len() {
+            match target.get(i).unwrap().unwrap().return_type(type_resolver) {
+                Some(target) => if target != self.fields.get(i).unwrap().field_type {
+                    return false;
+                },
+                None => return false
+            }
+        }
+        return true;
     }
 }
 
@@ -50,6 +67,12 @@ impl CodeBody {
 
     pub fn is_return(&self) -> bool {
         return self.expressions.iter().find(|expression| expression.is_return()).is_some()
+    }
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return self.format("", f);
     }
 }
 

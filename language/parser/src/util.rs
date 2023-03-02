@@ -1,46 +1,45 @@
 use ast::code::Field;
-use ast::function::CodeBody;
-use crate::code::parse_expression;
-use crate::parser::{ParseError, ParseInfo};
+use ast::function::{Arguments, CodeBody};
+use ast::program::Program;
+use crate::code::{parse_effect, parse_expression};
+use crate::parser::ParseInfo;
+use crate::types::ParsingTypeResolver;
 
-pub fn parse_fields(errors: &mut Vec<ParseError>, parsing: &mut ParseInfo) -> Option<Vec<Field>> {
+pub fn parse_fields(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
-    while let Some(found) = parsing.parse_to(b',') {
-        output.push(parse_field(errors, found, &mut info)?);
+    while let Some(found) = parsing.clone().parse_to(b',') {
+        output.push(parse_field(found, &mut info)?);
         info = parsing.clone();
     }
 
-    info = parsing.clone();
     if let Some(found) = parsing.parse_to(b')') {
         if !found.is_empty() {
-            output.push(parse_field(errors, found, &mut info)?)
+            output.push(parse_field(found, &mut info)?)
         }
-        return Some(output);
     }
 
-    errors.push(parsing.create_error("".to_string()));
-    return None;
+    return Some(output);
 }
 
-fn parse_field(errors: &mut Vec<ParseError>, string: String, parser: &mut ParseInfo) -> Option<Field> {
+fn parse_field(string: String, parser: &mut ParseInfo) -> Option<Field> {
     let parts: Vec<&str> = string.split(':').collect();
     if parts.len() != 2 {
-        errors.push(parser.create_error("Missing or unexpected colon in field.".to_string()));
+        parser.create_error("Missing or unexpected colon in field.".to_string());
         return None;
     }
 
     return Some(Field::new(parts[0].to_string(), parts[1].to_string()));
 }
 
-pub fn parse_code_block(errors: &mut Vec<ParseError>, parsing: &mut ParseInfo) -> Option<CodeBody> {
+pub fn parse_code_block(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo) -> Option<CodeBody> {
     if let None = parsing.parse_to(b'{') {
-        errors.push(parsing.create_error("Expected code body".to_string()));
+        parsing.create_error("Expected code body".to_string());
         return None;
     }
 
     let mut expressions = Vec::new();
-    while let Some(expression) = parse_expression(errors, parsing) {
+    while let Some(expression) = parse_expression(program, type_manager, parsing) {
         expressions.push(expression);
     }
 
@@ -54,4 +53,23 @@ pub fn get_line(buffer: &[u8], start: usize) -> String {
         }
     }
     return String::from_utf8_lossy(&buffer[start..]).to_string();
+}
+
+pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<String> {
+    if let Some(found) = parsing.clone().parse_to(first) {
+        if let Some(testing) = parsing.clone().parse_to(second) {
+            if found.len() < testing.len() {
+                return Some(parsing.parse_to(first).unwrap());
+            }
+        }
+    }
+    return None;
+}
+
+pub fn parse_arguments(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo) -> Arguments {
+    let mut output = Vec::new();
+    while let Some(effect) = parse_effect(program, type_manager, parsing, &[b',', b')']) {
+        output.push(effect);
+    }
+    return Arguments::new(output);
 }

@@ -55,7 +55,7 @@ impl<'ctx> Compiler<'ctx> {
             compile_function(function, &self);
         }
 
-        match program.main {
+        match program.static_functions.get("main::main") {
             Some(_main) => {
                 let function =  unsafe { self.execution_engine.get_function("main::main") };
                 return match function {

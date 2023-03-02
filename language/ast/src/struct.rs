@@ -1,4 +1,4 @@
-use std::fmt::Formatter;
+use std::fmt::{Display, Formatter};
 use crate::{DisplayIndented, get_modifier, is_modifier, Modifier};
 use crate::code::MemberField;
 use crate::function::Function;
@@ -16,6 +16,12 @@ impl Struct {
             members,
             name
         }
+    }
+}
+
+impl Display for Struct {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return self.format("", f);
     }
 }
 

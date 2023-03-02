@@ -1,6 +1,4 @@
 use std::fmt::{Display, Formatter};
-use crate::r#struct::Struct;
-use crate::function::Function;
 
 pub mod blocks;
 pub mod r#struct;
@@ -9,35 +7,23 @@ pub mod function;
 pub mod program;
 pub mod type_resolver;
 
-pub enum TopElement {
-    Struct(Struct),
-    Function(Function)
-}
-
-impl DisplayIndented for TopElement {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return match self {
-            TopElement::Struct(class_type) => class_type.format(indent, f),
-            TopElement::Function(function) => function.format(indent, f)
-        }
-    }
-}
-
-impl Display for TopElement {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return self.format("", f);
-    }
-}
-
 #[derive(Clone)]
 pub enum Modifier {
-    Public = 0b0000_0001
+    Public = 0b1,
+    Protected = 0b10,
+    Extern = 0b100,
+    Internal = 0b1000,
+    Operation = 0b1_0000,
 }
 
 impl Display for Modifier {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return match self {
-            Modifier::Public => write!(f, "pub")
+            Modifier::Public => write!(f, "pub"),
+            Modifier::Protected => write!(f, "pub(proj)"),
+            Modifier::Extern => write!(f, "extern"),
+            Modifier::Internal => write!(f, "internal"),
+            Modifier::Operation => write!(f, "operation")
         }
     }
 }
