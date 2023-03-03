@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use ast::program::Program;
+use ast::type_resolver::TypeResolver;
 use crate::top_elements::{parse_top_elements};
 use crate::util::get_line;
 
@@ -177,10 +178,10 @@ impl Display for ParseError {
     }
 }
 
-pub fn parse(program: &mut Program, name: &String, input: String, first_pass: bool) -> Result<(), Vec<ParseError>> {
+pub fn parse<'a>(program: &mut Program<'a>, type_manager: &mut dyn TypeResolver<'a>, name: &String, input: String, first_pass: bool) -> Result<(), Vec<ParseError>> {
     let mut parsing = ParseInfo::new(&input);
 
-    parse_top_elements(program, name, &mut parsing, !first_pass);
+    parse_top_elements(program, type_manager, name, &mut parsing, !first_pass);
 
     if !parsing.errors.is_empty() {
         return Err(parsing.errors);

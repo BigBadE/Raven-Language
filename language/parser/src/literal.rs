@@ -30,7 +30,7 @@ pub fn parse_string(parsing: &mut ParseInfo) -> Option<String> {
     return Some(output)
 }
 
-pub fn parse_number(parsing: &mut ParseInfo) -> Option<Effects> {
+pub fn parse_number<'a>(parsing: &mut ParseInfo) -> Option<Effects<'a>> {
     let start = parsing.index;
     let mut float = false;
     loop {

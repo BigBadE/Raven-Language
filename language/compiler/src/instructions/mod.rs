@@ -37,7 +37,7 @@ pub fn compile_internal<'ctx>(compiler: &Compiler<'ctx>, name: &String, fields: 
 
 fn check_types(fields: &Vec<Field>, checking: Vec<&str>) -> bool {
     for i in 0..fields.len() {
-        if &fields.get(i).unwrap().field_type != checking.get(i).unwrap() {
+        if &fields.get(i).unwrap().field_type.name != checking.get(i).unwrap() {
             return false;
         }
     }

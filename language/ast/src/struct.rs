@@ -3,14 +3,14 @@ use crate::{DisplayIndented, get_modifier, is_modifier, Modifier};
 use crate::code::MemberField;
 use crate::function::Function;
 
-pub struct Struct {
+pub struct Struct<'a> {
     pub modifiers: u8,
-    pub members: Vec<TypeMembers>,
+    pub members: Vec<TypeMembers<'a>>,
     pub name: String
 }
 
-impl Struct {
-    pub fn new(members: Vec<TypeMembers>, modifiers: &[Modifier], name: String) -> Self {
+impl<'a> Struct<'a> {
+    pub fn new(members: Vec<TypeMembers<'a>>, modifiers: &[Modifier], name: String) -> Self {
         return Self {
             modifiers: get_modifier(modifiers),
             members,
@@ -19,13 +19,13 @@ impl Struct {
     }
 }
 
-impl Display for Struct {
+impl<'a> Display for Struct<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return self.format("", f);
     }
 }
 
-impl DisplayIndented for Struct {
+impl<'a> DisplayIndented for Struct<'a> {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         if is_modifier(self.modifiers, Modifier::Public) {
             write!(f, "pub ")?;
@@ -45,12 +45,12 @@ pub trait TypeMember: DisplayIndented {
 
 }
 
-pub enum TypeMembers {
-    Function(Function),
-    Field(MemberField)
+pub enum TypeMembers<'a> {
+    Function(Function<'a>),
+    Field(MemberField<'a>)
 }
 
-impl DisplayIndented for TypeMembers {
+impl<'a> DisplayIndented for TypeMembers<'a> {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         let indent = indent.to_string() + "    ";
         let indent = indent.as_str();

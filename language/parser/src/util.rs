@@ -1,11 +1,10 @@
-use ast::code::Field;
 use ast::function::{Arguments, CodeBody};
 use ast::program::Program;
+use ast::type_resolver::TypeResolver;
 use crate::code::{parse_effect, parse_expression};
 use crate::parser::ParseInfo;
-use crate::types::ParsingTypeResolver;
 
-pub fn parse_fields(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
+pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<(String, String)>> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
     while let Some(found) = find_if_first(parsing, b',', b')') {
@@ -22,17 +21,17 @@ pub fn parse_fields(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
     return Some(output);
 }
 
-fn parse_field(string: String, parser: &mut ParseInfo) -> Option<Field> {
+fn parse_field<'a>(string: String, parser: &mut ParseInfo) -> Option<(String, String)> {
     let parts: Vec<&str> = string.split(':').collect();
     if parts.len() != 2 {
         parser.create_error("Missing or unexpected colon in field.".to_string());
         return None;
     }
 
-    return Some(Field::new(parts[0].to_string(), parts[1].to_string()));
+    return Some((parts[0].to_string(), parts[1].to_string()));
 }
 
-pub fn parse_code_block(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo) -> Option<CodeBody> {
+pub fn parse_code_block<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo) -> Option<CodeBody<'a>> {
     if let None = parsing.parse_to(b'{') {
         parsing.create_error("Expected code body".to_string());
         return None;
@@ -74,7 +73,7 @@ pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<S
     return None;
 }
 
-pub fn parse_arguments(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo) -> Arguments {
+pub fn parse_arguments<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo) -> Arguments<'a> {
     let mut output = Vec::new();
     while let Some(effect) = parse_effect(program, type_manager, parsing, &[b',', b')']) {
         output.push(effect);

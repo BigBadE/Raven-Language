@@ -1,12 +1,12 @@
 use std::mem;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
 use ast::program::Program;
+use ast::type_resolver::TypeResolver;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
 use crate::parser::ParseInfo;
-use crate::types::ParsingTypeResolver;
 use crate::util::{find_if_first, parse_arguments};
 
-pub fn parse_expression(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo) -> Option<Expression> {
+pub fn parse_expression<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo) -> Option<Expression<'a>> {
     return if parsing.matching("return") {
         Some(Expression::new(ExpressionType::Return,
                              parse_effect(program, type_manager, parsing, &[b';', b'}'])
@@ -21,7 +21,7 @@ pub fn parse_expression(program: &Program, type_manager: &ParsingTypeResolver, p
     };
 }
 
-pub fn parse_effect(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo, escape: &[u8]) -> Option<Effects> {
+pub fn parse_effect<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo, escape: &[u8]) -> Option<Effects<'a>> {
     let mut last = None;
     let mut assigning = None;
     if parsing.matching("let") {
@@ -108,8 +108,8 @@ pub fn parse_effect(program: &Program, type_manager: &ParsingTypeResolver, parsi
     };
 }
 
-fn parse_operator(program: &Program, type_manager: &ParsingTypeResolver, parsing: &mut ParseInfo,
-                  last: &mut Option<Effects>, escape: &[u8]) -> Option<Box<OperatorEffect>> {
+fn parse_operator<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo,
+                  last: &mut Option<Effects<'a>>, escape: &[u8]) -> Option<Box<OperatorEffect<'a>>> {
     for (operation, name) in &program.operations {
         let location = parsing.loc();
         if parsing.matching(operation.as_str()) {
