@@ -1,16 +1,25 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 use crate::code::Effects;
-use crate::function::Arguments;
+use crate::function::Function;
 use crate::types::Types;
 
-pub trait TypeResolver<'a> {
-    fn get_type(&self, name: &String) -> Option<&'a Types<'a>>;
+pub trait TypeResolver {
+    fn get_type(&self, name: &String) -> Option<Rc<Types>>;
 
-    fn add_type(&mut self, name: String, types: Types<'a>);
+    fn print(&self);
 
-    fn get_types(&self) -> &HashMap<String, Types>;
+    fn add_operation(&mut self, operation: String, function: String);
 
-    fn get_method_type(&self, name: &String, calling: &Option<Effects>, args: &Arguments) -> Option<&'a Types<'a>>;
+    fn get_operations(&self) -> &HashMap<String, String>;
 
-    fn get_variable_type(&self, name: &String) -> Option<&'a Types<'a>>;
+    fn get_function(&self, name: &String) -> Option<&Function>;
+
+    fn add_function(&mut self, name: String, function: Function);
+
+    fn get_method_type(&self, name: &String, calling: &Option<Effects>, args: &Vec<&Effects>) -> Option<Rc<Types>>;
+
+    fn get_variable_type(&self, name: &String) -> Option<Rc<Types>>;
+
+    fn finalize(&mut self);
 }

@@ -7,7 +7,5 @@ edition = "2021"
 parser = { path = "../parser" }
 ast = { path = "../ast" }
 
-either = "1.8.1"
-
 llvm-sys = "130.0.0"
 inkwell = { version = "0.1.1", features = [ "llvm13-0" ] }

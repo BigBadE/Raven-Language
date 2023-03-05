@@ -1,3 +1,4 @@
+#![feature(get_mut_unchecked)]
 extern crate core;
 
 pub mod instructions;

@@ -1,26 +1,27 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::rc::Rc;
 use crate::r#struct::TypeMember;
 use crate::code::{Effects, Expression, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
 use crate::type_resolver::TypeResolver;
 use crate::types::Types;
 
-pub struct Function<'a> {
+pub struct Function {
     pub attributes: HashMap<String, Attribute>,
     pub modifiers: u8,
-    pub fields: Vec<Field<'a>>,
-    pub code: CodeBody<'a>,
-    pub return_type: Option<&'a Types<'a>>,
+    pub fields: Vec<Field>,
+    pub code: CodeBody,
+    pub return_type: Option<Rc<Types>>,
     pub name: String,
     //Stored until all structs are loaded
     parsing_fields: Vec<(String, String)>,
     parsing_return: Option<String>,
 }
 
-impl<'a> Function<'a> {
+impl Function {
     pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<(String, String)>,
-               code: CodeBody<'a>, return_type: Option<String>, name: String) -> Self {
+               code: CodeBody, return_type: Option<String>, name: String) -> Self {
         return Self {
             attributes,
             modifiers,
@@ -33,7 +34,7 @@ impl<'a> Function<'a> {
         };
     }
 
-    pub fn finalize(&mut self, type_manager: &dyn TypeResolver<'a>) {
+    pub fn finalize(&mut self, type_manager: &dyn TypeResolver) {
         for (name, found_type) in &self.parsing_fields {
             match type_manager.get_type(found_type) {
                 Some(found) => self.fields.push(Field::new(name.clone(), found)),
@@ -69,12 +70,12 @@ impl<'a> Function<'a> {
 }
 
 #[derive(Default)]
-pub struct Arguments<'a> {
-    pub arguments: Vec<Effects<'a>>,
+pub struct Arguments {
+    pub arguments: Vec<Effects>,
 }
 
-impl<'a> Arguments<'a> {
-    pub fn new(arguments: Vec<Effects<'a>>) -> Self {
+impl Arguments {
+    pub fn new(arguments: Vec<Effects>) -> Self {
         return Self {
             arguments
         };
@@ -82,12 +83,12 @@ impl<'a> Arguments<'a> {
 }
 
 #[derive(Default)]
-pub struct CodeBody<'a> {
-    pub expressions: Vec<Expression<'a>>
+pub struct CodeBody {
+    pub expressions: Vec<Expression>
 }
 
-impl<'a> CodeBody<'a> {
-    pub fn new(expressions: Vec<Expression<'a>>) -> Self {
+impl CodeBody {
+    pub fn new(expressions: Vec<Expression>) -> Self {
         return Self {
             expressions
         };
@@ -98,13 +99,13 @@ impl<'a> CodeBody<'a> {
     }
 }
 
-impl<'a> Display for Function<'a> {
+impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return self.format("", f);
     }
 }
 
-impl<'a> DisplayIndented for Function<'a> {
+impl DisplayIndented for Function {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{} fn {}{} ", indent, display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
         if self.return_type.is_some() {
@@ -114,7 +115,7 @@ impl<'a> DisplayIndented for Function<'a> {
     }
 }
 
-impl<'a> DisplayIndented for CodeBody<'a> {
+impl DisplayIndented for CodeBody {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{\n")?;
         for expression in &self.expressions {
@@ -125,7 +126,7 @@ impl<'a> DisplayIndented for CodeBody<'a> {
     }
 }
 
-impl<'a> Display for Arguments<'a> {
+impl Display for Arguments {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", display(&self.arguments));
     }
@@ -143,4 +144,4 @@ pub fn display<T>(input: &Vec<T>) -> String where T : Display {
     return format!("({})", (&output[..output.len() - 2]).to_string());
 }
 
-impl<'a> TypeMember for Function<'a> {}
+impl TypeMember for Function {}

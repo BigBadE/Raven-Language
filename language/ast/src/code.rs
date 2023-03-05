@@ -1,12 +1,13 @@
 use std::fmt::{Display, Formatter};
+use std::rc::Rc;
 use crate::{DisplayIndented, to_modifiers};
 use crate::function::{Arguments, display, Function};
 use crate::type_resolver::TypeResolver;
 use crate::types::Types;
 
-pub struct Expression<'a> {
+pub struct Expression {
     pub expression_type: ExpressionType,
-    pub effect: Effects<'a>
+    pub effect: Effects
 }
 
 #[derive(Clone, Copy)]
@@ -16,24 +17,24 @@ pub enum ExpressionType {
     Line
 }
 
-pub struct Field<'a> {
+pub struct Field {
     pub name: String,
-    pub field_type: &'a Types<'a>
+    pub field_type: Rc<Types>
 }
 
-pub struct MemberField<'a> {
+pub struct MemberField {
     pub modifiers: u8,
-    pub field: Field<'a>
+    pub field: Field
 }
 
-impl<'a> DisplayIndented for MemberField<'a> {
+impl DisplayIndented for MemberField {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}{} {}", indent, display(&to_modifiers(self.modifiers)), self.field);
     }
 }
 
-impl<'a> Expression<'a> {
-    pub fn new(expression_type: ExpressionType, effect: Effects<'a>) -> Self {
+impl Expression {
+    pub fn new(expression_type: ExpressionType, effect: Effects) -> Self {
         return Self {
             expression_type,
             effect
@@ -49,8 +50,8 @@ impl<'a> Expression<'a> {
     }
 }
 
-impl<'a> Field<'a> {
-    pub fn new(name: String, field_type: &'a Types<'a>) -> Self {
+impl Field {
+    pub fn new(name: String, field_type: Rc<Types>) -> Self {
         return Self {
             name,
             field_type
@@ -58,7 +59,7 @@ impl<'a> Field<'a> {
     }
 }
 
-impl<'a> DisplayIndented for Expression<'a> {
+impl DisplayIndented for Expression {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", indent)?;
         match self.expression_type {
@@ -78,32 +79,32 @@ impl<'a> DisplayIndented for Expression<'a> {
     }
 }
 
-impl<'a> Display for Field<'a> {
+impl Display for Field {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}: {}", self.name, self.field_type);
     }
 }
 
-pub trait Effect<'a>: DisplayIndented {
+pub trait Effect: DisplayIndented {
     fn is_return(&self) -> bool;
 
-    fn return_type(&'a self, type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>>;
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>>;
 
     fn get_location(&self) -> (u32, u32);
 }
 
-pub enum Effects<'a> {
+pub enum Effects {
     NOP(),
-    Wrapped(Box<Effects<'a>>),
-    MethodCall(Box<MethodCall<'a>>),
+    Wrapped(Box<Effects>),
+    MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
     FloatEffect(Box<NumberEffect<f64>>),
     IntegerEffect(Box<NumberEffect<i64>>),
-    AssignVariable(Box<AssignVariable<'a>>),
-    OperatorEffect(Box<OperatorEffect<'a>>)
+    AssignVariable(Box<AssignVariable>),
+    OperatorEffect(Box<OperatorEffect>)
 }
 
-impl<'a> Effects<'a> {
+impl Effects {
     pub fn unwrap(&self) -> &dyn Effect {
         return match self {
             Effects::NOP() => panic!("Tried to unwrap a NOP!"),
@@ -118,13 +119,13 @@ impl<'a> Effects<'a> {
     }
 }
 
-impl<'a> Display for Effects<'a> {
+impl Display for Effects {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return self.format("", f);
     }
 }
 
-impl<'a> DisplayIndented for Effects<'a> {
+impl DisplayIndented for Effects {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return match self {
             Effects::Wrapped(effect) => {
@@ -138,15 +139,15 @@ impl<'a> DisplayIndented for Effects<'a> {
     }
 }
 
-pub struct MethodCall<'a> {
-    pub calling: Option<Effects<'a>>,
+pub struct MethodCall {
+    pub calling: Option<Effects>,
     pub method: String,
-    pub arguments: Arguments<'a>,
+    pub arguments: Arguments,
     location: (u32, u32)
 }
 
-impl<'a> MethodCall<'a> {
-    pub fn new(calling: Option<Effects<'a>>, method: String, arguments: Arguments<'a>, location: (u32, u32)) -> Self {
+impl MethodCall {
+    pub fn new(calling: Option<Effects>, method: String, arguments: Arguments, location: (u32, u32)) -> Self {
         return Self {
             calling,
             method,
@@ -156,13 +157,17 @@ impl<'a> MethodCall<'a> {
     }
 }
 
-impl<'a> Effect<'a> for MethodCall<'a> {
+impl Effect for MethodCall {
     fn is_return(&self) -> bool {
         return false;
     }
 
-    fn return_type(&'a self, type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>> {
-        return type_resolver.get_method_type(&self.method, &self.calling, &self.arguments);
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+        let mut output = Vec::new();
+        for arg in &self.arguments.arguments {
+            output.push(arg);
+        }
+        return type_resolver.get_method_type(&self.method, &self.calling, &output);
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -170,7 +175,7 @@ impl<'a> Effect<'a> for MethodCall<'a> {
     }
 }
 
-impl<'a> DisplayIndented for MethodCall<'a> {
+impl DisplayIndented for MethodCall {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         if let Some(value) = &self.calling {
             value.format(indent, f)?;
@@ -194,12 +199,12 @@ impl VariableLoad {
     }
 }
 
-impl<'a> Effect<'a> for VariableLoad {
+impl Effect for VariableLoad {
     fn is_return(&self) -> bool {
         return false;
     }
 
-    fn return_type(&'a self, _type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>> {
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
         return None;
     }
 
@@ -227,7 +232,7 @@ impl<T> NumberEffect<T> where T : Display {
 }
 
 pub trait Typed {
-    fn get_type<'a>() -> &'static str;
+    fn get_type() -> &'static str;
 }
 
 impl Typed for f64 {
@@ -242,12 +247,12 @@ impl Typed for i64 {
     }
 }
 
-impl<'a, T> Effect<'a> for NumberEffect<T> where T : Display + Typed {
+impl<T> Effect for NumberEffect<T> where T : Display + Typed {
     fn is_return(&self) -> bool {
         return false;
     }
 
-    fn return_type(&'a self, type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
         return type_resolver.get_type(&T::get_type().to_string());
     }
 
@@ -262,15 +267,15 @@ impl<T> DisplayIndented for NumberEffect<T> where T : Display {
     }
 }
 
-pub struct AssignVariable<'a> {
+pub struct AssignVariable {
     pub variable: String,
     pub given_type: Option<String>,
-    pub effect: Effects<'a>,
+    pub effect: Effects,
     location: (u32, u32)
 }
 
-impl<'a> AssignVariable<'a> {
-    pub fn new(variable: String, given_type: Option<String>, effect: Effects<'a>, location: (u32, u32)) -> Self {
+impl AssignVariable {
+    pub fn new(variable: String, given_type: Option<String>, effect: Effects, location: (u32, u32)) -> Self {
         return Self {
             variable,
             given_type,
@@ -280,12 +285,12 @@ impl<'a> AssignVariable<'a> {
     }
 }
 
-impl<'a> Effect<'a> for AssignVariable<'a> {
+impl Effect for AssignVariable {
     fn is_return(&self) -> bool {
         return false;
     }
 
-    fn return_type(&'a self, type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
         return self.effect.unwrap().return_type(type_resolver);
     }
 
@@ -294,7 +299,7 @@ impl<'a> Effect<'a> for AssignVariable<'a> {
     }
 }
 
-impl<'a> DisplayIndented for AssignVariable<'a> {
+impl DisplayIndented for AssignVariable {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "let {}", self.variable)?;
         if self.given_type.is_some() {
@@ -305,19 +310,19 @@ impl<'a> DisplayIndented for AssignVariable<'a> {
     }
 }
 
-pub struct OperatorEffect<'a> {
+pub struct OperatorEffect {
     pub operator: String,
     pub operator_symbol: String,
-    pub lhs: Option<Effects<'a>>,
-    pub rhs: Option<Effects<'a>>,
+    pub lhs: Option<Effects>,
+    pub rhs: Option<Effects>,
     pub priority: i8,
     pub parse_left: bool,
-    return_type: Option<&'a Types<'a>>,
+    parent_function: String,
     location: (u32, u32)
 }
 
-impl<'a> OperatorEffect<'a> {
-    pub fn new(operator: &String, function: &Function<'a>, lhs: Option<Effects<'a>>, rhs: Option<Effects<'a>>, location: (u32, u32)) -> Self {
+impl OperatorEffect {
+    pub fn new(operator: &String, function: &Function, lhs: Option<Effects>, rhs: Option<Effects>, location: (u32, u32)) -> Self {
         return Self {
             operator: function.name.clone(),
             operator_symbol: operator.clone(),
@@ -327,25 +332,32 @@ impl<'a> OperatorEffect<'a> {
                 .map_or(0, |attrib| attrib.value.parse().expect("Expected numerical priority!")),
             parse_left: function.attributes.get("parse_left")
                 .map_or(true, |attrib| attrib.value.parse().expect("Expected boolean parse_left!")),
-            return_type: function.return_type.clone(),
+            parent_function: function.name.clone(),
             location
         }
     }
 }
 
-impl<'a> Display for OperatorEffect<'a> {
+impl Display for OperatorEffect {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return self.format("", f);
     }
 }
 
-impl<'a> Effect<'a> for OperatorEffect<'a> {
+impl Effect for OperatorEffect {
     fn is_return(&self) -> bool {
         return false;
     }
 
-    fn return_type(&'a self, _type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>> {
-        return self.return_type;
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+        let mut output = Vec::new();
+        if let Some(value) = &self.lhs {
+            output.push(value);
+        }
+        if let Some(value) = &self.rhs {
+            output.push(value);
+        }
+        return type_resolver.get_method_type(&self.parent_function, &None, &output);
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -353,7 +365,7 @@ impl<'a> Effect<'a> for OperatorEffect<'a> {
     }
 }
 
-impl<'a> DisplayIndented for OperatorEffect<'a> {
+impl DisplayIndented for OperatorEffect {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return match &self.lhs {
             Some(lhs) => match &self.rhs {

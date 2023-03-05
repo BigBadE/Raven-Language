@@ -3,9 +3,7 @@ use std::fmt::{Display, Formatter};
 pub mod blocks;
 pub mod r#struct;
 pub mod code;
-pub mod compiler;
 pub mod function;
-pub mod program;
 pub mod types;
 pub mod type_resolver;
 

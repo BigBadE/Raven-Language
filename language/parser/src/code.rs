@@ -1,27 +1,26 @@
 use std::mem;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
-use ast::program::Program;
 use ast::type_resolver::TypeResolver;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
 use crate::parser::ParseInfo;
 use crate::util::{find_if_first, parse_arguments};
 
-pub fn parse_expression<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo) -> Option<Expression<'a>> {
+pub fn parse_expression(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Expression> {
     return if parsing.matching("return") {
         Some(Expression::new(ExpressionType::Return,
-                             parse_effect(program, type_manager, parsing, &[b';', b'}'])
+                             parse_effect(type_manager, parsing, &[b';', b'}'])
                                  .unwrap_or(Effects::NOP())))
     } else if parsing.matching("break") {
         Some(Expression::new(ExpressionType::Break,
-                             parse_effect(program, type_manager, parsing, &[b';', b'}'])
+                             parse_effect(type_manager, parsing, &[b';', b'}'])
                                  .unwrap_or(Effects::NOP())))
     } else {
         Some(Expression::new(ExpressionType::Line,
-                             parse_effect(program, type_manager, parsing, &[b';', b'}'])?))
+                             parse_effect(type_manager, parsing, &[b';', b'}'])?))
     };
 }
 
-pub fn parse_effect<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo, escape: &[u8]) -> Option<Effects<'a>> {
+pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, escape: &[u8]) -> Option<Effects> {
     let mut last = None;
     let mut assigning = None;
     if parsing.matching("let") {
@@ -47,7 +46,7 @@ pub fn parse_effect<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'
             _ if escape.contains(&next) => break,
             b'(' => {
                 last = Some(Effects::Wrapped(Box::new(
-                    parse_effect(program, type_manager, parsing, &[b')', b'}', b';'])?)));
+                    parse_effect(type_manager, parsing, &[b')', b'}', b';'])?)));
                 if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
                     parsing.create_error("Missing end of parenthesis!".to_string());
                 }
@@ -63,7 +62,7 @@ pub fn parse_effect<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'
                         let location = parsing.loc();
                         last = Some(Effects::MethodCall(Box::new(
                             MethodCall::new(last, found,
-                                            parse_arguments(program, type_manager, parsing), location))));
+                                            parse_arguments(type_manager, parsing), location))));
                     }
                     _ => {
                         parsing.create_error("Unexpected character".to_string());
@@ -83,7 +82,7 @@ pub fn parse_effect<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'
             }
             _ => {
                 parsing.index -= 1;
-                match parse_operator(program, type_manager, parsing, &mut last, escape) {
+                match parse_operator(type_manager, parsing, &mut last, escape) {
                     Some(mut operator) => last = Some(match last {
                         Some(found) => {
                             operator.lhs = Some(found);
@@ -108,13 +107,12 @@ pub fn parse_effect<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'
     };
 }
 
-fn parse_operator<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo,
-                  last: &mut Option<Effects<'a>>, escape: &[u8]) -> Option<Box<OperatorEffect<'a>>> {
-    for (operation, name) in &program.operations {
+fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
+                  last: &mut Option<Effects>, escape: &[u8]) -> Option<Box<OperatorEffect>> {
+    for (operation, name) in type_manager.get_operations() {
         let location = parsing.loc();
         if parsing.matching(operation.as_str()) {
-            let function = &program.static_functions;
-            let found = function.get(name).unwrap();
+            let found = type_manager.get_function(name).unwrap();
 
             match found.attributes.get("right_sided") {
                 Some(_attribute) => {
@@ -137,7 +135,7 @@ fn parse_operator<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>
                 None => {}
             }
 
-            let effect = match parse_effect(program, type_manager, parsing, escape) {
+            let effect = match parse_effect(type_manager, parsing, escape) {
                 Some(effect) => effect,
                 None => {
                     parsing.create_error("Unexpected end of line!".to_string());

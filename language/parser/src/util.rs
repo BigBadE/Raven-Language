@@ -1,5 +1,4 @@
 use ast::function::{Arguments, CodeBody};
-use ast::program::Program;
 use ast::type_resolver::TypeResolver;
 use crate::code::{parse_effect, parse_expression};
 use crate::parser::ParseInfo;
@@ -31,14 +30,14 @@ fn parse_field<'a>(string: String, parser: &mut ParseInfo) -> Option<(String, St
     return Some((parts[0].to_string(), parts[1].to_string()));
 }
 
-pub fn parse_code_block<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo) -> Option<CodeBody<'a>> {
+pub fn parse_code_block(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<CodeBody> {
     if let None = parsing.parse_to(b'{') {
         parsing.create_error("Expected code body".to_string());
         return None;
     }
 
     let mut expressions = Vec::new();
-    while let Some(expression) = parse_expression(program, type_manager, parsing) {
+    while let Some(expression) = parse_expression(type_manager, parsing) {
         expressions.push(expression);
 
         match parsing.next_included() {
@@ -73,9 +72,9 @@ pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<S
     return None;
 }
 
-pub fn parse_arguments<'a>(program: &Program<'a>, type_manager: &dyn TypeResolver<'a>, parsing: &mut ParseInfo) -> Arguments<'a> {
+pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Arguments {
     let mut output = Vec::new();
-    while let Some(effect) = parse_effect(program, type_manager, parsing, &[b',', b')']) {
+    while let Some(effect) = parse_effect(type_manager, parsing, &[b',', b')']) {
         output.push(effect);
     }
     return Arguments::new(output);

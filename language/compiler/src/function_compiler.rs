@@ -1,4 +1,4 @@
-use either::Either;
+use std::ops::Deref;
 use inkwell::types::{AsTypeRef, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
 use llvm_sys::core::LLVMFunctionType;
@@ -6,11 +6,12 @@ use llvm_sys::prelude::LLVMTypeRef;
 use ast::code::{Effects, ExpressionType};
 use ast::function::Function;
 use ast::{is_modifier, Modifier};
+use ast::type_resolver::TypeResolver;
 use crate::compiler::Compiler;
 use crate::instructions::compile_internal;
 use crate::types::type_resolver::CompilerTypeResolver;
 
-pub fn get_function_value<'ctx>(function: &Function<'ctx>, compiler: &'ctx Compiler<'ctx>) -> FunctionValue<'ctx> {
+pub fn get_function_value<'ctx>(function: &Function, compiler: &Compiler<'ctx>) -> FunctionValue<'ctx> {
     let return_type = match &function.return_type {
         Some(found) => compiler.get_llvm_type(found).as_type_ref(),
         None => compiler.context.void_type().as_type_ref()
@@ -27,14 +28,17 @@ pub fn get_function_value<'ctx>(function: &Function<'ctx>, compiler: &'ctx Compi
     return compiler.module.add_function(function.name.as_str(), fn_type, None);
 }
 
-pub fn compile_function<'ctx>(function: &'ctx Function<'ctx>, type_manager: &mut CompilerTypeResolver<'ctx>, compiler: &'ctx Compiler<'ctx>) {
-    let value = compiler.functions.get(&function.name).unwrap().1;
+pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) {
+    let value = compiler.type_manager.functions.get(&function.name).unwrap().1.unwrap();
     let block = compiler.context.append_basic_block(value, "entry");
     compiler.builder.position_at_end(block);
     if is_modifier(function.modifiers, Modifier::Internal) {
         compile_internal(compiler, &function.name, &function.fields, value);
-    } else if is_modifier(function.modifiers, Modifier::Extern) {} else {
-        compile_block(function, &mut type_manager.clone(), &compiler);
+    } else if is_modifier(function.modifiers, Modifier::Extern) {
+        todo!()
+    } else {
+        let mut function_types = compiler.type_manager.clone();
+        compile_block(function, &mut function_types, &compiler);
 
         if !function.code.is_return() {
             match &function.return_type {
@@ -45,8 +49,8 @@ pub fn compile_function<'ctx>(function: &'ctx Function<'ctx>, type_manager: &mut
     }
 }
 
-pub fn compile_block<'ctx>(function: &'ctx Function<'ctx>, variables: &mut CompilerTypeResolver<'ctx>,
-                           compiler: &'ctx Compiler<'ctx>) {
+pub fn compile_block<'ctx>(function: &Function, variables: &mut CompilerTypeResolver<'ctx>,
+                           compiler: &Compiler<'ctx>) {
     for line in &function.code.expressions {
         match line.expression_type {
             ExpressionType::Return => {
@@ -65,8 +69,8 @@ pub fn compile_block<'ctx>(function: &'ctx Function<'ctx>, variables: &mut Compi
     }
 }
 
-pub fn compile_effect<'ctx>(compiler: &'ctx Compiler<'ctx>, variables: &'ctx mut CompilerTypeResolver<'ctx>,
-                            effect: &'ctx Effects<'ctx>) -> BasicValueEnum<'ctx> {
+pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, variables: &mut CompilerTypeResolver<'ctx>,
+                            effect: &Effects) -> BasicValueEnum<'ctx> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Wrapped(effect) => compile_effect(compiler, variables, effect),
@@ -81,11 +85,8 @@ pub fn compile_effect<'ctx>(compiler: &'ctx Compiler<'ctx>, variables: &'ctx mut
                 arguments.push(From::from(compile_effect(compiler, variables, argument)))
             }
 
-            match compiler.builder.build_call(compiler.functions.get(&effect.method).unwrap().1,
-                                              arguments.as_slice(), effect.method.as_str()).try_as_basic_value() {
-                Either::Left(value) => value,
-                Either::Right(_) => panic!("I have no idea how you got here.")
-            }
+            compiler.builder.build_call(compiler.type_manager.functions.get(&effect.method).unwrap().1.unwrap(),
+                                              arguments.as_slice(), effect.method.as_str()).try_as_basic_value().left().unwrap()
         }
         Effects::OperatorEffect(effect) => {
             let mut arguments = Vec::new();
@@ -98,11 +99,8 @@ pub fn compile_effect<'ctx>(compiler: &'ctx Compiler<'ctx>, variables: &'ctx mut
                 arguments.push(From::from(compile_effect(compiler, variables, rhs)));
             }
 
-            match compiler.builder.build_call(compiler.functions.get(&effect.operator).unwrap().1,
-                                              arguments.as_slice(), effect.operator.as_str()).try_as_basic_value() {
-                Either::Left(value) => value,
-                Either::Right(_) => panic!("I have no idea how you got here.")
-            }
+            compiler.builder.build_call(compiler.type_manager.functions.get(&effect.operator).unwrap().1.unwrap(),
+                                              arguments.as_slice(), effect.operator.as_str()).try_as_basic_value().left().unwrap()
         }
         Effects::VariableLoad(effect) =>
             variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone(),
@@ -111,11 +109,11 @@ pub fn compile_effect<'ctx>(compiler: &'ctx Compiler<'ctx>, variables: &'ctx mut
                 match variable.effect.unwrap().return_type(variables) {
                     Some(found_type) => found_type,
                     None => match &variable.given_type {
-                        Some(found_type) => compiler.types.get_type_err(found_type.as_str()),
+                        Some(found_type) => compiler.type_manager.get_type(found_type).unwrap(),
                         None => panic!("Unable to find type for variable {}
                     (assign it using a let statement to specify the type)", variable.variable)
                     }
-                }), variable.variable.as_str());
+                }.deref()), variable.variable.as_str());
             let value = compile_effect(compiler, variables, &variable.effect);
 
             variables.variables.insert(variable.variable.clone(), value);

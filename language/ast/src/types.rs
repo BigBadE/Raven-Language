@@ -1,17 +1,19 @@
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
+use std::rc::Rc;
 use crate::r#struct::Struct;
 
-pub struct Types<'a> {
+pub struct Types {
     pub name: String,
-    pub structure: Struct<'a>,
-    pub parent: Option<&'a Types<'a>>,
-    pub traits: Vec<Types<'a>>,
+    pub structure: Struct,
+    pub parent: Option<Rc<Types>>,
+    pub traits: Vec<Rc<Types>>,
     pub is_trait: bool
 }
 
-impl<'a> Types<'a> {
-    pub fn new_struct(structure: Struct<'a>, parent: Option<&'a Types<'a>>, traits: Vec<Types<'a>>) -> Self {
+impl Types {
+    pub fn new_struct(structure: Struct, parent: Option<Rc<Types>>, traits: Vec<Rc<Types>>) -> Self {
         return Self {
             name: structure.name.clone(),
             structure,
@@ -21,7 +23,7 @@ impl<'a> Types<'a> {
         }
     }
 
-    pub fn new_trait(structure: Struct<'a>, parent: Option<&'a Types<'a>>) -> Self {
+    pub fn new_trait(structure: Struct, parent: Option<Rc<Types>>) -> Self {
         return Self {
             name: structure.name.clone(),
             structure,
@@ -31,16 +33,16 @@ impl<'a> Types<'a> {
         }
     }
 
-    pub fn is_type(&self, other: Types) -> bool {
+    pub fn is_type(&self, other: Rc<Types>) -> bool {
         let mut parent = self;
         loop {
             if parent.traits.contains(&other) {
                 return true;
             }
-            if parent == &other {
+            if parent == other.deref() {
                 return true;
             }
-            if let Some(next_parent) = parent.parent {
+            if let Some(next_parent) = &parent.parent {
                 parent = next_parent;
             } else {
                 break
@@ -50,21 +52,21 @@ impl<'a> Types<'a> {
     }
 }
 
-impl<'a> Hash for Types<'a> {
+impl Hash for Types {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
     }
 }
 
-impl<'a> Display for Types<'a> {
+impl Display for Types {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", self.name);
     }
 }
 
-impl<'a> Eq for Types<'a> {}
+impl Eq for Types {}
 
-impl<'a> PartialEq for Types<'a> {
+impl PartialEq for Types {
     fn eq(&self, other: &Self) -> bool {
         return self.name == other.name;
     }

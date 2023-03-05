@@ -1,17 +1,18 @@
 use std::fmt::Formatter;
+use std::rc::Rc;
 use crate::code::{Effect, Effects};
 use crate::DisplayIndented;
 use crate::function::CodeBody;
 use crate::type_resolver::TypeResolver;
 use crate::types::Types;
 
-pub struct ForStatement<'a> {
+pub struct ForStatement {
     pub variable: String,
-    pub effect: Effects<'a>,
-    pub code_block: CodeBody<'a>
+    pub effect: Effects,
+    pub code_block: CodeBody
 }
 
-impl<'a> DisplayIndented for ForStatement<'a> {
+impl DisplayIndented for ForStatement {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "for {} in {} ", self.variable, self.effect)?;
         let indent = indent.to_string() + "    ";
@@ -19,7 +20,7 @@ impl<'a> DisplayIndented for ForStatement<'a> {
     }
 }
 
-impl<'a> Effect<'a> for ForStatement<'a> {
+impl Effect for ForStatement {
     fn is_return(&self) -> bool {
         for expression in &self.code_block.expressions {
             if expression.effect.unwrap().is_return() {
@@ -29,7 +30,7 @@ impl<'a> Effect<'a> for ForStatement<'a> {
         return false;
     }
 
-    fn return_type(&'a self, _type_resolver: &'a dyn TypeResolver) -> Option<&'a Types<'a>> {
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
         todo!()
     }
 
