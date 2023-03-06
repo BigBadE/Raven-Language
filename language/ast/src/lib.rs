@@ -52,7 +52,7 @@ pub fn to_modifiers(from: u8) -> Vec<Modifier> {
 }
 
 pub trait DisplayIndented {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
+    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
 }
 
 pub struct Attribute {

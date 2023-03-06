@@ -1,7 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use crate::{DisplayIndented, to_modifiers};
-use crate::function::{Arguments, display, Function};
+use crate::blocks::IfStatement;
+use crate::function::{Arguments, CodeBody, display, Function};
 use crate::type_resolver::TypeResolver;
 use crate::types::Types;
 
@@ -96,6 +97,8 @@ pub trait Effect: DisplayIndented {
 pub enum Effects {
     NOP(),
     Wrapped(Box<Effects>),
+    CodeBody(Box<CodeBody>),
+    IfStatement(Box<IfStatement>),
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
     FloatEffect(Box<NumberEffect<f64>>),
@@ -109,6 +112,8 @@ impl Effects {
         return match self {
             Effects::NOP() => panic!("Tried to unwrap a NOP!"),
             Effects::Wrapped(effect) => effect.unwrap(),
+            Effects::CodeBody(effect) => effect.as_ref(),
+            Effects::IfStatement(effect) => effect.as_ref(),
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
             Effects::FloatEffect(effect) => effect.as_ref(),

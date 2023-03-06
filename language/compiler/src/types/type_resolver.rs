@@ -27,6 +27,7 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
 
         add_primitive("f64", context.f64_type().as_basic_type_enum(), &mut types, &mut llvm_types);
         add_primitive("i64", context.i64_type().as_basic_type_enum(), &mut types, &mut llvm_types);
+        add_primitive("bool", context.bool_type().as_basic_type_enum(), &mut types, &mut llvm_types);
 
         return Self {
             functions: Rc::new(HashMap::new()),

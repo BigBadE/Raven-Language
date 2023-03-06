@@ -1,9 +1,11 @@
+use std::io::read_to_string;
 use std::mem;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
 use ast::type_resolver::TypeResolver;
+use crate::conditional::parse_if;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
 use crate::parser::ParseInfo;
-use crate::util::{find_if_first, parse_arguments};
+use crate::util::{find_if_first, parse_arguments, parse_code_block};
 
 pub fn parse_expression(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Expression> {
     return if parsing.matching("return") {
@@ -38,61 +40,71 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
     }
 
     if parsing.matching("if") {
-        
-    }
-    
-    while let Some(next) = parsing.next_included() {
-        match next {
-            _ if escape.contains(&next) => break,
-            b'(' => {
-                last = Some(Effects::Wrapped(Box::new(
-                    parse_effect(type_manager, parsing, &[b')', b'}', b';'])?)));
-                if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
-                    parsing.create_error("Missing end of parenthesis!".to_string());
-                }
-            }
-            b'0'..=b'9' => {
-                parsing.index -= 1;
-                last = parse_number(parsing)
-            }
-            b'.' => {
-                let found = parse_ident(parsing);
-                match parsing.buffer[parsing.index] {
-                    b'(' => {
-                        let location = parsing.loc();
-                        last = Some(Effects::MethodCall(Box::new(
-                            MethodCall::new(last, found,
-                                            parse_arguments(type_manager, parsing), location))));
-                    }
-                    _ => {
-                        parsing.create_error("Unexpected character".to_string());
-                    }
-                }
-            }
-            val if (val > b'a' && val < b'z') || (val > b'A' && val < b'Z') => {
-                parsing.index -= 1;
-                let name = parse_with_references(parsing);
-                match parsing.buffer[parsing.index] {
-                    b'!' => todo!(),
-                    _ => {
-                        parsing.index -= 1;
-                        last = Some(Effects::VariableLoad(Box::new(VariableLoad::new(name, parsing.loc()))));
-                    }
-                }
-            }
-            _ => {
-                parsing.index -= 1;
-                match parse_operator(type_manager, parsing, &mut last, escape) {
-                    Some(mut operator) => last = Some(match last {
-                        Some(found) => {
-                            operator.lhs = Some(found);
-                            assign_with_priority(operator)
+        last = parse_if(type_manager, parsing);
+    } else {
+        while let Some(next) = parsing.next_included() {
+            match next {
+                _ if escape.contains(&next) => break,
+                b'{' => {
+                    parsing.index -= 1;
+                    match parse_code_block(type_manager, parsing) {
+                        Some(body) => last = Some(Effects::CodeBody(Box::new(body))),
+                        None => {
+                            parsing.create_error("Invalid code block!".to_string());
+                            return None;
                         }
-                        None => Effects::OperatorEffect(operator)
-                    }),
-                    None => continue
+                    }
                 }
-                break;
+                b'(' => {
+                    last = Some(Effects::Wrapped(Box::new(
+                        parse_effect(type_manager, parsing, &[b')', b'}', b';'])?)));
+                    if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
+                        parsing.create_error("Missing end of parenthesis!".to_string());
+                    }
+                }
+                b'0'..=b'9' => {
+                    parsing.index -= 1;
+                    last = parse_number(parsing)
+                }
+                b'.' => {
+                    let found = parse_ident(parsing);
+                    match parsing.buffer[parsing.index] {
+                        b'(' => {
+                            let location = parsing.loc();
+                            last = Some(Effects::MethodCall(Box::new(
+                                MethodCall::new(last, found,
+                                                parse_arguments(type_manager, parsing), location))));
+                        }
+                        _ => {
+                            parsing.create_error("Unexpected character".to_string());
+                        }
+                    }
+                }
+                val if (val > b'a' && val < b'z') || (val > b'A' && val < b'Z') => {
+                    parsing.index -= 1;
+                    let name = parse_with_references(parsing);
+                    match parsing.buffer[parsing.index] {
+                        b'!' => todo!(),
+                        _ => {
+                            parsing.index -= 1;
+                            last = Some(Effects::VariableLoad(Box::new(VariableLoad::new(name, parsing.loc()))));
+                        }
+                    }
+                }
+                _ => {
+                    parsing.index -= 1;
+                    match parse_operator(type_manager, parsing, &mut last, escape) {
+                        Some(mut operator) => last = Some(match last {
+                            Some(found) => {
+                                operator.lhs = Some(found);
+                                assign_with_priority(operator)
+                            }
+                            None => Effects::OperatorEffect(operator)
+                        }),
+                        None => continue
+                    }
+                    break;
+                }
             }
         }
     }

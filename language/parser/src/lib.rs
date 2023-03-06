@@ -4,6 +4,7 @@ use ast::type_resolver::TypeResolver;
 use crate::parser::ParseError;
 
 pub mod code;
+pub mod conditional;
 pub mod literal;
 pub mod parser;
 pub mod top_elements;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use crate::r#struct::TypeMember;
-use crate::code::{Effects, Expression, Field};
+use crate::code::{Effect, Effects, Expression, ExpressionType, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
 use crate::type_resolver::TypeResolver;
 use crate::types::Types;
@@ -96,6 +96,30 @@ impl CodeBody {
 
     pub fn is_return(&self) -> bool {
         return self.expressions.iter().find(|expression| expression.is_return()).is_some()
+    }
+}
+
+impl Effect for CodeBody {
+    fn is_return(&self) -> bool {
+        for expression in &self.expressions {
+            if expression.is_return() {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+        for expression in &self.expressions {
+            if let ExpressionType::Break = expression.expression_type {
+                return expression.effect.unwrap().return_type(type_resolver);
+            }
+        }
+        return None;
+    }
+
+    fn get_location(&self) -> (u32, u32) {
+        todo!()
     }
 }
 

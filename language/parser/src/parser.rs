@@ -8,6 +8,7 @@ pub struct ParseInfo<'a> {
     pub errors: Vec<ParseError>,
     pub buffer: &'a [u8],
     pub index: usize,
+    pub indent: String,
     pub len: usize,
     line: u32,
     line_index: usize
@@ -20,6 +21,7 @@ impl<'a> ParseInfo<'a> {
             len: buffer.len() as usize,
             buffer: buffer.as_bytes(),
             index: 0,
+            indent: String::new(),
             line: 1,
             line_index: 0
         }
