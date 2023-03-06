@@ -48,7 +48,6 @@ impl<'ctx> Compiler<'ctx> {
     }
 
     pub fn compile(&mut self) -> Option<JitFunction<'ctx, Main>> {
-
         //Add them to functions for function calls
         for (_name, (function, function_value)) in
         unsafe { Rc::get_mut_unchecked(&mut self.type_manager.functions.clone()) } {

@@ -11,6 +11,7 @@ use ast::type_resolver::TypeResolver;
 use crate::compiler::Compiler;
 use crate::instructions::compile_internal;
 use crate::types::type_resolver::CompilerTypeResolver;
+use crate::util::print_formatted;
 
 pub fn get_function_value<'ctx>(function: &Function, compiler: &Compiler<'ctx>) -> FunctionValue<'ctx> {
     let return_type = match &function.return_type {
@@ -38,6 +39,9 @@ pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) {
     } else {
         let mut function_types = compiler.type_manager.clone();
         compile_block(&function.code, value, &mut function_types, &compiler, &mut 0);
+        println!("Func:");
+        print_formatted(value.to_string());
+        compiler.builder.build_return(None);
 
         if !function.code.is_return() {
             match &function.return_type {
@@ -49,7 +53,7 @@ pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) {
 }
 
 pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, variables: &mut CompilerTypeResolver<'ctx>,
-                           compiler: &Compiler<'ctx>, id: &mut u64) -> (Option<BasicValueEnum<'ctx>>, BasicBlock<'ctx>) {
+                           compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
     let block = compiler.context.append_basic_block(function, id.to_string().as_str());
     *id += 1;
     compiler.builder.position_at_end(block);
@@ -59,7 +63,8 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, varia
                 match &line.effect {
                     Effects::NOP() => {}
                     _ => {
-                        compiler.builder.build_return(Some(&compile_effect(compiler, function, variables, &line.effect, id).unwrap()));
+                        compiler.builder.build_return(Some(&
+                            compile_effect(compiler, function, variables, &line.effect, id).unwrap()));
                     }
                 }
             }
@@ -90,34 +95,66 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, function: FunctionValue<'
             }
 
             Some(compiler.builder.build_call(compiler.type_manager.functions.get(&effect.method).unwrap().1.unwrap(),
-                                        arguments.as_slice(), effect.method.as_str()).try_as_basic_value().left().unwrap())
+                                             arguments.as_slice(), effect.method.as_str()).try_as_basic_value().left().unwrap())
         }
         Effects::CodeBody(effect) => {
-            let block = compile_block(effect, function, &mut variables.clone(), compiler, id);
-            compiler.builder.build_unconditional_branch(block);
+            let value = function.get_basic_blocks();
+            let value = value.get(*id as usize - 1).unwrap();
+            //Start block
+            let start = compile_block(effect, function, &mut variables.clone(), compiler, id);
+            compiler.builder.position_at_end(*value);
+            compiler.builder.build_unconditional_branch(start);
+            compiler.builder.position_at_end(start);
+
+            //End block
+            let end = compiler.context.append_basic_block(function, id.to_string().as_str());
+            *id += 1;
+            compiler.builder.build_unconditional_branch(end);
+            compiler.builder.position_at_end(end);
             None
-        },
+        }
         Effects::IfStatement(effect) => {
             let mut blocks = Vec::new();
 
-            blocks.push(compile_block(&effect.body, function, &mut variables.clone(), compiler, id));
-            compiler.builder.build_conditional_branch()
-            for block in effect.else_ifs {
-                blocks.push(compile_block(&effect.body, function, &mut variables.clone(), compiler, id));
+            //End block
+            let end = compiler.context.append_basic_block(function, id.to_string().as_str());
+            *id += 1;
+
+            let start = compile_block(&effect.body, function, &mut variables.clone(), compiler, id);
+            blocks.push((start, &effect.condition));
+
+            for (block, effect) in &effect.else_ifs {
+                let block = compile_block(&block, function, &mut variables.clone(), compiler, id);
+                blocks.push((block, &effect));
             }
 
+            let mut last;
             if effect.else_body.is_some() {
-                blocks.push(compile_block(&effect.else_body.unwrap(), function, &mut variables.clone(), compiler, id));
+                last = compile_block(&effect.else_body.as_ref().unwrap(), function, &mut variables.clone(), compiler, id);
+            } else {
+                last = compiler.context.append_basic_block(function, id.to_string().as_str());
+                *id += 1;
             }
+
+            for (elseif_block, condition) in blocks.iter().rev() {
+                compiler.builder.position_at_end(*elseif_block);
+                compiler.builder.build_conditional_branch(
+                    compile_effect(compiler, function, variables, condition, id).unwrap().into_int_value(),
+                    *elseif_block, last);
+                last = *elseif_block;
+            }
+
+            compiler.builder.position_at_end(end);
 
             return match effect.return_type(&compiler.type_manager) {
                 Some(return_type) => {
                     let phi = compiler.builder.build_phi(*compiler.get_llvm_type(return_type.deref()), "wtf?");
-                    phi.add_incoming(blocks.as_slice());
-                    Some(phi)
+                    todo!();
+                    //phi.add_incoming(blocks.as_slice());
+                    Some(phi.as_basic_value())
                 }
                 None => None
-            }
+            };
         }
         Effects::OperatorEffect(effect) => {
             let mut arguments = Vec::new();
@@ -131,7 +168,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, function: FunctionValue<'
             }
 
             Some(compiler.builder.build_call(compiler.type_manager.functions.get(&effect.operator).unwrap().1.unwrap(),
-                                        arguments.as_slice(), effect.operator.as_str()).try_as_basic_value().left().unwrap())
+                                             arguments.as_slice(), effect.operator.as_str()).try_as_basic_value().left().unwrap())
         }
         Effects::VariableLoad(effect) =>
             Some(variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone()),

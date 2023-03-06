@@ -84,7 +84,7 @@ impl Arguments {
 
 #[derive(Default)]
 pub struct CodeBody {
-    pub expressions: Vec<Expression>
+    pub expressions: Vec<Expression>,
 }
 
 impl CodeBody {
@@ -95,7 +95,7 @@ impl CodeBody {
     }
 
     pub fn is_return(&self) -> bool {
-        return self.expressions.iter().find(|expression| expression.is_return()).is_some()
+        return self.expressions.iter().find(|expression| expression.is_return()).is_some();
     }
 }
 
@@ -106,6 +106,10 @@ impl Effect for CodeBody {
                 return true;
             }
         }
+        return false;
+    }
+
+    fn has_return(&self) -> bool {
         return false;
     }
 
@@ -131,32 +135,42 @@ impl Display for Function {
 
 impl DisplayIndented for Function {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} fn {}{} ", indent, display(&to_modifiers(self.modifiers)), self.name, display(&self.fields))?;
+        write!(f, "{}{} fn {}{} ", indent, display_joined(&to_modifiers(self.modifiers)),
+               self.name, display(&self.fields))?;
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
-        return self.code.format((indent.to_string() + "    ").as_str(), f);
+        return self.code.format(indent, f);
     }
 }
 
 impl DisplayIndented for CodeBody {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{\n")?;
+        let deeper_indent = indent.to_string() + "    ";
         for expression in &self.expressions {
-            expression.format(indent, f)?;
+            expression.format(deeper_indent.as_str(), f)?;
         }
-        write!(f, "}}\n")?;
+        write!(f, "{}}}", indent)?;
         return Ok(());
     }
 }
 
 impl Display for Arguments {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}", display(&self.arguments));
+        return write!(f, "{}", display_joined(&self.arguments));
     }
 }
 
-pub fn display<T>(input: &Vec<T>) -> String where T : Display {
+pub fn display_joined<T>(input: &Vec<T>) -> String where T: Display {
+    let mut output = String::new();
+    for element in input {
+        output += &*format!("{} ", element);
+    }
+    return output[..output.len()-1].to_string();
+}
+
+pub fn display<T>(input: &Vec<T>) -> String where T: Display {
     if input.is_empty() {
         return "()".to_string();
     }
@@ -165,6 +179,7 @@ pub fn display<T>(input: &Vec<T>) -> String where T : Display {
     for element in input {
         output += &*format!("{}, ", element);
     }
+
     return format!("({})", (&output[..output.len() - 2]).to_string());
 }
 

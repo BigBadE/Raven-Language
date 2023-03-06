@@ -1,11 +1,6 @@
-use std::fmt::Formatter;
-use std::rc::Rc;
 use ast::blocks::IfStatement;
 use ast::code::{Effect, Effects};
-use ast::DisplayIndented;
-use ast::function::CodeBody;
 use ast::type_resolver::TypeResolver;
-use ast::types::Types;
 use crate::code::parse_effect;
 use crate::parser::ParseInfo;
 use crate::util::parse_code_block;

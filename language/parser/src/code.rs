@@ -1,4 +1,3 @@
-use std::io::read_to_string;
 use std::mem;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
 use ast::type_resolver::TypeResolver;

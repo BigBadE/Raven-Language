@@ -49,12 +49,12 @@ impl<'ctx> TypeResolver for CompilerTypeResolver<'ctx> {
     }
 
     fn print(&self) {
-        for (static_function, _ignored) in self.functions.deref() {
-            println!("{}", static_function);
+        for (_name, (static_function, _function_type)) in self.functions.deref() {
+            println!("{}\n", static_function);
         }
 
         for types in self.types.values() {
-            println!("{}", types.structure);
+            println!("{}\n", types.structure);
         }
     }
 

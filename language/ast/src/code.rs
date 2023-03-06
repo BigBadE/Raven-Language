@@ -76,7 +76,10 @@ impl DisplayIndented for Expression {
             write!(f, " ")?;
         }
         self.effect.format(indent, f)?;
-        return write!(f, ";\n");
+        if self.effect.unwrap().has_return() {
+            return write!(f, ";\n");
+        }
+        return write!(f, "\n");
     }
 }
 
@@ -88,6 +91,8 @@ impl Display for Field {
 
 pub trait Effect: DisplayIndented {
     fn is_return(&self) -> bool;
+
+    fn has_return(&self) -> bool;
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>>;
 
@@ -167,6 +172,10 @@ impl Effect for MethodCall {
         return false;
     }
 
+    fn has_return(&self) -> bool {
+        return true;
+    }
+
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
         let mut output = Vec::new();
         for arg in &self.arguments.arguments {
@@ -207,6 +216,10 @@ impl VariableLoad {
 impl Effect for VariableLoad {
     fn is_return(&self) -> bool {
         return false;
+    }
+
+    fn has_return(&self) -> bool {
+        return true;
     }
 
     fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
@@ -257,6 +270,10 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
         return false;
     }
 
+    fn has_return(&self) -> bool {
+        return true;
+    }
+
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
         return type_resolver.get_type(&T::get_type().to_string());
     }
@@ -293,6 +310,10 @@ impl AssignVariable {
 impl Effect for AssignVariable {
     fn is_return(&self) -> bool {
         return false;
+    }
+
+    fn has_return(&self) -> bool {
+        return true;
     }
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
@@ -352,6 +373,10 @@ impl Display for OperatorEffect {
 impl Effect for OperatorEffect {
     fn is_return(&self) -> bool {
         return false;
+    }
+
+    fn has_return(&self) -> bool {
+        return true;
     }
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {

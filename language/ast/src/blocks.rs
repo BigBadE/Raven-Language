@@ -17,8 +17,7 @@ impl DisplayIndented for ForStatement {
         write!(f, "for {} in ", self.variable)?;
         self.effect.format(indent, f)?;
         write!(f, " ")?;
-        let indent = indent.to_string() + "    ";
-        return self.code_block.format(indent.as_str(), f);
+        return self.code_block.format(indent, f);
     }
 }
 
@@ -29,6 +28,10 @@ impl Effect for ForStatement {
                 return true;
             }
         }
+        return false;
+    }
+
+    fn has_return(&self) -> bool {
         return false;
     }
 
@@ -65,20 +68,19 @@ impl DisplayIndented for IfStatement {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "if ")?;
         self.condition.format(indent, f)?;
-        let deeper_indent = indent.to_string() + "    ";
-        let deeper_indent = deeper_indent.as_str();
-        self.body.format(deeper_indent, f)?;
+        write!(f, " ")?;
+        self.body.format(indent, f)?;
 
         for (effect, body) in &self.else_ifs {
             write!(f, " else if ")?;
             effect.format(indent, f)?;
             write!(f, " ")?;
-            body.format(deeper_indent, f)?;
+            body.format(indent, f)?;
         }
 
         if self.else_body.is_some() {
             write!(f, " else ")?;
-            self.else_body.as_ref().unwrap().format(deeper_indent, f)?;
+            self.else_body.as_ref().unwrap().format(indent, f)?;
         }
         return Ok(());
     }
@@ -100,6 +102,10 @@ impl Effect for IfStatement {
         }
 
         return true;
+    }
+
+    fn has_return(&self) -> bool {
+        return false;
     }
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {

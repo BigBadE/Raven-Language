@@ -13,6 +13,7 @@ pub mod compiler;
 pub mod file;
 pub mod function_compiler;
 pub mod types;
+pub mod util;
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -23,7 +24,9 @@ pub fn main() {
     parser::parse(&mut type_manager, Box::new(directory));
     let mut compiler = Compiler::new(type_manager, &context);
     match compiler.compile() {
-        Some(main) => unsafe { println!("Output: {}", main.call()) },
+        Some(main) => {
+            unsafe { println!("Output: {}", main.call()) }
+        },
         None => panic!("Couldn't find main!")
     };
 }

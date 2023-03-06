@@ -7,7 +7,9 @@ pub mod function;
 pub mod types;
 pub mod type_resolver;
 
-#[derive(Clone)]
+pub static MODIFIERS: [Modifier; 5] = [Modifier::Public, Modifier::Protected, Modifier::Extern,
+    Modifier::Internal, Modifier::Operation];
+#[derive(Clone, Copy)]
 pub enum Modifier {
     Public = 0b1,
     Protected = 0b10,
@@ -45,9 +47,12 @@ pub fn is_modifier(modifiers: u8, target: Modifier) -> bool {
 
 pub fn to_modifiers(from: u8) -> Vec<Modifier> {
     let mut modifiers = Vec::new();
-    if from & (Modifier::Public as u8) != 0 {
-        modifiers.push(Modifier::Public)
+    for modifier in MODIFIERS {
+        if from & (modifier as u8) != 0 {
+            modifiers.push(modifier)
+        }
     }
+
     return modifiers;
 }
 
