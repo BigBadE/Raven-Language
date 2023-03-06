@@ -112,7 +112,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, function: FunctionValue<'
 
             return match effect.return_type(&compiler.type_manager) {
                 Some(return_type) => {
-                    let phi = compiler.builder.build_phi(&compiler.get_llvm_type(return_type), "wtf?");
+                    let phi = compiler.builder.build_phi(*compiler.get_llvm_type(return_type.deref()), "wtf?");
                     phi.add_incoming(blocks.as_slice());
                     Some(phi)
                 }
