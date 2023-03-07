@@ -25,7 +25,7 @@ pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Opt
         }
     }
 
-    while parsing.matching("else if") {
+    while parsing.matching("elseif") {
         let effect = parse_effect(type_manager, parsing, &[b'{', b'}', b';']);
         parsing.index -= 1;
         match effect {
