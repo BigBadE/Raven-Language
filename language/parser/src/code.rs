@@ -94,10 +94,7 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                     parsing.index -= 1;
                     match parse_operator(type_manager, parsing, &mut last, escape) {
                         Some(mut operator) => last = Some(match last {
-                            Some(found) => {
-                                operator.lhs = Some(found);
-                                assign_with_priority(operator)
-                            }
+                            Some(_found) => assign_with_priority(operator),
                             None => Effects::OperatorEffect(operator)
                         }),
                         None => continue
@@ -122,55 +119,59 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
                   last: &mut Option<Effects>, escape: &[u8]) -> Option<Box<OperatorEffect>> {
     for (operation, name) in type_manager.get_operations() {
         let location = parsing.loc();
-        if parsing.matching(operation.as_str()) {
-            let found = type_manager.get_function(name).unwrap();
-
-            match found.attributes.get("right_sided") {
-                Some(_attribute) => {
-                    match last.as_mut() {
-                        Some(last_found) => {
-                            if !found.check_args(type_manager, &vec!(last_found)) {
-                                continue;
-                            }
-                            let mut temp = Effects::NOP();
-                            mem::swap(last_found, &mut temp);
-                            *last = None;
-                            return Some(Box::new(
-                                OperatorEffect::new(&operation, found, Some(temp), None, parsing.loc())));
-                        }
-                        None => {
-                            continue;
-                        }
-                    }
-                }
-                None => {}
-            }
-
-            let effect = match parse_effect(type_manager, parsing, escape) {
-                Some(effect) => effect,
-                None => {
-                    parsing.create_error("Unexpected end of line!".to_string());
-                    return None;
-                }
-            };
-
-            return match last.as_mut() {
+        let mut op_parsing = ParseInfo::new(operation.as_bytes());
+        let mut effects = Vec::new();
+        let add_last;
+        //Add last if needed
+        if op_parsing.matching("{}") {
+            match last {
                 Some(last) => {
-                    if !found.check_args(type_manager, &vec!(last, &effect)) {
-                        continue;
-                    }
+                    add_last = true;
+                },
+                None => continue
+            }
+        } else {
+            if last.is_some() {
+                continue
+            }
+            add_last = false;
+        }
 
-                    Some(Box::new(OperatorEffect::new(operation, found,
-                                                      None, Some(effect), location)))
-                }
-                None => {
-                    if !found.check_args(type_manager, &vec!(&effect)) {
-                        continue;
+        loop {
+            if op_parsing.matching("{}") {
+                if op_parsing.index == op_parsing.len {
+                    effects.push(match parse_effect(type_manager, parsing, escape) {
+                        Some(effect) => effect,
+                        None => continue
+                    });
+                } else {
+                    let effect = match parse_effect(type_manager, parsing,
+                                              &[op_parsing.buffer[op_parsing.len+1], b';', b'}']) {
+                        Some(effect) => effect,
+                        None => continue
+                    };
+
+                    if op_parsing.buffer[op_parsing.len] == ';' || op_parsing.buffer[op_parsing.len] == b'}' {
+
                     }
-                    Some(Box::new(OperatorEffect::new(operation, found, None,
-                                                      Some(effect), location)))
                 }
-            };
+            } else {
+                match op_parsing.next_included() {
+                    Some(comparing) => match parsing.next_included() {
+                        Some(comparing_against) => if comparing_against != comparing {
+                            continue
+                        },
+                        None => continue
+                    }
+                    None => {
+                        if add_last {
+                            effects.insert(0, last.unwrap());
+                        }
+                        return Some(Box::new(OperatorEffect::new(
+                            type_manager.get_function(name).unwrap(), effects, location)))
+                    }
+                }
+            }
         }
     }
     return None;

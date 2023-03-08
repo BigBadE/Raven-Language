@@ -117,13 +117,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             //Compile the if body
             let then = compile_block(&effect.body, function, variables, compiler, id);
 
-            //End
-            let end = compiler.context.append_basic_block(function, &id.to_string());
-            *id += 1;
-            compiler.builder.build_unconditional_branch(end);
-
             //Add all the else ifs, and finally the else, to else_ifs
-            let empty = CodeBody::new(Vec::new());
             let mut else_ifs = Vec::new();
             for (value, effect) in &effect.else_ifs {
                 else_ifs.push((Some(value), Some(effect)));
@@ -135,7 +129,10 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             }
 
             //Recursively compile the else ifs
-            let other = compile_elseifs(&else_ifs, &end, 0, function, variables, compiler, id);
+            let (other, end) = compile_elseifs(&else_ifs, 0, function, variables, compiler, id);
+
+            compiler.builder.position_at_end(then);
+            compiler.builder.build_unconditional_branch(end);
 
             //Go back to the start of the if
             compiler.builder.position_at_end(*block);
@@ -144,6 +141,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                 then, other);
 
             compiler.builder.position_at_end(end);
+            *block = end;
 
             //If it's an if with a return value, use phi to get the value
             return match effect.return_type(&compiler.type_manager) {
@@ -158,13 +156,8 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
         }
         Effects::OperatorEffect(effect) => {
             let mut arguments = Vec::new();
-            if effect.lhs.is_some() {
-                let lhs = effect.lhs.as_ref().unwrap();
-                arguments.push(From::from(compile_effect(compiler, block, function, variables, lhs, id).unwrap()));
-            }
-            if effect.rhs.is_some() {
-                let rhs = effect.rhs.as_ref().unwrap();
-                arguments.push(From::from(compile_effect(compiler, block, function, variables, rhs, id).unwrap()));
+            for argument in &effect.effects {
+                arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()));
             }
 
             *id += 1;
@@ -192,12 +185,24 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
     };
 }
 
-fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, end: &BasicBlock<'ctx>, index: usize, function: FunctionValue<'ctx>,
-                   variables: &mut CompilerTypeResolver<'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
+//LLVM dies if the last instruction isn't a return, so this is weirdly structured
+//to make sure the end is created last.
+fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, index: usize, function: FunctionValue<'ctx>,
+                   variables: &mut CompilerTypeResolver<'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> (BasicBlock<'ctx>, BasicBlock<'ctx>) {
     if effects.len() == 1 {
         return match effects.get(0).unwrap().0 {
-            Some(effect) => compile_block(effect, function, variables, compiler, id),
-            None => *end
+            Some(effect) => {
+                let block = compile_block(effect, function, variables, compiler, id);
+                let end = compiler.context.append_basic_block(function, &id.to_string());
+                *id += 1;
+                compiler.builder.build_unconditional_branch(end);
+                (block, end)
+            },
+            None => {
+                let end = compiler.context.append_basic_block(function, &id.to_string());
+                *id += 1;
+                (end, end)
+            }
         }
     }
 
@@ -205,23 +210,27 @@ fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, e
     compiler.builder.position_at_end(new_block);
     *id += 1;
 
-    let other;
+    let (other, end);
     if index < effects.len() - 2 {
-        other = compile_elseifs(&effects, end, index + 1, function, variables, compiler, id);
+        let tuple = compile_elseifs(&effects, index + 1, function, variables, compiler, id);
+        other = tuple.0;
+        end = tuple.1;
     } else {
         other = compile_block(effects.get(index+1).unwrap().0.unwrap(), function, variables, compiler, id);
         compiler.builder.position_at_end(other);
-        compiler.builder.build_unconditional_branch(*end);
+        end = compiler.context.append_basic_block(function, &id.to_string());
+        *id += 1;
+        compiler.builder.build_unconditional_branch(end);
     }
 
     let (body, effect) = effects.get(index).unwrap();
     let then = compile_block(body.unwrap(), function, variables, compiler, id);
-    compiler.builder.build_unconditional_branch(*end);
+    compiler.builder.build_unconditional_branch(end);
 
     compiler.builder.position_at_end(new_block);
     let comparison = compile_effect(compiler, &mut new_block, function, variables, &effect.unwrap(), id)
         .unwrap().into_int_value();
     compiler.builder.build_conditional_branch(comparison, then, other);
 
-    return new_block;
+    return (new_block, end);
 }

@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::fs;
 use std::path::PathBuf;
 use ast::type_resolver::TypeResolver;

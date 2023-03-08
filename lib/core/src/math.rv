@@ -1,12 +1,12 @@
-pub internal operation +(first: i64, second: i64) -> i64 {}
+pub internal operation {}+{}(first: i64, second: i64) -> i64 {}
 
-pub internal operation -(first: i64, second: i64) -> i64 {}
-
-#[priority(1)]
-pub internal operation /(first: i64, second: i64) -> i64 {}
+pub internal operation {}-{}(first: i64, second: i64) -> i64 {}
 
 #[priority(1)]
-pub internal operation *(first: i64, second: i64) -> i64 {}
+pub internal operation {}/{}(first: i64, second: i64) -> i64 {}
+
+#[priority(1)]
+pub internal operation {}*{}(first: i64, second: i64) -> i64 {}
 
 #[priority(-1)]
-pub internal operation ==(first: i64, second: i64) -> bool {}
+pub internal operation {}=={}(first: i64, second: i64) -> bool {}

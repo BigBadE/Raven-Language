@@ -33,8 +33,11 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
         }
 
         //Only error once for a big block of issues.
-        if parsing.errors.last().is_none() || parsing.errors.last().unwrap().error != "Unknown element" {
-            parsing.create_error("Unknown element".to_string());
+        if parsing.errors.last().is_none() || !parsing.errors.last().unwrap().error.starts_with("Unknown element") {
+            let mut temp = parsing.clone();
+            temp.skip_line();
+            parsing.create_error(format!("Unknown element: {}",
+                String::from_utf8_lossy(&parsing.buffer[parsing.index..temp.index])));
         } else {
             parsing.skip_line();
         }

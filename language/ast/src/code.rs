@@ -338,9 +338,7 @@ impl DisplayIndented for AssignVariable {
 
 pub struct OperatorEffect {
     pub operator: String,
-    pub operator_symbol: String,
-    pub lhs: Option<Effects>,
-    pub rhs: Option<Effects>,
+    pub effects: Vec<Effects>,
     pub priority: i8,
     pub parse_left: bool,
     parent_function: String,
@@ -348,12 +346,10 @@ pub struct OperatorEffect {
 }
 
 impl OperatorEffect {
-    pub fn new(operator: &String, function: &Function, lhs: Option<Effects>, rhs: Option<Effects>, location: (u32, u32)) -> Self {
+    pub fn new(function: &Function, effects: Vec<Effects>, location: (u32, u32)) -> Self {
         return Self {
             operator: function.name.clone(),
-            operator_symbol: operator.clone(),
-            lhs,
-            rhs,
+            effects,
             priority: function.attributes.get("priority")
                 .map_or(0, |attrib| attrib.value.parse().expect("Expected numerical priority!")),
             parse_left: function.attributes.get("parse_left")
@@ -380,14 +376,11 @@ impl Effect for OperatorEffect {
     }
 
     fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
-        let mut output = Vec::new();
-        if let Some(value) = &self.lhs {
-            output.push(value);
+        let mut args = Vec::new();
+        for arg in &self.effects {
+            args.push(arg);
         }
-        if let Some(value) = &self.rhs {
-            output.push(value);
-        }
-        return type_resolver.get_method_type(&self.parent_function, &None, &output);
+        return type_resolver.get_method_type(&self.parent_function, &None, &args);
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -397,22 +390,22 @@ impl Effect for OperatorEffect {
 
 impl DisplayIndented for OperatorEffect {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return match &self.lhs {
-            Some(lhs) => match &self.rhs {
-                Some(rhs) => {
-                    lhs.format(indent, f)?;
-                    write!(f, " {} ", self.operator_symbol)?;
-                    rhs.format(indent, f)
-                },
-                None => {
-                    lhs.format(indent, f)?;
-                    write!(f, "{}", self.operator_symbol)
-                }
+        let mut skipping = false;
+        let mut effects = self.effects.iter();
+        //Get the operation itself
+        for char in self.operator.split("::").last().unwrap().chars() {
+            //Replace placeholders
+            if skipping {
+                skipping = false;
+                effects.next().unwrap().format(indent, f)?;
             }
-            None => {
-                write!(f, "{}", self.operator_symbol)?;
-                self.rhs.as_ref().unwrap().format(indent, f)
+            if char == '{' {
+                skipping = true;
+            }  else {
+                write!(f, "{}", char)?;
             }
         }
+        
+        return Ok(());
     }
 }

@@ -15,11 +15,11 @@ pub struct ParseInfo<'a> {
 }
 
 impl<'a> ParseInfo<'a> {
-    pub fn new(buffer: &'a String) -> Self {
+    pub fn new(buffer: &'a [u8]) -> Self {
         return Self {
             errors: Vec::new(),
             len: buffer.len() as usize,
-            buffer: buffer.as_bytes(),
+            buffer,
             index: 0,
             indent: String::new(),
             line: 1,
@@ -97,12 +97,38 @@ impl<'a> ParseInfo<'a> {
     pub fn next_included(&mut self) -> Option<u8> {
         while self.index < self.len {
             if !self.whitespace_next(self.buffer[self.index]) {
+                if self.buffer[self.index] == b'/' {
+                    if self.index < self.len-1 && self.buffer[self.index+1] == b'*' {
+                        self.parse_comment();
+                    } else if self.index < self.len-1 && self.buffer[self.index+1] == b'/' {
+                        self.skip_line();
+                    } else {
+                        self.index += 1;
+                        return Some(self.buffer[self.index-1]);
+                    }
+                }
                 self.index += 1;
                 return Some(self.buffer[self.index-1]);
             }
             self.index += 1;
         }
         return None;
+    }
+
+    pub fn parse_comment(&mut self) {
+        let mut escaping = false;
+        while self.index < self.len {
+            match self.buffer[self.index] {
+                b'*' => escaping = true,
+                b'/' => if escaping == true {
+                    self.index += 1;
+                    return;
+                },
+                _ => escaping = false
+            }
+            self.index += 1;
+        }
+        self.create_error("No end to block comment!".to_string());
     }
 
     pub fn loc(&self) -> (u32, u32) {
@@ -181,7 +207,7 @@ impl Display for ParseError {
 
 pub fn parse(type_manager: &mut dyn TypeResolver,
                  name: &String, input: String, first_pass: bool) -> Result<(), Vec<ParseError>> {
-    let mut parsing = ParseInfo::new(&input);
+    let mut parsing = ParseInfo::new(input.as_bytes());
 
     parse_top_elements(type_manager, name, &mut parsing, !first_pass);
 
