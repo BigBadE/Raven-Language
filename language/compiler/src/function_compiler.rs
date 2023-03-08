@@ -119,6 +119,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
 
             //End
             let end = compiler.context.append_basic_block(function, &id.to_string());
+            *id += 1;
             compiler.builder.build_unconditional_branch(end);
 
             //Add all the else ifs, and finally the else, to else_ifs
