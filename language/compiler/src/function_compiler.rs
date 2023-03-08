@@ -126,12 +126,12 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             let empty = CodeBody::new(Vec::new());
             let mut else_ifs = Vec::new();
             for (value, effect) in &effect.else_ifs {
-                else_ifs.push((value, Some(effect)));
+                else_ifs.push((Some(value), Some(effect)));
             }
             if effect.else_body.is_some() {
-                else_ifs.push((&effect.else_body.as_ref().unwrap(), None));
+                else_ifs.push((Some(&effect.else_body.as_ref().unwrap()), None));
             } else {
-                else_ifs.push((&empty, None));
+                else_ifs.push((None, None));
             }
 
             //Recursively compile the else ifs
@@ -143,8 +143,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                 compile_effect(compiler, block, function, variables, &effect.condition, id).unwrap().into_int_value(),
                 then, other);
 
-            compiler.builder.position_at_end(*block);
-            *id += 1;
+            compiler.builder.position_at_end(end);
 
             //If it's an if with a return value, use phi to get the value
             return match effect.return_type(&compiler.type_manager) {
@@ -193,10 +192,13 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
     };
 }
 
-fn compile_elseifs<'ctx>(effects: &Vec<(&CodeBody, Option<&Effects>)>, end: &BasicBlock, index: usize, function: FunctionValue<'ctx>,
+fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, end: &BasicBlock<'ctx>, index: usize, function: FunctionValue<'ctx>,
                    variables: &mut CompilerTypeResolver<'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
     if effects.len() == 1 {
-        return compile_block(effects.get(0).unwrap().0, function, variables, compiler, id);
+        return match effects.get(0).unwrap().0 {
+            Some(effect) => compile_block(effect, function, variables, compiler, id),
+            None => *end
+        }
     }
 
     let mut new_block = compiler.context.append_basic_block(function, &id.to_string());
@@ -207,17 +209,18 @@ fn compile_elseifs<'ctx>(effects: &Vec<(&CodeBody, Option<&Effects>)>, end: &Bas
     if index < effects.len() - 2 {
         other = compile_elseifs(&effects, end, index + 1, function, variables, compiler, id);
     } else {
-        other = compile_block(effects.get(index+1).unwrap().0, function, variables, compiler, id);
+        other = compile_block(effects.get(index+1).unwrap().0.unwrap(), function, variables, compiler, id);
         compiler.builder.position_at_end(other);
         compiler.builder.build_unconditional_branch(*end);
     }
 
     let (body, effect) = effects.get(index).unwrap();
-    let then = compile_block(body, function, variables, compiler, id);
+    let then = compile_block(body.unwrap(), function, variables, compiler, id);
     compiler.builder.build_unconditional_branch(*end);
 
     compiler.builder.position_at_end(new_block);
-    let comparison = compile_effect(compiler, &mut new_block, function, variables, &effect.unwrap(), id).unwrap().into_int_value();
+    let comparison = compile_effect(compiler, &mut new_block, function, variables, &effect.unwrap(), id)
+        .unwrap().into_int_value();
     compiler.builder.build_conditional_branch(comparison, then, other);
 
     return new_block;
