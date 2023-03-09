@@ -45,7 +45,7 @@ pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) {
 
         if !function.code.is_return() {
             match &function.return_type {
-                Some(return_type) => panic!("Missing return ({}) for function {}", return_type, function.name),
+                Some(return_type) => panic!("Missing return ({}) for function {}", return_type.unwrap(), function.name),
                 None => compiler.builder.build_return(None)
             };
         }

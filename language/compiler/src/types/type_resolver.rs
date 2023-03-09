@@ -77,7 +77,7 @@ impl<'ctx> TypeResolver for CompilerTypeResolver<'ctx> {
     }
 
     fn get_method_type(&self, name: &String, _calling: &Option<Effects>, _args: &Vec<&Effects>) -> Option<Rc<Types>> {
-        return self.functions.get(name).unwrap().0.return_type.clone();
+        return self.functions.get(name).unwrap().0.return_type.map(|value| value.unwrap());
     }
 
     fn get_variable_type(&self, name: &String) -> Option<Rc<Types>> {
@@ -96,17 +96,8 @@ impl<'ctx> TypeResolver for CompilerTypeResolver<'ctx> {
             static_function.finalize(self);
         }
 
-        let mut structures = Vec::new();
-        for (_name, structure) in self.types.deref() {
-            structures.push(structure.clone());
-        }
-
         for structure in structures {
-            for member in &mut unsafe { Rc::get_mut_unchecked(&mut structure.clone()) }.structure.members {
-                if let TypeMembers::Function(function) = member {
-                    function.finalize(self);
-                }
-            }
+            structure.finalize(self);
         }
     }
 }

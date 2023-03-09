@@ -4,7 +4,7 @@ use crate::code::{Effect, Effects};
 use crate::DisplayIndented;
 use crate::function::CodeBody;
 use crate::type_resolver::TypeResolver;
-use crate::types::Types;
+use crate::types::ResolvableTypes;
 
 pub struct ForStatement {
     pub variable: String,
@@ -35,7 +35,7 @@ impl Effect for ForStatement {
         return false;
     }
 
-    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
         todo!()
     }
 
@@ -108,7 +108,7 @@ impl Effect for IfStatement {
         return false;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
         return self.body.return_type(type_resolver);
     }
 

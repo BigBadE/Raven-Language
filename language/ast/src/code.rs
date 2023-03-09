@@ -4,7 +4,7 @@ use crate::{DisplayIndented, to_modifiers};
 use crate::blocks::IfStatement;
 use crate::function::{Arguments, CodeBody, display, Function};
 use crate::type_resolver::TypeResolver;
-use crate::types::Types;
+use crate::types::ResolvableTypes;
 
 pub struct Expression {
     pub expression_type: ExpressionType,
@@ -20,7 +20,7 @@ pub enum ExpressionType {
 
 pub struct Field {
     pub name: String,
-    pub field_type: Rc<Types>
+    pub field_type: ResolvableTypes
 }
 
 pub struct MemberField {
@@ -42,6 +42,10 @@ impl Expression {
         }
     }
 
+    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+        self.effect.finalize(type_resolver);
+    }
+
     pub fn is_return(&self) -> bool {
         return if let ExpressionType::Return = self.expression_type {
             true
@@ -52,11 +56,15 @@ impl Expression {
 }
 
 impl Field {
-    pub fn new(name: String, field_type: Rc<Types>) -> Self {
+    pub fn new(name: String, field_type: ResolvableTypes) -> Self {
         return Self {
             name,
             field_type
         }
+    }
+
+    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+        self.field_type.finalize(type_resolver);
     }
 }
 
@@ -94,7 +102,9 @@ pub trait Effect: DisplayIndented {
 
     fn has_return(&self) -> bool;
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>>;
+    fn finalize(&mut self, type_resolver: &dyn TypeResolver);
+
+    fn return_type(&self) -> Option<ResolvableTypes>;
 
     fn get_location(&self) -> (u32, u32);
 }
@@ -126,6 +136,10 @@ impl Effects {
             Effects::AssignVariable(effect) => effect.as_ref(),
             Effects::OperatorEffect(effect) => effect.as_ref()
         };
+    }
+
+    pub fn finalize(&self, type_resolver: &dyn TypeResolver) {
+        self.unwrap().finalize(type_resolver);
     }
 }
 
@@ -176,12 +190,19 @@ impl Effect for MethodCall {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
-        let mut output = Vec::new();
-        for arg in &self.arguments.arguments {
-            output.push(arg);
+    fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+        if self.calling.is_some() {
+            self.calling.unwrap().finalize(type_resolver);
         }
-        return type_resolver.get_method_type(&self.method, &self.calling, &output);
+
+        self.arguments.finalize(type_resolver);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return match &self.calling {
+            Some(calling) => calling.unwrap().return_type(),
+            None => None
+        };
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -222,7 +243,9 @@ impl Effect for VariableLoad {
         return true;
     }
 
-    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn finalize(&mut self, _type_resolver: &dyn TypeResolver) {}
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
         return None;
     }
 
@@ -274,7 +297,7 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
         return type_resolver.get_type(&T::get_type().to_string());
     }
 
@@ -316,7 +339,7 @@ impl Effect for AssignVariable {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
         return self.effect.unwrap().return_type(type_resolver);
     }
 
@@ -375,7 +398,7 @@ impl Effect for OperatorEffect {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
         let mut args = Vec::new();
         for arg in &self.effects {
             args.push(arg);

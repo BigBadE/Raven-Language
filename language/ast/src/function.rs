@@ -1,65 +1,52 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::rc::Rc;
 use crate::r#struct::TypeMember;
 use crate::code::{Effect, Effects, Expression, ExpressionType, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
 use crate::type_resolver::TypeResolver;
-use crate::types::Types;
+use crate::types::ResolvableTypes;
 
 pub struct Function {
     pub attributes: HashMap<String, Attribute>,
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
-    pub return_type: Option<Rc<Types>>,
-    pub name: String,
-    //Stored until all structs are loaded
-    parsing_fields: Vec<(String, String)>,
-    parsing_return: Option<String>,
+    pub return_type: Option<ResolvableTypes>,
+    pub name: String
 }
 
 impl Function {
-    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<(String, String)>,
-               code: CodeBody, return_type: Option<String>, name: String) -> Self {
+    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>,
+               code: CodeBody, return_type: Option<ResolvableTypes>, name: String) -> Self {
         return Self {
             attributes,
             modifiers,
-            fields: Vec::new(),
+            fields,
             code,
-            return_type: None,
-            name,
-            parsing_fields: fields,
-            parsing_return: return_type,
+            return_type,
+            name
         };
     }
 
     pub fn finalize(&mut self, type_manager: &dyn TypeResolver) {
-        for (name, found_type) in &self.parsing_fields {
-            match type_manager.get_type(found_type) {
-                Some(found) => self.fields.push(Field::new(name.clone(), found)),
-                None => panic!("Unknown type {}", found_type)
-            }
+        if self.return_type.is_some() {
+            self.return_type.unwrap().finalize(type_manager);
         }
-        self.parsing_fields.clear();
 
-        if let Some(found_type) = &self.parsing_return {
-            match type_manager.get_type(found_type) {
-                Some(return_type) => self.return_type = Some(return_type),
-                None => panic!("Unknown type {}", found_type)
-            }
+        for mut field in self.fields {
+            field.finalize(type_manager);
         }
-        self.parsing_return = None;
+        self.code.finalize(type_manager);
     }
 
-    pub fn check_args(&self, type_resolver: &dyn TypeResolver, target: &Vec<&Effects>) -> bool {
+    pub fn check_args(&self, target: &Vec<&Effects>) -> bool {
         if target.len() != self.fields.len() {
             return false;
         }
 
         for i in 0..target.len() {
-            match target.get(i).unwrap().unwrap().return_type(type_resolver) {
-                Some(target) => if target != self.fields.get(i).unwrap().field_type {
+            match target.get(i).unwrap().unwrap().return_type() {
+                Some(target) => if target.unwrap() != self.fields.get(i).unwrap().field_type.unwrap() {
                     return false;
                 },
                 None => return false
@@ -79,6 +66,12 @@ impl Arguments {
         return Self {
             arguments
         };
+    }
+
+    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+        for arg in self.arguments {
+            arg.finalize(type_resolver);
+        }
     }
 }
 
@@ -113,10 +106,16 @@ impl Effect for CodeBody {
         return false;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<Types>> {
+    fn finalize(&self, type_resolver: &dyn TypeResolver) {
+        for mut expression in self.expressions {
+            expression.finalize(type_resolver);
+        }
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
         for expression in &self.expressions {
             if let ExpressionType::Break = expression.expression_type {
-                return expression.effect.unwrap().return_type(type_resolver);
+                return expression.effect.unwrap().return_type();
             }
         }
         return None;

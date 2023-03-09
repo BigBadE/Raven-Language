@@ -3,7 +3,50 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::rc::Rc;
 use crate::r#struct::Struct;
+use crate::type_resolver::TypeResolver;
 
+pub enum ResolvableTypes {
+    Resolved(Rc<Types>),
+    Resolving(UnresolvedType)
+}
+
+impl ResolvableTypes {
+    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+        match self {
+            ResolvableTypes::Resolving(resolving) => 
+                *self = ResolvableTypes::Resolved(type_resolver.get_type(&resolving.name).unwrap()),
+            ResolvableTypes::Resolved(_) => panic!("Tried to resolve already-resolved type!")
+        }
+    }
+    
+    pub fn unwrap(&self) -> &Rc<Types> {
+        match self { 
+            ResolvableTypes::Resolved(types) => return types,
+            ResolvableTypes::Resolving(_) => panic!("Expected resolved type!")
+        }
+    }
+}
+
+impl Display for ResolvableTypes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResolvableTypes::Resolving(resolving) => write!(f, "{}", resolving.name),
+            ResolvableTypes::Resolved(resolved) => write!(f, "{}", resolved)
+        }
+    }
+}
+
+pub struct UnresolvedType {
+    pub name: String
+}
+
+impl UnresolvedType {
+    pub fn new(name: String) -> Self {
+        return Self {
+            name
+        }
+    }
+}
 pub struct Types {
     pub name: String,
     pub structure: Struct,

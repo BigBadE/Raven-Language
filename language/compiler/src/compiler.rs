@@ -7,7 +7,7 @@ use inkwell::module::Module;
 use inkwell::OptimizationLevel;
 use inkwell::types::BasicTypeEnum;
 use ast::type_resolver::TypeResolver;
-use ast::types::Types;
+use ast::types::ResolvableTypes;
 use crate::function_compiler::{compile_function, get_function_value};
 use crate::types::type_resolver::CompilerTypeResolver;
 
@@ -34,11 +34,11 @@ impl<'ctx> Compiler<'ctx> {
         };
     }
 
-    pub fn get_type(&self, name: &String) -> Rc<Types> {
+    pub fn get_type(&self, name: &String) -> Rc<ResolvableTypes> {
         return self.type_manager.get_type(name).expect(&*("Couldn't find type named ".to_string() + name)).clone();
     }
 
-    pub fn get_llvm_type(&self, types: &Types) -> &BasicTypeEnum {
+    pub fn get_llvm_type(&self, types: &ResolvableTypes) -> &BasicTypeEnum {
         for (name, found_types) in self.type_manager.types.deref() {
             if found_types.deref() == types {
                 return self.type_manager.llvm_types.get(name).unwrap();
