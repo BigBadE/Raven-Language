@@ -7,7 +7,7 @@ use inkwell::module::Module;
 use inkwell::OptimizationLevel;
 use inkwell::types::BasicTypeEnum;
 use ast::type_resolver::TypeResolver;
-use ast::types::ResolvableTypes;
+use ast::types::Types;
 use crate::function_compiler::{compile_function, get_function_value};
 use crate::types::type_resolver::CompilerTypeResolver;
 

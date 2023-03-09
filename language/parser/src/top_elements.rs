@@ -1,22 +1,29 @@
 use std::collections::HashMap;
 use ast::function::{CodeBody, Function};
-use ast::{Attribute, get_modifier, is_modifier, Modifier};
+use ast::{Attribute, get_modifier, is_modifier, Modifier, to_modifiers};
+use ast::code::{Field, MemberField};
+use ast::parsing_type::ParsingTypes;
+use ast::r#struct::{Struct, TypeMembers};
 use ast::type_resolver::TypeResolver;
+use ast::types::Types;
 use crate::literal::parse_ident;
 use crate::parser::ParseInfo;
 use crate::util::{parse_code_block, parse_fields};
 
 pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
-                          name: &String, parsing: &mut ParseInfo, parse_code: bool) {
+                          name: &String, parsing: &mut ParseInfo) {
     while let Some(_) = parsing.next_included() {
         parsing.index -= 1;
         let attributes = parse_attributes(parsing, false);
         let modifiers = get_modifier(parse_modifiers(parsing).as_slice());
         if parsing.matching("struct") {
-            parse_struct(type_manager, name, modifiers, parsing, parse_code);
+            match parse_struct_type(type_manager, name, modifiers, parsing) {
+                Some(struct_type) => type_manager.add_type(struct_type),
+                None => {}
+            };
             continue;
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
-            match parse_function(type_manager, name, attributes, modifiers, parsing, parse_code) {
+            match parse_function(type_manager, name, attributes, modifiers, parsing) {
                 Some(mut function) => {
                     if parse_code {
                         function.finalize(type_manager);
@@ -44,9 +51,71 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
     }
 }
 
-fn parse_struct(type_manager: &dyn TypeResolver, name: &String,
-                modifiers: u8, parsing: &mut ParseInfo, parse_code: bool) {
-    todo!()
+fn parse_struct_type(type_manager: &dyn TypeResolver, name: &String,
+                     modifiers: u8, parsing: &mut ParseInfo) -> Option<ParsingTypes> {
+    let fn_name = name.clone() + "::" + match parsing.parse_to(b'{') {
+        Some(name) => name.clone(),
+        None => {
+            parsing.create_error("Expected string name".to_string());
+            return None;
+        }
+    }.as_str();
+
+    let mut members = Vec::new();
+    while match parsing.next_included() {
+        Some(character) => character != b'}',
+        None => {
+            parsing.create_error("Unexpected EOF before end of struct!".to_string());
+            return None;
+        }
+    } {
+        let attributes = parse_attributes(parsing, false);
+        let modifiers = parse_modifiers(parsing);
+
+        if parsing.matching("fn") {
+            match parse_function(type_manager, name, attributes, get_modifier(modifiers.as_slice()),
+                                 parsing, parse_code) {
+                Some(function) => {
+                    members.push(TypeMembers::Function(function));
+                    continue
+                },
+                None => {}
+            }
+        }
+
+        let field_name = match parsing.parse_to(b':') {
+            Some(field_name) => field_name,
+            None => {
+                parsing.create_error("Expected field name!".to_string());
+                return None;
+            }
+        };
+
+        if parse_code {
+            members.push(TypeMembers::Field(MemberField::new(get_modifier(modifiers.as_slice()),
+            Field::new(field_name, type_manager.get_type(&"void".to_string()).unwrap()))))
+        } else {
+            let field_type = match parsing.parse_to(b';') {
+                Some(field_type) => match type_manager.get_type(&field_type) {
+                    Some(rc_type) => rc_type,
+                    None => {
+                        parsing.create_error(format!("Type {} doesn't exist!", field_type));
+                        return None;
+                    }
+                },
+                None => {
+                    parsing.create_error("Expected field type!".to_string());
+                    return None;
+                }
+            };
+
+            members.push(TypeMembers::Field(MemberField::new(get_modifier(modifiers.as_slice()),
+            Field::new(field_name, field_type))));
+        }
+    }
+
+    return Some(Types::new_struct(Struct::new(members, modifiers, fn_name),
+                                  None, Vec::new()));
 }
 
 fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: HashMap<String, Attribute>,

@@ -206,10 +206,10 @@ impl Display for ParseError {
 }
 
 pub fn parse(type_manager: &mut dyn TypeResolver,
-                 name: &String, input: String, first_pass: bool) -> Result<(), Vec<ParseError>> {
+                 name: &String, input: String) -> Result<(), Vec<ParseError>> {
     let mut parsing = ParseInfo::new(input.as_bytes());
 
-    parse_top_elements(type_manager, name, &mut parsing, !first_pass);
+    parse_top_elements(type_manager, name, &mut parsing);
 
     if !parsing.errors.is_empty() {
         return Err(parsing.errors);

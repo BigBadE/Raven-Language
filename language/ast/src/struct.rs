@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use crate::{DisplayIndented, get_modifier, Modifier, to_modifiers};
+use crate::{DisplayIndented, to_modifiers};
 use crate::code::MemberField;
 use crate::function::{display_joined, Function};
 
@@ -10,9 +10,9 @@ pub struct Struct {
 }
 
 impl Struct {
-    pub fn new(members: Vec<TypeMembers>, modifiers: &[Modifier], name: String) -> Self {
+    pub fn new(members: Vec<TypeMembers>, modifiers: u8, name: String) -> Self {
         return Self {
-            modifiers: get_modifier(modifiers),
+            modifiers,
             members,
             name
         }

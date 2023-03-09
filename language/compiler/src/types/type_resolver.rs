@@ -18,10 +18,11 @@ pub struct CompilerTypeResolver<'ctx> {
     pub llvm_types: Rc<HashMap<String, BasicTypeEnum<'ctx>>>,
     pub variables: HashMap<String, BasicValueEnum<'ctx>>,
     pub operations: Rc<HashMap<String, String>>,
+    pub context: &'ctx Context
 }
 
 impl<'ctx> CompilerTypeResolver<'ctx> {
-    pub fn new(context: &'ctx Context) -> Self {
+    pub fn new() -> Self {
         let mut types = HashMap::new();
         let mut llvm_types = HashMap::new();
 
@@ -34,7 +35,8 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
             types: Rc::new(types),
             llvm_types: Rc::new(llvm_types),
             variables: HashMap::new(),
-            operations: Rc::new(HashMap::new())
+            operations: Rc::new(HashMap::new()),
+            context
         }
     }
 
@@ -48,6 +50,19 @@ impl<'ctx> TypeResolver for CompilerTypeResolver<'ctx> {
         return self.types.get(name).map(|tuple| tuple.clone());
     }
 
+    fn add_type(&mut self, types: Types) {
+        let mut fields = Vec::new();
+        for member in types.structure.members {
+            match member {
+                TypeMembers::Field(field) => fields.push(
+                    *self.llvm_types.get(&field.field.field_type.name).unwrap()),
+                _ => {}
+            }
+        }
+        self.llvm_types.insert(types.name.clone(), self.context
+            .struct_type(fields.as_slice(), false).as_basic_type_enum());
+        self.types.insert(types.name.clone(), Rc::new(types));
+    }
     fn print(&self) {
         for (_name, (static_function, _function_type)) in self.functions.deref() {
             println!("{}\n", static_function);
@@ -106,6 +121,7 @@ impl<'ctx> TypeResolver for CompilerTypeResolver<'ctx> {
 fn add_primitive<'ctx>(name: &str, primitive_type: BasicTypeEnum<'ctx>, types: &mut HashMap<String, Rc<Types>>,
                        llvm_types: &mut HashMap<String, BasicTypeEnum<'ctx>>) {
     types.insert(name.to_string(), Rc::new(Types::new_struct(
-        Struct::new(Vec::new(), &[Modifier::Public], name.to_string()), None, Vec::new())));
+        Struct::new(Vec::new(), get_modifier(&[Modifier::Public]), name.to_string()),
+        None, Vec::new())));
     llvm_types.insert(name.to_string(), primitive_type);
 }
