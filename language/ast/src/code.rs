@@ -398,14 +398,13 @@ impl DisplayIndented for OperatorEffect {
             if skipping {
                 skipping = false;
                 effects.next().unwrap().format(indent, f)?;
-            }
-            if char == '{' {
+            } else if char == '{' {
                 skipping = true;
             }  else {
                 write!(f, "{}", char)?;
             }
         }
-        
+
         return Ok(());
     }
 }

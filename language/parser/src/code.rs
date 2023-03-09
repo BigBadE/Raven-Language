@@ -1,4 +1,5 @@
 use std::mem;
+use std::ops::DerefMut;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
 use ast::code::Effects::NOP;
 use ast::type_resolver::TypeResolver;
@@ -124,75 +125,70 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
         let mut op_parsing = ParseInfo::new(operation.as_bytes());
         let mut effects = Vec::new();
 
-        //Add last if needed
+        //Skip if last is needed
         if op_parsing.matching("{}") != last.is_some() {
-            continue
+            continue;
         }
 
         loop {
+            //Parse placeholder
             if op_parsing.matching("{}") {
-                if op_parsing.index == op_parsing.len {
-                    effects.push(match parse_effect(type_manager, &mut temp, escape) {
-                        Some(effect) => effect,
-                        None => continue 'outer
-                    });
-                } else {
-                    let effect = match parse_effect(type_manager, &mut temp,
-                                              &[op_parsing.buffer[op_parsing.len+1], b';', b'}']) {
-                        Some(effect) => effect,
-                        None => continue 'outer
-                    };
-
-                    if op_parsing.buffer[op_parsing.len] == b';' || op_parsing.buffer[op_parsing.len] == b'}' {
-                        continue 'outer
-                    }
-
-                    effects.push(effect);
-                }
+                effects.push(match parse_effect(type_manager, &mut temp, escape) {
+                    Some(effect) => effect,
+                    None => continue 'outer
+                });
             } else {
                 match op_parsing.next_included() {
                     Some(comparing) => match temp.next_included() {
-                        Some(comparing_against) => if comparing_against == comparing {
-                            let function = type_manager.get_function(name).unwrap();
-                            if last.is_some() {
-                                if function.fields.len() != effects.len()+1 {
-                                    continue 'outer
-                                }
-                                for i in 1..function.fields.len() {
-                                    if function.fields.get(i).unwrap().field_type !=
-                                        effects.get(i-1).unwrap().unwrap().return_type(type_manager).unwrap() {
-                                        continue 'outer
-                                    }
-                                }
-
-                                if last.as_ref().unwrap().unwrap().return_type(type_manager).unwrap() !=
-                                    function.fields.get(0).unwrap().field_type {
-                                    continue 'outer
-                                }
-
-                                let mut temp_last = NOP();
-                                mem::swap(&mut temp_last, last.as_mut().unwrap());
-                                effects.insert(0, temp_last);
-                            } else {
-                                if function.fields.len() != effects.len() {
-                                    continue 'outer
-                                }
-                                for i in 0..function.fields.len() {
-                                    if function.fields.get(i).unwrap().field_type !=
-                                        effects.get(i).unwrap().unwrap().return_type(type_manager).unwrap() {
-                                        continue 'outer
-                                    }
-                                }
-                            }
-
-                            *parsing = temp;
-                            return Some(Box::new(OperatorEffect::new(function, effects, location)));
-                        } else {
-                            continue 'outer
+                        Some(comparing_against) => if comparing_against != comparing {
+                            //Make sure both sides have a character
+                            continue 'outer;
                         },
                         None => continue 'outer
                     }
-                    None => continue 'outer
+                    None => {
+                        let function = type_manager.get_function(name).unwrap();
+                        //Since last isn't owned, swap is needed, which can only be done after every argument
+                        //is type checked.
+                        if last.is_some() {
+                            //Check length
+                            if function.fields.len() != effects.len() + 1 {
+                                continue 'outer;
+                            }
+                            //Check args are equal
+                            for i in 1..function.fields.len() {
+                                if function.fields.get(i).unwrap().field_type !=
+                                    effects.get(i - 1).unwrap().unwrap().return_type(type_manager).unwrap() {
+                                    continue 'outer;
+                                }
+                            }
+
+                            //Check first arg is equal
+                            if last.as_ref().unwrap().unwrap().return_type(type_manager).unwrap() !=
+                                function.fields.get(0).unwrap().field_type {
+                                continue 'outer;
+                            }
+
+                            //Finally add last to effects
+                            let mut temp_last = NOP();
+                            mem::swap(&mut temp_last, last.as_mut().unwrap());
+                            effects.push(temp_last);
+                        } else {
+                            if function.fields.len() != effects.len() {
+                                continue 'outer;
+                            }
+                            for i in 0..function.fields.len() {
+                                if function.fields.get(i).unwrap().field_type !=
+                                    effects.get(i).unwrap().unwrap().return_type(type_manager).unwrap() {
+                                    continue 'outer;
+                                }
+                            }
+                        }
+
+                        //Update parsing and return
+                        *parsing = temp;
+                        return Some(Box::new(OperatorEffect::new(function, effects, location)));
+                    }
                 }
             }
         }
@@ -201,36 +197,27 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
 }
 
 fn assign_with_priority(mut operator: Box<OperatorEffect>) -> Effects {
-    //This will be overwritten
-    let mut temp_rhs = Effects::NOP();
-    mem::swap(&mut temp_rhs, operator.effects.last_mut().as_mut().unwrap());
+    //Needs ownership of the value
+    let mut temp_lhs = NOP();
+    mem::swap(&mut temp_lhs, operator.effects.first_mut().unwrap());
+    match temp_lhs {
+        // Code explained using the following example: 1 + 2 / 2
+        Effects::OperatorEffect(mut lhs) => {
+            // temp_lhs = (1 + 2), operator = {} / 2
+            if lhs.priority < operator.priority || !operator.parse_left && lhs.priority == operator.priority {
+                // temp_lhs = 1 + {}, operator = 2 / 2
+                mem::swap(lhs.effects.last_mut().unwrap(), operator.effects.first_mut().unwrap());
 
-    //If the right side has more priority, it must be swapped
-    return if let Effects::OperatorEffect(rhs) = temp_rhs {
-        if rhs.priority < operator.priority || (rhs.priority == operator.priority && rhs.parse_left) {
-            //1 / (2 + 3)
-            let mut temp = Effects::NOP();
-            //1 / {}, temp = 2 + 3
-            mem::swap(&mut Effects::OperatorEffect(rhs), &mut temp);
-            if let Effects::OperatorEffect(mut value) = temp {
-                //1 / 2, temp = {} + 3
-                mem::swap(&mut value.effects.first(), &mut operator.effects.last());
+                // 1 + (2 / 2)
+                mem::swap(lhs.effects.last_mut().unwrap(), &mut Effects::OperatorEffect(operator));
 
-                let mut effect = Effects::OperatorEffect(operator);
-
-                //(1 / 2) + 3
-                mem::swap(value.effects.first_mut().unwrap(), &mut effect);
-
-                return Effects::OperatorEffect(value);
+                return Effects::OperatorEffect(lhs);
+            } else {
+                mem::swap(&mut Effects::OperatorEffect(lhs), operator.effects.get_mut(0).unwrap());
             }
-            panic!("Temp magically changed types!");
-        }
-        //Swap it back if this failed
-        mem::swap(&mut Effects::OperatorEffect(rhs), operator.effects.last_mut().unwrap());
-        Effects::OperatorEffect(operator)
-    } else {
-        //Swap it back if this failed
-        mem::swap(&mut temp_rhs, operator.effects.last_mut().unwrap());
-        Effects::OperatorEffect(operator)
+        },
+        _ => mem::swap(&mut temp_lhs, operator.effects.get_mut(0).unwrap())
     }
+
+    return Effects::OperatorEffect(operator);
 }

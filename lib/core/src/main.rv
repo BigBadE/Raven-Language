@@ -1,6 +1,6 @@
 /*pub struct Testing {
     pub field: i64;
-    pub default_field = 0;
+    pub default_field: i64;
 
     pub fn new() -> Self {
         return Self(0, default_field = 1);
@@ -8,5 +8,5 @@
 }*/
 
 pub fn main() -> i64 {
-    return 1 + 2;
+    return 1 + 2 / 2 + 1;
 }
