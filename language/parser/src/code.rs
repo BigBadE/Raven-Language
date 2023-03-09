@@ -1,5 +1,6 @@
 use std::mem;
 use ast::code::{AssignVariable, Effects, Expression, ExpressionType, MethodCall, OperatorEffect, VariableLoad};
+use ast::code::Effects::NOP;
 use ast::type_resolver::TypeResolver;
 use crate::conditional::parse_if;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
@@ -117,59 +118,81 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
 
 fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
                   last: &mut Option<Effects>, escape: &[u8]) -> Option<Box<OperatorEffect>> {
-    for (operation, name) in type_manager.get_operations() {
+    'outer: for (operation, name) in type_manager.get_operations() {
         let location = parsing.loc();
+        let mut temp = parsing.clone();
         let mut op_parsing = ParseInfo::new(operation.as_bytes());
         let mut effects = Vec::new();
-        let add_last;
+
         //Add last if needed
-        if op_parsing.matching("{}") {
-            match last {
-                Some(last) => {
-                    add_last = true;
-                },
-                None => continue
-            }
-        } else {
-            if last.is_some() {
-                continue
-            }
-            add_last = false;
+        if op_parsing.matching("{}") != last.is_some() {
+            continue
         }
 
         loop {
             if op_parsing.matching("{}") {
                 if op_parsing.index == op_parsing.len {
-                    effects.push(match parse_effect(type_manager, parsing, escape) {
+                    effects.push(match parse_effect(type_manager, &mut temp, escape) {
                         Some(effect) => effect,
-                        None => continue
+                        None => continue 'outer
                     });
                 } else {
-                    let effect = match parse_effect(type_manager, parsing,
+                    let effect = match parse_effect(type_manager, &mut temp,
                                               &[op_parsing.buffer[op_parsing.len+1], b';', b'}']) {
                         Some(effect) => effect,
-                        None => continue
+                        None => continue 'outer
                     };
 
-                    if op_parsing.buffer[op_parsing.len] == ';' || op_parsing.buffer[op_parsing.len] == b'}' {
-
+                    if op_parsing.buffer[op_parsing.len] == b';' || op_parsing.buffer[op_parsing.len] == b'}' {
+                        continue 'outer
                     }
+
+                    effects.push(effect);
                 }
             } else {
                 match op_parsing.next_included() {
-                    Some(comparing) => match parsing.next_included() {
-                        Some(comparing_against) => if comparing_against != comparing {
-                            continue
+                    Some(comparing) => match temp.next_included() {
+                        Some(comparing_against) => if comparing_against == comparing {
+                            let function = type_manager.get_function(name).unwrap();
+                            if last.is_some() {
+                                if function.fields.len() != effects.len()+1 {
+                                    continue 'outer
+                                }
+                                for i in 1..function.fields.len() {
+                                    if function.fields.get(i).unwrap().field_type !=
+                                        effects.get(i-1).unwrap().unwrap().return_type(type_manager).unwrap() {
+                                        continue 'outer
+                                    }
+                                }
+
+                                if last.as_ref().unwrap().unwrap().return_type(type_manager).unwrap() !=
+                                    function.fields.get(0).unwrap().field_type {
+                                    continue 'outer
+                                }
+
+                                let mut temp_last = NOP();
+                                mem::swap(&mut temp_last, last.as_mut().unwrap());
+                                effects.insert(0, temp_last);
+                            } else {
+                                if function.fields.len() != effects.len() {
+                                    continue 'outer
+                                }
+                                for i in 0..function.fields.len() {
+                                    if function.fields.get(i).unwrap().field_type !=
+                                        effects.get(i).unwrap().unwrap().return_type(type_manager).unwrap() {
+                                        continue 'outer
+                                    }
+                                }
+                            }
+
+                            *parsing = temp;
+                            return Some(Box::new(OperatorEffect::new(function, effects, location)));
+                        } else {
+                            continue 'outer
                         },
-                        None => continue
+                        None => continue 'outer
                     }
-                    None => {
-                        if add_last {
-                            effects.insert(0, last.unwrap());
-                        }
-                        return Some(Box::new(OperatorEffect::new(
-                            type_manager.get_function(name).unwrap(), effects, location)))
-                    }
+                    None => continue 'outer
                 }
             }
         }
@@ -180,7 +203,7 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
 fn assign_with_priority(mut operator: Box<OperatorEffect>) -> Effects {
     //This will be overwritten
     let mut temp_rhs = Effects::NOP();
-    mem::swap(&mut temp_rhs, operator.rhs.as_mut().unwrap());
+    mem::swap(&mut temp_rhs, operator.effects.last_mut().as_mut().unwrap());
 
     //If the right side has more priority, it must be swapped
     return if let Effects::OperatorEffect(rhs) = temp_rhs {
@@ -191,22 +214,23 @@ fn assign_with_priority(mut operator: Box<OperatorEffect>) -> Effects {
             mem::swap(&mut Effects::OperatorEffect(rhs), &mut temp);
             if let Effects::OperatorEffect(mut value) = temp {
                 //1 / 2, temp = {} + 3
-                mem::swap(&mut value.lhs, &mut operator.rhs);
+                mem::swap(&mut value.effects.first(), &mut operator.effects.last());
 
                 let mut effect = Effects::OperatorEffect(operator);
+
                 //(1 / 2) + 3
-                mem::swap(value.lhs.as_mut().unwrap(), &mut effect);
+                mem::swap(value.effects.first_mut().unwrap(), &mut effect);
 
                 return Effects::OperatorEffect(value);
             }
             panic!("Temp magically changed types!");
         }
         //Swap it back if this failed
-        mem::swap(&mut Effects::OperatorEffect(rhs), operator.rhs.as_mut().unwrap());
+        mem::swap(&mut Effects::OperatorEffect(rhs), operator.effects.last_mut().unwrap());
         Effects::OperatorEffect(operator)
     } else {
         //Swap it back if this failed
-        mem::swap(&mut temp_rhs, operator.rhs.as_mut().unwrap());
+        mem::swap(&mut temp_rhs, operator.effects.last_mut().unwrap());
         Effects::OperatorEffect(operator)
     }
 }
