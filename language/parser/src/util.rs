@@ -20,6 +20,10 @@ pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<(String, String)>
     return Some(output);
 }
 
+pub fn parse_struct_fields() {
+    
+}
+
 fn parse_field<'a>(string: String, parser: &mut ParseInfo) -> Option<(String, String)> {
     let parts: Vec<&str> = string.split(':').collect();
     if parts.len() != 2 {

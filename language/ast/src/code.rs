@@ -28,6 +28,15 @@ pub struct MemberField {
     pub field: Field
 }
 
+impl MemberField {
+    pub fn new(modifiers: u8, field: Field) -> Self {
+        return Self {
+            modifiers,
+            field
+        }
+    }
+}
+
 impl DisplayIndented for MemberField {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}{} {}", indent, display(&to_modifiers(self.modifiers)), self.field);

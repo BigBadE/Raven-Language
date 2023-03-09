@@ -39,12 +39,7 @@ impl<'ctx> Compiler<'ctx> {
     }
 
     pub fn get_llvm_type(&self, types: &Types) -> &BasicTypeEnum {
-        for (name, found_types) in self.type_manager.types.deref() {
-            if found_types.deref() == types {
-                return self.type_manager.llvm_types.get(name).unwrap();
-            }
-        }
-        panic!("Couldn't find type?");
+        return self.type_manager.llvm_types.get(&types.name).expect("Failed to find type");
     }
 
     pub fn compile(&mut self) -> Option<JitFunction<'ctx, Main>> {

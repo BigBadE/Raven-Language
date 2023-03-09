@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use inkwell::context::Context;
 use crate::compiler::Compiler;
 use crate::file::FileStructureImpl;
-use crate::types::type_resolver::CompilerTypeResolver;
+use crate::types::type_resolver::{CompilerTypeResolver, ParserTypeResolver};
 
 pub mod instructions;
 
@@ -20,9 +20,9 @@ pub fn main() {
     let directory = FileStructureImpl::new(PathBuf::from(args.get(1).unwrap()));
 
     let context = Context::create();
-    let mut type_manager = CompilerTypeResolver::new(&context);
+    let mut type_manager = ParserTypeResolver::new();
     parser::parse(&mut type_manager, Box::new(directory));
-    let mut compiler = Compiler::new(type_manager, &context);
+    let mut compiler = Compiler::new(type_manager.finalize(), &context);
     match compiler.compile() {
         Some(main) => {
             unsafe { println!("Output: {}", main.call()) }

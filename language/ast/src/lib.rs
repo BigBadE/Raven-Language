@@ -1,11 +1,12 @@
 use std::fmt::{Display, Formatter};
 
 pub mod blocks;
-pub mod r#struct;
 pub mod code;
 pub mod function;
-pub mod types;
+pub mod parsing_type;
+pub mod r#struct;
 pub mod type_resolver;
+pub mod types;
 
 pub static MODIFIERS: [Modifier; 5] = [Modifier::Public, Modifier::Protected, Modifier::Extern,
     Modifier::Internal, Modifier::Operation];

@@ -17,17 +17,7 @@ pub fn parse(type_manager: &mut dyn TypeResolver, input: Box<dyn FileStructure>)
 
     for file in input.get_files() {
         let name = file.to_str().unwrap()[root_offset..file.to_str().unwrap().len() - 3].to_string();
-        match parser::parse(type_manager, &name, fs::read_to_string(&file).unwrap(), true) {
-            Ok(_) => {},
-            Err(errors) => print_errors(errors)
-        };
-    }
-
-    type_manager.finalize();
-
-    for file in input.get_files() {
-        let name = file.to_str().unwrap()[root_offset..file.to_str().unwrap().len() - 3].to_string();
-        match parser::parse(type_manager, &name, fs::read_to_string(&file).unwrap(), false) {
+        match parser::parse(type_manager, &name, fs::read_to_string(&file).unwrap()) {
             Ok(_) => {},
             Err(errors) => print_errors(errors)
         };
