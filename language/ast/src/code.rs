@@ -1,9 +1,9 @@
 use std::fmt::{Display, Formatter};
-use std::rc::Rc;
-use crate::{DisplayIndented, to_modifiers};
+use std::mem;
+use crate::{assign_with_priority, DisplayIndented, to_modifiers};
 use crate::blocks::IfStatement;
-use crate::function::{Arguments, CodeBody, display, Function};
-use crate::type_resolver::TypeResolver;
+use crate::function::{Arguments, CodeBody, display_joined};
+use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
 pub struct Expression {
@@ -39,7 +39,7 @@ impl MemberField {
 
 impl DisplayIndented for MemberField {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}{} {}", indent, display(&to_modifiers(self.modifiers)), self.field);
+        return write!(f, "{}{} {}", indent, display_joined(&to_modifiers(self.modifiers)), self.field);
     }
 }
 
@@ -51,7 +51,7 @@ impl Expression {
         }
     }
 
-    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+    pub fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
         self.effect.finalize(type_resolver);
     }
 
@@ -72,8 +72,8 @@ impl Field {
         }
     }
 
-    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
-        self.field_type.finalize(type_resolver);
+    pub fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        type_resolver.finalize(&mut self.field_type);
     }
 }
 
@@ -111,7 +111,7 @@ pub trait Effect: DisplayIndented {
 
     fn has_return(&self) -> bool;
 
-    fn finalize(&mut self, type_resolver: &dyn TypeResolver);
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver);
 
     fn return_type(&self) -> Option<ResolvableTypes>;
 
@@ -125,6 +125,8 @@ pub enum Effects {
     IfStatement(Box<IfStatement>),
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
+    FieldLoad(Box<FieldLoad>),
+    CreateStruct(Box<CreateStruct>),
     FloatEffect(Box<NumberEffect<f64>>),
     IntegerEffect(Box<NumberEffect<i64>>),
     AssignVariable(Box<AssignVariable>),
@@ -140,6 +142,8 @@ impl Effects {
             Effects::IfStatement(effect) => effect.as_ref(),
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
+            Effects::FieldLoad(effect) => effect.as_ref(),
+            Effects::CreateStruct(effect) => effect.as_ref(),
             Effects::FloatEffect(effect) => effect.as_ref(),
             Effects::IntegerEffect(effect) => effect.as_ref(),
             Effects::AssignVariable(effect) => effect.as_ref(),
@@ -147,8 +151,25 @@ impl Effects {
         };
     }
 
-    pub fn finalize(&self, type_resolver: &dyn TypeResolver) {
-        self.unwrap().finalize(type_resolver);
+    pub fn as_mut(&mut self) -> &mut dyn Effect {
+        return match self {
+            Effects::NOP() => panic!("Tried to unwrap a NOP!"),
+            Effects::Wrapped(effect) => Effects::as_mut(effect),
+            Effects::CodeBody(effect) => effect.as_mut(),
+            Effects::IfStatement(effect) => effect.as_mut(),
+            Effects::MethodCall(effect) => effect.as_mut(),
+            Effects::VariableLoad(effect) => effect.as_mut(),
+            Effects::FieldLoad(effect) => effect.as_mut(),
+            Effects::CreateStruct(effect) => effect.as_mut(),
+            Effects::FloatEffect(effect) => effect.as_mut(),
+            Effects::IntegerEffect(effect) => effect.as_mut(),
+            Effects::AssignVariable(effect) => effect.as_mut(),
+            Effects::OperatorEffect(effect) => effect.as_mut()
+        };
+    }
+
+    pub fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.as_mut().finalize(type_resolver);
     }
 }
 
@@ -172,9 +193,60 @@ impl DisplayIndented for Effects {
     }
 }
 
+pub struct FieldLoad {
+    pub calling: Effects,
+    pub name: String,
+    loc: (u32, u32)
+}
+
+impl FieldLoad {
+    pub fn new(calling: Effects, name: String, loc: (u32, u32)) -> Self {
+        return Self {
+            calling,
+            name,
+            loc
+        }
+    }
+}
+
+impl Effect for FieldLoad {
+    fn is_return(&self) -> bool {
+        return false;
+    }
+
+    fn has_return(&self) -> bool {
+        return true;
+    }
+
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.calling.finalize(type_resolver);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        for field in self.calling.unwrap().return_type().as_ref().unwrap().unwrap().get_fields() {
+            if field.field.name == self.name {
+                return Some(field.field.field_type.clone());
+            }
+        }
+        panic!("Failed to find return type!")
+    }
+
+    fn get_location(&self) -> (u32, u32) {
+        return self.loc;
+    }
+}
+
+impl DisplayIndented for FieldLoad {
+    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.calling.format(parsing, f)?;
+        return write!(f, ".{}", self.name);
+    }
+}
+
 pub struct MethodCall {
     pub calling: Option<Effects>,
     pub method: String,
+    pub method_return: Option<ResolvableTypes>,
     pub arguments: Arguments,
     location: (u32, u32)
 }
@@ -184,6 +256,7 @@ impl MethodCall {
         return Self {
             calling,
             method,
+            method_return: None,
             arguments,
             location
         };
@@ -199,19 +272,20 @@ impl Effect for MethodCall {
         return true;
     }
 
-    fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
         if self.calling.is_some() {
-            self.calling.unwrap().finalize(type_resolver);
+            self.calling.as_mut().unwrap().finalize(type_resolver);
         }
 
         self.arguments.finalize(type_resolver);
+        self.method_return = match type_resolver.get_function(&self.method) {
+            Some(func) => func.return_type.clone(),
+            None => panic!("No method named {}!", self.method)
+        };
     }
 
     fn return_type(&self) -> Option<ResolvableTypes> {
-        return match &self.calling {
-            Some(calling) => calling.unwrap().return_type(),
-            None => None
-        };
+        return self.method_return.clone();
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -226,6 +300,88 @@ impl DisplayIndented for MethodCall {
             write!(f, ".")?;
         }
         return write!(f, "{}{}", self.method, self.arguments);
+    }
+}
+
+pub struct CreateStruct {
+    pub structure: ResolvableTypes,
+    pub parsed_effects: Option<Vec<(usize, Effects)>>,
+    pub effects: Option<Vec<(String, Effects)>>,
+    location: (u32, u32)
+}
+
+impl CreateStruct {
+    pub fn new(structure: ResolvableTypes, effects: Vec<(String, Effects)>, location: (u32, u32)) -> Self {
+        return Self {
+            structure,
+            parsed_effects: None,
+            effects: Some(effects),
+            location
+        }
+    }
+}
+
+impl Effect for CreateStruct {
+    fn is_return(&self) -> bool {
+        return false;
+    }
+
+    fn has_return(&self) -> bool {
+        return true;
+    }
+
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.structure.finalize(type_resolver);
+        let structure = &self.structure.unwrap();
+
+        let mut output = Vec::new();
+
+        let mut temp = None;
+        mem::swap(&mut temp, &mut self.effects);
+
+        for (name, mut effect) in temp.unwrap() {
+            effect.finalize(type_resolver);
+            let fields = structure.get_fields();
+            for i in 0..fields.len() {
+                let field = fields.get(i).unwrap();
+                if field.field.name == name {
+                    output.push((i, effect));
+                    break
+                }
+            }
+        }
+
+        self.parsed_effects = Some(output);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return Some(self.structure.clone());
+    }
+
+    fn get_location(&self) -> (u32, u32) {
+        return self.location;
+    }
+}
+
+impl DisplayIndented for CreateStruct {
+    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {{", self.structure)?;
+        match self.effects.as_ref() {
+            Some(effects) => {
+                for (name, effect) in effects {
+                    write!(f, "{}{}: ", parsing, name)?;
+                    DisplayIndented::format(effect, parsing, f)?;
+                }
+            },
+            None => {
+                for (loc, effect) in self.parsed_effects.as_ref().unwrap() {
+                    write!(f, "{}{}: ", parsing,
+                           self.structure.unwrap().get_fields().get(*loc).unwrap().field.name)?;
+                    DisplayIndented::format(effect, parsing, f)?;
+                }
+            }
+        }
+        return write!(f, "{}}}", parsing);
     }
 }
 
@@ -252,7 +408,7 @@ impl Effect for VariableLoad {
         return true;
     }
 
-    fn finalize(&mut self, _type_resolver: &dyn TypeResolver) {}
+    fn finalize(&mut self, _type_resolver: &dyn FinalizedTypeResolver) {}
 
     fn return_type(&self) -> Option<ResolvableTypes> {
         return None;
@@ -269,31 +425,33 @@ impl DisplayIndented for VariableLoad {
     }
 }
 
-pub struct NumberEffect<T> where T : Display {
+pub struct NumberEffect<T> where T : Display + Typed {
+    pub return_type: ResolvableTypes,
     pub number: T
 }
 
-impl<T> NumberEffect<T> where T : Display {
+impl<T> NumberEffect<T> where T : Display + Typed {
     pub fn new(number: T) -> Self {
         return Self {
+            return_type: T::get_type(),
             number
         }
     }
 }
 
 pub trait Typed {
-    fn get_type() -> &'static str;
+    fn get_type() -> ResolvableTypes;
 }
 
 impl Typed for f64 {
-    fn get_type() -> &'static str {
-        return "f64";
+    fn get_type() -> ResolvableTypes {
+        return ResolvableTypes::Resolving("f64".to_string());
     }
 }
 
 impl Typed for i64 {
-    fn get_type() -> &'static str {
-        return "i64";
+    fn get_type() -> ResolvableTypes {
+        return ResolvableTypes::Resolving("i64".to_string());
     }
 }
 
@@ -306,8 +464,12 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
-        return type_resolver.get_type(&T::get_type().to_string());
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.return_type.finalize(type_resolver);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return Some(self.return_type.clone());
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -315,7 +477,7 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
     }
 }
 
-impl<T> DisplayIndented for NumberEffect<T> where T : Display {
+impl<T> DisplayIndented for NumberEffect<T> where T : Display + Typed {
     fn format(&self, _indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", self.number);
     }
@@ -323,16 +485,14 @@ impl<T> DisplayIndented for NumberEffect<T> where T : Display {
 
 pub struct AssignVariable {
     pub variable: String,
-    pub given_type: Option<String>,
     pub effect: Effects,
     location: (u32, u32)
 }
 
 impl AssignVariable {
-    pub fn new(variable: String, given_type: Option<String>, effect: Effects, location: (u32, u32)) -> Self {
+    pub fn new(variable: String, effect: Effects, location: (u32, u32)) -> Self {
         return Self {
             variable,
-            given_type,
             effect,
             location
         }
@@ -348,8 +508,12 @@ impl Effect for AssignVariable {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
-        return self.effect.unwrap().return_type(type_resolver);
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.effect.finalize(type_resolver);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return self.effect.unwrap().return_type();
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -359,34 +523,30 @@ impl Effect for AssignVariable {
 
 impl DisplayIndented for AssignVariable {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "let {}", self.variable)?;
-        if self.given_type.is_some() {
-            write!(f, ": {}", self.given_type.as_ref().unwrap())?;
-        }
-        write!(f, " = ")?;
+        write!(f, "let {} = ", self.variable)?;
         return self.effect.format(indent, f);
     }
 }
 
 pub struct OperatorEffect {
     pub operator: String,
+    pub function: Option<String>,
     pub effects: Vec<Effects>,
     pub priority: i8,
     pub parse_left: bool,
-    parent_function: String,
+    return_type: Option<ResolvableTypes>,
     location: (u32, u32)
 }
 
 impl OperatorEffect {
-    pub fn new(function: &Function, effects: Vec<Effects>, location: (u32, u32)) -> Self {
+    pub fn new(operator: String, effects: Vec<Effects>, location: (u32, u32)) -> Self {
         return Self {
-            operator: function.name.clone(),
+            operator,
+            function: None,
             effects,
-            priority: function.attributes.get("priority")
-                .map_or(0, |attrib| attrib.value.parse().expect("Expected numerical priority!")),
-            parse_left: function.attributes.get("parse_left")
-                .map_or(true, |attrib| attrib.value.parse().expect("Expected boolean parse_left!")),
-            parent_function: function.name.clone(),
+            priority: -100,
+            parse_left: false,
+            return_type: None,
             location
         }
     }
@@ -407,12 +567,27 @@ impl Effect for OperatorEffect {
         return true;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
-        let mut args = Vec::new();
-        for arg in &self.effects {
-            args.push(arg);
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        for effect in &mut self.effects {
+            effect.finalize(type_resolver);
         }
-        return type_resolver.get_method_type(&self.parent_function, &None, &args);
+
+        let function = type_resolver.get_operator(&self.effects, self.operator.clone()).unwrap();
+        self.function = Some(function.name.clone());
+        self.return_type = function.return_type.clone();
+
+        self.priority = function.attributes.get("priority")
+            .map_or(0, |attrib| attrib.value.parse().expect("Expected numerical priority!"));
+        self.parse_left = function.attributes.get("parse_left")
+            .map_or(true, |attrib| attrib.value.parse().expect("Expected boolean parse_left!"));
+
+        let mut temp = OperatorEffect::new(String::new(), Vec::new(), (0, 0));
+        mem::swap(&mut temp, self);
+        *self = assign_with_priority(Box::new(temp));
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return self.return_type.clone();
     }
 
     fn get_location(&self) -> (u32, u32) {

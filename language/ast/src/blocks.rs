@@ -1,9 +1,8 @@
 use std::fmt::Formatter;
-use std::rc::Rc;
 use crate::code::{Effect, Effects};
 use crate::DisplayIndented;
 use crate::function::CodeBody;
-use crate::type_resolver::TypeResolver;
+use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
 pub struct ForStatement {
@@ -35,8 +34,13 @@ impl Effect for ForStatement {
         return false;
     }
 
-    fn return_type(&self, _type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
-        todo!()
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.code_block.finalize(type_resolver);
+        self.effect.finalize(type_resolver);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return None;
     }
 
     fn get_location(&self) -> (u32, u32) {
@@ -108,8 +112,20 @@ impl Effect for IfStatement {
         return false;
     }
 
-    fn return_type(&self, type_resolver: &dyn TypeResolver) -> Option<Rc<ResolvableTypes>> {
-        return self.body.return_type(type_resolver);
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        self.body.finalize(type_resolver);
+        if self.else_body.is_some() {
+            self.else_body.as_mut().unwrap().finalize(type_resolver);
+        }
+        self.condition.finalize(type_resolver);
+        for (else_if, condition) in &mut self.else_ifs {
+            else_if.finalize(type_resolver);
+            condition.finalize(type_resolver);
+        }
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return self.body.return_type();
     }
 
     fn get_location(&self) -> (u32, u32) {

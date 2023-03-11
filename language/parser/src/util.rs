@@ -1,9 +1,11 @@
+use ast::code::{Effects, Field};
 use ast::function::{Arguments, CodeBody};
 use ast::type_resolver::TypeResolver;
+use ast::types::ResolvableTypes;
 use crate::code::{parse_effect, parse_expression};
 use crate::parser::ParseInfo;
 
-pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<(String, String)>> {
+pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
     while let Some(found) = find_if_first(parsing, b',', b')') {
@@ -20,18 +22,16 @@ pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<(String, String)>
     return Some(output);
 }
 
-pub fn parse_struct_fields() {
-    
-}
+pub fn parse_struct_fields() {}
 
-fn parse_field<'a>(string: String, parser: &mut ParseInfo) -> Option<(String, String)> {
+fn parse_field<'a>(string: String, parser: &mut ParseInfo) -> Option<Field> {
     let parts: Vec<&str> = string.split(':').collect();
     if parts.len() != 2 {
         parser.create_error("Missing or unexpected colon in field.".to_string());
         return None;
     }
 
-    return Some((parts[0].to_string(), parts[1].to_string()));
+    return Some(Field::new(parts[0].to_string(), ResolvableTypes::Resolving(parts[1].to_string())));
 }
 
 pub fn parse_code_block(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<CodeBody> {
@@ -82,4 +82,34 @@ pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo)
         output.push(effect);
     }
     return Arguments::new(output);
+}
+
+pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Vec<(String, Effects)> {
+    let mut output = Vec::new();
+    while parsing.len != parsing.index && !parsing.matching("}") {
+        let found_name;
+        if let Some(name) = find_if_first(parsing, b':', b',') {
+            found_name = name;
+        } else if let Some(name) = find_if_first(parsing, b':', b'}') {
+            found_name = name;
+        } else {
+            if let Some(_name) = find_if_first(&mut parsing.clone(), b',', b'}') {
+                found_name = parsing.parse_to(b',').unwrap();
+            } else {
+                found_name = match parsing.parse_to(b'}') {
+                    Some(name) => name,
+                    None => {
+                        parsing.create_error("Missing end to Struct parameters!".to_string());
+                        return output;
+                    }
+                }
+            }
+        }
+        output.push((found_name, parse_effect(type_manager, parsing, &[b',', b';', b'}']).expect("No effect!")));
+        if (parsing.buffer[parsing.index - 1] == b'}' && !parsing.find_next(b'}')) || parsing.buffer[parsing.index - 1] == b';' {
+            parsing.create_error("Missing comma after structure initializer value".to_string());
+            return output;
+        }
+    }
+    return output;
 }

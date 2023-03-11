@@ -162,7 +162,9 @@ impl<'a> ParseInfo<'a> {
         while line == self.line {
             match self.next_included() {
                 Some(_) => {},
-                None => break
+                None => {
+                    break
+                }
             }
         }
     }

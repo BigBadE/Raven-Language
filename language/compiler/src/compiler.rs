@@ -1,15 +1,11 @@
-use std::ops::Deref;
-use std::rc::Rc;
+use std::mem;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
-use inkwell::types::BasicTypeEnum;
-use ast::type_resolver::TypeResolver;
-use ast::types::Types;
-use crate::function_compiler::{compile_function, get_function_value};
-use crate::types::type_resolver::CompilerTypeResolver;
+use crate::function_compiler::compile_function;
+use crate::types::type_resolver::ParserTypeResolver;
 
 type Main = unsafe extern "C" fn() -> i64;
 
@@ -18,48 +14,35 @@ pub struct Compiler<'ctx> {
     pub module: Module<'ctx>,
     pub builder: Builder<'ctx>,
     execution_engine: ExecutionEngine<'ctx>,
-    pub type_manager: CompilerTypeResolver<'ctx>,
+    pub type_manager: ParserTypeResolver,
 }
 
 impl<'ctx> Compiler<'ctx> {
-    pub fn new(type_manager: CompilerTypeResolver<'ctx>, context: &'ctx Context) -> Self {
+    pub fn new(type_manager: ParserTypeResolver, context: &'ctx Context) -> Self {
         let module = context.create_module("main");
         let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
+
         return Self {
-            context,
+            type_manager,
             module,
+            context,
             builder: context.create_builder(),
             execution_engine,
-            type_manager,
         };
     }
 
-    pub fn get_type(&self, name: &String) -> Rc<ResolvableTypes> {
-        return self.type_manager.get_type(name).expect(&*("Couldn't find type named ".to_string() + name)).clone();
-    }
-
-    pub fn get_llvm_type(&self, types: &ResolvableTypes) -> &BasicTypeEnum {
-        for (name, found_types) in self.type_manager.types.deref() {
-            if found_types.deref() == types {
-                return self.type_manager.llvm_types.get(name).unwrap();
-            }
-        }
-        panic!("Couldn't find type?");
-    }
-
-    pub fn compile(&mut self) -> Option<JitFunction<'ctx, Main>> {
-        //Add them to functions for function calls
-        for (_name, (function, function_value)) in
-        unsafe { Rc::get_mut_unchecked(&mut self.type_manager.functions.clone()) } {
-            *function_value = Some(get_function_value(function, self));
-        }
+    pub fn compile(mut self) -> Option<JitFunction<'ctx, Main>> {
+        let mut temp = ParserTypeResolver::new();
+        mem::swap(&mut temp, &mut self.type_manager);
+        let type_manager = temp.finalize(self.context, &self.module);
+        type_manager.print();
 
         //Compile
-        for (function, _function_value) in self.type_manager.functions.values() {
-            compile_function(function, self);
+        for (function, _function_value) in type_manager.functions.values() {
+            compile_function(function, &self, &type_manager);
         }
 
-        match self.type_manager.functions.get("main::main") {
+        match type_manager.functions.get("main::main") {
             Some(_main) => {
                 let function = unsafe { self.execution_engine.get_function("main::main") };
                 return match function {

@@ -53,8 +53,8 @@ pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Opt
         }
     }
 
-    match statement.condition.unwrap().return_type(type_manager) {
-        Some(return_type) => if return_type.name != "bool" {
+    match statement.condition.unwrap().return_type() {
+        Some(return_type) => if return_type.to_string() != "bool" {
             parsing.create_error("If expression isn't a boolean".to_string());
             return None;
         },
@@ -64,10 +64,10 @@ pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Opt
         }
     }
 
-    let expected = statement.body.return_type(type_manager);
+    let expected = statement.body.return_type();
     match &statement.else_body {
         Some(effect) => {
-            if effect.return_type(type_manager) != expected {
+            if effect.return_type() != expected {
                 parsing.create_error("Else has different return type from If".to_string());
             }
         }
@@ -75,8 +75,8 @@ pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Opt
     }
 
     for (body, expression) in &statement.else_ifs {
-        match expression.unwrap().return_type(type_manager) {
-            Some(return_type) => if return_type.name != "bool" {
+        match expression.unwrap().return_type() {
+            Some(return_type) => if return_type.to_string() != "bool" {
                 parsing.create_error("Else If expression isn't a boolean".to_string());
                 return None;
             },
@@ -86,7 +86,7 @@ pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Opt
             }
         }
 
-        if body.return_type(type_manager) != expected {
+        if body.return_type() != expected {
             parsing.create_error("Else If has different return type from If".to_string());
         }
     }

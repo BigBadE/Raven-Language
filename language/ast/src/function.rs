@@ -1,9 +1,8 @@
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use crate::r#struct::TypeMember;
+use std::fmt::{Debug, Display, Formatter};
 use crate::code::{Effect, Effects, Expression, ExpressionType, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
-use crate::type_resolver::TypeResolver;
+use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
 pub struct Function {
@@ -28,14 +27,17 @@ impl Function {
         };
     }
 
-    pub fn finalize(&mut self, type_manager: &dyn TypeResolver) {
+    pub fn finalize(&mut self, type_manager: &dyn FinalizedTypeResolver) {
         if self.return_type.is_some() {
-            self.return_type.unwrap().finalize(type_manager);
+            self.return_type.as_mut().unwrap().finalize(type_manager);
         }
 
-        for mut field in self.fields {
+        for field in &mut self.fields {
             field.finalize(type_manager);
         }
+    }
+
+    pub fn finalize_code(&mut self, type_manager: &dyn FinalizedTypeResolver) {
         self.code.finalize(type_manager);
     }
 
@@ -68,8 +70,8 @@ impl Arguments {
         };
     }
 
-    pub fn finalize(&mut self, type_resolver: &dyn TypeResolver) {
-        for arg in self.arguments {
+    pub fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        for arg in &mut self.arguments {
             arg.finalize(type_resolver);
         }
     }
@@ -106,8 +108,8 @@ impl Effect for CodeBody {
         return false;
     }
 
-    fn finalize(&self, type_resolver: &dyn TypeResolver) {
-        for mut expression in self.expressions {
+    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+        for expression in &mut self.expressions {
             expression.finalize(type_resolver);
         }
     }
@@ -123,6 +125,12 @@ impl Effect for CodeBody {
 
     fn get_location(&self) -> (u32, u32) {
         todo!()
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return self.format("", f);
     }
 }
 
@@ -162,6 +170,9 @@ impl Display for Arguments {
 }
 
 pub fn display_joined<T>(input: &Vec<T>) -> String where T: Display {
+    if input.is_empty() {
+        return String::new();
+    }
     let mut output = String::new();
     for element in input {
         output += &*format!("{} ", element);
@@ -181,5 +192,3 @@ pub fn display<T>(input: &Vec<T>) -> String where T: Display {
 
     return format!("({})", (&output[..output.len() - 2]).to_string());
 }
-
-impl TypeMember for Function {}

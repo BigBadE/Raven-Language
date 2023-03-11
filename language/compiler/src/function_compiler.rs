@@ -1,43 +1,23 @@
+use std::mem::MaybeUninit;
 use std::ops::Deref;
 use inkwell::basic_block::BasicBlock;
-use inkwell::types::{AsTypeRef, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
-use llvm_sys::core::LLVMFunctionType;
-use llvm_sys::prelude::LLVMTypeRef;
 use ast::code::{Effect, Effects, ExpressionType};
 use ast::function::{CodeBody, Function};
 use ast::{is_modifier, Modifier};
-use ast::type_resolver::TypeResolver;
 use crate::compiler::Compiler;
-use crate::instructions::compile_internal;
+use crate::internal::instructions::compile_internal;
 use crate::types::type_resolver::CompilerTypeResolver;
 use crate::util::print_formatted;
 
-pub fn get_function_value<'ctx>(function: &Function, compiler: &Compiler<'ctx>) -> FunctionValue<'ctx> {
-    let return_type = match &function.return_type {
-        Some(found) => compiler.get_llvm_type(found).as_type_ref(),
-        None => compiler.context.void_type().as_type_ref()
-    };
-
-    let mut params: Vec<LLVMTypeRef> = function.fields.iter().map(
-        |field| compiler.get_llvm_type(&field.field_type).as_type_ref()).collect();
-
-    let fn_type = unsafe {
-        FunctionType::new(LLVMFunctionType(return_type, params.as_mut_ptr(),
-                                           params.len() as u32, false as i32))
-    };
-
-    return compiler.module.add_function(function.name.as_str(), fn_type, None);
-}
-
-pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>) {
-    let value = compiler.type_manager.functions.get(&function.name).unwrap().1.unwrap();
+pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>, type_manager: &CompilerTypeResolver<'ctx>) {
+    let value = type_manager.functions.get(&function.name).unwrap().1;
     if is_modifier(function.modifiers, Modifier::Internal) {
         compile_internal(compiler, &function.name, &function.fields, value);
     } else if is_modifier(function.modifiers, Modifier::Extern) {
         todo!()
     } else {
-        let mut function_types = compiler.type_manager.clone();
+        let mut function_types = type_manager.clone();
         compile_block(&function.code, value, &mut function_types, &compiler, &mut 0);
         println!("Func:");
         print_formatted(value.to_string());
@@ -95,8 +75,44 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             }
 
             *id += 1;
-            Some(compiler.builder.build_call(compiler.type_manager.functions.get(&effect.method).unwrap().1.unwrap(),
+            Some(compiler.builder.build_call(variables.functions.get(&effect.method).unwrap().1,
                                              arguments.as_slice(), &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
+        },
+        Effects::FieldLoad(effect) => {
+            let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
+            *id += 1;
+            let mut offset = 0;
+            for field in effect.calling.unwrap().return_type().unwrap().unwrap().get_fields() {
+                if field.field.name != effect.name {
+                    offset += field.field.field_type.unwrap().size;
+                }
+            }
+            Some(compiler.builder.build_extract_value(from.into_struct_value(), offset, &(*id - 1).to_string()).unwrap())
+        }
+        Effects::CreateStruct(effect) => {
+            let types = effect.structure.unwrap();
+
+            let structure = variables.llvm_types.get(types).unwrap()
+                .into_struct_type().get_undef();
+
+            let mut arguments = vec![MaybeUninit::uninit(); effect.parsed_effects.as_ref().unwrap().len()];
+
+            for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
+                let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
+                arguments.insert(*index, MaybeUninit::new((returned,
+                                                           effect.unwrap().return_type().unwrap().unwrap().size)));
+            }
+
+            let mut offset = 0;
+            for argument in arguments {
+                let (effect, size) = unsafe { argument.assume_init() };
+                compiler.builder.build_insert_value(structure, effect,
+                                                    offset, id.to_string().as_str());
+                offset += size;
+                *id += 1;
+            }
+
+            Some(structure.as_basic_value_enum())
         }
         Effects::CodeBody(effect) => {
             //Start block
@@ -144,12 +160,14 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             *block = end;
 
             //If it's an if with a return value, use phi to get the value
-            return match effect.return_type(&compiler.type_manager) {
-                Some(return_type) => {
-                    let phi = compiler.builder.build_phi(*compiler.get_llvm_type(return_type.deref()), "wtf?");
+            return match effect.return_type() {
+                Some(_return_type) => {
                     todo!();
-                    //phi.add_incoming(blocks.as_slice());
-                    Some(phi.as_basic_value())
+                    /*let phi = compiler.builder.build_phi(
+                        *compiler.type_manager.llvm_types.get(return_type.unwrap()).unwrap(), &id.to_string());
+                    *id += 1;
+                    phi.add_incoming(blocks.as_slice());
+                    Some(phi.as_basic_value())*/
                 }
                 None => None
             };
@@ -161,21 +179,21 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             }
 
             *id += 1;
-            Some(compiler.builder.build_call(compiler.type_manager.functions.get(&effect.operator).unwrap().1.unwrap(),
+            Some(compiler.builder.build_call(variables.functions.get(effect.function.as_ref().unwrap()).unwrap().1,
                                              arguments.as_slice(), &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
         }
         Effects::VariableLoad(effect) =>
-            Some(variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone()),
+            Some(variables.variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone()),
         Effects::AssignVariable(variable) => {
-            let pointer = compiler.builder.build_alloca(*compiler.get_llvm_type(
-                match variable.effect.unwrap().return_type(variables) {
-                    Some(found_type) => found_type,
-                    None => match &variable.given_type {
-                        Some(found_type) => compiler.type_manager.get_type(found_type).unwrap(),
+            let pointer = compiler.builder.build_alloca(*variables.llvm_types.get(
+                match variable.effect.unwrap().return_type() {
+                    Some(found_type) => found_type.unwrap().clone(),
+                    None => match &variable.effect.unwrap().return_type() {
+                        Some(found_type) => found_type.unwrap().clone(),
                         None => panic!("Unable to find type for variable {}
                     (assign it using a let statement to specify the type)", variable.variable)
                     }
-                }.deref()), variable.variable.as_str());
+                }.deref()).unwrap(), variable.variable.as_str());
             let value = compile_effect(compiler, block, function, variables, &variable.effect, id).unwrap();
 
             variables.variables.insert(variable.variable.clone(), value);

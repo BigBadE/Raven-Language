@@ -2,19 +2,34 @@ use std::fmt::{Display, Formatter};
 use crate::{DisplayIndented, to_modifiers};
 use crate::code::MemberField;
 use crate::function::{display_joined, Function};
+use crate::type_resolver::FinalizedTypeResolver;
 
 pub struct Struct {
     pub modifiers: u8,
-    pub members: Vec<TypeMembers>,
+    pub fields: Option<Vec<MemberField>>,
+    pub functions: Vec<Function>,
     pub name: String
 }
 
 impl Struct {
-    pub fn new(members: Vec<TypeMembers>, modifiers: u8, name: String) -> Self {
+    pub fn new(fields: Option<Vec<MemberField>>, functions: Vec<Function>, modifiers: u8, name: String) -> Self {
         return Self {
             modifiers,
-            members,
+            fields,
+            functions,
             name
+        }
+    }
+
+    pub fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
+        if self.fields.is_some() {
+            for field in self.fields.as_mut().unwrap() {
+                field.field.finalize(type_resolver);
+            }
+        }
+
+        for function in &mut self.functions {
+            function.finalize(type_resolver);
         }
     }
 }
@@ -27,33 +42,24 @@ impl Display for Struct {
 
 impl DisplayIndented for Struct {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} struct {} {{\n", display_joined(&to_modifiers(self.modifiers)), self.name)?;
-        for member in &self.members {
+        write!(f, "{} struct {} {{", display_joined(&to_modifiers(self.modifiers)), self.name)?;
+        let deeper_indent = "    ".to_string() + indent;
+        let deeper_indent = deeper_indent.as_str();
+
+        if self.fields.is_some() {
+            for field in self.fields.as_ref().unwrap() {
+                write!(f, "\n")?;
+                DisplayIndented::format(field, deeper_indent, f)?;
+            }
+        }
+
+        write!(f, "\n")?;
+        for member in &self.functions {
             write!(f, "\n")?;
-            DisplayIndented::format(member, indent, f)?;
+            DisplayIndented::format(member, deeper_indent, f)?;
             write!(f, "\n")?;
         }
-        write!(f, "}}")?;
+        write!(f, "{}}}", indent)?;
         return Ok(());
-    }
-}
-
-pub trait TypeMember: DisplayIndented {
-
-}
-
-pub enum TypeMembers {
-    Function(Function),
-    Field(MemberField)
-}
-
-impl DisplayIndented for TypeMembers {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let indent = indent.to_string() + "    ";
-        let indent = indent.as_str();
-        return match self {
-            TypeMembers::Function(function) => DisplayIndented::format(function, indent, f),
-            TypeMembers::Field(field) => DisplayIndented::format(field, indent, f)
-        };
     }
 }

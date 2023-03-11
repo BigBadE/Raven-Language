@@ -22,8 +22,6 @@ pub fn parse(type_manager: &mut dyn TypeResolver, input: Box<dyn FileStructure>)
             Err(errors) => print_errors(errors)
         };
     }
-
-    type_manager.print();
 }
 
 fn print_errors(failed: Vec<ParseError>) {

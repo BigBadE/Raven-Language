@@ -2,14 +2,15 @@ pub struct Testing {
     pub field: i64;
     pub default_field: i64;
 
-    pub fn new() -> Self {
+    pub fn new() -> main::Testing {
         return Self {
             field: 0,
             default_field: 1
-        };
+        }
     }
 }
 
 pub fn main() -> i64 {
-    return 1 + 2 / 2 + 1;
+    let testing = main::Testing::new();
+    return testing.field;
 }

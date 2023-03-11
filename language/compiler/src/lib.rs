@@ -1,7 +1,7 @@
 #![feature(get_mut_unchecked)]
 extern crate core;
 
-pub mod instructions;
+pub mod internal;
 pub mod types;
 
 pub mod compiler;

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 use ast::function::{CodeBody, Function};
-use ast::{Attribute, get_modifier, is_modifier, Modifier, to_modifiers};
+use ast::{Attribute, get_modifier, is_modifier, Modifier};
 use ast::code::{Field, MemberField};
-use ast::parsing_type::ParsingTypes;
-use ast::r#struct::{Struct, TypeMembers};
+use ast::r#struct::Struct;
 use ast::type_resolver::TypeResolver;
-use ast::types::Types;
+use ast::types::{ResolvableTypes, Types};
 use crate::literal::parse_ident;
 use crate::parser::ParseInfo;
 use crate::util::{parse_code_block, parse_fields};
@@ -18,21 +18,18 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
         let modifiers = get_modifier(parse_modifiers(parsing).as_slice());
         if parsing.matching("struct") {
             match parse_struct_type(type_manager, name, modifiers, parsing) {
-                Some(struct_type) => type_manager.add_type(struct_type),
+                Some(struct_type) => type_manager.add_type(Rc::new(struct_type)),
                 None => {}
             };
             continue;
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
             match parse_function(type_manager, name, attributes, modifiers, parsing) {
-                Some(mut function) => {
-                    if parse_code {
-                        function.finalize(type_manager);
-                    }
+                Some(function) => {
                     if is_modifier(modifiers, Modifier::Operation) {
                         //Add only the method name.
                         type_manager.add_operation(function.name[name.len() + 2..].to_string(), function.name.clone());
                     }
-                    type_manager.add_function(function.name.clone(), function)
+                    type_manager.add_function(function)
                 }
                 None => {}
             };
@@ -44,24 +41,29 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
             let mut temp = parsing.clone();
             temp.skip_line();
             parsing.create_error(format!("Unknown element: {}",
-                String::from_utf8_lossy(&parsing.buffer[parsing.index..temp.index])));
+                                         String::from_utf8_lossy(&parsing.buffer[parsing.index..temp.index])));
         } else {
             parsing.skip_line();
         }
     }
 }
 
-fn parse_struct_type(type_manager: &dyn TypeResolver, name: &String,
-                     modifiers: u8, parsing: &mut ParseInfo) -> Option<ParsingTypes> {
-    let fn_name = name.clone() + "::" + match parsing.parse_to(b'{') {
+fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
+                     modifiers: u8, parsing: &mut ParseInfo) -> Option<Types> {
+    let mut fn_name = match parsing.parse_to(b'{') {
         Some(name) => name.clone(),
         None => {
             parsing.create_error("Expected string name".to_string());
             return None;
         }
-    }.as_str();
+    };
 
-    let mut members = Vec::new();
+    if !is_modifier(modifiers, Modifier::Internal) {
+        fn_name = name.clone() + "::" + fn_name.as_str();
+    }
+
+    let mut functions = Vec::new();
+    let mut fields = Vec::new();
     while match parsing.next_included() {
         Some(character) => character != b'}',
         None => {
@@ -69,20 +71,25 @@ fn parse_struct_type(type_manager: &dyn TypeResolver, name: &String,
             return None;
         }
     } {
+        parsing.index -= 1;
         let attributes = parse_attributes(parsing, false);
         let modifiers = parse_modifiers(parsing);
 
         if parsing.matching("fn") {
-            match parse_function(type_manager, name, attributes, get_modifier(modifiers.as_slice()),
-                                 parsing, parse_code) {
+            match parse_function(type_manager, &fn_name, attributes, get_modifier(modifiers.as_slice()),
+                                 parsing) {
                 Some(function) => {
-                    members.push(TypeMembers::Function(function));
-                    continue
-                },
+                    if function.fields.iter().any(|field| field.name == "self") {
+                        functions.push(function);
+                    } else {
+                        type_manager.add_function(function);
+                    }
+                    parsing.index -= 1;
+                    continue;
+                }
                 None => {}
             }
         }
-
         let field_name = match parsing.parse_to(b':') {
             Some(field_name) => field_name,
             None => {
@@ -91,35 +98,25 @@ fn parse_struct_type(type_manager: &dyn TypeResolver, name: &String,
             }
         };
 
-        if parse_code {
-            members.push(TypeMembers::Field(MemberField::new(get_modifier(modifiers.as_slice()),
-            Field::new(field_name, type_manager.get_type(&"void".to_string()).unwrap()))))
-        } else {
-            let field_type = match parsing.parse_to(b';') {
-                Some(field_type) => match type_manager.get_type(&field_type) {
-                    Some(rc_type) => rc_type,
-                    None => {
-                        parsing.create_error(format!("Type {} doesn't exist!", field_type));
-                        return None;
-                    }
-                },
-                None => {
-                    parsing.create_error("Expected field type!".to_string());
-                    return None;
-                }
-            };
 
-            members.push(TypeMembers::Field(MemberField::new(get_modifier(modifiers.as_slice()),
-            Field::new(field_name, field_type))));
-        }
+        let field_type = match parsing.parse_to(b';') {
+            Some(field_type) => ResolvableTypes::Resolving(field_type),
+            None => {
+                parsing.create_error("Expected field type!".to_string());
+                return None;
+            }
+        };
+
+        fields.push(MemberField::new(get_modifier(modifiers.as_slice()),
+                                     Field::new(field_name, field_type)));
     }
 
-    return Some(Types::new_struct(Struct::new(members, modifiers, fn_name),
+    return Some(Types::new_struct(Struct::new(Some(fields), functions, modifiers, fn_name),
                                   None, Vec::new()));
 }
 
 fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: HashMap<String, Attribute>,
-                  modifiers: u8, parsing: &mut ParseInfo, parse_code: bool) -> Option<Function> {
+                  modifiers: u8, parsing: &mut ParseInfo) -> Option<Function> {
     let name = name.clone() + "::" + match parsing.parse_to(b'(') {
         Some(name) => name.clone(),
         None => {
@@ -137,7 +134,7 @@ fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: Ha
         match parsing.parse_to(b'{') {
             Some(found) => {
                 parsing.index -= 1;
-                Some(found)
+                Some(ResolvableTypes::Resolving(found))
             }
             None => {
                 parsing.create_error("Expected code body".to_string());
@@ -148,8 +145,7 @@ fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: Ha
         None
     };
 
-    let code = if parse_code && !is_modifier(modifiers, Modifier::Internal) &&
-        !is_modifier(modifiers, Modifier::Extern) {
+    let code = if !is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
         match parse_code_block(type_manager, parsing) {
             Some(code) => code,
             None => return None
@@ -210,8 +206,7 @@ fn parse_attributes(parsing: &mut ParseInfo, global: bool) -> HashMap<String, At
                         }
                     }
                     b']' => {}
-                    val => {
-                        println!("Value: {}", val as char);
+                    _val => {
                         parsing.create_error("Expected value or end of attribute".to_string());
                     }
                 }

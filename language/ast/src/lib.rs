@@ -1,9 +1,12 @@
+#![feature(box_into_inner)]
+
 use std::fmt::{Display, Formatter};
+use std::mem;
+use crate::code::{Effects, OperatorEffect};
 
 pub mod blocks;
 pub mod code;
 pub mod function;
-pub mod parsing_type;
 pub mod r#struct;
 pub mod type_resolver;
 pub mod types;
@@ -71,4 +74,30 @@ impl Attribute {
             value
         }
     }
+}
+
+pub fn assign_with_priority(mut operator: Box<OperatorEffect>) -> OperatorEffect {
+    //Needs ownership of the value
+    let mut temp_lhs = Effects::NOP();
+    mem::swap(&mut temp_lhs, operator.effects.first_mut().unwrap());
+    match temp_lhs {
+        // Code explained using the following example: 1 + 2 / 2
+        Effects::OperatorEffect(mut lhs) => {
+            // temp_lhs = (1 + 2), operator = {} / 2
+            if lhs.priority < operator.priority || (!operator.parse_left && lhs.priority == operator.priority) {
+                // temp_lhs = 1 + {}, operator = 2 / 2
+                mem::swap(lhs.effects.last_mut().unwrap(), operator.effects.first_mut().unwrap());
+
+                // 1 + (2 / 2)
+                mem::swap(lhs.effects.last_mut().unwrap(), &mut Effects::OperatorEffect(operator));
+
+                return Box::into_inner(lhs);
+            } else {
+                mem::swap(&mut Effects::OperatorEffect(lhs), operator.effects.get_mut(0).unwrap());
+            }
+        }
+        _ => mem::swap(&mut temp_lhs, operator.effects.get_mut(0).unwrap())
+    }
+
+    return Box::into_inner(operator);
 }
