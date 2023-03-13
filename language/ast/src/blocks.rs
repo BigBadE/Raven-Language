@@ -34,7 +34,7 @@ impl Effect for ForStatement {
         return false;
     }
 
-    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+    fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         self.code_block.finalize(type_resolver);
         self.effect.finalize(type_resolver);
     }
@@ -112,7 +112,7 @@ impl Effect for IfStatement {
         return false;
     }
 
-    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+    fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         self.body.finalize(type_resolver);
         if self.else_body.is_some() {
             self.else_body.as_mut().unwrap().finalize(type_resolver);

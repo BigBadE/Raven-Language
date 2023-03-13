@@ -27,7 +27,7 @@ impl Function {
         };
     }
 
-    pub fn finalize(&mut self, type_manager: &dyn FinalizedTypeResolver) {
+    pub fn finalize(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
         if self.return_type.is_some() {
             self.return_type.as_mut().unwrap().finalize(type_manager);
         }
@@ -37,7 +37,7 @@ impl Function {
         }
     }
 
-    pub fn finalize_code(&mut self, type_manager: &dyn FinalizedTypeResolver) {
+    pub fn finalize_code(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
         self.code.finalize(type_manager);
     }
 
@@ -70,7 +70,7 @@ impl Arguments {
         };
     }
 
-    pub fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+    pub fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         for arg in &mut self.arguments {
             arg.finalize(type_resolver);
         }
@@ -108,7 +108,7 @@ impl Effect for CodeBody {
         return false;
     }
 
-    fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+    fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         for expression in &mut self.expressions {
             expression.finalize(type_resolver);
         }
@@ -165,7 +165,7 @@ impl DisplayIndented for CodeBody {
 
 impl Display for Arguments {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}", display_joined(&self.arguments));
+        return write!(f, "{}", display(&self.arguments));
     }
 }
 

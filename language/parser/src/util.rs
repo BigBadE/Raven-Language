@@ -102,14 +102,18 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
                         parsing.create_error("Missing end to Struct parameters!".to_string());
                         return output;
                     }
-                }
+                };
+                parsing.index -= 1;
             }
         }
+
         output.push((found_name, parse_effect(type_manager, parsing, &[b',', b';', b'}']).expect("No effect!")));
+        parsing.index -= 1;
         if (parsing.buffer[parsing.index - 1] == b'}' && !parsing.find_next(b'}')) || parsing.buffer[parsing.index - 1] == b';' {
             parsing.create_error("Missing comma after structure initializer value".to_string());
             return output;
         }
+        parsing.matching(",");
     }
     return output;
 }

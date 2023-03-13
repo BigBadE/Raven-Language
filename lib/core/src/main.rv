@@ -3,7 +3,7 @@ pub struct Testing {
     pub default_field: i64;
 
     pub fn new() -> main::Testing {
-        return Self {
+        return main::Testing {
             field: 0,
             default_field: 1
         }

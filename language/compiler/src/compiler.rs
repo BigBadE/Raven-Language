@@ -1,9 +1,13 @@
+use std::borrow::BorrowMut;
 use std::mem;
+use std::rc::Rc;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
+use ast::code::{Field, MemberField};
+use ast::types::ResolvableTypes::Resolved;
 use crate::function_compiler::compile_function;
 use crate::types::type_resolver::ParserTypeResolver;
 

@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use inkwell::basic_block::BasicBlock;
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use ast::code::{Effect, Effects, ExpressionType};
 use ast::function::{CodeBody, Function};
 use ast::{is_modifier, Modifier};
@@ -43,8 +43,15 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
                 match &line.effect {
                     Effects::NOP() => {}
                     _ => {
-                        compiler.builder.build_return(Some(&
-                            compile_effect(compiler, &mut block, function, variables, &line.effect, id).unwrap()));
+                        let returned = compile_effect(compiler, &mut block, function, variables, &line.effect, id).unwrap();
+                        if returned.is_struct_value() {
+                            compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
+                                                         returned);
+                            *id += 1;
+                            compiler.builder.build_return(None);
+                        } else {
+                            compiler.builder.build_return(Some(&returned));
+                        }
                     }
                 }
             }
@@ -70,49 +77,72 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
         Effects::MethodCall(effect) => {
             let mut arguments = Vec::new();
 
+            let calling = variables.functions.get(&effect.method).unwrap().1;
+            if effect.return_type().is_some() {
+                let pointer = compiler.builder.build_alloca(
+                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().0,
+                    &id.to_string());
+                *id += 1;
+                arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
+            }
+
             for argument in &effect.arguments.arguments {
                 arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()))
             }
 
             *id += 1;
-            Some(compiler.builder.build_call(variables.functions.get(&effect.method).unwrap().1,
-                                             arguments.as_slice(), &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
+            Some(compiler.builder.build_call(calling, arguments.as_slice(),
+                                             &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
         },
         Effects::FieldLoad(effect) => {
             let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
-            *id += 1;
             let mut offset = 0;
             for field in effect.calling.unwrap().return_type().unwrap().unwrap().get_fields() {
                 if field.field.name != effect.name {
-                    offset += field.field.field_type.unwrap().size;
+                    offset += 1;
                 }
             }
-            Some(compiler.builder.build_extract_value(from.into_struct_value(), offset, &(*id - 1).to_string()).unwrap())
+            let pointer = compiler.builder.build_alloca(from.get_type(), &id.to_string());
+            *id += 1;
+            compiler.builder.build_store(pointer, from.into_struct_value().as_basic_value_enum());
+            *id += 2;
+            Some(compiler.builder.build_load(
+                compiler.builder.build_struct_gep(pointer, offset, &(*id - 1).to_string()).unwrap(),
+            &(*id-1).to_string()).as_basic_value_enum())
         }
         Effects::CreateStruct(effect) => {
             let types = effect.structure.unwrap();
 
-            let structure = variables.llvm_types.get(types).unwrap()
-                .into_struct_type().get_undef();
 
             let mut arguments = vec![MaybeUninit::uninit(); effect.parsed_effects.as_ref().unwrap().len()];
 
+            //VTable
+            arguments.insert(0, MaybeUninit::uninit());
+
             for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
                 let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
-                arguments.insert(*index, MaybeUninit::new((returned,
-                                                           effect.unwrap().return_type().unwrap().unwrap().size)));
+                arguments.remove(*index+1);
+                let found_size = effect.unwrap().return_type().unwrap().unwrap().size;
+                arguments.insert(*index+1, MaybeUninit::new((returned, found_size)));
             }
+
+            let (structure, global_value) = variables.llvm_types.get(types).unwrap();
+            arguments.remove(0);
+            arguments.insert(0, MaybeUninit::new((global_value.as_pointer_value().as_basic_value_enum(), 8)));
+            let pointer = compiler.builder.build_alloca(*structure, &id.to_string());
+            *id += 1;
 
             let mut offset = 0;
             for argument in arguments {
-                let (effect, size) = unsafe { argument.assume_init() };
-                compiler.builder.build_insert_value(structure, effect,
-                                                    offset, id.to_string().as_str());
-                offset += size;
+                let (effect, _size) = unsafe { argument.assume_init() };
+
+                let pointer = compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
                 *id += 1;
+                compiler.builder.build_store(pointer, effect);
+                offset += 1;
             }
 
-            Some(structure.as_basic_value_enum())
+            Some(pointer.as_basic_value_enum())
         }
         Effects::CodeBody(effect) => {
             //Start block
@@ -159,18 +189,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             compiler.builder.position_at_end(end);
             *block = end;
 
-            //If it's an if with a return value, use phi to get the value
-            return match effect.return_type() {
-                Some(_return_type) => {
-                    todo!();
-                    /*let phi = compiler.builder.build_phi(
-                        *compiler.type_manager.llvm_types.get(return_type.unwrap()).unwrap(), &id.to_string());
-                    *id += 1;
-                    phi.add_incoming(blocks.as_slice());
-                    Some(phi.as_basic_value())*/
-                }
-                None => None
-            };
+            return None;
         }
         Effects::OperatorEffect(effect) => {
             let mut arguments = Vec::new();
@@ -185,7 +204,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
         Effects::VariableLoad(effect) =>
             Some(variables.variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone()),
         Effects::AssignVariable(variable) => {
-            let pointer = compiler.builder.build_alloca(*variables.llvm_types.get(
+            let pointer = compiler.builder.build_alloca(variables.llvm_types.get(
                 match variable.effect.unwrap().return_type() {
                     Some(found_type) => found_type.unwrap().clone(),
                     None => match &variable.effect.unwrap().return_type() {
@@ -193,7 +212,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                         None => panic!("Unable to find type for variable {}
                     (assign it using a let statement to specify the type)", variable.variable)
                     }
-                }.deref()).unwrap(), variable.variable.as_str());
+                }.deref()).unwrap().0, variable.variable.as_str());
             let value = compile_effect(compiler, block, function, variables, &variable.effect, id).unwrap();
 
             variables.variables.insert(variable.variable.clone(), value);

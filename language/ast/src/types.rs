@@ -13,7 +13,7 @@ pub enum ResolvableTypes {
 }
 
 impl ResolvableTypes {
-    pub fn finalize(&mut self, type_resolver: &dyn FinalizedTypeResolver) {
+    pub fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         type_resolver.finalize(self);
     }
     
