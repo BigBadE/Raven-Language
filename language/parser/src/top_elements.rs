@@ -89,10 +89,9 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                                  parsing) {
                 Some(function) => {
                     if function.fields.iter().any(|field| field.name == "self") {
-                        functions.push(function);
-                    } else {
-                        type_manager.add_function(function);
+                        functions.push(function.name.clone());
                     }
+                    type_manager.add_function(function);
                     parsing.index -= 1;
                     continue;
                 }
@@ -126,18 +125,24 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
 
 fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: HashMap<String, Attribute>,
                   modifiers: u8, parsing: &mut ParseInfo) -> Option<Function> {
-    let name = name.clone() + "::" + match parsing.parse_to(b'(') {
-        Some(name) => name.clone(),
-        None => {
-            parsing.create_error("Expected string name".to_string());
-            return None;
-        }
-    }.as_str();
-
+    let fn_name;
     let mut generics = Vec::new();
 
-    if parsing.matching("<") {
+    if let Some(found_name) = find_if_first(parsing, b'<', b'(') {
+        fn_name = name.clone() + "::" + found_name.as_str();
+
         parse_generics(parsing, &mut generics);
+    } else {
+        fn_name = name.clone() + "::" + match parsing.parse_to(b'(') {
+            Some(name) => name.clone(),
+            None => {
+                parsing.create_error("Expected string name".to_string());
+                return None;
+            }
+        }.as_str();
+    }
+    if parsing.next_included().is_none() {
+        panic!("Expected function parameters!");
     }
 
     let fields = match parse_fields(parsing) {
@@ -170,7 +175,7 @@ fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: Ha
         CodeBody::new(Vec::new())
     };
 
-    return Some(Function::new(attributes, modifiers, fields, generics, code, return_type, name));
+    return Some(Function::new(attributes, modifiers, fields, generics, code, return_type, fn_name));
 }
 
 fn parse_modifiers(parsing: &mut ParseInfo) -> Vec<Modifier> {

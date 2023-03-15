@@ -30,21 +30,30 @@ impl Function {
     }
 
     pub fn finalize(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
-        if self.return_type.is_some() {
-            self.return_type.as_mut().unwrap().finalize(type_manager);
-        }
-
         for generic in &mut self.generics {
             generic.finalize(type_manager);
+        }
+
+        type_manager.start_func(self.generics.clone());
+
+        if self.return_type.is_some() {
+            self.return_type.as_mut().unwrap().finalize(type_manager);
         }
         
         for field in &mut self.fields {
             field.finalize(type_manager);
         }
+
+        type_manager.end_func();
     }
 
     pub fn finalize_code(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
+        type_manager.start_func(self.generics.clone());
+        for field in &mut self.fields {
+            type_manager.set_variable(field.name.clone(), field.field_type.clone());
+        }
         self.code.finalize(type_manager);
+        type_manager.end_func();
     }
 
     pub fn check_args(&self, target: &Vec<&Effects>) -> bool {

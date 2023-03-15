@@ -125,18 +125,28 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
 
 pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut Vec<ResolvableTypes>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
-        let mut split = value.split(':');
-        let name = split.next().unwrap();
-        let mut found = Vec::new();
-        match split.next() {
-            Some(constraint) => {
-                let mut constraints = constraint.split('+');
-                while let Some(constraint) = constraints.next() {
-                    found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
-                }
-            },
-            None => {}
-        }
-        generics.push(ResolvableTypes::ResolvingGeneric(name.to_string(), vec!()))
+        generics.push(parse_generic(value));
     }
+
+    if let Some(value) = parsing.parse_to(b'>') {
+        generics.push(parse_generic(value))
+    } else {
+        panic!("Expected generic!");
+    }
+}
+
+pub fn parse_generic(value: String) -> ResolvableTypes {
+    let mut split = value.split(':');
+    let name = split.next().unwrap();
+    let mut found = Vec::new();
+    match split.next() {
+        Some(constraint) => {
+            let mut constraints = constraint.split('+');
+            while let Some(constraint) = constraints.next() {
+                found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
+            }
+        },
+        None => {}
+    }
+    return ResolvableTypes::ResolvingGeneric(name.to_string(), vec!())
 }

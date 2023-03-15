@@ -39,7 +39,7 @@ impl<'ctx> Compiler<'ctx> {
         let mut temp = ParserTypeResolver::new();
         mem::swap(&mut temp, &mut self.type_manager);
         let type_manager = temp.finalize(self.context, &self.module);
-        type_manager.print();
+        print!("{}", type_manager);
 
         //Compile
         for (function, _function_value) in type_manager.functions.values() {

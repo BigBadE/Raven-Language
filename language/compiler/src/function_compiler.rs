@@ -113,7 +113,6 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
             let mut offset = 1;
             for field in effect.calling.unwrap().return_type().unwrap().unwrap().get_fields().unwrap() {
-                println!("{} vs {}", field.field.name, effect.name);
                 if field.field.name != effect.name {
                     offset += 1;
                 } else {

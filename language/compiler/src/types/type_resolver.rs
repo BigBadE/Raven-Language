@@ -1,4 +1,6 @@
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use inkwell::AddressSpace;
 use inkwell::context::Context;
@@ -9,7 +11,7 @@ use llvm_sys::core::LLVMFunctionType;
 use llvm_sys::prelude::LLVMTypeRef;
 use ast::code::Effects;
 use ast::function::Function;
-use ast::{is_modifier, Modifier};
+use ast::{DisplayIndented, is_modifier, Modifier};
 use ast::r#struct::Struct;
 use ast::type_resolver::{FinalizedTypeResolver, TypeResolver};
 use ast::types::{ResolvableTypes, Types};
@@ -55,7 +57,7 @@ impl ParserTypeResolver {
         for types in finalized.types.values() {
             let (_llvm_type, vtable) = unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }.get_mut(types).unwrap();
             let functions = types.structure.as_ref().unwrap().functions.iter()
-                .map(|function| finalized.functions.get(&function.name).unwrap().1).collect();
+                .map(|function| finalized.functions.get(function).unwrap().1).collect();
             let raw_table = create_vtable(context, functions);
             unsafe { vtable.delete() };
             *vtable = module.add_global(raw_table.get_type(), None, &types.name);
@@ -85,7 +87,7 @@ pub fn compile_llvm_type<'ctx>(context: &'ctx Context, module: &Module<'ctx>, ty
 
         //Give it a temp vtable
         unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }
-            .insert(types.clone(), (opaque_type.as_basic_type_enum(), module.add_global(context.i64_type(), None, &types.name) ));
+            .insert(types.clone(), (opaque_type.as_basic_type_enum(), module.add_global(context.i64_type(), None, &types.name)));
 
         let mut llvm_fields = vec!(context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
 
@@ -133,6 +135,7 @@ pub fn compile<'ctx>(context: &'ctx Context, types: &Rc<Types>, all: &mut Vec<Rc
         }
     }
 
+    finalizer.start_struct(types.clone());
     if types.structure.as_ref().unwrap().fields.is_some() {
         for field in types.structure.as_ref().unwrap().fields.as_ref().unwrap() {
             match &field.field.field_type {
@@ -149,6 +152,7 @@ pub fn compile<'ctx>(context: &'ctx Context, types: &Rc<Types>, all: &mut Vec<Rc
             }
         }
     }
+    finalizer.end_struct();
 
     unsafe { Rc::get_mut_unchecked(&mut finalizer.types) }.insert(types.name.clone(), types.clone());
 }
@@ -185,6 +189,7 @@ pub struct CompilerTypeResolver<'ctx> {
     pub variables: HashMap<String, BasicValueEnum<'ctx>>,
     pub operations: Rc<HashMap<String, Vec<String>>>,
     pub current_struct: Option<Rc<Types>>,
+    pub current_func: Vec<Vec<ResolvableTypes>>,
 }
 
 impl<'ctx> CompilerTypeResolver<'ctx> {
@@ -198,7 +203,8 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
             variable_types: HashMap::new(),
             variables: HashMap::new(),
             operations,
-            current_struct: None
+            current_struct: None,
+            current_func: Vec::new(),
         };
     }
 
@@ -210,8 +216,29 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
         self.current_struct = None;
     }
 
-    fn setup_functions(&mut self, context: &'ctx Context, module: &Module<'ctx>, functions: HashMap<String, Function>) {
+    fn start_func(&mut self, func: Vec<ResolvableTypes>) {
+        self.current_func.push(func);
+    }
+
+    fn end_func(&mut self) {
+        self.current_func.pop();
+    }
+
+    fn setup_functions(&mut self, context: &'ctx Context, module: &Module<'ctx>, mut functions: HashMap<String, Function>) {
         let mut new_functions = HashMap::new();
+        for (_, structure) in unsafe { Rc::get_mut_unchecked(&mut self.types.clone()) } {
+            if structure.structure.is_none() {
+                continue;
+            }
+
+            for name in &mut unsafe { Rc::get_mut_unchecked(structure) }.structure.as_mut().unwrap().functions {
+                let mut function = functions.remove(name).unwrap();
+                function.finalize(self);
+                let func_value = get_func_value(&function, module, context, &self.llvm_types);
+                new_functions.insert(function.name.clone(), (function, func_value));
+            }
+        }
+
         for (name, mut function) in functions {
             function.finalize(self);
             let func_value = get_func_value(&function, module, context, &self.llvm_types);
@@ -221,20 +248,27 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
         self.functions = Rc::new(new_functions);
 
         for (_name, (function, _func_value)) in unsafe { Rc::get_mut_unchecked(&mut self.functions.clone()) } {
-            function.finalize_code(self);
+            let mut type_manager = self.clone();
+            function.finalize_code(&mut type_manager);
         }
     }
+}
 
-    pub fn print(&self) {
+impl<'ctx> Display for CompilerTypeResolver<'ctx> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for types in self.types.values() {
             if types.structure.is_some() {
-                print!("{}\n\n", types.structure.as_ref().unwrap());
+                types.structure.as_ref().unwrap().format("", f, self)?;
+                write!(f, "\n\n")?;
             }
         }
 
         for function in self.functions.values() {
-            print!("{}\n\n", function.0);
+            function.0.format("", f)?;
+            write!(f, "\n\n")?;
         }
+
+        return Ok(());
     }
 }
 
@@ -244,13 +278,33 @@ impl<'ctx> FinalizedTypeResolver for CompilerTypeResolver<'ctx> {
             ResolvableTypes::Resolving(name) =>
                 {
                     if name == "Self" {
-                        *resolving = ResolvableTypes::Resolved(
-                            self.current_struct.as_ref().expect("Can't use Self outside of a struct!").clone())
+                        *resolving = ResolvableTypes::Resolved(self.current_struct.as_ref().expect("Can't use Self outside of a struct!").clone())
                     } else {
-                        *resolving = ResolvableTypes::Resolved(self.types.get(name).expect(
-                            format!("Unknown type {}", name).as_str()).clone())
+                        match self.types.get(name) {
+                            Some(found) => *resolving = ResolvableTypes::Resolved(found.clone()),
+                            None => {
+                                let temp = name.clone();
+                                if self.current_struct.is_some() {
+                                    for generic in &self.current_struct.as_ref().unwrap().structure.as_ref().unwrap().generics {
+                                        if generic.name() == name {
+                                            *resolving = ResolvableTypes::Resolved(generic.unwrap().clone());
+                                            return;
+                                        }
+                                    }
+                                }
+                                if self.current_func.len() > 0 {
+                                    for generic in self.current_func.get(0).unwrap() {
+                                        if generic.name() == name {
+                                            *resolving = ResolvableTypes::Resolved(generic.unwrap().clone());
+                                            return;
+                                        }
+                                    }
+                                }
+                                panic!("Unknown type named {}", temp);
+                            }
+                        }
                     }
-                },
+                }
             ResolvableTypes::ResolvingGeneric(name, bounds) => {
                 let mut type_bounds = Vec::new();
                 let mut parent = None;
@@ -274,9 +328,17 @@ impl<'ctx> FinalizedTypeResolver for CompilerTypeResolver<'ctx> {
                     }
                 }
                 *resolving = ResolvableTypes::Resolved(Rc::new(Types::new_generic(name.clone(), parent, type_bounds)))
-            },
+            }
             ResolvableTypes::Resolved(_) => panic!("Tried to resolve already-resolved type!")
         }
+    }
+
+    fn start_func(&mut self, func: Vec<ResolvableTypes>) {
+        self.current_func.push(func);
+    }
+
+    fn end_func(&mut self) {
+        self.current_func.pop();
     }
 
     fn set_variable(&mut self, name: String, value: ResolvableTypes) {
@@ -318,8 +380,11 @@ fn get_func_value<'ctx>(function: &Function, module: &Module<'ctx>, context: &'c
     let mut return_type = context.void_type().as_type_ref();
 
     if function.return_type.is_some() {
-        let found_type = llvm_types.get(&function.return_type.as_ref().unwrap().unwrap().clone())
-            .unwrap().0;
+        let found_type = match llvm_types.get(&function.return_type.as_ref().unwrap().unwrap().clone()){
+            Some(llvm_type) => llvm_type.0,
+            //Generics get an opaque type
+            None => context.struct_type(&[], false).as_basic_type_enum()
+        };
         if found_type.is_struct_type() {
             params.push(found_type.ptr_type(AddressSpace::default()).as_type_ref());
         } else {
@@ -328,7 +393,10 @@ fn get_func_value<'ctx>(function: &Function, module: &Module<'ctx>, context: &'c
     }
 
     for field in &function.fields {
-        params.push(llvm_types.get(field.field_type.unwrap()).unwrap().0.as_type_ref());
+        params.push(match llvm_types.get(field.field_type.unwrap()) {
+            Some(llvm_type) => llvm_type.0,
+            None => context.struct_type(&[], false).as_basic_type_enum()
+        }.as_type_ref());
     }
 
     let fn_type = unsafe {

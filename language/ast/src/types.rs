@@ -22,7 +22,16 @@ impl ResolvableTypes {
     pub fn unwrap(&self) -> &Rc<Types> {
         match self { 
             ResolvableTypes::Resolved(types) => return types,
-            _ => panic!("Expected resolved type!")
+            ResolvableTypes::Resolving(name) => panic!("Expected {} to be resolved!", name),
+            ResolvableTypes::ResolvingGeneric(name, _ignored) => panic!("Expected {} to be resolved!", name)
+        }
+    }
+
+    pub fn name(&self) -> &String {
+        return match self {
+            ResolvableTypes::Resolving(found) => found,
+            ResolvableTypes::Resolved(found) => &found.name,
+            ResolvableTypes::ResolvingGeneric(name, _bounds) => &name
         }
     }
 }
