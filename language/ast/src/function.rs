@@ -7,6 +7,7 @@ use crate::types::ResolvableTypes;
 
 pub struct Function {
     pub attributes: HashMap<String, Attribute>,
+    pub generics: Vec<ResolvableTypes>,
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
@@ -15,10 +16,11 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>,
+    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: Vec<ResolvableTypes>, 
                code: CodeBody, return_type: Option<ResolvableTypes>, name: String) -> Self {
         return Self {
             attributes,
+            generics,
             modifiers,
             fields,
             code,
@@ -32,6 +34,10 @@ impl Function {
             self.return_type.as_mut().unwrap().finalize(type_manager);
         }
 
+        for generic in &mut self.generics {
+            generic.finalize(type_manager);
+        }
+        
         for field in &mut self.fields {
             field.finalize(type_manager);
         }
@@ -143,7 +149,7 @@ impl Display for Function {
 impl DisplayIndented for Function {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{} fn {}{} ", indent, display_joined(&to_modifiers(self.modifiers)),
-               self.name, display(&self.fields))?;
+               self.name, display(&self.fields, ", "))?;
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
@@ -165,7 +171,7 @@ impl DisplayIndented for CodeBody {
 
 impl Display for Arguments {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}", display(&self.arguments));
+        return write!(f, "{}", display(&self.arguments, ", "));
     }
 }
 
@@ -180,14 +186,14 @@ pub fn display_joined<T>(input: &Vec<T>) -> String where T: Display {
     return output[..output.len()-1].to_string();
 }
 
-pub fn display<T>(input: &Vec<T>) -> String where T: Display {
+pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {
     if input.is_empty() {
         return "()".to_string();
     }
 
     let mut output = String::new();
     for element in input {
-        output += &*format!("{}, ", element);
+        output += &*format!("{}{}", element, deliminator);
     }
 
     return format!("({})", (&output[..output.len() - 2]).to_string());

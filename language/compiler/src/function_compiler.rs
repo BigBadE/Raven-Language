@@ -44,11 +44,18 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
                     Effects::NOP() => {}
                     _ => {
                         let returned = compile_effect(compiler, &mut block, function, variables, &line.effect, id).unwrap();
+
                         if returned.is_struct_value() {
                             compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
                                                          returned);
+                            compiler.builder.build_return(None);
+                        } else if returned.is_pointer_value() &&
+                            returned.into_pointer_value().get_type().get_element_type().is_struct_type() {
+                            compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
+                                                         compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
                             *id += 1;
                             compiler.builder.build_return(None);
+
                         } else {
                             compiler.builder.build_return(Some(&returned));
                         }
@@ -78,36 +85,53 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             let mut arguments = Vec::new();
 
             let calling = variables.functions.get(&effect.method).unwrap().1;
-            if effect.return_type().is_some() {
+            if effect.return_type().is_some() && !calling.get_type().get_return_type().is_some() {
                 let pointer = compiler.builder.build_alloca(
                     variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().0,
                     &id.to_string());
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
-            }
 
-            for argument in &effect.arguments.arguments {
-                arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()))
-            }
+                for argument in &effect.arguments.arguments {
+                    arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()))
+                }
 
-            *id += 1;
-            Some(compiler.builder.build_call(calling, arguments.as_slice(),
-                                             &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
+                *id += 1;
+                compiler.builder.build_call(calling, arguments.as_slice(), &(*id - 1).to_string());
+                Some(pointer.as_basic_value_enum())
+            } else {
+                for argument in &effect.arguments.arguments {
+                    arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()))
+                }
+
+                *id += 1;
+                Some(compiler.builder.build_call(calling, arguments.as_slice(),
+                                                 &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
+            }
         },
         Effects::FieldLoad(effect) => {
             let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
-            let mut offset = 0;
-            for field in effect.calling.unwrap().return_type().unwrap().unwrap().get_fields() {
+            let mut offset = 1;
+            for field in effect.calling.unwrap().return_type().unwrap().unwrap().get_fields().unwrap() {
+                println!("{} vs {}", field.field.name, effect.name);
                 if field.field.name != effect.name {
                     offset += 1;
+                } else {
+                    break
                 }
             }
-            let pointer = compiler.builder.build_alloca(from.get_type(), &id.to_string());
-            *id += 1;
-            compiler.builder.build_store(pointer, from.into_struct_value().as_basic_value_enum());
+
+            let pointer;
+            if !from.is_pointer_value() {
+                pointer = compiler.builder.build_alloca(from.get_type(), &id.to_string());
+                *id += 1;
+                compiler.builder.build_store(pointer, from.into_struct_value().as_basic_value_enum());
+            } else {
+                pointer = from.into_pointer_value();
+            }
             *id += 2;
             Some(compiler.builder.build_load(
-                compiler.builder.build_struct_gep(pointer, offset, &(*id - 1).to_string()).unwrap(),
+                compiler.builder.build_struct_gep(pointer, offset, &(*id - 2).to_string()).unwrap(),
             &(*id-1).to_string()).as_basic_value_enum())
         }
         Effects::CreateStruct(effect) => {

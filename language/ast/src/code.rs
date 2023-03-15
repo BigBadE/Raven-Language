@@ -223,7 +223,7 @@ impl Effect for FieldLoad {
     }
 
     fn return_type(&self) -> Option<ResolvableTypes> {
-        for field in self.calling.unwrap().return_type().as_ref().unwrap().unwrap().get_fields() {
+        for field in self.calling.unwrap().return_type().as_ref().unwrap().unwrap().get_fields().unwrap() {
             if field.field.name == self.name {
                 return Some(field.field.field_type.clone());
             }
@@ -341,7 +341,7 @@ impl Effect for CreateStruct {
 
         for (name, mut effect) in temp.unwrap() {
             effect.finalize(type_resolver);
-            let fields = structure.get_fields();
+            let fields = structure.get_fields().unwrap();
             for i in 0..fields.len() {
                 let field = fields.get(i).unwrap();
                 if field.field.name == name {
@@ -381,7 +381,7 @@ impl DisplayIndented for CreateStruct {
             None => {
                 for (loc, effect) in self.parsed_effects.as_ref().unwrap() {
                     write!(f, "{}{}: ", deeper_indent,
-                           self.structure.unwrap().get_fields().get(*loc).unwrap().field.name)?;
+                           self.structure.unwrap().get_fields().unwrap().get(*loc).unwrap().field.name)?;
                     DisplayIndented::format(effect, deepest_indent, f)?;
                     write!(f, "\n")?;
                 }

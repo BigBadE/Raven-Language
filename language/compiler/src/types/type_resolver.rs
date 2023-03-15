@@ -10,6 +10,7 @@ use llvm_sys::prelude::LLVMTypeRef;
 use ast::code::Effects;
 use ast::function::Function;
 use ast::{is_modifier, Modifier};
+use ast::r#struct::Struct;
 use ast::type_resolver::{FinalizedTypeResolver, TypeResolver};
 use ast::types::{ResolvableTypes, Types};
 use crate::internal::structs::get_internal_struct;
@@ -53,7 +54,7 @@ impl ParserTypeResolver {
         //Setup vtables
         for types in finalized.types.values() {
             let (_llvm_type, vtable) = unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }.get_mut(types).unwrap();
-            let functions = types.structure.functions.iter()
+            let functions = types.structure.as_ref().unwrap().functions.iter()
                 .map(|function| finalized.functions.get(&function.name).unwrap().1).collect();
             let raw_table = create_vtable(context, functions);
             unsafe { vtable.delete() };
@@ -70,9 +71,9 @@ impl ParserTypeResolver {
 
 pub fn compile_llvm_type<'ctx>(context: &'ctx Context, module: &Module<'ctx>, types: &Rc<Types>,
                                all: &mut Vec<&Rc<Types>>, finalized: &mut CompilerTypeResolver<'ctx>) {
-    unsafe { Rc::get_mut_unchecked(&mut types.clone()) }.structure.finalize(finalized);
+    unsafe { Rc::get_mut_unchecked(&mut types.clone()) }.structure.as_mut().unwrap().finalize(finalized);
 
-    if is_modifier(types.structure.modifiers, Modifier::Internal) {
+    if is_modifier(types.structure.as_ref().unwrap().modifiers, Modifier::Internal) {
         let (size, llvm_type) = get_internal_struct(context, &types.name);
         let vtable = module.add_global(context.i64_type(), None, &types.name);
 
@@ -80,7 +81,7 @@ pub fn compile_llvm_type<'ctx>(context: &'ctx Context, module: &Module<'ctx>, ty
             .insert(types.clone(), (llvm_type, vtable));
         unsafe { Rc::get_mut_unchecked(&mut types.clone()) }.size = size;
     } else {
-        let opaque_type = context.opaque_struct_type(&types.structure.name);
+        let opaque_type = context.opaque_struct_type(&types.structure.as_ref().unwrap().name);
 
         //Give it a temp vtable
         unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }
@@ -88,7 +89,7 @@ pub fn compile_llvm_type<'ctx>(context: &'ctx Context, module: &Module<'ctx>, ty
 
         let mut llvm_fields = vec!(context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
 
-        for field in types.get_fields() {
+        for field in types.get_fields().unwrap() {
             let field_type = field.field.field_type.unwrap();
             match finalized.llvm_types.get(field_type) {
                 Some(found_type) => llvm_fields.push(found_type.0),
@@ -102,7 +103,7 @@ pub fn compile_llvm_type<'ctx>(context: &'ctx Context, module: &Module<'ctx>, ty
         opaque_type.set_body(llvm_fields.as_slice(), false);
 
         let mut size = 0;
-        for field in types.get_fields() {
+        for field in types.get_fields().unwrap() {
             size += field.field.field_type.unwrap().size;
         }
         unsafe { Rc::get_mut_unchecked(&mut types.clone()) }.size = size;
@@ -132,8 +133,8 @@ pub fn compile<'ctx>(context: &'ctx Context, types: &Rc<Types>, all: &mut Vec<Rc
         }
     }
 
-    if types.structure.fields.is_some() {
-        for field in types.structure.fields.as_ref().unwrap() {
+    if types.structure.as_ref().unwrap().fields.is_some() {
+        for field in types.structure.as_ref().unwrap().fields.as_ref().unwrap() {
             match &field.field.field_type {
                 ResolvableTypes::Resolving(name) => {
                     if name == "Self" {
@@ -226,7 +227,9 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
 
     pub fn print(&self) {
         for types in self.types.values() {
-            print!("{}\n\n", types.structure);
+            if types.structure.is_some() {
+                print!("{}\n\n", types.structure.as_ref().unwrap());
+            }
         }
 
         for function in self.functions.values() {
@@ -247,7 +250,31 @@ impl<'ctx> FinalizedTypeResolver for CompilerTypeResolver<'ctx> {
                         *resolving = ResolvableTypes::Resolved(self.types.get(name).expect(
                             format!("Unknown type {}", name).as_str()).clone())
                     }
+                },
+            ResolvableTypes::ResolvingGeneric(name, bounds) => {
+                let mut type_bounds = Vec::new();
+                let mut parent = None;
+                for bound in bounds {
+                    let found = self.types.get(bound).expect(format!("Unknown type {}", bound).as_str());
+                    if found.is_trait {
+                        type_bounds.push(ResolvableTypes::Resolved(found.clone()));
+                    } else {
+                        if parent.is_some() {
+                            let unwrapped: &ResolvableTypes = parent.as_ref().unwrap();
+                            if unwrapped.unwrap().has_parent(found) {
+                                //Already good
+                            } else if found.has_parent(unwrapped.unwrap()) {
+                                parent = Some(parent.unwrap());
+                            } else {
+                                panic!("Two parents for single generic! {} and {}", unwrapped, found)
+                            }
+                        } else {
+                            parent = Some(ResolvableTypes::Resolved(found.clone()));
+                        }
+                    }
                 }
+                *resolving = ResolvableTypes::Resolved(Rc::new(Types::new_generic(name.clone(), parent, type_bounds)))
+            },
             ResolvableTypes::Resolved(_) => panic!("Tried to resolve already-resolved type!")
         }
     }

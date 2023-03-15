@@ -78,8 +78,13 @@ pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<S
 
 pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Arguments {
     let mut output = Vec::new();
-    while let Some(effect) = parse_effect(type_manager, parsing, &[b',', b')']) {
-        output.push(effect);
+    while parsing.buffer[parsing.index-1] != b')' {
+        if let Some(effect) = parse_effect(type_manager, parsing, &[b',', b')']) {
+            output.push(effect);
+        } else {
+            parsing.create_error("Missing effect!".to_string());
+            break
+        }
     }
     return Arguments::new(output);
 }
@@ -116,4 +121,22 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
         parsing.matching(",");
     }
     return output;
+}
+
+pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut Vec<ResolvableTypes>) {
+    while let Some(value) = find_if_first(parsing, b',', b'>') {
+        let mut split = value.split(':');
+        let name = split.next().unwrap();
+        let mut found = Vec::new();
+        match split.next() {
+            Some(constraint) => {
+                let mut constraints = constraint.split('+');
+                while let Some(constraint) = constraints.next() {
+                    found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
+                }
+            },
+            None => {}
+        }
+        generics.push(ResolvableTypes::ResolvingGeneric(name.to_string(), vec!()))
+    }
 }

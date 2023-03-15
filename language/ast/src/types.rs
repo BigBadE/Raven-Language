@@ -3,12 +3,14 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::rc::Rc;
 use crate::code::MemberField;
+use crate::function::display;
 use crate::r#struct::Struct;
 use crate::type_resolver::FinalizedTypeResolver;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum ResolvableTypes {
     Resolved(Rc<Types>),
+    ResolvingGeneric(String, Vec<String>),
     Resolving(String)
 }
 
@@ -20,7 +22,7 @@ impl ResolvableTypes {
     pub fn unwrap(&self) -> &Rc<Types> {
         match self { 
             ResolvableTypes::Resolved(types) => return types,
-            ResolvableTypes::Resolving(_) => panic!("Expected resolved type!")
+            _ => panic!("Expected resolved type!")
         }
     }
 }
@@ -29,14 +31,21 @@ impl Display for ResolvableTypes {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ResolvableTypes::Resolving(resolving) => write!(f, "{}", resolving),
-            ResolvableTypes::Resolved(resolved) => write!(f, "{}", resolved)
+            ResolvableTypes::Resolved(resolved) => write!(f, "{}", resolved),
+            ResolvableTypes::ResolvingGeneric(name, bounds) => {
+                write!(f, "{}", name)?;
+                if !bounds.is_empty() {
+                    write!(f, ": {}", display(bounds, " + "))?;
+                }
+                return Ok(());
+            },
         }
     }
 }
 
 pub struct Types {
     pub name: String,
-    pub structure: Struct,
+    pub structure: Option<Struct>,
     pub parent: Option<ResolvableTypes>,
     pub traits: Vec<ResolvableTypes>,
     pub size: u32,
@@ -47,7 +56,7 @@ impl Types {
     pub fn new_struct(structure: Struct, parent: Option<ResolvableTypes>, traits: Vec<ResolvableTypes>) -> Self {
         return Self {
             name: structure.name.clone(),
-            structure,
+            structure: Some(structure),
             parent,
             traits,
             size: 0,
@@ -55,22 +64,35 @@ impl Types {
         }
     }
 
-    pub fn new_trait(pointer_size: u32, structure: Struct, parent: Option<ResolvableTypes>) -> Self {
+    pub fn new_generic(name: String, parent: Option<ResolvableTypes>, bounds: Vec<ResolvableTypes>) -> Self {
+        return Self {
+            name,
+            structure: None,
+            parent,
+            traits: bounds,
+            size: 0,
+            is_trait: false
+        }
+    }
+    pub fn new_trait(pointer_size: u32, structure: Struct, parent: Vec<ResolvableTypes>) -> Self {
         return Self {
             name: structure.name.clone(),
-            structure,
-            parent,
-            traits: Vec::new(),
+            structure: Some(structure),
+            parent: None,
+            traits: parent,
             is_trait: true,
             size: pointer_size
         }
     }
 
-    pub fn get_fields(&self) -> &Vec<MemberField> {
+    pub fn get_fields(&self) -> Option<&Vec<MemberField>> {
+        if self.structure.is_none() {
+            return None;
+        }
         let mut parent = self;
         loop {
-            if parent.structure.fields.is_some() {
-                return parent.structure.fields.as_ref().unwrap();
+            if parent.structure.as_ref().unwrap().fields.is_some() {
+                return Some(parent.structure.as_ref().unwrap().fields.as_ref().unwrap());
             }
             parent = parent.parent.as_ref().unwrap().unwrap().as_ref();
         }
@@ -90,6 +112,17 @@ impl Types {
             } else {
                 break
             }
+        }
+        return false;
+    }
+
+    pub fn has_parent(&self, other: &Rc<Types>) -> bool {
+        let mut parent = &self.parent;
+        while let Some(found_parent) = parent {
+            if found_parent.unwrap() == other {
+                return true;
+            }
+            parent = &found_parent.unwrap().parent;
         }
         return false;
     }
