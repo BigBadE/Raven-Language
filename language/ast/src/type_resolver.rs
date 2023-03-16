@@ -16,13 +16,11 @@ pub trait TypeResolver {
 pub trait FinalizedTypeResolver {
     fn finalize(&self, resolving: &mut ResolvableTypes);
 
-    fn start_func(&mut self, func: Vec<ResolvableTypes>);
+    fn finalize_func(&mut self, function: &mut Function);
 
-    fn end_func(&mut self);
+    fn finalize_code(&mut self, function: &String);
 
-    fn set_variable(&mut self, name: String, value: ResolvableTypes);
-
-    fn get_variable(&self, name: &String) -> Option<&ResolvableTypes>;
+    fn get_variable(&self, name: &String) -> Option<ResolvableTypes>;
 
     fn get_operator(&self, effects: &Vec<Effects>, operator: String) -> Option<&Function>;
 

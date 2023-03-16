@@ -132,6 +132,10 @@ fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: Ha
         fn_name = name.clone() + "::" + found_name.as_str();
 
         parse_generics(parsing, &mut generics);
+
+        if parsing.next_included().is_none() {
+            panic!("Expected function parameters!");
+        }
     } else {
         fn_name = name.clone() + "::" + match parsing.parse_to(b'(') {
             Some(name) => name.clone(),
@@ -140,9 +144,6 @@ fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: Ha
                 return None;
             }
         }.as_str();
-    }
-    if parsing.next_included().is_none() {
-        panic!("Expected function parameters!");
     }
 
     let fields = match parse_fields(parsing) {

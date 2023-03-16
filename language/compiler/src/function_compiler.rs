@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use inkwell::basic_block::BasicBlock;
+use inkwell::types::BasicType;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use ast::code::{Effect, Effects, ExpressionType};
 use ast::function::{CodeBody, Function};
@@ -87,8 +88,10 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             let calling = variables.functions.get(&effect.method).unwrap().1;
             if effect.return_type().is_some() && !calling.get_type().get_return_type().is_some() {
                 let pointer = compiler.builder.build_alloca(
-                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().0,
-                    &id.to_string());
+                    match variables.llvm_types.get(effect.return_type().unwrap().unwrap()) {
+                        Some(types) => types.0,
+                        None => compiler.context.struct_type(&[], false).as_basic_type_enum()
+                    }, &id.to_string());
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
 
@@ -225,7 +228,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                                              arguments.as_slice(), &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
         }
         Effects::VariableLoad(effect) =>
-            Some(variables.variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).clone()),
+            Some(variables.variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).1.clone()),
         Effects::AssignVariable(variable) => {
             let pointer = compiler.builder.build_alloca(variables.llvm_types.get(
                 match variable.effect.unwrap().return_type() {
@@ -238,7 +241,8 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                 }.deref()).unwrap().0, variable.variable.as_str());
             let value = compile_effect(compiler, block, function, variables, &variable.effect, id).unwrap();
 
-            variables.variables.insert(variable.variable.clone(), value);
+            variables.variables.insert(variable.variable.clone(),
+                                       (variable.effect.unwrap().return_type().unwrap().unwrap().clone(), value));
             compiler.builder.build_store(pointer, value);
             Some(value)
         }

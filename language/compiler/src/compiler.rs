@@ -1,12 +1,15 @@
 use std::borrow::BorrowMut;
 use std::mem;
+use std::ops::Deref;
 use std::rc::Rc;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
+use inkwell::types::BasicType;
 use ast::code::{Field, MemberField};
+use ast::type_resolver::FinalizedTypeResolver;
 use ast::types::ResolvableTypes::Resolved;
 use crate::function_compiler::compile_function;
 use crate::types::type_resolver::ParserTypeResolver;
@@ -43,6 +46,7 @@ impl<'ctx> Compiler<'ctx> {
 
         //Compile
         for (function, _function_value) in type_manager.functions.values() {
+            let type_manager = type_manager.for_func(&function.name);
             compile_function(function, &self, &type_manager);
         }
 
