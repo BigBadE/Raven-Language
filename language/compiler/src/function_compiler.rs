@@ -1,5 +1,6 @@
 use std::mem::MaybeUninit;
 use std::ops::Deref;
+use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicType;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
@@ -44,7 +45,20 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
                 match &line.effect {
                     Effects::NOP() => {}
                     _ => {
-                        let returned = compile_effect(compiler, &mut block, function, variables, &line.effect, id).unwrap();
+                        let mut returned = compile_effect(compiler, &mut block, function, variables, &line.effect, id).unwrap();
+
+                        let func = &variables.functions.get(function.get_name().to_str().unwrap()).unwrap().0;
+
+                        let returning = variables.get_llvm_type(func.return_type.as_ref().unwrap().unwrap());
+
+                        if &returned.get_type() != returning {
+                            let pointer = compiler.builder.build_pointer_cast(
+                                returned.into_pointer_value(), returning.ptr_type(AddressSpace::default()),
+                                &id.to_string());
+                            *id += 1;
+                            returned = compiler.builder.build_load(pointer, &id.to_string()).as_basic_value_enum();
+                            *id += 1;
+                        }
 
                         if returned.is_struct_value() {
                             compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
@@ -56,7 +70,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
                                                          compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
                             *id += 1;
                             compiler.builder.build_return(None);
-
                         } else {
                             compiler.builder.build_return(Some(&returned));
                         }

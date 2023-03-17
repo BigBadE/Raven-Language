@@ -199,7 +199,14 @@ impl<'ctx> CompilerTypeResolver<'ctx> {
         };
     }
 
-    pub(crate) fn for_func(&self, function: &String) -> Self {
+    pub fn get_llvm_type(&self, types: &Rc<Types>) -> &BasicTypeEnum<'ctx> {
+        return match self.llvm_types.get(types) {
+            Some(llvm_type) => &llvm_type.0,
+            None => return &self.func_types.get(&types.name).unwrap().1
+        };
+    }
+
+    pub fn for_func(&self, function: &String) -> Self {
         let mut type_manager = self.clone();
         let (function, function_value) = self.functions.get(function).unwrap();
 
