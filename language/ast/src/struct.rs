@@ -4,17 +4,18 @@ use crate::{DisplayIndented, to_modifiers};
 use crate::code::MemberField;
 use crate::function::{display_joined};
 use crate::type_resolver::FinalizedTypeResolver;
+use crate::types::ResolvableTypes;
 
 pub struct Struct {
     pub modifiers: u8,
-    pub generics: HashMap<String, Vec<String>>,
+    pub generics: HashMap<String, Vec<ResolvableTypes>>,
     pub fields: Option<Vec<MemberField>>,
     pub functions: Vec<String>,
     pub name: String
 }
 
 impl Struct {
-    pub fn new(fields: Option<Vec<MemberField>>, generics: HashMap<String, Vec<String>>,
+    pub fn new(fields: Option<Vec<MemberField>>, generics: HashMap<String, Vec<ResolvableTypes>>,
                functions: Vec<String>, modifiers: u8, name: String) -> Self {
         return Self {
             modifiers,

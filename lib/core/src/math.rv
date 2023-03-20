@@ -1,0 +1,4 @@
+pub internal struct i64 {}
+pub internal struct i32 {}
+pub internal struct i16 {}
+pub internal struct i8 {}

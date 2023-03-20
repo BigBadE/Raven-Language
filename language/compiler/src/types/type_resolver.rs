@@ -232,22 +232,13 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
 
     fn setup_functions(&mut self, context: &'ctx Context, module: &Module<'ctx>, mut functions: HashMap<String, Function>) {
         let mut new_functions = HashMap::new();
-        for (_, structure) in unsafe { Rc::get_mut_unchecked(&mut self.types.clone()) } {
-            if structure.structure.is_none() {
-                continue;
-            }
-
-            for name in &mut unsafe { Rc::get_mut_unchecked(structure) }.structure.as_mut().unwrap().functions {
-                let mut function = functions.remove(name).unwrap();
-
-                function.finalize(self);
-                let func_value = get_func_value(&function, module, context, &self.llvm_types);
-                new_functions.insert(function.name.clone(), (function, func_value));
-            }
-        }
-
         for (name, mut function) in functions {
             if !function.generics.is_empty() {
+                for found in function.generics.values_mut() {
+                    for types in found {
+                        types.finalize(self);
+                    }
+                }
                 unsafe { Rc::get_mut_unchecked(&mut self.generics) }.insert(name, function);
                 continue
             }

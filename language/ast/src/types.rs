@@ -83,6 +83,7 @@ impl Types {
             is_trait: false
         }
     }
+
     pub fn new_trait(pointer_size: u32, structure: Struct, parent: Vec<ResolvableTypes>) -> Self {
         return Self {
             name: structure.name.clone(),
@@ -107,7 +108,7 @@ impl Types {
         }
     }
 
-    pub fn is_type(&self, other: Rc<Types>) -> bool {
+    pub fn is_type(&self, other: &Rc<Types>) -> bool {
         let mut parent = self;
         loop {
             if parent.traits.contains(&ResolvableTypes::Resolved(other.clone())) {

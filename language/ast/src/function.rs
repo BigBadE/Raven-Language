@@ -7,7 +7,7 @@ use crate::types::ResolvableTypes;
 
 pub struct Function {
     pub attributes: HashMap<String, Attribute>,
-    pub generics: HashMap<String, Vec<String>>,
+    pub generics: HashMap<String, Vec<ResolvableTypes>>,
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
@@ -16,7 +16,7 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: HashMap<String, Vec<String>>,
+    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: HashMap<String, Vec<ResolvableTypes>>,
                code: CodeBody, return_type: Option<ResolvableTypes>, name: String) -> Self {
         return Self {
             attributes,
@@ -51,7 +51,14 @@ impl Function {
         for i in 0..calling.len() {
             if let ResolvableTypes::Resolving(name) = &self.fields.get(i).unwrap().field_type {
                 if self.generics.contains_key(name) {
-                    output.insert(name.clone(), (*calling.get(i).unwrap()).clone());
+                    let bounds = self.generics.get(name).unwrap();
+                    let target = (*calling.get(i).unwrap()).clone();
+                    for bound in bounds {
+                        if !target.unwrap().is_type(bound.unwrap()) {
+                            panic!("Generic {} isn't of type {}!", target, bound);
+                        }
+                    }
+                    output.insert(name.clone(), target);
                 }
             }
         }

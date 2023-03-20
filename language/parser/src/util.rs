@@ -124,7 +124,7 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
     return output;
 }
 
-pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Vec<String>>) {
+pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Vec<ResolvableTypes>>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
         parse_generic(value, generics);
     }
@@ -136,7 +136,7 @@ pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Ve
     }
 }
 
-pub fn parse_generic(value: String, generics: &mut HashMap<String, Vec<String>>) {
+pub fn parse_generic(value: String, generics: &mut HashMap<String, Vec<ResolvableTypes>>) {
     let mut split = value.split(':');
     let name = split.next().unwrap();
     let mut found = Vec::new();
@@ -144,7 +144,7 @@ pub fn parse_generic(value: String, generics: &mut HashMap<String, Vec<String>>)
         Some(constraint) => {
             let mut constraints = constraint.split('+');
             while let Some(constraint) = constraints.next() {
-                found.push(constraint.to_string().replace(" ", ""));
+                found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
             }
         },
         None => {}

@@ -1,9 +1,7 @@
-pub internal struct i64 {}
-
 pub fn main() -> i64 {
     return main::test(1);
 }
 
-pub fn test<T>(input: T) -> T {
+pub fn test<T: i64>(input: T) -> T {
     return input;
 }
