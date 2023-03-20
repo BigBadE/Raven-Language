@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -18,7 +19,13 @@ impl ResolvableTypes {
     pub fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         type_resolver.finalize(self);
     }
-    
+
+    pub fn set_generic(&mut self, resolving: &HashMap<String, ResolvableTypes>) {
+        if let ResolvableTypes::ResolvingGeneric(name, _ignored) = self {
+            *self = resolving.get(name).unwrap().clone();
+        }
+    }
+
     pub fn unwrap(&self) -> &Rc<Types> {
         match self { 
             ResolvableTypes::Resolved(types) => return types,

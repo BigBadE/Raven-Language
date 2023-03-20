@@ -101,10 +101,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             let calling = variables.functions.get(&effect.method).unwrap().1;
             if effect.return_type().is_some() && !calling.get_type().get_return_type().is_some() {
                 let pointer = compiler.builder.build_alloca(
-                    match variables.llvm_types.get(effect.return_type().unwrap().unwrap()) {
-                        Some(types) => types.0,
-                        None => compiler.context.struct_type(&[], false).as_basic_type_enum()
-                    }, &id.to_string());
+                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().types.0, &id.to_string());
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
 

@@ -64,6 +64,7 @@ pub trait DisplayIndented {
     fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
 }
 
+#[derive(Clone)]
 pub struct Attribute {
     pub value: String
 }

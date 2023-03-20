@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::DerefMut;
 use crate::code::{Effect, Effects, Expression, ExpressionType, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
 use crate::type_resolver::FinalizedTypeResolver;
@@ -8,7 +7,7 @@ use crate::types::ResolvableTypes;
 
 pub struct Function {
     pub attributes: HashMap<String, Attribute>,
-    pub generics: Vec<ResolvableTypes>,
+    pub generics: Vec<(String, Vec<String>)>,
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
@@ -17,7 +16,7 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: Vec<ResolvableTypes>, 
+    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: Vec<(String, Vec<String>)>,
                code: CodeBody, return_type: Option<ResolvableTypes>, name: String) -> Self {
         return Self {
             attributes,
@@ -30,11 +29,15 @@ impl Function {
         };
     }
 
-    pub fn finalize(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
-        for generic in &mut self.generics {
-            generic.finalize(type_manager);
-        }
+    pub fn set_generics(&self, replacing: &HashMap<String, ResolvableTypes>) -> Self {
 
+        return Function::new(self.attributes.clone(), self.modifiers, self.fields.set_generics(&replacing),
+                             Vec::new(), self.code.set_generics(&replacing),
+                             self.return_type.clone().map(|returning| returning.set_generics(&replacing)),
+        self.name.clone() + "_" + &display(&replacing.values().collect(), "_"));
+    }
+
+    pub fn finalize(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
         type_manager.finalize_func(self);
     }
 
@@ -143,8 +146,22 @@ impl Display for Function {
 
 impl DisplayIndented for Function {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} fn {}{} ", indent, display_joined(&to_modifiers(self.modifiers)),
-               self.name, display(&self.fields, ", "))?;
+        write!(f, "{}{} fn {} ", indent, display_joined(&to_modifiers(self.modifiers)),
+               self.name)?;
+
+        if !self.generics.is_empty() {
+            write!(f, "<")?;
+            for (name, bounds) in &self.generics {
+                write!(f, "{}", name)?;
+                if !bounds.is_empty() {
+                    write!(f, ": {}", display(bounds, " + "))?;
+                }
+            }
+            write!(f, ">")?;
+        }
+
+        write!(f, "{} ", display(&self.fields, ", "))?;
+
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
