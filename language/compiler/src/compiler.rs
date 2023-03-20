@@ -46,6 +46,10 @@ impl<'ctx> Compiler<'ctx> {
 
         //Compile
         for (function, _function_value) in type_manager.functions.values() {
+            if !function.generics.is_empty() {
+                continue
+            }
+
             let type_manager = type_manager.for_func(&function.name);
             compile_function(function, &self, &type_manager);
         }

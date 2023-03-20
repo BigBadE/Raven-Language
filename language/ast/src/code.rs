@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::mem;
 use crate::{assign_with_priority, DisplayIndented, to_modifiers};
@@ -6,6 +7,7 @@ use crate::function::{Arguments, CodeBody, display_joined};
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
+#[derive(Clone)]
 pub struct Expression {
     pub expression_type: ExpressionType,
     pub effect: Effects
@@ -18,6 +20,7 @@ pub enum ExpressionType {
     Line
 }
 
+#[derive(Clone)]
 pub struct Field {
     pub name: String,
     pub field_type: ResolvableTypes
@@ -55,6 +58,10 @@ impl Expression {
         self.effect.finalize(type_resolver);
     }
 
+    pub fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.effect.as_mut().set_generics(replacing);
+    }
+
     pub fn is_return(&self) -> bool {
         return if let ExpressionType::Return = self.expression_type {
             true
@@ -70,6 +77,12 @@ impl Field {
             name,
             field_type
         }
+    }
+
+    pub fn set_generics(&self, replacing: &HashMap<String, ResolvableTypes>) -> Self {
+        let mut field = self.clone();
+        field.field_type.set_generic(replacing);
+        return field;
     }
 
     pub fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
@@ -116,8 +129,11 @@ pub trait Effect: DisplayIndented {
     fn return_type(&self) -> Option<ResolvableTypes>;
 
     fn get_location(&self) -> (u32, u32);
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>);
 }
 
+#[derive(Clone)]
 pub enum Effects {
     NOP(),
     Wrapped(Box<Effects>),
@@ -193,6 +209,7 @@ impl DisplayIndented for Effects {
     }
 }
 
+#[derive(Clone)]
 pub struct FieldLoad {
     pub calling: Effects,
     pub name: String,
@@ -234,6 +251,10 @@ impl Effect for FieldLoad {
     fn get_location(&self) -> (u32, u32) {
         return self.loc;
     }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.calling.as_mut().set_generics(replacing);
+    }
 }
 
 impl DisplayIndented for FieldLoad {
@@ -243,6 +264,7 @@ impl DisplayIndented for FieldLoad {
     }
 }
 
+#[derive(Clone)]
 pub struct MethodCall {
     pub calling: Option<Effects>,
     pub method: String,
@@ -279,8 +301,18 @@ impl Effect for MethodCall {
 
         self.arguments.finalize(type_resolver);
         self.method_return = match type_resolver.get_function(&self.method) {
-            Some(func) => func.return_type.clone(),
-            None => panic!("No method named {}!", self.method)
+            Some(func) => if func.generics.is_empty() {
+                func.return_type.clone()
+            } else {
+                let func = type_resolver.solidify_generics(&self.method, func.extract_generics(
+                    &self.arguments.arguments.iter().map(|arg| arg.unwrap().return_type().unwrap()).collect()
+                ));
+                self.method = func.name.clone();
+                func.return_type.clone()
+            },
+            None => {
+                panic!("No method named {}!", self.method)
+            }
         };
     }
 
@@ -290,6 +322,17 @@ impl Effect for MethodCall {
 
     fn get_location(&self) -> (u32, u32) {
         return self.location
+    }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        if let Some(found) = &mut self.calling {
+            found.as_mut().set_generics(replacing);
+        }
+
+        if let Some(returned) = &self.method_return {
+            self.method_return = Some(returned.clone());
+            self.method_return.as_mut().unwrap().set_generic(replacing);
+        }
     }
 }
 
@@ -303,6 +346,7 @@ impl DisplayIndented for MethodCall {
     }
 }
 
+#[derive(Clone)]
 pub struct CreateStruct {
     pub structure: ResolvableTypes,
     pub parsed_effects: Option<Vec<(usize, Effects)>>,
@@ -361,6 +405,15 @@ impl Effect for CreateStruct {
     fn get_location(&self) -> (u32, u32) {
         return self.location;
     }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.structure.set_generic(replacing);
+        if let Some(effects) = &mut self.parsed_effects {
+            for (_name, effect) in effects {
+                effect.as_mut().set_generics(replacing);
+            }
+        }
+    }
 }
 
 impl DisplayIndented for CreateStruct {
@@ -391,6 +444,7 @@ impl DisplayIndented for CreateStruct {
     }
 }
 
+#[derive(Clone)]
 pub struct VariableLoad {
     pub name: String,
     pub types: Option<ResolvableTypes>,
@@ -427,6 +481,14 @@ impl Effect for VariableLoad {
     fn get_location(&self) -> (u32, u32) {
         return self.location;
     }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        if let Some(types) = &self.types {
+            let mut types = types.clone();
+            types.set_generic(replacing);
+            self.types = Some(types);
+        }
+    }
 }
 
 impl DisplayIndented for VariableLoad {
@@ -435,6 +497,7 @@ impl DisplayIndented for VariableLoad {
     }
 }
 
+#[derive(Clone)]
 pub struct NumberEffect<T> where T : Display + Typed {
     pub return_type: ResolvableTypes,
     pub number: T
@@ -485,6 +548,10 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
     fn get_location(&self) -> (u32, u32) {
         panic!("Unexpected get location!");
     }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.return_type.set_generic(replacing);
+    }
 }
 
 impl<T> DisplayIndented for NumberEffect<T> where T : Display + Typed {
@@ -493,6 +560,7 @@ impl<T> DisplayIndented for NumberEffect<T> where T : Display + Typed {
     }
 }
 
+#[derive(Clone)]
 pub struct AssignVariable {
     pub variable: String,
     pub effect: Effects,
@@ -529,6 +597,10 @@ impl Effect for AssignVariable {
     fn get_location(&self) -> (u32, u32) {
         return self.location;
     }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.effect.as_mut().set_generics(replacing);
+    }
 }
 
 impl DisplayIndented for AssignVariable {
@@ -538,6 +610,7 @@ impl DisplayIndented for AssignVariable {
     }
 }
 
+#[derive(Clone)]
 pub struct OperatorEffect {
     pub operator: String,
     pub function: Option<String>,
@@ -602,6 +675,18 @@ impl Effect for OperatorEffect {
 
     fn get_location(&self) -> (u32, u32) {
         return self.location
+    }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        if let Some(returning) = &self.return_type {
+            let mut returning = returning.clone();
+            returning.set_generic(replacing);
+            self.return_type = Some(returning);
+        }
+
+        for effects in &mut self.effects {
+            effects.as_mut().set_generics(replacing);
+        }
     }
 }
 

@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use inkwell::values::FunctionValue;
+use ast::function::Function;
+
 pub fn print_formatted(input: String) {
     let mut output = String::new();
     let mut special = false;

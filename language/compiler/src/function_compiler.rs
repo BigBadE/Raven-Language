@@ -1,5 +1,6 @@
 use std::mem::MaybeUninit;
 use std::ops::Deref;
+use std::rc::Rc;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicType;
@@ -9,10 +10,10 @@ use ast::function::{CodeBody, Function};
 use ast::{is_modifier, Modifier};
 use crate::compiler::Compiler;
 use crate::internal::instructions::compile_internal;
-use crate::types::type_resolver::CompilerTypeResolver;
+use crate::types::type_resolver::{CompilerTypeResolver, get_func_value};
 use crate::util::print_formatted;
 
-pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>, type_manager: &CompilerTypeResolver<'ctx>) {
+pub fn compile_function<'a, 'ctx>(function: &Function, compiler: &Compiler<'ctx>, type_manager: &CompilerTypeResolver<'a, 'ctx>) {
     let value = type_manager.functions.get(&function.name).unwrap().1;
     if is_modifier(function.modifiers, Modifier::Internal) {
         compile_internal(compiler, &function.name, &function.fields, value);
@@ -34,8 +35,8 @@ pub fn compile_function<'ctx>(function: &Function, compiler: &Compiler<'ctx>, ty
     }
 }
 
-pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
-                           variables: &mut CompilerTypeResolver<'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
+pub fn compile_block<'a, 'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
+                           variables: &mut CompilerTypeResolver<'a, 'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
     let mut block = compiler.context.append_basic_block(function, id.to_string().as_str());
     *id += 1;
     compiler.builder.position_at_end(block);
@@ -86,8 +87,8 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
     return block;
 }
 
-pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'ctx>, function: FunctionValue<'ctx>,
-                            variables: &mut CompilerTypeResolver<'ctx>, effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
+pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'ctx>, function: FunctionValue<'ctx>,
+                            variables: &mut CompilerTypeResolver<'a, 'ctx>, effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Wrapped(effect) => compile_effect(compiler, block, function, variables, effect, id),
@@ -101,12 +102,12 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             let calling = variables.functions.get(&effect.method).unwrap().1;
             if effect.return_type().is_some() && !calling.get_type().get_return_type().is_some() {
                 let pointer = compiler.builder.build_alloca(
-                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().types.0, &id.to_string());
+                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().0, &id.to_string());
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
 
                 for argument in &effect.arguments.arguments {
-                    arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()))
+                    arguments.push(From::from(compile_effect(compiler, block, calling, variables, argument, id).unwrap()))
                 }
 
                 *id += 1;
@@ -114,14 +115,14 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                 Some(pointer.as_basic_value_enum())
             } else {
                 for argument in &effect.arguments.arguments {
-                    arguments.push(From::from(compile_effect(compiler, block, function, variables, argument, id).unwrap()))
+                    arguments.push(From::from(compile_effect(compiler, block, calling, variables, argument, id).unwrap()))
                 }
 
                 *id += 1;
                 Some(compiler.builder.build_call(calling, arguments.as_slice(),
                                                  &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
             }
-        },
+        }
         Effects::FieldLoad(effect) => {
             let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
             let mut offset = 1;
@@ -129,7 +130,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
                 if field.field.name != effect.name {
                     offset += 1;
                 } else {
-                    break
+                    break;
                 }
             }
 
@@ -144,7 +145,7 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
             *id += 2;
             Some(compiler.builder.build_load(
                 compiler.builder.build_struct_gep(pointer, offset, &(*id - 2).to_string()).unwrap(),
-            &(*id-1).to_string()).as_basic_value_enum())
+                &(*id - 1).to_string()).as_basic_value_enum())
         }
         Effects::CreateStruct(effect) => {
             let types = effect.structure.unwrap();
@@ -157,9 +158,9 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
 
             for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
                 let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
-                arguments.remove(*index+1);
+                arguments.remove(*index + 1);
                 let found_size = effect.unwrap().return_type().unwrap().unwrap().size;
-                arguments.insert(*index+1, MaybeUninit::new((returned, found_size)));
+                arguments.insert(*index + 1, MaybeUninit::new((returned, found_size)));
             }
 
             let (structure, global_value) = variables.llvm_types.get(types).unwrap();
@@ -261,8 +262,8 @@ pub fn compile_effect<'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'c
 
 //LLVM dies if the last instruction isn't a return, so this is weirdly structured
 //to make sure the end is created last.
-fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, index: usize, function: FunctionValue<'ctx>,
-                   variables: &mut CompilerTypeResolver<'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> (BasicBlock<'ctx>, BasicBlock<'ctx>) {
+fn compile_elseifs<'a, 'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, index: usize, function: FunctionValue<'ctx>,
+                         variables: &mut CompilerTypeResolver<'a, 'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> (BasicBlock<'ctx>, BasicBlock<'ctx>) {
     if effects.len() == 1 {
         return match effects.get(0).unwrap().0 {
             Some(effect) => {
@@ -271,13 +272,13 @@ fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, i
                 *id += 1;
                 compiler.builder.build_unconditional_branch(end);
                 (block, end)
-            },
+            }
             None => {
                 let end = compiler.context.append_basic_block(function, &id.to_string());
                 *id += 1;
                 (end, end)
             }
-        }
+        };
     }
 
     let mut new_block = compiler.context.append_basic_block(function, &id.to_string());
@@ -290,7 +291,7 @@ fn compile_elseifs<'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, i
         other = tuple.0;
         end = tuple.1;
     } else {
-        other = compile_block(effects.get(index+1).unwrap().0.unwrap(), function, variables, compiler, id);
+        other = compile_block(effects.get(index + 1).unwrap().0.unwrap(), function, variables, compiler, id);
         compiler.builder.position_at_end(other);
         end = compiler.context.append_basic_block(function, &id.to_string());
         *id += 1;

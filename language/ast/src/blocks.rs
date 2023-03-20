@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Formatter;
 use crate::code::{Effect, Effects};
 use crate::DisplayIndented;
@@ -46,8 +47,14 @@ impl Effect for ForStatement {
     fn get_location(&self) -> (u32, u32) {
         panic!("Unexpected location!");
     }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.effect.as_mut().set_generics(replacing);
+        self.code_block.set_generics(replacing);
+    }
 }
 
+#[derive(Clone)]
 pub struct IfStatement {
     pub body: CodeBody,
     pub condition: Effects,
@@ -130,5 +137,18 @@ impl Effect for IfStatement {
 
     fn get_location(&self) -> (u32, u32) {
         return self.location
+    }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        self.condition.as_mut().set_generics(replacing);
+        self.body.set_generics(replacing);
+        if let Some(body) = &mut self.else_body {
+            body.set_generics(replacing);
+        }
+
+        for (body, effect) in &mut self.else_ifs {
+            body.set_generics(replacing);
+            effect.as_mut().set_generics(replacing);
+        }
     }
 }

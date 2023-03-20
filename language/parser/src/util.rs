@@ -123,7 +123,7 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
     return output;
 }
 
-pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut Vec<ResolvableTypes>) {
+pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut Vec<(String, Vec<String>)>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
         generics.push(parse_generic(value));
     }
@@ -135,7 +135,7 @@ pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut Vec<ResolvableType
     }
 }
 
-pub fn parse_generic(value: String) -> ResolvableTypes {
+pub fn parse_generic(value: String) -> (String, Vec<String>) {
     let mut split = value.split(':');
     let name = split.next().unwrap();
     let mut found = Vec::new();
@@ -143,10 +143,10 @@ pub fn parse_generic(value: String) -> ResolvableTypes {
         Some(constraint) => {
             let mut constraints = constraint.split('+');
             while let Some(constraint) = constraints.next() {
-                found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
+                found.push(constraint.to_string().replace(" ", ""));
             }
         },
         None => {}
     }
-    return ResolvableTypes::ResolvingGeneric(name.to_string(), vec!())
+    return (name.to_string(), found);
 }

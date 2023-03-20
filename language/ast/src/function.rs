@@ -30,15 +30,36 @@ impl Function {
     }
 
     pub fn set_generics(&self, replacing: &HashMap<String, ResolvableTypes>) -> Self {
+        let mut code = self.code.clone();
+        code.set_generics(&replacing);
+        let mut return_type = self.return_type.clone();
+        if let Some(returning) = &mut return_type {
+            returning.set_generic(replacing);
+        }
+        return Function::new(self.attributes.clone(), self.modifiers,
+                             self.fields.iter().map(|field| field.set_generics(&replacing)).collect(),
+                             Vec::new(), code, return_type,
+        self.get_mangled_name(replacing));
+    }
 
-        return Function::new(self.attributes.clone(), self.modifiers, self.fields.set_generics(&replacing),
-                             Vec::new(), self.code.set_generics(&replacing),
-                             self.return_type.clone().map(|returning| returning.set_generics(&replacing)),
-        self.name.clone() + "_" + &display(&replacing.values().collect(), "_"));
+    pub fn get_mangled_name(&self, replacing: &HashMap<String, ResolvableTypes>) -> String {
+        return self.name.clone() + "_" + &display(&replacing.values().collect(), "_")
+    }
+
+    pub fn extract_generics(&self, calling: &Vec<ResolvableTypes>) -> HashMap<String, ResolvableTypes> {
+        let mut output = HashMap::new();
+        for i in 0..calling.len() {
+            if let ResolvableTypes::ResolvingGeneric(name, _bounds) = &self.fields.get(i).unwrap().field_type {
+                output.insert(name.clone(), (*calling.get(i).unwrap()).clone());
+            }
+        }
+        return output;
     }
 
     pub fn finalize(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
-        type_manager.finalize_func(self);
+        if self.generics.is_empty() {
+            type_manager.finalize_func(self);
+        }
     }
 
     pub fn finalize_code(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
@@ -62,7 +83,7 @@ impl Function {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Arguments {
     pub arguments: Vec<Effects>,
 }
@@ -81,7 +102,7 @@ impl Arguments {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct CodeBody {
     pub expressions: Vec<Expression>,
 }
@@ -129,6 +150,12 @@ impl Effect for CodeBody {
 
     fn get_location(&self) -> (u32, u32) {
         todo!()
+    }
+
+    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+        for expression in &mut self.expressions {
+            expression.set_generics(replacing);
+        }
     }
 }
 
