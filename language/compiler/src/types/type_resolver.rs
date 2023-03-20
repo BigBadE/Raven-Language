@@ -312,31 +312,7 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
                         }
                     }
                 }
-            ResolvableTypes::ResolvingGeneric(name, bounds) => {
-                let mut type_bounds = Vec::new();
-                let mut parent = None;
-                for bound in bounds {
-                    let found = self.types.get(bound).expect(format!("Unknown type {}", bound).as_str());
-                    if found.is_trait {
-                        type_bounds.push(ResolvableTypes::Resolved(found.clone()));
-                    } else {
-                        if parent.is_some() {
-                            let unwrapped: &ResolvableTypes = parent.as_ref().unwrap();
-                            if unwrapped.unwrap().has_parent(found) {
-                                //Already good
-                            } else if found.has_parent(unwrapped.unwrap()) {
-                                parent = Some(parent.unwrap());
-                            } else {
-                                panic!("Two parents for single generic! {} and {}", unwrapped, found)
-                            }
-                        } else {
-                            parent = Some(ResolvableTypes::Resolved(found.clone()));
-                        }
-                    }
-                }
-                *resolving = ResolvableTypes::Resolved(Rc::new(Types::new_generic(name.clone(), parent, type_bounds)))
-            }
-            ResolvableTypes::Resolved(_) => panic!("Tried to resolve already-resolved type!")
+            ResolvableTypes::Resolved(_) => {}
         }
     }
 

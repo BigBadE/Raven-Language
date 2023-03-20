@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use ast::code::{Effects, Field};
 use ast::function::{Arguments, CodeBody};
 use ast::type_resolver::TypeResolver;
@@ -123,19 +124,19 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
     return output;
 }
 
-pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut Vec<(String, Vec<String>)>) {
+pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Vec<String>>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
-        generics.push(parse_generic(value));
+        parse_generic(value, generics);
     }
 
     if let Some(value) = parsing.parse_to(b'>') {
-        generics.push(parse_generic(value))
+        parse_generic(value, generics);
     } else {
         panic!("Expected generic!");
     }
 }
 
-pub fn parse_generic(value: String) -> (String, Vec<String>) {
+pub fn parse_generic(value: String, generics: &mut HashMap<String, Vec<String>>) {
     let mut split = value.split(':');
     let name = split.next().unwrap();
     let mut found = Vec::new();
@@ -148,5 +149,5 @@ pub fn parse_generic(value: String) -> (String, Vec<String>) {
         },
         None => {}
     }
-    return (name.to_string(), found);
+    generics.insert(name.to_string(), found);
 }

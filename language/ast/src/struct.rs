@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use crate::{DisplayIndented, to_modifiers};
 use crate::code::MemberField;
@@ -6,14 +7,14 @@ use crate::type_resolver::FinalizedTypeResolver;
 
 pub struct Struct {
     pub modifiers: u8,
-    pub generics: Vec<(String, Vec<String>)>,
+    pub generics: HashMap<String, Vec<String>>,
     pub fields: Option<Vec<MemberField>>,
     pub functions: Vec<String>,
     pub name: String
 }
 
 impl Struct {
-    pub fn new(fields: Option<Vec<MemberField>>, generics: Vec<(String, Vec<String>)>,
+    pub fn new(fields: Option<Vec<MemberField>>, generics: HashMap<String, Vec<String>>,
                functions: Vec<String>, modifiers: u8, name: String) -> Self {
         return Self {
             modifiers,

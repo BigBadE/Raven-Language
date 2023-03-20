@@ -7,7 +7,7 @@ use crate::types::ResolvableTypes;
 
 pub struct Function {
     pub attributes: HashMap<String, Attribute>,
-    pub generics: Vec<(String, Vec<String>)>,
+    pub generics: HashMap<String, Vec<String>>,
     pub modifiers: u8,
     pub fields: Vec<Field>,
     pub code: CodeBody,
@@ -16,7 +16,7 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: Vec<(String, Vec<String>)>,
+    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: HashMap<String, Vec<String>>,
                code: CodeBody, return_type: Option<ResolvableTypes>, name: String) -> Self {
         return Self {
             attributes,
@@ -38,7 +38,7 @@ impl Function {
         }
         return Function::new(self.attributes.clone(), self.modifiers,
                              self.fields.iter().map(|field| field.set_generics(&replacing)).collect(),
-                             Vec::new(), code, return_type,
+                             HashMap::new(), code, return_type,
         self.get_mangled_name(replacing));
     }
 
@@ -49,8 +49,10 @@ impl Function {
     pub fn extract_generics(&self, calling: &Vec<ResolvableTypes>) -> HashMap<String, ResolvableTypes> {
         let mut output = HashMap::new();
         for i in 0..calling.len() {
-            if let ResolvableTypes::ResolvingGeneric(name, _bounds) = &self.fields.get(i).unwrap().field_type {
-                output.insert(name.clone(), (*calling.get(i).unwrap()).clone());
+            if let ResolvableTypes::Resolving(name) = &self.fields.get(i).unwrap().field_type {
+                if self.generics.contains_key(name) {
+                    output.insert(name.clone(), (*calling.get(i).unwrap()).clone());
+                }
             }
         }
         return output;
@@ -235,5 +237,5 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
         output += &*format!("{}{}", element, deliminator);
     }
 
-    return format!("({})", (&output[..output.len() - 2]).to_string());
+    return format!("({})", (&output[..output.len() - deliminator.len()]).to_string());
 }

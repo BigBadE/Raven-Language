@@ -11,7 +11,6 @@ use crate::type_resolver::FinalizedTypeResolver;
 #[derive(Clone, PartialEq, Eq)]
 pub enum ResolvableTypes {
     Resolved(Rc<Types>),
-    ResolvingGeneric(String, Vec<String>),
     Resolving(String)
 }
 
@@ -21,8 +20,11 @@ impl ResolvableTypes {
     }
 
     pub fn set_generic(&mut self, resolving: &HashMap<String, ResolvableTypes>) {
-        if let ResolvableTypes::ResolvingGeneric(name, _ignored) = self {
-            *self = resolving.get(name).unwrap().clone();
+        if let ResolvableTypes::Resolving(name) = self {
+            match resolving.get(name) {
+                Some(found) => *self = found.clone(),
+                None => {}
+            }
         }
     }
 
@@ -30,7 +32,6 @@ impl ResolvableTypes {
         match self { 
             ResolvableTypes::Resolved(types) => return types,
             ResolvableTypes::Resolving(name) => panic!("Expected {} to be resolved!", name),
-            ResolvableTypes::ResolvingGeneric(name, _ignored) => panic!("Expected {} to be resolved!", name)
         }
     }
 
@@ -38,7 +39,6 @@ impl ResolvableTypes {
         return match self {
             ResolvableTypes::Resolving(found) => found,
             ResolvableTypes::Resolved(found) => &found.name,
-            ResolvableTypes::ResolvingGeneric(name, _bounds) => &name
         }
     }
 }
@@ -47,14 +47,7 @@ impl Display for ResolvableTypes {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ResolvableTypes::Resolving(resolving) => write!(f, "{}", resolving),
-            ResolvableTypes::Resolved(resolved) => write!(f, "{}", resolved),
-            ResolvableTypes::ResolvingGeneric(name, bounds) => {
-                write!(f, "{}", name)?;
-                if !bounds.is_empty() {
-                    write!(f, ": {}", display(bounds, " + "))?;
-                }
-                return Ok(());
-            },
+            ResolvableTypes::Resolved(resolved) => write!(f, "{}", resolved)
         }
     }
 }

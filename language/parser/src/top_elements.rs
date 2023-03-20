@@ -51,7 +51,7 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
 fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                      modifiers: u8, parsing: &mut ParseInfo) -> Option<Types> {
     let mut fn_name;
-    let mut generics = Vec::new();
+    let mut generics = HashMap::new();
     if let Some(temp_name) = find_if_first(parsing, b'<', b'{') {
         fn_name = temp_name;
 
@@ -126,7 +126,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
 fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: HashMap<String, Attribute>,
                   modifiers: u8, parsing: &mut ParseInfo) -> Option<Function> {
     let fn_name;
-    let mut generics = Vec::new();
+    let mut generics = HashMap::new();
 
     if let Some(found_name) = find_if_first(parsing, b'<', b'(') {
         fn_name = name.clone() + "::" + found_name.as_str();
