@@ -87,8 +87,11 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
         if parsing.matching("fn") {
             match parse_function(type_manager, &fn_name, attributes, get_modifier(modifiers.as_slice()),
                                  parsing) {
-                Some(function) => {
-                    if function.fields.iter().any(|field| field.name == "self") {
+                Some(mut function) => {
+                    if function.fields.iter().any(|field| field.name == "self" || field.name == fn_name) {
+                        for (key, val) in &generics {
+                            function.generics.insert(key.clone(), val.clone());
+                        }
                         functions.push(function.name.clone());
                     }
                     type_manager.add_function(function);

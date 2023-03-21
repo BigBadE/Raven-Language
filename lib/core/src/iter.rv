@@ -1,0 +1,15 @@
+pub struct NumberIter<T> {
+    pub last: T;
+    pub end: T;
+
+    pub fn new<T>(start: T, end: T) -> NumberIter<T> {
+        return NumberIter {
+            start,
+            end
+        }
+    }
+
+    pub fn next(self) -> T {
+        return self.last;
+    }
+}

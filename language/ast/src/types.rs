@@ -54,7 +54,7 @@ impl Display for ResolvableTypes {
 
 pub struct Types {
     pub name: String,
-    pub structure: Option<Struct>,
+    pub structure: Struct,
     pub parent: Option<ResolvableTypes>,
     pub traits: Vec<ResolvableTypes>,
     pub size: u32,
@@ -65,20 +65,9 @@ impl Types {
     pub fn new_struct(structure: Struct, parent: Option<ResolvableTypes>, traits: Vec<ResolvableTypes>) -> Self {
         return Self {
             name: structure.name.clone(),
-            structure: Some(structure),
+            structure,
             parent,
             traits,
-            size: 0,
-            is_trait: false
-        }
-    }
-
-    pub fn new_generic(name: String, parent: Option<ResolvableTypes>, bounds: Vec<ResolvableTypes>) -> Self {
-        return Self {
-            name,
-            structure: None,
-            parent,
-            traits: bounds,
             size: 0,
             is_trait: false
         }
@@ -87,7 +76,7 @@ impl Types {
     pub fn new_trait(pointer_size: u32, structure: Struct, parent: Vec<ResolvableTypes>) -> Self {
         return Self {
             name: structure.name.clone(),
-            structure: Some(structure),
+            structure,
             parent: None,
             traits: parent,
             is_trait: true,
@@ -95,14 +84,11 @@ impl Types {
         }
     }
 
-    pub fn get_fields(&self) -> Option<&Vec<MemberField>> {
-        if self.structure.is_none() {
-            return None;
-        }
+    pub fn get_fields(&self) -> &Vec<MemberField> {
         let mut parent = self;
         loop {
-            if parent.structure.as_ref().unwrap().fields.is_some() {
-                return Some(parent.structure.as_ref().unwrap().fields.as_ref().unwrap());
+            if parent.structure.fields.is_some() {
+                return parent.structure.fields.as_ref().unwrap();
             }
             parent = parent.parent.as_ref().unwrap().unwrap().as_ref();
         }
