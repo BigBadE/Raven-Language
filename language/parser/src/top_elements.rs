@@ -23,7 +23,7 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
             };
             continue;
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
-            match parse_function(type_manager, name, attributes, modifiers, parsing) {
+            match parse_function(type_manager, None, name, attributes, modifiers, parsing) {
                 Some(function) => {
                     if is_modifier(modifiers, Modifier::Operation) {
                         //Add only the method name.
@@ -85,10 +85,10 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
         let modifiers = parse_modifiers(parsing);
 
         if parsing.matching("fn") {
-            match parse_function(type_manager, &fn_name, attributes, get_modifier(modifiers.as_slice()),
+            match parse_function(type_manager, Some(fn_name.clone()), &fn_name, attributes, get_modifier(modifiers.as_slice()),
                                  parsing) {
                 Some(mut function) => {
-                    if function.fields.iter().any(|field| field.name == "self" || field.name == fn_name) {
+                    if function.fields.iter().any(|field| field.name == "self") {
                         for (key, val) in &generics {
                             function.generics.insert(key.clone(), val.clone());
                         }
@@ -101,6 +101,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                 None => {}
             }
         }
+
         let field_name = match parsing.parse_to(b':') {
             Some(field_name) => field_name,
             None => {
@@ -126,7 +127,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                                   None, Vec::new()));
 }
 
-fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: HashMap<String, Attribute>,
+fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name: &String, attributes: HashMap<String, Attribute>,
                   modifiers: u8, parsing: &mut ParseInfo) -> Option<Function> {
     let fn_name;
     let mut generics = HashMap::new();
@@ -149,7 +150,7 @@ fn parse_function(type_manager: &dyn TypeResolver, name: &String, attributes: Ha
         }.as_str();
     }
 
-    let fields = match parse_fields(parsing) {
+    let fields = match parse_fields(parent, parsing) {
         Some(fields) => fields,
         None => return None
     };

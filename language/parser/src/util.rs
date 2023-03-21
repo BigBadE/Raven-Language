@@ -6,17 +6,17 @@ use ast::types::ResolvableTypes;
 use crate::code::{parse_effect, parse_expression};
 use crate::parser::ParseInfo;
 
-pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
+pub fn parse_fields<'a>(parent: Option<String>, parsing: &mut ParseInfo) -> Option<Vec<Field>> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
     while let Some(found) = find_if_first(parsing, b',', b')') {
-        output.push(parse_field(found, &mut info)?);
+        output.push(parse_field(&parent, found, &mut info)?);
         info = parsing.clone();
     }
 
     if let Some(found) = parsing.parse_to(b')') {
         if !found.is_empty() {
-            output.push(parse_field(found, &mut info)?)
+            output.push(parse_field(&parent, found, &mut info)?)
         }
     }
 
@@ -25,13 +25,24 @@ pub fn parse_fields<'a>(parsing: &mut ParseInfo) -> Option<Vec<Field>> {
 
 pub fn parse_struct_fields() {}
 
-fn parse_field<'a>(string: String, parser: &mut ParseInfo) -> Option<Field> {
+fn parse_field<'a>(parent: &Option<String>, string: String, parser: &mut ParseInfo) -> Option<Field> {
     let parts: Vec<&str> = string.split(':').collect();
     if parts.len() != 2 {
         parser.create_error("Missing or unexpected colon in field.".to_string());
         return None;
     }
 
+    if parts.get(1).unwrap().contains(")") {
+        if parts.get(0).unwrap() == &"self" {
+            match parent {
+                Some(parent) => return Some(Field::new("self".to_string(), ResolvableTypes::Resolving(parent.clone()))),
+                None => parser.create_error("Cannot have self outside of struct!".to_string())
+            }
+        } else {
+            parser.create_error("Field missing type!".to_string());
+        }
+        return None;
+    }
     return Some(Field::new(parts[0].to_string(), ResolvableTypes::Resolving(parts[1].to_string())));
 }
 
