@@ -95,7 +95,6 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                         functions.push(function.name.clone());
                     }
                     type_manager.add_function(function);
-                    parsing.index -= 1;
                     continue;
                 }
                 None => {}

@@ -2,7 +2,7 @@ pub struct NumberIter<T> {
     pub last: T;
     pub end: T;
 
-    pub fn next(self) -> T {
+    pub fn next<T>(self: NumberIter<T>) -> T {
         return self.last;
     }
 }
