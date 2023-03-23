@@ -43,7 +43,7 @@ impl Function {
     }
 
     pub fn get_mangled_name(&self, replacing: &HashMap<String, ResolvableTypes>) -> String {
-        return self.name.clone() + "_" + &display(&replacing.values().collect(), "_")
+        return self.name.clone() + "_" + &display_parenless(&replacing.values().collect(), "_")
     }
 
     pub fn extract_generics(&self, calling: &Vec<ResolvableTypes>) -> HashMap<String, ResolvableTypes> {
@@ -182,7 +182,7 @@ impl Display for Function {
 
 impl DisplayIndented for Function {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} fn {} ", indent, display_joined(&to_modifiers(self.modifiers)),
+        write!(f, "{}{} fn {}", indent, display_joined(&to_modifiers(self.modifiers)),
                self.name)?;
 
         if !self.generics.is_empty() {
@@ -245,4 +245,17 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
     }
 
     return format!("({})", (&output[..output.len() - deliminator.len()]).to_string());
+}
+
+pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {
+    if input.is_empty() {
+        return String::new();
+    }
+
+    let mut output = String::new();
+    for element in input {
+        output += &*format!("{}{}", element, deliminator);
+    }
+
+    return (&output[..output.len() - deliminator.len()]).to_string();
 }

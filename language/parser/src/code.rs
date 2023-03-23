@@ -99,8 +99,10 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                 }
                 b'.' => {
                     let found = parse_ident(parsing);
+
                     match parsing.buffer[parsing.index] {
                         b'(' => {
+                            parsing.index += 1;
                             let location = parsing.loc();
                             last = Some(Effects::MethodCall(Box::new(
                                 MethodCall::new(last, found,

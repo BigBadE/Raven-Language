@@ -42,7 +42,7 @@ impl MemberField {
 
 impl DisplayIndented for MemberField {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}{} {}", indent, display_joined(&to_modifiers(self.modifiers)), self.field);
+        return write!(f, "{}{} {};", indent, display_joined(&to_modifiers(self.modifiers)), self.field);
     }
 }
 

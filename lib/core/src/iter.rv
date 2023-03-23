@@ -2,6 +2,13 @@ pub struct NumberIter<T> {
     pub last: T;
     pub end: T;
 
+    pub fn new<T>(start: T, end: T) -> NumberIter<T> {
+        return NumberIter {
+            last: start,
+            end: end
+        };
+    }
+
     pub fn next<T>(self: NumberIter<T>) -> T {
         return self.last;
     }

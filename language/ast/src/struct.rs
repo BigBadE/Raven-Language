@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use crate::{DisplayIndented, to_modifiers};
 use crate::code::MemberField;
-use crate::function::{display_joined};
+use crate::function::{display, display_joined};
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
@@ -35,7 +35,19 @@ impl Struct {
     }
 
     pub fn format(&self, indent: &str, f: &mut Formatter<'_>, type_manager: &dyn FinalizedTypeResolver) -> std::fmt::Result {
-        write!(f, "{} struct {} {{", display_joined(&to_modifiers(self.modifiers)), self.name)?;
+        write!(f, "{} struct {}", display_joined(&to_modifiers(self.modifiers)), self.name)?;
+
+        if !self.generics.is_empty() {
+            write!(f, "<")?;
+            for (name, bounds) in &self.generics {
+                write!(f, "{}", name)?;
+                if !bounds.is_empty() {
+                    write!(f, ": {}", display(bounds, " + "))?;
+                }
+            }
+            write!(f, ">")?;
+        }
+        write!(f, " {{")?;
         let deeper_indent = "    ".to_string() + indent;
         let deeper_indent = deeper_indent.as_str();
 
