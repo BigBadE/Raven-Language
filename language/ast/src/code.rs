@@ -10,33 +10,33 @@ use crate::types::ResolvableTypes;
 #[derive(Clone)]
 pub struct Expression {
     pub expression_type: ExpressionType,
-    pub effect: Effects
+    pub effect: Effects,
 }
 
 #[derive(Clone, Copy)]
 pub enum ExpressionType {
     Break,
     Return,
-    Line
+    Line,
 }
 
 #[derive(Clone)]
 pub struct Field {
     pub name: String,
-    pub field_type: ResolvableTypes
+    pub field_type: ResolvableTypes,
 }
 
 pub struct MemberField {
     pub modifiers: u8,
-    pub field: Field
+    pub field: Field,
 }
 
 impl MemberField {
     pub fn new(modifiers: u8, field: Field) -> Self {
         return Self {
             modifiers,
-            field
-        }
+            field,
+        };
     }
 }
 
@@ -50,8 +50,8 @@ impl Expression {
     pub fn new(expression_type: ExpressionType, effect: Effects) -> Self {
         return Self {
             expression_type,
-            effect
-        }
+            effect,
+        };
     }
 
     pub fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
@@ -67,7 +67,7 @@ impl Expression {
             true
         } else {
             self.effect.unwrap().is_return()
-        }
+        };
     }
 }
 
@@ -75,8 +75,8 @@ impl Field {
     pub fn new(name: String, field_type: ResolvableTypes) -> Self {
         return Self {
             name,
-            field_type
-        }
+            field_type,
+        };
     }
 
     pub fn set_generics(&self, replacing: &HashMap<String, ResolvableTypes>) -> Self {
@@ -146,7 +146,7 @@ pub enum Effects {
     FloatEffect(Box<NumberEffect<f64>>),
     IntegerEffect(Box<NumberEffect<i64>>),
     AssignVariable(Box<AssignVariable>),
-    OperatorEffect(Box<OperatorEffect>)
+    OperatorEffect(Box<OperatorEffect>),
 }
 
 impl Effects {
@@ -202,10 +202,10 @@ impl DisplayIndented for Effects {
                 write!(f, "(")?;
                 effect.format(indent, f)?;
                 write!(f, ")")
-            },
+            }
             Effects::NOP() => write!(f, "{{}}"),
             _ => self.unwrap().format(indent, f)
-        }
+        };
     }
 }
 
@@ -213,7 +213,7 @@ impl DisplayIndented for Effects {
 pub struct FieldLoad {
     pub calling: Effects,
     pub name: String,
-    loc: (u32, u32)
+    loc: (u32, u32),
 }
 
 impl FieldLoad {
@@ -221,8 +221,8 @@ impl FieldLoad {
         return Self {
             calling,
             name,
-            loc
-        }
+            loc,
+        };
     }
 }
 
@@ -270,7 +270,7 @@ pub struct MethodCall {
     pub method: String,
     pub method_return: Option<ResolvableTypes>,
     pub arguments: Arguments,
-    location: (u32, u32)
+    location: (u32, u32),
 }
 
 impl MethodCall {
@@ -280,7 +280,7 @@ impl MethodCall {
             method,
             method_return: None,
             arguments,
-            location
+            location,
         };
     }
 }
@@ -295,12 +295,24 @@ impl Effect for MethodCall {
     }
 
     fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
+        self.arguments.finalize(type_resolver);
+
+        let mut method = self.method.clone();
+
         if self.calling.is_some() {
             self.calling.as_mut().unwrap().finalize(type_resolver);
+            let returned = self.calling.as_mut().unwrap().unwrap().return_type();
+            println!("Calling {}", returned.as_ref().map(|types| types.to_string()).unwrap_or("None".to_string()));
+            for func in &returned.as_ref().unwrap().unwrap().structure.functions {
+                println!("Testing {}", func);
+                if func.split("::").last().unwrap() == method {
+                    method = func.clone();
+                    break
+                }
+            }
         }
 
-        self.arguments.finalize(type_resolver);
-        self.method_return = match type_resolver.get_function(&self.method) {
+        self.method_return = match type_resolver.get_function(&method) {
             Some(func) => if func.generics.is_empty() {
                 func.return_type.clone()
             } else {
@@ -321,7 +333,7 @@ impl Effect for MethodCall {
     }
 
     fn get_location(&self) -> (u32, u32) {
-        return self.location
+        return self.location;
     }
 
     fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
@@ -351,7 +363,7 @@ pub struct CreateStruct {
     pub structure: ResolvableTypes,
     pub parsed_effects: Option<Vec<(usize, Effects)>>,
     pub effects: Option<Vec<(String, Effects)>>,
-    location: (u32, u32)
+    location: (u32, u32),
 }
 
 impl CreateStruct {
@@ -360,8 +372,8 @@ impl CreateStruct {
             structure,
             parsed_effects: None,
             effects: Some(effects),
-            location
-        }
+            location,
+        };
     }
 }
 
@@ -390,7 +402,7 @@ impl Effect for CreateStruct {
                 let field = fields.get(i).unwrap();
                 if field.field.name == name {
                     output.push((i, effect));
-                    break
+                    break;
                 }
             }
         }
@@ -430,7 +442,7 @@ impl DisplayIndented for CreateStruct {
                     DisplayIndented::format(effect, deepest_indent, f)?;
                     write!(f, "\n")?;
                 }
-            },
+            }
             None => {
                 for (loc, effect) in self.parsed_effects.as_ref().unwrap() {
                     write!(f, "{}{}: ", deeper_indent,
@@ -448,7 +460,7 @@ impl DisplayIndented for CreateStruct {
 pub struct VariableLoad {
     pub name: String,
     pub types: Option<ResolvableTypes>,
-    location: (u32, u32)
+    location: (u32, u32),
 }
 
 impl VariableLoad {
@@ -456,8 +468,8 @@ impl VariableLoad {
         return Self {
             name,
             types: None,
-            location
-        }
+            location,
+        };
     }
 }
 
@@ -498,17 +510,17 @@ impl DisplayIndented for VariableLoad {
 }
 
 #[derive(Clone)]
-pub struct NumberEffect<T> where T : Display + Typed {
+pub struct NumberEffect<T> where T: Display + Typed {
     pub return_type: ResolvableTypes,
-    pub number: T
+    pub number: T,
 }
 
-impl<T> NumberEffect<T> where T : Display + Typed {
+impl<T> NumberEffect<T> where T: Display + Typed {
     pub fn new(number: T) -> Self {
         return Self {
             return_type: T::get_type(),
-            number
-        }
+            number,
+        };
     }
 }
 
@@ -528,7 +540,7 @@ impl Typed for i64 {
     }
 }
 
-impl<T> Effect for NumberEffect<T> where T : Display + Typed {
+impl<T> Effect for NumberEffect<T> where T: Display + Typed {
     fn is_return(&self) -> bool {
         return false;
     }
@@ -554,7 +566,7 @@ impl<T> Effect for NumberEffect<T> where T : Display + Typed {
     }
 }
 
-impl<T> DisplayIndented for NumberEffect<T> where T : Display + Typed {
+impl<T> DisplayIndented for NumberEffect<T> where T: Display + Typed {
     fn format(&self, _indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "{}", self.number);
     }
@@ -564,7 +576,7 @@ impl<T> DisplayIndented for NumberEffect<T> where T : Display + Typed {
 pub struct AssignVariable {
     pub variable: String,
     pub effect: Effects,
-    location: (u32, u32)
+    location: (u32, u32),
 }
 
 impl AssignVariable {
@@ -572,8 +584,8 @@ impl AssignVariable {
         return Self {
             variable,
             effect,
-            location
-        }
+            location,
+        };
     }
 }
 
@@ -618,7 +630,7 @@ pub struct OperatorEffect {
     pub priority: i8,
     pub parse_left: bool,
     return_type: Option<ResolvableTypes>,
-    location: (u32, u32)
+    location: (u32, u32),
 }
 
 impl OperatorEffect {
@@ -630,8 +642,8 @@ impl OperatorEffect {
             priority: -100,
             parse_left: false,
             return_type: None,
-            location
-        }
+            location,
+        };
     }
 }
 
@@ -674,7 +686,7 @@ impl Effect for OperatorEffect {
     }
 
     fn get_location(&self) -> (u32, u32) {
-        return self.location
+        return self.location;
     }
 
     fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
@@ -702,7 +714,7 @@ impl DisplayIndented for OperatorEffect {
                 effects.next().unwrap().format(indent, f)?;
             } else if char == '{' {
                 skipping = true;
-            }  else {
+            } else {
                 write!(f, "{}", char)?;
             }
         }

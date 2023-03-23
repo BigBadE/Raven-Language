@@ -101,7 +101,6 @@ pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo)
             break
         }
     }
-    parsing.index += 1;
     return Arguments::new(output);
 }
 
