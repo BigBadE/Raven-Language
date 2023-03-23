@@ -308,7 +308,17 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
                         Some(found) => *resolving = ResolvableTypes::Resolved(found.clone()),
                         None => match self.func_types.get(name) {
                             Some((temp_type, _)) => *resolving = ResolvableTypes::Resolved(temp_type.clone()),
-                            None => panic!("Unknown type {}!", name)
+                            None => match self.generic_types.get(name.split("<").next().unwrap()) {
+                                Some(generic) => {
+                                    panic!("Test!");
+                                }
+                                None => {
+                                    for generic in self.generic_types.keys() {
+                                        println!("Found {}", generic);
+                                    }
+                                    panic!("Unknown type {}!", name)
+                                }
+                            }
                         }
                     }
                 }
