@@ -50,10 +50,24 @@ impl Function {
     pub fn extract_generics(&self, calling: &Vec<ResolvableTypes>) -> HashMap<String, ResolvableTypes> {
         let mut output = HashMap::new();
         for i in 0..calling.len() {
+            let target = (*calling.get(i).unwrap()).clone();
             if let ResolvableTypes::Resolving(name) = &self.fields.get(i).unwrap().field_type {
+                if name.contains("<") {
+                    let generics = &name[name.split("<").next().unwrap().len()+1..name.len()-1];
+                    'outer: for generic in generics.split(",") {
+                        let generic = generic.replace(" ", "");
+                        let name = generic.split(":").next().unwrap();
+                        for (found, types) in &target.unwrap().structure.resolved_generics {
+                            if found == name {
+                                output.insert(name.to_string(), types.clone());
+                                continue 'outer;
+                            }
+                        }
+                        panic!("Failed to resolve generic type for {} in {}", name, target.unwrap().structure.name);
+                    }
+                }
                 if self.generics.contains_key(name) {
                     let bounds = self.generics.get(name).unwrap();
-                    let target = (*calling.get(i).unwrap()).clone();
                     for bound in bounds {
                         if !target.unwrap().is_type(bound.unwrap()) {
                             panic!("Generic {} isn't of type {}!", target, bound);

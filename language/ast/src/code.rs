@@ -315,14 +315,19 @@ impl Effect for MethodCall {
             Some(func) => if func.generics.is_empty() {
                 func.return_type.clone()
             } else {
-                let func = type_resolver.solidify_generics(&self.method, func.extract_generics(
-                    &self.arguments.arguments.iter().map(|arg| arg.unwrap().return_type().unwrap()).collect()
-                ));
+                let mut arguments: Vec<ResolvableTypes> = self.arguments.arguments.iter()
+                    .map(|arg| arg.unwrap().return_type().unwrap()).collect();
+
+                if self.calling.is_some() {
+                    arguments.insert(0, self.calling.as_ref().unwrap().unwrap().return_type().unwrap())
+                }
+
+                let func = type_resolver.solidify_generics(&method, func.extract_generics(&arguments));
                 self.method = func.name.clone();
                 func.return_type.clone()
             },
             None => {
-                panic!("No method named {}!", self.method)
+                panic!("No method named {}!", method)
             }
         };
     }

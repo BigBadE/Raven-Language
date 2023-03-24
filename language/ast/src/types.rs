@@ -26,7 +26,7 @@ impl ResolvableTypes {
                     *self = found.clone()
                 },
                 None => {
-                    match type_resolver.get_generic_struct(name) {
+                    match type_resolver.get_generic_struct(&name.split("<").next().unwrap().to_string()) {
                         Some(generic_struct) => {
                             self.finalize(type_resolver);
                         },

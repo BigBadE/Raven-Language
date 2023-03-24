@@ -10,6 +10,7 @@ use crate::types::ResolvableTypes;
 pub struct Struct {
     pub modifiers: u8,
     pub generics: Vec<(String, Vec<ResolvableTypes>)>,
+    pub resolved_generics: Vec<(String, ResolvableTypes)>,
     pub fields: Option<Vec<MemberField>>,
     pub functions: Vec<String>,
     pub name: String
@@ -21,6 +22,7 @@ impl Struct {
         return Self {
             modifiers,
             generics,
+            resolved_generics: Vec::new(),
             fields,
             functions,
             name
@@ -51,18 +53,23 @@ impl Struct {
             values.insert(name.clone(), testing.clone());
         }
 
-        let returning = self.clone();
-        if let Some(fields) = &self.fields {
+        let mut returning = self.clone();
+        returning.name = self.get_mangled_name(&generics.iter().map(|generic| generic.name().clone()).collect()).clone();
+        if let Some(fields) = &returning.fields {
             for field in fields {
                 field.field.set_generics(type_resolver, &values);
             }
         }
-
+        for i in 0..returning.generics.len() {
+            returning.resolved_generics.push(
+                (returning.generics.get(i).unwrap().0.clone(), generics.get(i).unwrap().clone()));
+        }
+        returning.generics = Vec::new();
         return returning;
     }
 
     pub fn get_mangled_name(&self, generics: &Vec<String>) -> String {
-        return self.name.clone() + &display_parenless(generics, "_");
+        return self.name.clone() + "_" + &display_parenless(generics, "_");
     }
 
     pub fn format(&self, indent: &str, f: &mut Formatter<'_>, type_manager: &dyn FinalizedTypeResolver) -> std::fmt::Result {

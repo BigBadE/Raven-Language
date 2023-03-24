@@ -8,4 +8,8 @@ pub struct NumberIter<T> {
             end: end
         };
     }
+
+    pub fn next<T>(self: iter::NumberIter<T>) -> T {
+        return self.last;
+    }
 }

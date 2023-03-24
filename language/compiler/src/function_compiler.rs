@@ -150,7 +150,6 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
         Effects::CreateStruct(effect) => {
             let types = effect.structure.unwrap();
 
-
             let mut arguments = vec![MaybeUninit::uninit(); effect.parsed_effects.as_ref().unwrap().len()];
 
             //VTable

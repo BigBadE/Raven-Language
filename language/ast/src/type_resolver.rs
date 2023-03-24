@@ -17,7 +17,7 @@ pub trait TypeResolver {
 pub trait FinalizedTypeResolver {
     fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function;
 
-    fn finalize(&self, resolving: &mut ResolvableTypes);
+    fn finalize(&mut self, resolving: &mut ResolvableTypes);
 
     fn finalize_func(&mut self, function: &mut Function);
 

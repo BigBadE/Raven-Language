@@ -52,7 +52,7 @@ impl ParserTypeResolver {
         //Setup vtables
         for types in finalized.types.values() {
             if !types.structure.generics.is_empty() {
-                continue
+                continue;
             }
             let (_llvm_type, vtable) = unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }.get_mut(types).unwrap();
             let functions = types.structure.functions.iter()
@@ -92,7 +92,6 @@ pub fn compile_llvm_type<'a, 'ctx>(context: &'ctx Context, module: &Module<'ctx>
         //Give it a temp vtable
         unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }
             .insert(types.clone(), (opaque_type.as_basic_type_enum(), module.add_global(context.i64_type(), None, &types.name)));
-
         let mut llvm_fields = vec!(context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
 
         for field in types.get_fields() {
@@ -193,7 +192,7 @@ pub struct CompilerTypeResolver<'a, 'ctx> {
     pub operations: Rc<HashMap<String, Vec<String>>>,
     pub generics: Rc<HashMap<String, Function>>,
     pub generic_types: Rc<HashMap<String, Rc<Types>>>,
-    pub func_types: HashMap<String, (Rc<Types>, BasicTypeEnum<'ctx>)>,
+    pub func_types: HashMap<String, ResolvableTypes>,
     pub variables: HashMap<String, (Rc<Types>, BasicValueEnum<'ctx>)>,
 }
 
@@ -215,10 +214,18 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
         };
     }
 
+    fn add_type(&mut self, original: &Rc<Types>, types: Struct) -> Rc<Types> {
+        let output = Rc::new(Types::new_struct(types, original.parent.clone(), original.traits.clone()));
+        unsafe { Rc::get_mut_unchecked(&mut self.types) }.insert(output.name.clone(), output.clone());
+        //All is empty because all dependencies of this structure are already compiled
+        compile_llvm_type(self.context, self.module, &output, &mut Vec::new(), self);
+        return output;
+    }
+
     pub fn get_llvm_type(&self, types: &Rc<Types>) -> &BasicTypeEnum<'ctx> {
         return match self.llvm_types.get(types) {
             Some(llvm_type) => &llvm_type.0,
-            None => return &self.func_types.get(&types.name).unwrap().1
+            None => panic!("Failed to get LLVM type!")
         };
     }
 
@@ -292,27 +299,30 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
         {
             let temp = self.generics.clone();
             let func = &temp.get(function).unwrap();
+            self.func_types = generics.clone();
             output = func.set_generics(self, &generics);
         }
 
         output.finalize(self);
+        self.func_types.clear();
         let name = output.name.clone();
         let func_val = get_func_value(&output, &self.module, self.context, &self.llvm_types);
         unsafe { Rc::get_mut_unchecked(&mut self.functions) }.insert(name.clone(), (output, func_val));
         return &self.functions.get(&name).unwrap().0;
     }
 
-    fn finalize(&self, resolving: &mut ResolvableTypes) {
+    fn finalize(&mut self, resolving: &mut ResolvableTypes) {
         match resolving {
             ResolvableTypes::Resolving(name) =>
                 {
                     match self.types.get(name) {
                         Some(found) => *resolving = ResolvableTypes::Resolved(found.clone()),
                         None => match self.func_types.get(name) {
-                            Some((temp_type, _)) => *resolving = ResolvableTypes::Resolved(temp_type.clone()),
+                            Some(temp_type) => *resolving = temp_type.clone(),
                             None => match self.generic_types.get(name.split("<").next().unwrap()) {
                                 Some(generic) => {
-                                    let generics: Vec<String> = name[generic.name.len()+1..name.len()-1].split(",")
+                                    let generic = generic.clone();
+                                    let generics: Vec<String> = name[generic.name.len() + 1..name.len() - 1].split(",")
                                         .map(|string| string.to_string()).collect();
                                     let name = generic.structure.get_mangled_name(&generics);
                                     if let Some(found) = self.types.get(&name) {
@@ -320,11 +330,13 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
                                         return;
                                     }
                                     let mut generics = generics.iter().map(
-                                        |generic| ResolvableTypes::Resolving(generic.to_string()));
-                                    for mut generic in &mut generics {
-                                        self.finalize(&mut generic);
+                                        |generic| ResolvableTypes::Resolving(generic.to_string())).collect();
+                                    for generic in &mut generics {
+                                        self.finalize(generic);
                                     }
 
+                                    let types = generic.structure.resolve_generics(self, generics);
+                                    *resolving = ResolvableTypes::Resolved(self.add_type(&generic, types));
                                 }
                                 None => {
                                     panic!("Unknown type {}!", name)
@@ -364,7 +376,8 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
     }
 
     fn get_operator(&self, effects: &Vec<Effects>, operator: String) -> Option<&Function> {
-        for operation in self.operations.get(&operator).unwrap() {
+        for operation in self.operations.get(&operator)
+            .expect(format!("Couldn't find operator {}", operator).as_str()) {
             let function: &Function = &self.functions.get(operation).as_ref().unwrap().0;
             if function.fields.len() != effects.len() {
                 continue;
@@ -399,8 +412,8 @@ pub fn get_func_value<'ctx>(function: &Function, module: &Module<'ctx>, context:
     if function.return_type.is_some() {
         let found_type = match llvm_types.get(&function.return_type.as_ref().unwrap().unwrap().clone()) {
             Some(llvm_type) => llvm_type.0,
-            //Generics get an opaque type
-            None => context.struct_type(&[], false).as_basic_type_enum()
+            None => panic!("Failed to find type! {} from {}", function.return_type.as_ref().unwrap().name(),
+                display(&llvm_types.keys().map(|key| key.structure.name.clone()).collect(), ", "))
         };
         if found_type.is_struct_type() {
             params.push(found_type.ptr_type(AddressSpace::default()).as_type_ref());
