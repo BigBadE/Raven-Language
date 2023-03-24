@@ -158,7 +158,7 @@ impl<'a> ParseInfo<'a> {
     }
 
     pub fn skip_line(&mut self) {
-        let line = self.line;
+        let line = self.line.clone();
         while line == self.line {
             match self.next_included() {
                 Some(_) => {},

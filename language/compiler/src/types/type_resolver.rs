@@ -17,6 +17,7 @@ use crate::internal::structs::get_internal_struct;
 
 #[derive(Clone)]
 pub struct ParserTypeResolver {
+    pub imports: Rc<HashMap<String, HashMap<String, String>>>,
     pub types: Rc<HashMap<String, Rc<Types>>>,
     pub functions: Rc<HashMap<String, Function>>,
     pub operations: Rc<HashMap<String, Vec<String>>>,
@@ -25,6 +26,7 @@ pub struct ParserTypeResolver {
 impl ParserTypeResolver {
     pub fn new() -> Self {
         return Self {
+            imports: Rc::new(HashMap::new()),
             types: Rc::new(HashMap::new()),
             functions: Rc::new(HashMap::new()),
             operations: Rc::new(HashMap::new()),
@@ -32,7 +34,8 @@ impl ParserTypeResolver {
     }
 
     pub fn finalize<'a, 'ctx>(self, context: &'ctx Context, module: &'a Module<'ctx>) -> CompilerTypeResolver<'a, 'ctx> {
-        let mut finalized = CompilerTypeResolver::new(context, module, self.operations.clone());
+        let mut finalized = CompilerTypeResolver::new(context, module,
+                                                      self.operations.clone(), self.imports.clone());
 
         //Compile types
         let types = Rc::try_unwrap(self.types).unwrap();
@@ -160,6 +163,20 @@ pub fn compile<'a, 'ctx>(context: &'ctx Context, types: &Rc<Types>, all: &mut Ve
 }
 
 impl TypeResolver for ParserTypeResolver {
+    fn add_import(&mut self, file: &String, importing: String) {
+        let mut temp = unsafe { Rc::get_mut_unchecked(&mut self.imports) };
+        match temp.get_mut(file) {
+            Some(found) => {
+                found.insert(importing.split(":").last().unwrap().to_string(), importing);
+            }
+            None => {
+                let mut imports = HashMap::new();
+                imports.insert(importing.split(":").last().unwrap().to_string(), importing);
+                temp.insert(file.clone(), imports);
+            }
+        }
+    }
+
     fn add_type(&mut self, adding_types: Rc<Types>) {
         unsafe { Rc::get_mut_unchecked(&mut self.types) }.insert(adding_types.name.clone(), adding_types);
     }
@@ -194,10 +211,13 @@ pub struct CompilerTypeResolver<'a, 'ctx> {
     pub generic_types: Rc<HashMap<String, Rc<Types>>>,
     pub func_types: HashMap<String, ResolvableTypes>,
     pub variables: HashMap<String, (Rc<Types>, BasicValueEnum<'ctx>)>,
+    pub imports: Rc<HashMap<String, HashMap<String, String>>>,
+    pub current_file: Option<String>
 }
 
 impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
-    pub fn new(context: &'ctx Context, module: &'a Module<'ctx>, operations: Rc<HashMap<String, Vec<String>>>) -> Self {
+    pub fn new(context: &'ctx Context, module: &'a Module<'ctx>, operations: Rc<HashMap<String, Vec<String>>>,
+               imports: Rc<HashMap<String, HashMap<String, String>>>) -> Self {
         let llvm_types = HashMap::new();
 
         return Self {
@@ -211,6 +231,8 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
             generic_types: Rc::new(HashMap::new()),
             func_types: HashMap::new(),
             variables: HashMap::new(),
+            imports,
+            current_file: None
         };
     }
 
@@ -294,6 +316,14 @@ impl<'a, 'ctx> Display for CompilerTypeResolver<'a, 'ctx> {
 }
 
 impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
+    fn start_file(&mut self, name: String) {
+        self.current_file = Some(name);
+    }
+
+    fn get_import(&self, name: &String) -> Option<&String> {
+        return self.imports.get(self.current_file.as_ref().unwrap()).unwrap().get(name);
+    }
+
     fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function {
         let mut output;
         {
@@ -401,9 +431,25 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
     }
 
     fn get_function(&self, name: &String) -> Option<&Function> {
-        return match self.functions.get(name) {
-            Some(found) => Some(&found.0),
-            None => self.generics.get(name)
+        let function = name.split("::").last().unwrap();
+        if function.len() == name.len() {
+            return self.generics.get(name);
+        }
+
+        let parent = &name[0..name.len()-function.len()-2].to_string();
+        return if parent.contains(":") {
+            self.functions.get(name).map(|found| &found.0)
+        } else {
+            match self.get_import(parent) {
+                Some(import) => {
+                    let name = (import.clone() + "::" + function);
+                    match self.functions.get(&name) {
+                        Some(found) => Some(&found.0),
+                        None => self.generics.get(&name)
+                    }
+                },
+                None => panic!("Type {} isn't imported!", parent)
+            }
         };
     }
 }
@@ -418,7 +464,7 @@ pub fn get_func_value<'ctx>(function: &Function, module: &Module<'ctx>, context:
         let found_type = match llvm_types.get(&function.return_type.as_ref().unwrap().unwrap().clone()) {
             Some(llvm_type) => llvm_type.0,
             None => panic!("Failed to find type! {} from {}", function.return_type.as_ref().unwrap().name(),
-                display(&llvm_types.keys().map(|key| key.structure.name.clone()).collect(), ", "))
+                           display(&llvm_types.keys().map(|key| key.structure.name.clone()).collect(), ", "))
         };
         if found_type.is_struct_type() {
             params.push(found_type.ptr_type(AddressSpace::default()).as_type_ref());

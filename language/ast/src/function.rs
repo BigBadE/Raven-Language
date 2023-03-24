@@ -87,6 +87,8 @@ impl Function {
     }
 
     pub fn finalize_code(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
+        let split: Vec<&str> = self.name.split("::").collect();
+        type_manager.start_file(split.get(split.len()-2).unwrap().to_string());
         type_manager.finalize_code(&self.name);
     }
 

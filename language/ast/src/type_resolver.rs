@@ -5,6 +5,8 @@ use crate::function::Function;
 use crate::types::{ResolvableTypes, Types};
 
 pub trait TypeResolver {
+    fn add_import(&mut self, file: &String, importing: String);
+
     fn add_type(&mut self, types: Rc<Types>);
 
     fn add_function(&mut self, function: Function);
@@ -15,6 +17,10 @@ pub trait TypeResolver {
 }
 
 pub trait FinalizedTypeResolver {
+    fn start_file(&mut self, name: String);
+
+    fn get_import(&self, name: &String) -> Option<&String>;
+
     fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function;
 
     fn finalize(&mut self, resolving: &mut ResolvableTypes);

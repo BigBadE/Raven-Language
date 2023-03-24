@@ -6,7 +6,7 @@ use ast::code::{Field, MemberField};
 use ast::r#struct::Struct;
 use ast::type_resolver::TypeResolver;
 use ast::types::{ResolvableTypes, Types};
-use crate::literal::parse_ident;
+use crate::literal::{parse_ident, parse_with_references};
 use crate::parser::ParseInfo;
 use crate::util::{find_if_first, parse_code_block, parse_fields, parse_generics, parse_generics_vec};
 
@@ -16,12 +16,18 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
         parsing.index -= 1;
         let attributes = parse_attributes(parsing, false);
         let modifiers = get_modifier(parse_modifiers(parsing).as_slice());
-        if parsing.matching("struct") {
+
+        if parsing.matching("import") {
+            let importing = parse_with_references(parsing);
+            type_manager.add_import(&name, importing.replace(" ", ""));
+            if !parsing.matching(";") {
+                parsing.create_error("Missing semicolon!".to_string());
+            }
+        } else if parsing.matching("struct") {
             match parse_struct_type(type_manager, name, modifiers, parsing) {
                 Some(struct_type) => type_manager.add_type(Rc::new(struct_type)),
                 None => {}
             };
-            continue;
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
             match parse_function(type_manager, None, name, attributes, modifiers, parsing) {
                 Some(function) => {
@@ -33,17 +39,16 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
                 }
                 None => {}
             };
-            continue;
-        }
-
-        //Only error once for a big block of issues.
-        if parsing.errors.last().is_none() || !parsing.errors.last().unwrap().error.starts_with("Unknown element") {
-            let mut temp = parsing.clone();
-            temp.skip_line();
-            parsing.create_error(format!("Unknown element: {}",
-                                         String::from_utf8_lossy(&parsing.buffer[parsing.index..temp.index])));
         } else {
-            parsing.skip_line();
+            //Only error once for a big block of issues.
+            if parsing.errors.last().is_none() || !parsing.errors.last().unwrap().error.starts_with("Unknown element") {
+                let mut temp = parsing.clone();
+                temp.skip_line();
+                parsing.create_error(format!("Unknown element: {}",
+                                             String::from_utf8_lossy(&parsing.buffer[parsing.index..temp.index - 1])));
+            } else {
+                parsing.skip_line();
+            }
         }
     }
 }

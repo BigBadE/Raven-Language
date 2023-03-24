@@ -106,6 +106,10 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
 
+                if effect.calling.is_some() {
+                    arguments.push(From::from(compile_effect(compiler, block, calling, variables, effect.calling.as_ref().unwrap(), id).unwrap()));
+                }
+
                 for argument in &effect.arguments.arguments {
                     arguments.push(From::from(compile_effect(compiler, block, calling, variables, argument, id).unwrap()))
                 }
@@ -114,6 +118,10 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                 compiler.builder.build_call(calling, arguments.as_slice(), &(*id - 1).to_string());
                 Some(pointer.as_basic_value_enum())
             } else {
+                if effect.calling.is_some() {
+                    arguments.push(From::from(compile_effect(compiler, block, calling, variables, effect.calling.as_ref().unwrap(), id).unwrap()));
+                }
+
                 for argument in &effect.arguments.arguments {
                     arguments.push(From::from(compile_effect(compiler, block, calling, variables, argument, id).unwrap()))
                 }
@@ -177,7 +185,6 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                 compiler.builder.build_store(pointer, effect);
                 offset += 1;
             }
-            println!("Yep!");
 
             Some(pointer.as_basic_value_enum())
         }
