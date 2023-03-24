@@ -1,22 +1,36 @@
 use std::collections::HashMap;
+
 use ast::code::{Effects, Field};
 use ast::function::{Arguments, CodeBody};
 use ast::type_resolver::TypeResolver;
 use ast::types::ResolvableTypes;
+
 use crate::code::{parse_effect, parse_expression};
 use crate::parser::ParseInfo;
 
-pub fn parse_fields<'a>(parent: Option<String>, parsing: &mut ParseInfo) -> Option<Vec<Field>> {
+pub fn parse_fields(parent: Option<String>, parsing: &mut ParseInfo) -> Option<Vec<Field>> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
     while let Some(found) = find_if_first(parsing, b',', b')') {
-        output.push(parse_field(&parent, found, &mut info)?);
+        output.push(match parse_field(&parent, found, &mut info) {
+            Some(found) => found,
+            None => {
+                parsing.create_error(info.errors.get(0).unwrap().error.clone());
+                return None;
+            }
+        });
         info = parsing.clone();
     }
 
     if let Some(found) = parsing.parse_to(b')') {
         if !found.is_empty() {
-            output.push(parse_field(&parent, found, &mut info)?)
+            output.push(match parse_field(&parent, found, &mut info) {
+                Some(found) => found,
+                None => {
+                    parsing.create_error(info.errors.get(0).unwrap().error.clone());
+                    return None;
+                }
+            })
         }
     }
 
@@ -25,15 +39,17 @@ pub fn parse_fields<'a>(parent: Option<String>, parsing: &mut ParseInfo) -> Opti
 
 pub fn parse_struct_fields() {}
 
-fn parse_field<'a>(parent: &Option<String>, string: String, parser: &mut ParseInfo) -> Option<Field> {
-    let parts: Vec<&str> = string.split(':').collect();
-    if parts.len() != 2 {
-        parser.create_error("Missing or unexpected colon in field.".to_string());
+fn parse_field(parent: &Option<String>, string: String, parser: &mut ParseInfo) -> Option<Field> {
+    let mut parts = string.split(':');
+    let name = parts.next().unwrap();
+    if name.len() == string.len() {
+        parser.create_error("Missing type for field.".to_string());
         return None;
     }
 
-    if parts.get(1).unwrap().contains(")") {
-        if parts.get(0).unwrap() == &"self" {
+    let body = &string[name.len()+1..].to_string().replace(" ", "");
+    if body.contains(")") {
+        if name == "self" {
             match parent {
                 Some(parent) => return Some(Field::new("self".to_string(), ResolvableTypes::Resolving(parent.clone()))),
                 None => parser.create_error("Cannot have self outside of struct!".to_string())
@@ -43,7 +59,7 @@ fn parse_field<'a>(parent: &Option<String>, string: String, parser: &mut ParseIn
         }
         return None;
     }
-    return Some(Field::new(parts[0].to_string(), ResolvableTypes::Resolving(parts[1].to_string())));
+    return Some(Field::new(name.to_string(), ResolvableTypes::Resolving(body.to_string())));
 }
 
 pub fn parse_code_block(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<CodeBody> {
@@ -93,12 +109,12 @@ pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo)
     if parsing.buffer[parsing.index] == b')' {
         return Arguments::new(output);
     }
-    while parsing.buffer[parsing.index-1] != b')' {
+    while parsing.buffer[parsing.index - 1] != b')' {
         if let Some(effect) = parse_effect(type_manager, parsing, &[b',', b')']) {
             output.push(effect);
         } else {
             parsing.create_error("Missing effect!".to_string());
-            break
+            break;
         }
     }
     return Arguments::new(output);
@@ -140,17 +156,31 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
 
 pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Vec<ResolvableTypes>>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
-        parse_generic(value, generics);
+        let (name, val) = parse_generic(value);
+        generics.insert(name, val);
     }
 
     if let Some(value) = parsing.parse_to(b'>') {
-        parse_generic(value, generics);
+        let (name, val) = parse_generic(value);
+        generics.insert(name, val);
     } else {
         panic!("Expected generic!");
     }
 }
 
-pub fn parse_generic(value: String, generics: &mut HashMap<String, Vec<ResolvableTypes>>) {
+pub fn parse_generics_vec(parsing: &mut ParseInfo, generics: &mut Vec<(String, Vec<ResolvableTypes>)>) {
+    while let Some(value) = find_if_first(parsing, b',', b'>') {
+        generics.push(parse_generic(value));
+    }
+
+    if let Some(value) = parsing.parse_to(b'>') {
+        generics.push(parse_generic(value));
+    } else {
+        panic!("Expected generic!");
+    }
+}
+
+pub fn parse_generic(value: String) -> (String, Vec<ResolvableTypes>) {
     let mut split = value.split(':');
     let name = split.next().unwrap();
     let mut found = Vec::new();
@@ -160,8 +190,8 @@ pub fn parse_generic(value: String, generics: &mut HashMap<String, Vec<Resolvabl
             while let Some(constraint) = constraints.next() {
                 found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
             }
-        },
+        }
         None => {}
     }
-    generics.insert(name.to_string(), found);
+    return (name.to_string(), found);
 }

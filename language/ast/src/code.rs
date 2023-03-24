@@ -26,6 +26,7 @@ pub struct Field {
     pub field_type: ResolvableTypes,
 }
 
+#[derive(Clone)]
 pub struct MemberField {
     pub modifiers: u8,
     pub field: Field,

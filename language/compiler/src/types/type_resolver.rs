@@ -310,12 +310,21 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
                             Some((temp_type, _)) => *resolving = ResolvableTypes::Resolved(temp_type.clone()),
                             None => match self.generic_types.get(name.split("<").next().unwrap()) {
                                 Some(generic) => {
-                                    panic!("Test!");
+                                    let generics: Vec<String> = name[generic.name.len()+1..name.len()-1].split(",")
+                                        .map(|string| string.to_string()).collect();
+                                    let name = generic.structure.get_mangled_name(&generics);
+                                    if let Some(found) = self.types.get(&name) {
+                                        *resolving = ResolvableTypes::Resolved(found.clone());
+                                        return;
+                                    }
+                                    let mut generics = generics.iter().map(
+                                        |generic| ResolvableTypes::Resolving(generic.to_string()));
+                                    for mut generic in &mut generics {
+                                        self.finalize(&mut generic);
+                                    }
+
                                 }
                                 None => {
-                                    for generic in self.generic_types.keys() {
-                                        println!("Found {}", generic);
-                                    }
                                     panic!("Unknown type {}!", name)
                                 }
                             }

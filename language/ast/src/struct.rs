@@ -2,20 +2,21 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use crate::{DisplayIndented, to_modifiers};
 use crate::code::MemberField;
-use crate::function::{display, display_joined};
+use crate::function::{display, display_joined, display_parenless};
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
+#[derive(Clone)]
 pub struct Struct {
     pub modifiers: u8,
-    pub generics: HashMap<String, Vec<ResolvableTypes>>,
+    pub generics: Vec<(String, Vec<ResolvableTypes>)>,
     pub fields: Option<Vec<MemberField>>,
     pub functions: Vec<String>,
     pub name: String
 }
 
 impl Struct {
-    pub fn new(fields: Option<Vec<MemberField>>, generics: HashMap<String, Vec<ResolvableTypes>>,
+    pub fn new(fields: Option<Vec<MemberField>>, generics: Vec<(String, Vec<ResolvableTypes>)>,
                functions: Vec<String>, modifiers: u8, name: String) -> Self {
         return Self {
             modifiers,
@@ -32,6 +33,36 @@ impl Struct {
                 field.field.finalize(type_resolver);
             }
         }
+    }
+
+    pub fn resolve_generics(&self, generics: Vec<ResolvableTypes>) -> Self {
+        if generics.len() != self.generics.len() {
+            panic!("Missing correct amount of generics for generic function!");
+        }
+        let mut values = HashMap::new();
+        for i in 0..generics.len() {
+            let (name, bounds) = self.generics.get(i).unwrap();
+            let testing = generics.get(i).unwrap();
+            for bound in bounds {
+                if !testing.unwrap().is_type(bound.unwrap()) {
+                    panic!("Expected {} to be of type {}", testing, bound);
+                }
+            }
+            values.insert(name.clone(), testing.clone());
+        }
+
+        let returning = self.clone();
+        if let Some(fields) = &self.fields {
+            for field in fields {
+                field.field.set_generics(&values);
+            }
+        }
+
+        return returning;
+    }
+
+    pub fn get_mangled_name(&self, generics: &Vec<String>) -> String {
+        return self.name.clone() + &display_parenless(generics, "_");
     }
 
     pub fn format(&self, indent: &str, f: &mut Formatter<'_>, type_manager: &dyn FinalizedTypeResolver) -> std::fmt::Result {

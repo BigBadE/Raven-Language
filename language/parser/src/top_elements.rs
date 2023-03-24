@@ -8,7 +8,7 @@ use ast::type_resolver::TypeResolver;
 use ast::types::{ResolvableTypes, Types};
 use crate::literal::parse_ident;
 use crate::parser::ParseInfo;
-use crate::util::{find_if_first, parse_code_block, parse_fields, parse_generics};
+use crate::util::{find_if_first, parse_code_block, parse_fields, parse_generics, parse_generics_vec};
 
 pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
                           name: &String, parsing: &mut ParseInfo) {
@@ -51,12 +51,12 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
 fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                      modifiers: u8, parsing: &mut ParseInfo) -> Option<Types> {
     let mut fn_name;
-    let mut generics = HashMap::new();
+    let mut generics = Vec::new();
     if let Some(temp_name) = find_if_first(parsing, b'<', b'{') {
         fn_name = temp_name;
 
         parsing.matching("<");
-        parse_generics(parsing, &mut generics);
+        parse_generics_vec(parsing, &mut generics);
     } else {
         fn_name = match parsing.parse_to(b'{') {
             Some(name) => name.clone(),
