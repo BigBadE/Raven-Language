@@ -6,7 +6,7 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicType;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use ast::code::{Effect, Effects, ExpressionType};
-use ast::function::{CodeBody, Function};
+use ast::function::{CodeBody, display, Function};
 use ast::{is_modifier, Modifier};
 use crate::compiler::Compiler;
 use crate::internal::instructions::compile_internal;
@@ -157,9 +157,9 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
 
             for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
                 let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
-                arguments.remove(*index + 1);
+                arguments.remove(*index);
                 let found_size = effect.unwrap().return_type().unwrap().unwrap().size;
-                arguments.insert(*index + 1, MaybeUninit::new((returned, found_size)));
+                arguments.insert(*index, MaybeUninit::new((returned, found_size)));
             }
 
             let (structure, global_value) = variables.llvm_types.get(types).unwrap();

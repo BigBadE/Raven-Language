@@ -57,6 +57,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
 
         parsing.matching("<");
         parse_generics_vec(parsing, &mut generics);
+        parsing.matching("{");
     } else {
         fn_name = match parsing.parse_to(b'{') {
             Some(name) => name.clone(),

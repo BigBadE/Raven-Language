@@ -106,7 +106,7 @@ pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<S
 
 pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Arguments {
     let mut output = Vec::new();
-    if parsing.buffer[parsing.index] == b')' {
+    if parsing.matching(")") {
         return Arguments::new(output);
     }
     while parsing.buffer[parsing.index - 1] != b')' {

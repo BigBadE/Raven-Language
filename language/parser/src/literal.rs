@@ -76,6 +76,7 @@ pub fn parse_ident(parsing: &mut ParseInfo) -> String {
 
 pub fn parse_with_references(parsing: &mut ParseInfo) -> String {
     let start = parsing.index;
+    let mut awaiting_generic = None;
     loop {
         parsing.index += 1;
         if parsing.index == parsing.len {
@@ -85,10 +86,19 @@ pub fn parse_with_references(parsing: &mut ParseInfo) -> String {
         match parsing.buffer[parsing.index] {
             b'a'..=b'z' => {},
             b'A'..=b'Z' => {},
+            b'<' => awaiting_generic = Some(parsing.clone()),
+            b'>' => {
+                awaiting_generic = None;
+                parsing.index += 1;
+                break
+            }
             b':' => {},
             _ => break
         }
     }
 
+    if let Some(found) = awaiting_generic {
+        *parsing = found;
+    }
     return String::from_utf8_lossy(&parsing.buffer[start..parsing.index]).to_string();
 }

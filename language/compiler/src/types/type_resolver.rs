@@ -303,11 +303,16 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
             output = func.set_generics(self, &generics);
         }
 
+        output.generics.clear();
         output.finalize(self);
-        self.func_types.clear();
+
         let name = output.name.clone();
         let func_val = get_func_value(&output, &self.module, self.context, &self.llvm_types);
         unsafe { Rc::get_mut_unchecked(&mut self.functions) }.insert(name.clone(), (output, func_val));
+
+        unsafe { Rc::get_mut_unchecked(&mut self.functions.clone()) }.get_mut(&name).unwrap().0.finalize_code(self);
+        self.func_types.clear();
+
         return &self.functions.get(&name).unwrap().0;
     }
 
