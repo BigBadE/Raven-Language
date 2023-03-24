@@ -54,6 +54,7 @@ impl<'ctx> Compiler<'ctx> {
             compile_function(function, &self, &type_manager);
         }
 
+        println!("Running!");
         match type_manager.functions.get("main::main") {
             Some(_main) => {
                 let function = unsafe { self.execution_engine.get_function("main::main") };

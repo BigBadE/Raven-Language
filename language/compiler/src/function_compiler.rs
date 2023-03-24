@@ -157,9 +157,9 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
 
             for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
                 let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
-                arguments.remove(*index);
+                arguments.remove(*index+1);
                 let found_size = effect.unwrap().return_type().unwrap().unwrap().size;
-                arguments.insert(*index, MaybeUninit::new((returned, found_size)));
+                arguments.insert(*index+1, MaybeUninit::new((returned, found_size)));
             }
 
             let (structure, global_value) = variables.llvm_types.get(types).unwrap();
@@ -177,6 +177,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                 compiler.builder.build_store(pointer, effect);
                 offset += 1;
             }
+            println!("Yep!");
 
             Some(pointer.as_basic_value_enum())
         }
