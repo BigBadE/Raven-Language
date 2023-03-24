@@ -35,7 +35,7 @@ impl Struct {
         }
     }
 
-    pub fn resolve_generics(&self, generics: Vec<ResolvableTypes>) -> Self {
+    pub fn resolve_generics(&self, type_resolver: &mut dyn FinalizedTypeResolver, generics: Vec<ResolvableTypes>) -> Self {
         if generics.len() != self.generics.len() {
             panic!("Missing correct amount of generics for generic function!");
         }
@@ -54,7 +54,7 @@ impl Struct {
         let returning = self.clone();
         if let Some(fields) = &self.fields {
             for field in fields {
-                field.field.set_generics(&values);
+                field.field.set_generics(type_resolver, &values);
             }
         }
 

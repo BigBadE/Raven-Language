@@ -29,15 +29,16 @@ impl Function {
         };
     }
 
-    pub fn set_generics(&self, replacing: &HashMap<String, ResolvableTypes>) -> Self {
+    pub fn set_generics(&self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) -> Self {
         let mut code = self.code.clone();
-        code.set_generics(&replacing);
+        code.set_generics(type_resolver, &replacing);
+
         let mut return_type = self.return_type.clone();
         if let Some(returning) = &mut return_type {
-            returning.set_generic(replacing);
+            returning.set_generic(type_resolver, replacing);
         }
         return Function::new(self.attributes.clone(), self.modifiers,
-                             self.fields.iter().map(|field| field.set_generics(&replacing)).collect(),
+                             self.fields.iter().map(|field| field.set_generics(type_resolver, &replacing)).collect(),
                              HashMap::new(), code, return_type,
         self.get_mangled_name(replacing));
     }
@@ -161,9 +162,9 @@ impl Effect for CodeBody {
         todo!()
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
         for expression in &mut self.expressions {
-            expression.set_generics(replacing);
+            expression.set_generics(type_resolver, replacing);
         }
     }
 }

@@ -19,11 +19,20 @@ impl ResolvableTypes {
         type_resolver.finalize(self);
     }
 
-    pub fn set_generic(&mut self, resolving: &HashMap<String, ResolvableTypes>) {
+    pub fn set_generic(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, resolving: &HashMap<String, ResolvableTypes>) {
         if let ResolvableTypes::Resolving(name) = self {
             match resolving.get(name) {
-                Some(found) => *self = found.clone(),
-                None => {}
+                Some(found) => {
+                    *self = found.clone()
+                },
+                None => {
+                    match type_resolver.get_generic_struct(name) {
+                        Some(generic_struct) => {
+                            self.finalize(type_resolver);
+                        },
+                        None => {}
+                    }
+                }
             }
         }
     }

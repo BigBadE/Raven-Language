@@ -8,7 +8,7 @@ use inkwell::types::{AsTypeRef, BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue};
 use llvm_sys::core::LLVMFunctionType;
 use ast::code::{Effect, Effects};
-use ast::function::Function;
+use ast::function::{display, Function};
 use ast::{DisplayIndented, is_modifier, Modifier};
 use ast::r#struct::Struct;
 use ast::type_resolver::{FinalizedTypeResolver, TypeResolver};
@@ -290,9 +290,11 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
     fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function {
         let mut output;
         {
-            let func = &self.generics.get(function).unwrap();
-            output = func.set_generics(&generics);
+            let temp = self.generics.clone();
+            let func = &temp.get(function).unwrap();
+            output = func.set_generics(self, &generics);
         }
+
         output.finalize(self);
         let name = output.name.clone();
         let func_val = get_func_value(&output, &self.module, self.context, &self.llvm_types);
@@ -351,6 +353,10 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
         let mut temp = self.functions.clone();
         let (func, _func_value) = unsafe { Rc::get_mut_unchecked(&mut temp) }.get_mut(function).unwrap();
         func.code.finalize(&mut self.for_func(function));
+    }
+
+    fn get_generic_struct(&self, name: &String) -> Option<&Rc<Types>> {
+        return self.generic_types.get(name);
     }
 
     fn get_variable(&self, name: &String) -> Option<ResolvableTypes> {

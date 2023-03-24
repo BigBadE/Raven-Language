@@ -59,8 +59,8 @@ impl Expression {
         self.effect.finalize(type_resolver);
     }
 
-    pub fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.effect.as_mut().set_generics(replacing);
+    pub fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.effect.as_mut().set_generics(type_resolver, replacing);
     }
 
     pub fn is_return(&self) -> bool {
@@ -80,9 +80,9 @@ impl Field {
         };
     }
 
-    pub fn set_generics(&self, replacing: &HashMap<String, ResolvableTypes>) -> Self {
+    pub fn set_generics(&self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) -> Self {
         let mut field = self.clone();
-        field.field_type.set_generic(replacing);
+        field.field_type.set_generic(type_resolver, replacing);
         return field;
     }
 
@@ -131,7 +131,7 @@ pub trait Effect: DisplayIndented {
 
     fn get_location(&self) -> (u32, u32);
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>);
 }
 
 #[derive(Clone)]
@@ -253,8 +253,8 @@ impl Effect for FieldLoad {
         return self.loc;
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.calling.as_mut().set_generics(replacing);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.calling.as_mut().set_generics(type_resolver, replacing);
     }
 }
 
@@ -303,9 +303,7 @@ impl Effect for MethodCall {
         if self.calling.is_some() {
             self.calling.as_mut().unwrap().finalize(type_resolver);
             let returned = self.calling.as_mut().unwrap().unwrap().return_type();
-            println!("Calling {}", returned.as_ref().map(|types| types.to_string()).unwrap_or("None".to_string()));
             for func in &returned.as_ref().unwrap().unwrap().structure.functions {
-                println!("Testing {}", func);
                 if func.split("::").last().unwrap() == method {
                     method = func.clone();
                     break
@@ -337,14 +335,14 @@ impl Effect for MethodCall {
         return self.location;
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
         if let Some(found) = &mut self.calling {
-            found.as_mut().set_generics(replacing);
+            found.as_mut().set_generics(type_resolver, replacing);
         }
 
         if let Some(returned) = &self.method_return {
             self.method_return = Some(returned.clone());
-            self.method_return.as_mut().unwrap().set_generic(replacing);
+            self.method_return.as_mut().unwrap().set_generic(type_resolver, replacing);
         }
     }
 }
@@ -419,11 +417,11 @@ impl Effect for CreateStruct {
         return self.location;
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.structure.set_generic(replacing);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.structure.set_generic(type_resolver, replacing);
         if let Some(effects) = &mut self.parsed_effects {
             for (_name, effect) in effects {
-                effect.as_mut().set_generics(replacing);
+                effect.as_mut().set_generics(type_resolver, replacing);
             }
         }
     }
@@ -495,10 +493,10 @@ impl Effect for VariableLoad {
         return self.location;
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
         if let Some(types) = &self.types {
             let mut types = types.clone();
-            types.set_generic(replacing);
+            types.set_generic(type_resolver, replacing);
             self.types = Some(types);
         }
     }
@@ -562,8 +560,8 @@ impl<T> Effect for NumberEffect<T> where T: Display + Typed {
         panic!("Unexpected get location!");
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.return_type.set_generic(replacing);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.return_type.set_generic(type_resolver, replacing);
     }
 }
 
@@ -611,8 +609,8 @@ impl Effect for AssignVariable {
         return self.location;
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.effect.as_mut().set_generics(replacing);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.effect.as_mut().set_generics(type_resolver, replacing);
     }
 }
 
@@ -690,15 +688,15 @@ impl Effect for OperatorEffect {
         return self.location;
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
         if let Some(returning) = &self.return_type {
             let mut returning = returning.clone();
-            returning.set_generic(replacing);
+            returning.set_generic(type_resolver, replacing);
             self.return_type = Some(returning);
         }
 
         for effects in &mut self.effects {
-            effects.as_mut().set_generics(replacing);
+            effects.as_mut().set_generics(type_resolver, replacing);
         }
     }
 }

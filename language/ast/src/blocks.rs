@@ -48,9 +48,9 @@ impl Effect for ForStatement {
         panic!("Unexpected location!");
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.effect.as_mut().set_generics(replacing);
-        self.code_block.set_generics(replacing);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.effect.as_mut().set_generics(type_resolver, replacing);
+        self.code_block.set_generics(type_resolver, replacing);
     }
 }
 
@@ -139,16 +139,16 @@ impl Effect for IfStatement {
         return self.location
     }
 
-    fn set_generics(&mut self, replacing: &HashMap<String, ResolvableTypes>) {
-        self.condition.as_mut().set_generics(replacing);
-        self.body.set_generics(replacing);
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.condition.as_mut().set_generics(type_resolver, replacing);
+        self.body.set_generics(type_resolver, replacing);
         if let Some(body) = &mut self.else_body {
-            body.set_generics(replacing);
+            body.set_generics(type_resolver, replacing);
         }
 
         for (body, effect) in &mut self.else_ifs {
-            body.set_generics(replacing);
-            effect.as_mut().set_generics(replacing);
+            body.set_generics(type_resolver, replacing);
+            effect.as_mut().set_generics(type_resolver, replacing);
         }
     }
 }

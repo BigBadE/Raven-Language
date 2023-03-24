@@ -23,6 +23,8 @@ pub trait FinalizedTypeResolver {
 
     fn finalize_code(&mut self, function: &String);
 
+    fn get_generic_struct(&self, name: &String) -> Option<&Rc<Types>>;
+
     fn get_variable(&self, name: &String) -> Option<ResolvableTypes>;
 
     fn get_operator(&self, effects: &Vec<Effects>, operator: String) -> Option<&Function>;
