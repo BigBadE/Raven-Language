@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use crate::code::{Effect, Effects, Expression, ExpressionType, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
+use crate::r#struct::Struct;
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
@@ -86,9 +87,14 @@ impl Function {
         }
     }
 
-    pub fn finalize_code(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
+    pub fn finalize_code(&mut self, parent: Option<&String>, type_manager: &mut dyn FinalizedTypeResolver) {
         let split: Vec<&str> = self.name.split("::").collect();
-        type_manager.start_file(split.get(split.len()-2).unwrap().to_string());
+        let mut output = vec!(split.get(split.len()-2).unwrap().to_string());
+        if let Some(parent) = parent {
+            let split: Vec<&str> = parent.split("::").collect();
+            output.push(split.get(split.len()-2).unwrap().to_string());
+        }
+        type_manager.start_file(output);
         type_manager.finalize_code(&self.name);
     }
 

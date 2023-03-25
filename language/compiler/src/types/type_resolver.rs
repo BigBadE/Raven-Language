@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::ops::Deref;
 use std::rc::Rc;
 use inkwell::AddressSpace;
 use inkwell::context::Context;
@@ -212,7 +213,7 @@ pub struct CompilerTypeResolver<'a, 'ctx> {
     pub func_types: HashMap<String, ResolvableTypes>,
     pub variables: HashMap<String, (Rc<Types>, BasicValueEnum<'ctx>)>,
     pub imports: Rc<HashMap<String, HashMap<String, String>>>,
-    pub current_file: Option<String>
+    pub current_file: Vec<String>
 }
 
 impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
@@ -232,7 +233,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
             func_types: HashMap::new(),
             variables: HashMap::new(),
             imports,
-            current_file: None
+            current_file: Vec::new()
         };
     }
 
@@ -289,13 +290,81 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
 
         self.functions = Rc::new(new_functions);
 
-        for (_name, (function, _func_value)) in unsafe { Rc::get_mut_unchecked(&mut self.functions.clone()) } {
+        let mut temp = self.functions.clone();
+        let mut all_funcs = HashMap::new();
+
+        for (key, (func, _)) in unsafe { Rc::get_mut_unchecked(&mut temp) } {
+            all_funcs.insert(key.clone(), func);
+        }
+
+        for structure in self.types.values() {
+            for function in &structure.structure.functions {
+                let found = match all_funcs.remove(function) {
+                    Some(func) => func,
+                    None => continue
+                };
+                let mut type_manager = self.clone();
+                let all: Vec<&str> = function.split("::").collect();
+                let all = &all[0..all.len()-2].to_vec();
+                found.finalize_code(Some(&display(all, "::")), &mut type_manager);
+            }
+        }
+
+        for function in all_funcs.values_mut() {
             if !function.generics.is_empty() {
                 continue;
             }
             let mut type_manager = self.clone();
-            function.finalize_code(&mut type_manager);
+            function.finalize_code(None, &mut type_manager);
         }
+    }
+
+    fn check_func_import<'b, T>(&self, name: &String, input: &'b HashMap<String, T>) -> Option<&'b T> {
+        let end_name = name.split("::").last().unwrap();
+        if end_name.len() == name.len() {
+            return input.get(name);
+        }
+        let parent = &name[0..name.len()- end_name.len()-2].to_string();
+        return if parent.contains(":") {
+            input.get(name)
+        } else {
+            match self.get_import(parent) {
+                Some(import) => {
+                    let name = import.clone() + "::" + end_name;
+                    input.get(&name)
+                },
+                None => {
+                    for file in &self.current_file {
+                        if let Some(found) = input.get(&(file.clone() + "::" + end_name)) {
+                            return Some(found);
+                        }
+                    }
+                    return input.get(name);
+                }
+            }
+        };
+    }
+
+    fn check_import<'b, T>(&self, name: &String, input: &'b HashMap<String, T>) -> Option<&'b T> where T: Debug {
+        println!("{}: {:?}, {:?}", name, input.keys(), self.current_file);
+        return if name.contains(":") {
+            input.get(name)
+        } else {
+            match self.get_import(name) {
+                Some(import) => {
+                    let name = import.clone();
+                    input.get(&name)
+                },
+                None => {
+                    for file in &self.current_file {
+                        if let Some(found) = input.get(&(file.clone() + "::" + name)) {
+                            return Some(found);
+                        }
+                    }
+                    return input.get(name);
+                }
+            }
+        };
     }
 }
 
@@ -316,20 +385,31 @@ impl<'a, 'ctx> Display for CompilerTypeResolver<'a, 'ctx> {
 }
 
 impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
-    fn start_file(&mut self, name: String) {
-        self.current_file = Some(name);
+    fn start_file(&mut self, names: Vec<String>) {
+        if self.current_file.is_empty() {
+            self.current_file = names;
+        }
+    }
+
+    fn get_struct(&self, name: &String) -> Option<&Struct> {
+        return self.types.get(name).map(|found| &found.structure);
     }
 
     fn get_import(&self, name: &String) -> Option<&String> {
-        return self.imports.get(self.current_file.as_ref().unwrap()).unwrap().get(name);
+        for file in &self.current_file {
+            if let Some(found) = self.imports.get(file) {
+                return found.get(name);
+            };
+        }
+        return None;
     }
 
     fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function {
         let mut output;
         {
             let temp = self.generics.clone();
-            let func = &temp.get(function).unwrap();
             self.func_types = generics.clone();
+            let func = self.check_func_import(function, temp.deref()).unwrap();
             output = func.set_generics(self, &generics);
         }
 
@@ -340,7 +420,7 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
         let func_val = get_func_value(&output, &self.module, self.context, &self.llvm_types);
         unsafe { Rc::get_mut_unchecked(&mut self.functions) }.insert(name.clone(), (output, func_val));
 
-        unsafe { Rc::get_mut_unchecked(&mut self.functions.clone()) }.get_mut(&name).unwrap().0.finalize_code(self);
+        unsafe { Rc::get_mut_unchecked(&mut self.functions.clone()) }.get_mut(&name).unwrap().0.finalize_code(None, self);
         self.func_types.clear();
 
         return &self.functions.get(&name).unwrap().0;
@@ -352,12 +432,12 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
                 {
                     match self.types.get(name) {
                         Some(found) => *resolving = ResolvableTypes::Resolved(found.clone()),
-                        None => match self.func_types.get(name) {
+                        None => match self.check_import(name, &self.func_types) {
                             Some(temp_type) => *resolving = temp_type.clone(),
-                            None => match self.generic_types.get(name.split("<").next().unwrap()) {
+                            None => match self.check_import(&name.split("<").next().unwrap().to_string(), &self.generic_types) {
                                 Some(generic) => {
                                     let generic = generic.clone();
-                                    let generics: Vec<String> = name[generic.name.len() + 1..name.len() - 1].split(",")
+                                    let generics: Vec<String> = name[name.split("<").next().unwrap().len() + 1..name.len() - 1].split(",")
                                         .map(|string| string.to_string()).collect();
                                     let name = generic.structure.get_mangled_name(&generics);
                                     if let Some(found) = self.types.get(&name) {
@@ -436,20 +516,9 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
             return self.generics.get(name);
         }
 
-        let parent = &name[0..name.len()-function.len()-2].to_string();
-        return if parent.contains(":") {
-            self.functions.get(name).map(|found| &found.0)
-        } else {
-            match self.get_import(parent) {
-                Some(import) => {
-                    let name = (import.clone() + "::" + function);
-                    match self.functions.get(&name) {
-                        Some(found) => Some(&found.0),
-                        None => self.generics.get(&name)
-                    }
-                },
-                None => panic!("Type {} isn't imported!", parent)
-            }
+        return match self.check_func_import(name, self.functions.deref()) {
+            Some(found) => Some(&found.0),
+            None => self.check_func_import(name, self.generics.deref())
         };
     }
 }

@@ -4,7 +4,6 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::rc::Rc;
 use crate::code::MemberField;
-use crate::function::display;
 use crate::r#struct::Struct;
 use crate::type_resolver::FinalizedTypeResolver;
 
@@ -58,6 +57,12 @@ impl Display for ResolvableTypes {
             ResolvableTypes::Resolving(resolving) => write!(f, "{}", resolving),
             ResolvableTypes::Resolved(resolved) => write!(f, "{}", resolved)
         }
+    }
+}
+
+impl Debug for ResolvableTypes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return Display::fmt(self, f);
     }
 }
 

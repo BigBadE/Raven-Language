@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use crate::code::Effects;
 use crate::function::Function;
+use crate::r#struct::Struct;
 use crate::types::{ResolvableTypes, Types};
 
 pub trait TypeResolver {
@@ -17,7 +18,9 @@ pub trait TypeResolver {
 }
 
 pub trait FinalizedTypeResolver {
-    fn start_file(&mut self, name: String);
+    fn start_file(&mut self, names: Vec<String>);
+
+    fn get_struct(&self, name: &String) -> Option<&Struct>;
 
     fn get_import(&self, name: &String) -> Option<&String>;
 

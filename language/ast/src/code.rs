@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::mem;
 use crate::{assign_with_priority, DisplayIndented, to_modifiers};
 use crate::blocks::IfStatement;
-use crate::function::{Arguments, CodeBody, display, display_joined};
+use crate::function::{Arguments, CodeBody, display_joined};
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
