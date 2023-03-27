@@ -50,20 +50,23 @@ impl ParserTypeResolver {
         }
 
         //Resolve types
-        for (file, (base, implementing, functions)) in Rc::try_unwrap(self.unresolved) {
+        for (file, (base, mut implementing, functions)) in Rc::try_unwrap(self.unresolved).unwrap() {
             let mut found_base = None;
             let mut found_implementing = None;
-            for (name, full_name) in self.imports.get(file).unwrap() {
-                if base == name {
-                    found_base = Some(ResolvableTypes::Resolving(full_name.clone()));
-                }
-                if implementing == name {
-                    found_implementing = Some(ResolvableTypes::Resolving(full_name.clone()));
-                }
+            match self.imports.get(&file) {
+                Some(imports) => for (name, full_name) in imports {
+                    if &base == name {
+                        found_base = Some(ResolvableTypes::Resolving(full_name.clone()));
+                    }
+                    if &implementing == name {
+                        found_implementing = Some(ResolvableTypes::Resolving(full_name.clone()));
+                    }
+                },
+                None => {}
             }
 
-            for possible in self.types_by_file.get(file).unwrap() {
-                let testing = possible.name.split("::").last();
+            for possible in self.types_by_file.get(&file).unwrap() {
+                let testing = possible.name.split("::").last().unwrap();
                 if testing == base {
                     found_base = Some(ResolvableTypes::Resolved(possible.clone()));
                 }
@@ -76,7 +79,7 @@ impl ParserTypeResolver {
             if let Some(base) = found_base {
                 out_base = base;
             } else {
-                out_base = ResolvableTypes::Resolving(base);
+                out_base = ResolvableTypes::Resolving(base.clone());
             }
             out_base.finalize(&mut finalized);
 
@@ -84,13 +87,13 @@ impl ParserTypeResolver {
             if let Some(implementing) = found_implementing {
                 out_implementing = implementing;
             } else {
-                out_implementing = ResolvableTypes::Resolving(implementing);
+                out_implementing = ResolvableTypes::Resolving(implementing.clone());
             }
-            out_implementing.finalize(&mut implementing);
+            out_implementing.finalize(&mut finalized);
 
-            for testing in out_implementing.unwrap().structure.functions {
+            for testing in &out_implementing.unwrap().structure.functions {
                 let name = testing.split("::").last().unwrap();
-                if !functions.iter().any(|found| found.split("::").last().unwrap() == name) {
+                if !functions.iter().any(|found| found.name.split("::").last().unwrap() == name) {
                     panic!("Missing implementation for function {} for struct {}", name, base);
                 }
             }
@@ -99,12 +102,14 @@ impl ParserTypeResolver {
                 panic!("Too many functions implemented!")
             }
 
+            let mut found = out_base.unwrap().clone();
+            let mut found = unsafe { Rc::get_mut_unchecked(&mut found) };
             for function in functions {
-                out_base.unwrap().structure.functions.push(function.name);
-                unsafe { Rc::get_mut_unchecked(&mut self.functions) }.insert(function.name, function);
+                found.structure.functions.push(function.name.clone());
+                unsafe { Rc::get_mut_unchecked(&mut self.functions) }.insert(function.name.clone(), function);
             }
 
-            out_base.unwrap().traits.push(out_implementing);
+            found.traits.push(out_implementing);
         }
 
         //Finalize LLVM types
@@ -240,11 +245,16 @@ impl TypeResolver for ParserTypeResolver {
     }
 
     fn add_type(&mut self, adding_types: Rc<Types>) {
-        let file = adding_types.name[..adding_types.name.len()-2-adding_types.name.split("::").last().unwrap().len()].to_string();
         unsafe { Rc::get_mut_unchecked(&mut self.types) }.insert(adding_types.name.clone(), adding_types.clone());
-        match self.types_by_file.get_mut(&file) {
+        if !adding_types.name.contains("::") {
+            return;
+        }
+        let file = adding_types.name[..adding_types.name.len()-2-adding_types.name.split("::").last().unwrap().len()].to_string();
+        match unsafe { Rc::get_mut_unchecked(&mut self.types_by_file) }.get_mut(&file) {
             Some(vec) => vec.push(adding_types),
-            None => unsafe { Rc::get_mut_unchecked(&mut self.types_by_file) }.insert(file, vec!(adding_types))
+            None => {
+                unsafe { Rc::get_mut_unchecked(&mut self.types_by_file) }.insert(file, vec!(adding_types));
+            }
         }
     }
 

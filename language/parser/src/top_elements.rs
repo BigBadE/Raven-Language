@@ -25,7 +25,7 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
             }
         } else if parsing.matching("impl") {
             match parse_impl(type_manager, parsing) {
-                Some((original, functions)) => type_manager.add_unresolved_type(name.clone(), original, implementing, functions),
+                Some((original, implementing, functions)) => type_manager.add_unresolved_type(name.clone(), original, implementing, functions),
                 None => {}
             };
         } else if parsing.matching("trait") {
@@ -63,8 +63,51 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
     }
 }
 
-fn parse_impl(type_manager: &mut dyn TypeResolver, parsing: &mut ParseInfo) {
+fn parse_impl(type_manager: &mut dyn TypeResolver, parsing: &mut ParseInfo) -> Option<(String, String, Vec<Function>)> {
+    parsing.next_included();
+    parsing.index -= 1;
+    let implementing = match parsing.parse_to_space() {
+        Some(found) => found,
+        None => {
+            parsing.create_error("Unexpected EOF".to_string());
+            return None;
+        }
+    }.split("<").next().unwrap().to_string();
+    if !parsing.matching("for") {
+        parsing.create_error("Expected for in impl".to_string());
+        return None;
+    }
+    let base = match parsing.parse_to(b'{')  {
+        Some(found) => found,
+        None => {
+            parsing.create_error("Unexpected EOF".to_string());
+            return None;
+        }
+    }.split("<").next().unwrap().to_string();
+    let mut functions = Vec::new();
+    while match parsing.next_included() {
+        Some(character) => character != b'}',
+        None => {
+            parsing.create_error("Unexpected EOF before end of impl!".to_string());
+            return None;
+        }
+    } {
+        parsing.index -= 1;
+        let attributes = parse_attributes(parsing, false);
+        let modifiers = parse_modifiers(parsing);
 
+        if parsing.matching("fn") {
+            match parse_function(type_manager, Some(implementing.clone()), &implementing, attributes,
+                                 get_modifier(modifiers.as_slice()), parsing, true) {
+                Some(function) => {
+                    functions.push(function);
+                    continue;
+                }
+                None => {}
+            }
+        }
+    }
+    return Some((base, implementing, functions));
 }
 
 fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,

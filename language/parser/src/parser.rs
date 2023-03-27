@@ -79,6 +79,19 @@ impl<'a> ParseInfo<'a> {
         return None;
     }
 
+    pub fn parse_to_space(&mut self) -> Option<String> {
+        let mut output = String::new();
+        while self.index < self.len {
+            let character = self.buffer[self.index];
+            self.index += 1;
+            if self.whitespace_next(character) {
+                return Some(output);
+            }
+            output.push(character as char);
+        }
+        return None;
+    }
+
     pub fn parse_to_or_end(&mut self, char: u8, end: usize) -> Option<String> {
         let mut output = String::new();
         while self.index < end {
