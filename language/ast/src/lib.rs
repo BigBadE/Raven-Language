@@ -20,6 +20,7 @@ pub enum Modifier {
     Extern = 0b100,
     Internal = 0b1000,
     Operation = 0b1_0000,
+    Trait = 0b1100
 }
 
 impl Display for Modifier {
@@ -29,7 +30,8 @@ impl Display for Modifier {
             Modifier::Protected => write!(f, "pub(proj)"),
             Modifier::Extern => write!(f, "extern"),
             Modifier::Internal => write!(f, "internal"),
-            Modifier::Operation => write!(f, "operation")
+            Modifier::Operation => write!(f, "operation"),
+            Modifier::Trait => panic!("Shouldn't display trait modifier!")
         }
     }
 }
@@ -46,7 +48,7 @@ pub fn get_modifier(modifiers: &[Modifier]) -> u8 {
 #[inline]
 pub fn is_modifier(modifiers: u8, target: Modifier) -> bool {
     let target = target as u8;
-    return modifiers & target != 0;
+    return modifiers & target == target as u8;
 }
 
 pub fn to_modifiers(from: u8) -> Vec<Modifier> {

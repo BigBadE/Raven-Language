@@ -10,6 +10,8 @@ pub trait TypeResolver {
 
     fn add_type(&mut self, types: Rc<Types>);
 
+    fn add_unresolved_type(&mut self, file: String, base: String, implementing: String, functions: Vec<Function>);
+
     fn add_function(&mut self, function: Function);
 
     fn get_function(&self, name: &String) -> &Function;

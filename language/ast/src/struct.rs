@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use crate::{DisplayIndented, to_modifiers};
+use crate::{DisplayIndented, is_modifier, Modifier, to_modifiers};
 use crate::code::MemberField;
 use crate::function::{display, display_joined, display_parenless};
 use crate::type_resolver::FinalizedTypeResolver;
@@ -73,7 +73,11 @@ impl Struct {
     }
 
     pub fn format(&self, indent: &str, f: &mut Formatter<'_>, type_manager: &dyn FinalizedTypeResolver) -> std::fmt::Result {
-        write!(f, "{} struct {}", display_joined(&to_modifiers(self.modifiers)), self.name)?;
+        if is_modifier(self.modifiers, Modifier::Trait) {
+            write!(f, "{} trait {}", display_joined(&to_modifiers(self.modifiers ^ Modifier::Trait as u8)), self.name)?;
+        } else {
+            write!(f, "{} struct {}", display_joined(&to_modifiers(self.modifiers)), self.name)?;
+        }
 
         if !self.generics.is_empty() {
             write!(f, "<")?;

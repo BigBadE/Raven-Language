@@ -1,3 +1,9 @@
+pub trait Iter<T> {
+    pub fn next<T>(self: Iter<T>) -> T;
+
+    pub fn is_end<T>(self: Iter<T>) -> bool;
+}
+
 pub struct NumberIter<T> {
     pub last: T;
     pub end: T;

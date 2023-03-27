@@ -357,6 +357,7 @@ impl DisplayIndented for MethodCall {
         if let Some(value) = &self.calling {
             value.format(indent, f)?;
             write!(f, ".")?;
+            return write!(f, "{}{}", self.method.split("::").last().unwrap(), self.arguments);
         }
         return write!(f, "{}{}", self.method, self.arguments);
     }

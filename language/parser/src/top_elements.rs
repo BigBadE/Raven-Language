@@ -23,13 +23,23 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
             if !parsing.matching(";") {
                 parsing.create_error("Missing semicolon!".to_string());
             }
+        } else if parsing.matching("impl") {
+            match parse_impl(type_manager, parsing) {
+                Some((original, functions)) => type_manager.add_unresolved_type(name.clone(), original, implementing, functions),
+                None => {}
+            };
+        } else if parsing.matching("trait") {
+            match parse_struct_type(type_manager, name, modifiers, parsing, true) {
+                Some(trait_type) => type_manager.add_type(Rc::new(trait_type)),
+                None => {}
+            };
         } else if parsing.matching("struct") {
-            match parse_struct_type(type_manager, name, modifiers, parsing) {
+            match parse_struct_type(type_manager, name, modifiers, parsing, false) {
                 Some(struct_type) => type_manager.add_type(Rc::new(struct_type)),
                 None => {}
             };
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
-            match parse_function(type_manager, None, name, attributes, modifiers, parsing) {
+            match parse_function(type_manager, None, name, attributes, modifiers, parsing, true) {
                 Some(function) => {
                     if is_modifier(modifiers, Modifier::Operation) {
                         //Add only the method name.
@@ -53,24 +63,50 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
     }
 }
 
+fn parse_impl(type_manager: &mut dyn TypeResolver, parsing: &mut ParseInfo) {
+
+}
+
 fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
-                     modifiers: u8, parsing: &mut ParseInfo) -> Option<Types> {
-    let mut fn_name;
+                     modifiers: u8, parsing: &mut ParseInfo, is_trait: bool) -> Option<Types> {
+    let mut fn_name = String::new();
     let mut generics = Vec::new();
+
     if let Some(temp_name) = find_if_first(parsing, b'<', b'{') {
         fn_name = temp_name;
 
         parsing.matching("<");
         parse_generics_vec(parsing, &mut generics);
-        parsing.matching("{");
-    } else {
-        fn_name = match parsing.parse_to(b'{') {
-            Some(name) => name.clone(),
+    }
+
+    let mut parent_types = Vec::new();
+    if let Some(temp_name) = find_if_first(parsing, b':', b'{') {
+        fn_name = temp_name;
+        let subtypes = match parsing.parse_to(b'{') {
+            Some(found) => found,
             None => {
-                parsing.create_error("Expected string name".to_string());
+                parsing.create_error("Expected bracket!".to_string());
                 return None;
             }
         };
+        let subtypes: Vec<ResolvableTypes> = subtypes.split("+").map(|found| ResolvableTypes::Resolving(found.to_string())).collect();
+
+        if subtypes.len() > 1 && !is_trait {
+            parsing.create_error("Can't have multiple supertypes on a structure. Implement traits using the impl keyword!".to_string());
+            return None;
+        }
+
+        parent_types = subtypes;
+    } else if fn_name.is_empty() {
+        fn_name = match parsing.parse_to(b'{') {
+            Some(name) => name.clone(),
+            None => {
+                parsing.create_error("Expected bracket!".to_string());
+                return None;
+            }
+        };
+    } else {
+        parsing.matching("{");
     }
 
     if !is_modifier(modifiers, Modifier::Internal) {
@@ -92,7 +128,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
 
         if parsing.matching("fn") {
             match parse_function(type_manager, Some(fn_name.clone()), &fn_name, attributes, get_modifier(modifiers.as_slice()),
-                                 parsing) {
+                                 parsing, !is_trait) {
                 Some(mut function) => {
                     if function.fields.iter().any(|field| field.name == "self") {
                         for (key, val) in &generics {
@@ -128,12 +164,25 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
                                      Field::new(field_name, field_type)));
     }
 
-    return Some(Types::new_struct(Struct::new(Some(fields), generics, functions, modifiers, fn_name),
-                                  None, Vec::new()));
+    return if is_trait {
+        //TODO figure out pointer size
+        if (modifiers & Modifier::Trait as u8) != 0 {
+            panic!("Traits can't have internal or external modifiers!");
+        }
+        let modifiers = modifiers + Modifier::Trait as u8;
+        Some(Types::new_trait(8, Struct::new(Some(fields), generics, functions, modifiers, fn_name),
+                              parent_types))
+    } else {
+        if !parent_types.is_empty() && !fields.is_empty() {
+            panic!("Subtypes can't declare new fields!");
+        }
+        Some(Types::new_struct(Struct::new(Some(fields), generics, functions, modifiers, fn_name),
+                               parent_types.get(0).map(|found| found.clone()), Vec::new()))
+    }
 }
 
 fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name: &String, attributes: HashMap<String, Attribute>,
-                  modifiers: u8, parsing: &mut ParseInfo) -> Option<Function> {
+                  modifiers: u8, parsing: &mut ParseInfo, parse_body: bool) -> Option<Function> {
     let fn_name;
     let mut generics = HashMap::new();
 
@@ -161,19 +210,39 @@ fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name:
     };
 
     let return_type = if parsing.matching("->") {
-        match parsing.parse_to(b'{') {
-            Some(found) => {
-                parsing.index -= 1;
-                Some(ResolvableTypes::Resolving(found))
+        if parse_body {
+            match parsing.parse_to(b'{') {
+                Some(found) => {
+                    parsing.index -= 1;
+                    Some(ResolvableTypes::Resolving(found))
+                }
+                None => {
+                    parsing.create_error("Expected code body".to_string());
+                    return None;
+                }
             }
-            None => {
-                parsing.create_error("Expected code body".to_string());
-                return None;
+        } else {
+            match parsing.parse_to(b';') {
+                Some(found) => {
+                    parsing.index -= 1;
+                    Some(ResolvableTypes::Resolving(found))
+                }
+                None => {
+                    parsing.create_error("Expected no body on trait function".to_string());
+                    return None;
+                }
             }
         }
     } else {
         None
     };
+
+    if !parse_body {
+        if !parsing.matching(";") {
+            parsing.create_error("Unexpected body on function!".to_string());
+        }
+        return Some(Function::new(attributes, modifiers, fields, generics, CodeBody::new(Vec::new()), return_type, fn_name));
+    }
 
     let code = if !is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
         match parse_code_block(type_manager, parsing) {

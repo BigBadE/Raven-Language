@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use crate::code::{Effect, Effects, Expression, ExpressionType, Field};
 use crate::{Attribute, DisplayIndented, to_modifiers};
-use crate::r#struct::Struct;
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 

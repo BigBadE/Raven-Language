@@ -20,8 +20,10 @@ use crate::internal::structs::get_internal_struct;
 pub struct ParserTypeResolver {
     pub imports: Rc<HashMap<String, HashMap<String, String>>>,
     pub types: Rc<HashMap<String, Rc<Types>>>,
+    pub types_by_file: Rc<HashMap<String, Vec<Rc<Types>>>>,
     pub functions: Rc<HashMap<String, Function>>,
     pub operations: Rc<HashMap<String, Vec<String>>>,
+    pub unresolved: Rc<HashMap<String, (String, String, Vec<Function>)>>
 }
 
 impl ParserTypeResolver {
@@ -29,21 +31,80 @@ impl ParserTypeResolver {
         return Self {
             imports: Rc::new(HashMap::new()),
             types: Rc::new(HashMap::new()),
+            types_by_file: Rc::new(HashMap::new()),
             functions: Rc::new(HashMap::new()),
             operations: Rc::new(HashMap::new()),
+            unresolved: Rc::new(HashMap::new())
         };
     }
 
-    pub fn finalize<'a, 'ctx>(self, context: &'ctx Context, module: &'a Module<'ctx>) -> CompilerTypeResolver<'a, 'ctx> {
+    pub fn finalize<'a, 'ctx>(mut self, context: &'ctx Context, module: &'a Module<'ctx>) -> CompilerTypeResolver<'a, 'ctx> {
         let mut finalized = CompilerTypeResolver::new(context, module,
                                                       self.operations.clone(), self.imports.clone());
-
         //Compile types
         let types = Rc::try_unwrap(self.types).unwrap();
         let mut types: Vec<Rc<Types>> = types.into_values().collect();
         while !types.is_empty() {
             let found = types.pop().unwrap();
             compile(context, &found, &mut types, &mut finalized);
+        }
+
+        //Resolve types
+        for (file, (base, implementing, functions)) in Rc::try_unwrap(self.unresolved) {
+            let mut found_base = None;
+            let mut found_implementing = None;
+            for (name, full_name) in self.imports.get(file).unwrap() {
+                if base == name {
+                    found_base = Some(ResolvableTypes::Resolving(full_name.clone()));
+                }
+                if implementing == name {
+                    found_implementing = Some(ResolvableTypes::Resolving(full_name.clone()));
+                }
+            }
+
+            for possible in self.types_by_file.get(file).unwrap() {
+                let testing = possible.name.split("::").last();
+                if testing == base {
+                    found_base = Some(ResolvableTypes::Resolved(possible.clone()));
+                }
+                if testing == implementing {
+                    found_implementing = Some(ResolvableTypes::Resolved(possible.clone()));
+                }
+            }
+
+            let mut out_base;
+            if let Some(base) = found_base {
+                out_base = base;
+            } else {
+                out_base = ResolvableTypes::Resolving(base);
+            }
+            out_base.finalize(&mut finalized);
+
+            let mut out_implementing;
+            if let Some(implementing) = found_implementing {
+                out_implementing = implementing;
+            } else {
+                out_implementing = ResolvableTypes::Resolving(implementing);
+            }
+            out_implementing.finalize(&mut implementing);
+
+            for testing in out_implementing.unwrap().structure.functions {
+                let name = testing.split("::").last().unwrap();
+                if !functions.iter().any(|found| found.split("::").last().unwrap() == name) {
+                    panic!("Missing implementation for function {} for struct {}", name, base);
+                }
+            }
+
+            if functions.len() != out_implementing.unwrap().structure.functions.len() {
+                panic!("Too many functions implemented!")
+            }
+
+            for function in functions {
+                out_base.unwrap().structure.functions.push(function.name);
+                unsafe { Rc::get_mut_unchecked(&mut self.functions) }.insert(function.name, function);
+            }
+
+            out_base.unwrap().traits.push(out_implementing);
         }
 
         //Finalize LLVM types
@@ -179,7 +240,16 @@ impl TypeResolver for ParserTypeResolver {
     }
 
     fn add_type(&mut self, adding_types: Rc<Types>) {
-        unsafe { Rc::get_mut_unchecked(&mut self.types) }.insert(adding_types.name.clone(), adding_types);
+        let file = adding_types.name[..adding_types.name.len()-2-adding_types.name.split("::").last().unwrap().len()].to_string();
+        unsafe { Rc::get_mut_unchecked(&mut self.types) }.insert(adding_types.name.clone(), adding_types.clone());
+        match self.types_by_file.get_mut(&file) {
+            Some(vec) => vec.push(adding_types),
+            None => unsafe { Rc::get_mut_unchecked(&mut self.types_by_file) }.insert(file, vec!(adding_types))
+        }
+    }
+
+    fn add_unresolved_type(&mut self, file: String, base: String, implementing: String, functions: Vec<Function>) {
+        unsafe { Rc::get_mut_unchecked(&mut self.unresolved) }.insert(file, (base, implementing, functions));
     }
 
     fn add_function(&mut self, function: Function) {
@@ -346,7 +416,6 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
     }
 
     fn check_import<'b, T>(&self, name: &String, input: &'b HashMap<String, T>) -> Option<&'b T> where T: Debug {
-        println!("{}: {:?}, {:?}", name, input.keys(), self.current_file);
         return if name.contains(":") {
             input.get(name)
         } else {
