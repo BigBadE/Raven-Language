@@ -2,7 +2,7 @@ use std::mem;
 use ast::code::{AssignVariable, CreateStruct, Effects, Expression, ExpressionType, FieldLoad, MethodCall, OperatorEffect, VariableLoad};
 use ast::type_resolver::TypeResolver;
 use ast::types::ResolvableTypes;
-use crate::conditional::parse_if;
+use crate::conditional::{parse_for, parse_if, parse_switch};
 use crate::literal::{parse_ident, parse_number, parse_with_references};
 use crate::parser::ParseInfo;
 use crate::util::{parse_arguments, parse_code_block, parse_struct_args};
@@ -39,6 +39,10 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
 
     if parsing.matching("if") {
         last = parse_if(type_manager, parsing);
+    } else if parsing.matching("for") {
+        return parse_for(type_manager, parsing);
+    } else if parsing.matching("switch") {
+        last = parse_switch(type_manager, parsing);
     } else {
         while let Some(next) = parsing.next_included() {
             match next {

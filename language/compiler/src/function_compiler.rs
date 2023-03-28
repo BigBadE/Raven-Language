@@ -1,3 +1,4 @@
+use std::mem;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -5,9 +6,10 @@ use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicType;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
-use ast::code::{Effect, Effects, ExpressionType};
-use ast::function::{CodeBody, display, Function};
+use ast::code::{Effect, Effects, Expression, ExpressionType, MethodCall};
+use ast::function::{Arguments, CodeBody, display, Function};
 use ast::{is_modifier, Modifier};
+use ast::blocks::IfStatement;
 use crate::compiler::Compiler;
 use crate::internal::instructions::compile_internal;
 use crate::types::type_resolver::{CompilerTypeResolver, get_func_value};
@@ -130,6 +132,51 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                 Some(compiler.builder.build_call(calling, arguments.as_slice(),
                                                  &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
             }
+        },
+        Effects::ForStatement(effect) => {
+            let comparison_block = compiler.context.append_basic_block(function, id.to_string().as_str());
+            //Continue to comparison block
+            compiler.builder.build_unconditional_branch(comparison_block);
+            *id += 1;
+
+            //Build for body
+            let for_body = compile_block(&effect.code_block, function, variables, compiler, id);
+            compiler.builder.build_unconditional_branch(for_body);
+            //Build end
+            let end = compiler.context.append_basic_block(function, id.to_string().as_str());
+            *id += 1;
+
+            //Set end check
+            let name = effect.effect.unwrap().return_type().unwrap().unwrap().structure.functions
+                .iter().find(|func: &&String| func.split("::").last().unwrap().contains("is_end")).unwrap().clone();
+
+            let mut comparison = MethodCall::new(Some(effect.effect.clone()), name,
+                Arguments::new(vec!()), (0, 0));
+            comparison.finalize(variables);
+
+            compiler.builder.position_at_end(comparison_block);
+            let comparison = compile_effect(compiler, block, function, variables,
+                                            &Effects::MethodCall(Box::new(comparison)), id).unwrap();
+            compiler.builder.build_conditional_branch(comparison.into_int_value(), end, for_body);
+
+            *block = end;
+            compiler.builder.position_at_end(*block);
+            None
+        },
+        Effects::SwitchStatement(effect) => {
+            let mut if_effect: Option<IfStatement> = None;
+
+            for value in &effect.possible {
+                if let Some(if_effect) = &mut if_effect {
+                    let case = compile_case(&effect.value, value);
+                    if_effect.else_ifs.push(case);
+                } else {
+                    let first = compile_case(&effect.value, value);
+                    if_effect = Some(IfStatement::new(first.0, first.1, (0, 0)));
+                }
+            }
+
+            compile_effect(compiler, block, function, variables, &Effects::IfStatement(Box::new(if_effect.unwrap())), id)
         }
         Effects::FieldLoad(effect) => {
             let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
@@ -259,6 +306,18 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             Some(value)
         }
     };
+}
+
+fn compile_case(value: &Effects, input: &(Effects, Effects)) -> (CodeBody, Effects) {
+    let body;
+    match &input.1 {
+        Effects::CodeBody(box_body) => body = Box::into_inner(box_body.clone()),
+        _ => body = CodeBody::new(vec!(Expression::new(ExpressionType::Break, input.1.clone())))
+    }
+    let method = value.unwrap().return_type().unwrap().unwrap().name.clone() + "::equals";
+    let calling = Effects::MethodCall(Box::new(MethodCall::new(Some(value.clone()), method,
+    Arguments::new(vec!(input.0.clone())), (0, 0))));
+    return (body, calling);
 }
 
 //LLVM dies if the last instruction isn't a return, so this is weirdly structured

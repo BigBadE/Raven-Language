@@ -1,5 +1,7 @@
 import iter::NumberIter;
 
 pub fn main() -> i64 {
-    return NumberIter::new(2, 5).next();
+    for number in NumberIter::new(2, 5) {
+
+    }
 }

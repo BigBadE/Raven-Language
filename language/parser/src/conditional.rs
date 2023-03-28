@@ -1,4 +1,4 @@
-use ast::blocks::IfStatement;
+use ast::blocks::{ForStatement, IfStatement, SwitchStatement};
 use ast::code::{Effect, Effects};
 use ast::type_resolver::TypeResolver;
 use crate::code::parse_effect;
@@ -92,4 +92,97 @@ pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Opt
     }
 
     return Some(Effects::IfStatement(Box::new(statement)));
+}
+
+pub fn parse_for(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Effects> {
+    parsing.next_included();
+    parsing.index -= 1;
+    let var_name = match parsing.parse_to_space() {
+        Some(found) => found,
+        None => {
+            parsing.create_error("Expected variable name in for".to_string());
+            return None;
+        }
+    };
+
+    if !parsing.matching("in") {
+        parsing.create_error("For loop needs \"in\"".to_string());
+        return None;
+    }
+
+    let iterating = parse_effect(type_manager, parsing, &[b'{', b'}', b';']);
+
+    if parsing.buffer[parsing.index-1] != b'{' {
+        parsing.create_error("Unexpected end to for loop statement!".to_string());
+        return None;
+    }
+    let iterating = match iterating {
+        Some(iterating) => iterating,
+        None => {
+            parsing.create_error("Couldn't find effect!".to_string());
+            return None;
+        }
+    };
+
+    parsing.index -= 1;
+    let code = match parse_code_block(type_manager, parsing) {
+        Some(code) => code,
+        None => {
+            parsing.create_error("Expected code body".to_string());
+            return None;
+        }
+    };
+    return Some(Effects::ForStatement(Box::new(ForStatement::new(var_name, iterating, code))));
+}
+
+pub fn parse_switch(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Effects> {
+    let effect = match parse_effect(type_manager, parsing, &[b'{', b'}', b';']) {
+        Some(effect) => effect,
+        None => {
+            parsing.create_error("Expected effect!".to_string());
+            return None;
+        }
+    };
+
+    if parsing.buffer[parsing.index-1] != b'{' {
+        parsing.create_error("Unexpected end to switch!".to_string());
+        return None;
+    }
+
+    let mut conditions = Vec::new();
+    while !parsing.matching("}") {
+        let condition = match parse_effect(type_manager, parsing, &[b'{', b'}', b';']) {
+            Some(effect) => effect,
+            None => {
+                parsing.create_error("Expected effect!".to_string());
+                return None;
+            }
+        };
+        if !parsing.matching("=>") {
+            parsing.create_error("Expected => before switch case body".to_string());
+            return None;
+        }
+        let body;
+        if parsing.matching("{") {
+            parsing.index -= 1;
+            body = match parse_code_block(type_manager, parsing) {
+                Some(body) => Effects::CodeBody(Box::new(body)),
+                None => {
+                    parsing.create_error("Expected code body!".to_string());
+                    return None;
+                }
+            };
+        } else {
+            body = match parse_effect(type_manager, parsing, &[b',', b'}']) {
+                Some(body) => body,
+                None => {
+                    parsing.create_error("Expected effect!".to_string());
+                    return None;
+                }
+            };
+        }
+        conditions.push((condition, body));
+    }
+
+    return Some(Effects::SwitchStatement(Box::new(SwitchStatement::new(effect, conditions, parsing.loc()))));
 }

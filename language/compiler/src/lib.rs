@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked)]
+#![feature(get_mut_unchecked, box_into_inner)]
 extern crate core;
 
 pub mod internal;
