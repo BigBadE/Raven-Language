@@ -102,7 +102,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             let calling = variables.functions.get(&effect.method).unwrap().1;
             if effect.return_type().is_some() && !calling.get_type().get_return_type().is_some() {
                 let pointer = compiler.builder.build_alloca(
-                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().0, &id.to_string());
+                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().types, &id.to_string());
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
 
@@ -160,20 +160,14 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
 
             let mut arguments = vec![MaybeUninit::uninit(); effect.parsed_effects.as_ref().unwrap().len()];
 
-            //VTable
-            arguments.insert(0, MaybeUninit::uninit());
-
             for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
                 let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
-                arguments.remove(*index+1);
                 let found_size = effect.unwrap().return_type().unwrap().unwrap().size;
-                arguments.insert(*index+1, MaybeUninit::new((returned, found_size)));
+                arguments.insert(*index, MaybeUninit::new((returned, found_size)));
             }
 
-            let (structure, global_value) = variables.llvm_types.get(types).unwrap();
-            arguments.remove(0);
-            arguments.insert(0, MaybeUninit::new((global_value.as_pointer_value().as_basic_value_enum(), 8)));
-            let pointer = compiler.builder.build_alloca(*structure, &id.to_string());
+            let structure = variables.llvm_types.get(types).unwrap().types;
+            let pointer = compiler.builder.build_alloca(structure, &id.to_string());
             *id += 1;
 
             let mut offset = 0;
@@ -256,7 +250,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                         None => panic!("Unable to find type for variable {}
                     (assign it using a let statement to specify the type)", variable.variable)
                     }
-                }.deref()).unwrap().0, variable.variable.as_str());
+                }.deref()).unwrap().types, variable.variable.as_str());
             let value = compile_effect(compiler, block, function, variables, &variable.effect, id).unwrap();
 
             variables.variables.insert(variable.variable.clone(),

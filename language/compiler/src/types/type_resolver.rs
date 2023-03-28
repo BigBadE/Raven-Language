@@ -15,6 +15,7 @@ use ast::r#struct::Struct;
 use ast::type_resolver::{FinalizedTypeResolver, TypeResolver};
 use ast::types::{ResolvableTypes, Types};
 use crate::internal::structs::get_internal_struct;
+use crate::types::resolved_type::ResolvedType;
 
 #[derive(Clone)]
 pub struct ParserTypeResolver {
@@ -124,13 +125,15 @@ impl ParserTypeResolver {
             if !types.structure.generics.is_empty() {
                 continue;
             }
-            let (_llvm_type, vtable) = unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }.get_mut(types).unwrap();
-            let functions = types.structure.functions.iter()
-                .map(|function| finalized.functions.get(function).unwrap().1).collect();
-            let raw_table = create_vtable(context, functions);
-            unsafe { vtable.delete() };
-            *vtable = module.add_global(raw_table.get_type(), None, &types.name);
-            vtable.set_initializer(&raw_table);
+            for (traits, vtable) in &mut unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }.get_mut(types).unwrap().vtables {
+                let functions = types.structure.functions.iter()
+                    .filter(|function| traits.structure.functions.contains(function))
+                    .map(|function| finalized.functions.get(function).unwrap().1).collect();
+                let raw_table = create_vtable(context, functions);
+                unsafe { vtable.delete() };
+                *vtable = module.add_global(raw_table.get_type(), None, &types.name);
+                vtable.set_initializer(&raw_table);
+            }
         }
 
         //Setup functions
@@ -151,27 +154,31 @@ pub fn compile_llvm_type<'a, 'ctx>(context: &'ctx Context, module: &Module<'ctx>
 
     if is_modifier(types.structure.modifiers, Modifier::Internal) {
         let (size, llvm_type) = get_internal_struct(context, &types.name);
-        let vtable = module.add_global(context.i64_type(), None, &types.name);
 
         unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }
-            .insert(types.clone(), (llvm_type, vtable));
+            .insert(types.clone(), ResolvedType::new(llvm_type, HashMap::new()));
         unsafe { Rc::get_mut_unchecked(&mut types.clone()) }.size = size;
     } else {
         let opaque_type = context.opaque_struct_type(&types.structure.name);
 
+        let vtables = HashMap::new();
+        for found_trait in &types.traits {
+            module.add_global(context.i64_type(), None, &(types.name.clone() + "_" + found_trait.name()));
+        }
+
         //Give it a temp vtable
         unsafe { Rc::get_mut_unchecked(&mut finalized.llvm_types) }
-            .insert(types.clone(), (opaque_type.as_basic_type_enum(), module.add_global(context.i64_type(), None, &types.name)));
+            .insert(types.clone(), ResolvedType::new(opaque_type.as_basic_type_enum(), vtables));
         let mut llvm_fields = vec!(context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
 
         for field in types.get_fields() {
             let field_type = field.field.field_type.unwrap();
             match finalized.llvm_types.get(field_type) {
-                Some(found_type) => llvm_fields.push(found_type.0),
+                Some(found_type) => llvm_fields.push(found_type.types),
                 None => {
                     let position = all.iter().position(|found| *found == field_type).unwrap();
                     compile_llvm_type(context, module, all.remove(position), all, finalized);
-                    llvm_fields.push(finalized.llvm_types.get(field.field.field_type.unwrap()).unwrap().0)
+                    llvm_fields.push(finalized.llvm_types.get(field.field.field_type.unwrap()).unwrap().types)
                 }
             }
         }
@@ -286,7 +293,7 @@ pub struct CompilerTypeResolver<'a, 'ctx> {
     pub module: &'a Module<'ctx>,
     pub types: Rc<HashMap<String, Rc<Types>>>,
     pub functions: Rc<HashMap<String, (Function, FunctionValue<'ctx>)>>,
-    pub llvm_types: Rc<HashMap<Rc<Types>, (BasicTypeEnum<'ctx>, GlobalValue<'ctx>)>>,
+    pub llvm_types: Rc<HashMap<Rc<Types>, ResolvedType<'ctx>>>,
     pub operations: Rc<HashMap<String, Vec<String>>>,
     pub generics: Rc<HashMap<String, Function>>,
     pub generic_types: Rc<HashMap<String, Rc<Types>>>,
@@ -327,7 +334,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
 
     pub fn get_llvm_type(&self, types: &Rc<Types>) -> &BasicTypeEnum<'ctx> {
         return match self.llvm_types.get(types) {
-            Some(llvm_type) => &llvm_type.0,
+            Some(llvm_type) => &llvm_type.types,
             None => panic!("Failed to get LLVM type!")
         };
     }
@@ -603,14 +610,14 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
 }
 
 pub fn get_func_value<'ctx>(function: &Function, module: &Module<'ctx>, context: &'ctx Context,
-                            llvm_types: &HashMap<Rc<Types>, (BasicTypeEnum<'ctx>, GlobalValue<'ctx>)>) -> FunctionValue<'ctx> {
+                            llvm_types: &HashMap<Rc<Types>, ResolvedType<'ctx>>) -> FunctionValue<'ctx> {
     let mut params = Vec::new();
 
     let mut return_type = context.void_type().as_type_ref();
 
     if function.return_type.is_some() {
         let found_type = match llvm_types.get(&function.return_type.as_ref().unwrap().unwrap().clone()) {
-            Some(llvm_type) => llvm_type.0,
+            Some(llvm_type) => llvm_type.types,
             None => panic!("Failed to find type! {} from {}", function.return_type.as_ref().unwrap().name(),
                            display(&llvm_types.keys().map(|key| key.structure.name.clone()).collect(), ", "))
         };
@@ -623,7 +630,7 @@ pub fn get_func_value<'ctx>(function: &Function, module: &Module<'ctx>, context:
 
     for field in &function.fields {
         params.push(match llvm_types.get(field.field_type.unwrap()) {
-            Some(llvm_type) => llvm_type.0,
+            Some(llvm_type) => llvm_type.types,
             None => context.struct_type(&[], false).as_basic_type_enum()
         }.as_type_ref());
     }
