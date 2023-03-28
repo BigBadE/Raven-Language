@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::mem;
 use crate::{assign_with_priority, DisplayIndented, to_modifiers};
-use crate::blocks::IfStatement;
+use crate::blocks::{ForStatement, IfStatement, SwitchStatement};
 use crate::function::{Arguments, CodeBody, display_joined};
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
@@ -139,6 +139,8 @@ pub enum Effects {
     NOP(),
     Wrapped(Box<Effects>),
     CodeBody(Box<CodeBody>),
+    ForStatement(Box<ForStatement>),
+    SwitchStatement(Box<SwitchStatement>),
     IfStatement(Box<IfStatement>),
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
@@ -157,6 +159,8 @@ impl Effects {
             Effects::Wrapped(effect) => effect.unwrap(),
             Effects::CodeBody(effect) => effect.as_ref(),
             Effects::IfStatement(effect) => effect.as_ref(),
+            Effects::ForStatement(effect) => effect.as_ref(),
+            Effects::SwitchStatement(effect) => effect.as_ref(),
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
             Effects::FieldLoad(effect) => effect.as_ref(),
@@ -174,6 +178,8 @@ impl Effects {
             Effects::Wrapped(effect) => Effects::as_mut(effect),
             Effects::CodeBody(effect) => effect.as_mut(),
             Effects::IfStatement(effect) => effect.as_mut(),
+            Effects::ForStatement(effect) => effect.as_mut(),
+            Effects::SwitchStatement(effect) => effect.as_mut(),
             Effects::MethodCall(effect) => effect.as_mut(),
             Effects::VariableLoad(effect) => effect.as_mut(),
             Effects::FieldLoad(effect) => effect.as_mut(),

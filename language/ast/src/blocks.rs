@@ -1,15 +1,26 @@
 use std::collections::HashMap;
 use std::fmt::Formatter;
-use crate::code::{Effect, Effects};
+use crate::code::{AssignVariable, Effect, Effects, Expression, ExpressionType, MethodCall, VariableLoad};
 use crate::DisplayIndented;
-use crate::function::CodeBody;
+use crate::function::{Arguments, CodeBody};
 use crate::type_resolver::FinalizedTypeResolver;
 use crate::types::ResolvableTypes;
 
+#[derive(Clone)]
 pub struct ForStatement {
     pub variable: String,
     pub effect: Effects,
-    pub code_block: CodeBody
+    pub code_block: CodeBody,
+}
+
+impl ForStatement {
+    pub fn new(variable: String, effect: Effects, code_block: CodeBody) -> Self {
+        return Self {
+            variable,
+            effect,
+            code_block,
+        };
+    }
 }
 
 impl DisplayIndented for ForStatement {
@@ -36,8 +47,19 @@ impl Effect for ForStatement {
     }
 
     fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
-        self.code_block.finalize(type_resolver);
+        self.effect = Effects::AssignVariable(Box::new(AssignVariable::new("$for".to_string(),
+                                                                         self.effect.clone(), (0, 0))));
         self.effect.finalize(type_resolver);
+        let load_effect = Effects::VariableLoad(Box::new(VariableLoad::new("$for".to_string(), (0, 0))));
+        let name = self.effect.unwrap().return_type().unwrap().unwrap().structure.functions
+            .iter().find(|func: &&String| func.split("::").last().unwrap().contains("next")).unwrap().clone();
+        let next = MethodCall::new(Some(load_effect.clone()),
+                                   name, Arguments::new(vec!()), (0, 0));
+        let var_set = AssignVariable::new(self.variable.clone(),
+                                          Effects::MethodCall(Box::new(next)), (0, 0));
+        self.code_block.expressions.insert(0, Expression::new(ExpressionType::Line,
+                                                              Effects::AssignVariable(Box::new(var_set))));
+        self.code_block.finalize(type_resolver);
     }
 
     fn return_type(&self) -> Option<ResolvableTypes> {
@@ -60,7 +82,7 @@ pub struct IfStatement {
     pub condition: Effects,
     pub else_ifs: Vec<(CodeBody, Effects)>,
     pub else_body: Option<CodeBody>,
-    pub location: (u32, u32)
+    pub location: (u32, u32),
 }
 
 impl IfStatement {
@@ -70,7 +92,7 @@ impl IfStatement {
             condition,
             else_ifs: Vec::new(),
             else_body: None,
-            location
+            location,
         };
     }
 }
@@ -136,7 +158,7 @@ impl Effect for IfStatement {
     }
 
     fn get_location(&self) -> (u32, u32) {
-        return self.location
+        return self.location;
     }
 
     fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
@@ -150,5 +172,77 @@ impl Effect for IfStatement {
             body.set_generics(type_resolver, replacing);
             effect.as_mut().set_generics(type_resolver, replacing);
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct SwitchStatement {
+    pub value: Effects,
+    pub possible: Vec<(Effects, Effects)>,
+    pub location: (u32, u32),
+}
+
+impl SwitchStatement {
+    pub fn new(value: Effects, possible: Vec<(Effects, Effects)>, location: (u32, u32)) -> Self {
+        return Self {
+            value,
+            possible,
+            location
+        }
+    }
+}
+
+impl Effect for SwitchStatement {
+    fn is_return(&self) -> bool {
+        for (_, found) in &self.possible {
+            if !found.unwrap().is_return() {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    fn has_return(&self) -> bool {
+        return false;
+    }
+
+    fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
+        self.value.finalize(type_resolver);
+        for (effect, body) in &mut self.possible {
+            effect.finalize(type_resolver);
+            body.finalize(type_resolver);
+        }
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        return self.possible.get(0).unwrap().1.unwrap().return_type();
+    }
+
+    fn get_location(&self) -> (u32, u32) {
+        return self.location;
+    }
+
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.value.as_mut().set_generics(type_resolver, replacing);
+        for (effect, body) in &mut self.possible {
+            effect.as_mut().set_generics(type_resolver, replacing);
+            body.as_mut().set_generics(type_resolver, replacing);
+        }
+    }
+}
+
+impl DisplayIndented for SwitchStatement {
+    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "switch ")?;
+        self.value.format(parsing, f)?;
+        write!(f, "{{\n")?;
+        let deeper_indent = parsing.to_string() + "    ";
+        for (condition, body) in &self.possible {
+            write!(f, "{}", deeper_indent)?;
+            condition.format(&deeper_indent, f)?;
+            write!(f, " => ")?;
+            body.format(&deeper_indent, f)?;
+        }
+        return write!(f, "}}");
     }
 }
