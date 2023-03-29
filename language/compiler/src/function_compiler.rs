@@ -147,8 +147,10 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                                                  Arguments::new(vec!()), (0, 0));
             comparison.finalize(variables);
 
+            let mut temp = variables.clone();
+            compile_effect(compiler, block, function, &mut temp, &effect.effect, id);
             //Build for body
-            let for_body = compile_block(&effect.code_block, function, variables, compiler, id);
+            let for_body = compile_block(&effect.code_block, function, &mut temp, compiler, id);
             compiler.builder.build_unconditional_branch(for_body);
             //Build end
             let end = compiler.context.append_basic_block(function, id.to_string().as_str());

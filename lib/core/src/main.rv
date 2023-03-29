@@ -2,6 +2,7 @@ import iter::NumberIter;
 
 pub fn main() -> i64 {
     for number in NumberIter::new(2, 5) {
-
+        return 1;
     }
+    return 0;
 }
