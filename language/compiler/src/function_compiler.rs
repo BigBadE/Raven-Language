@@ -5,11 +5,12 @@ use std::rc::Rc;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicType;
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use ast::code::{Effect, Effects, Expression, ExpressionType, MethodCall, VariableLoad};
 use ast::function::{Arguments, CodeBody, display, Function};
 use ast::{is_modifier, Modifier};
 use ast::blocks::IfStatement;
+use ast::types::Types;
 use crate::compiler::Compiler;
 use crate::internal::instructions::compile_internal;
 use crate::types::type_resolver::{CompilerTypeResolver, get_func_value};
@@ -38,7 +39,7 @@ pub fn compile_function<'a, 'ctx>(function: &Function, compiler: &Compiler<'ctx>
 }
 
 pub fn compile_block<'a, 'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
-                           variables: &mut CompilerTypeResolver<'a, 'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
+                               variables: &mut CompilerTypeResolver<'a, 'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> BasicBlock<'ctx> {
     let mut block = compiler.context.append_basic_block(function, id.to_string().as_str());
     *id += 1;
     compiler.builder.position_at_end(block);
@@ -90,7 +91,7 @@ pub fn compile_block<'a, 'ctx>(code: &CodeBody, function: FunctionValue<'ctx>,
 }
 
 pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBlock<'ctx>, function: FunctionValue<'ctx>,
-                            variables: &mut CompilerTypeResolver<'a, 'ctx>, effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
+                                variables: &mut CompilerTypeResolver<'a, 'ctx>, effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Wrapped(effect) => compile_effect(compiler, block, function, variables, effect, id),
@@ -101,10 +102,16 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
         Effects::MethodCall(effect) => {
             let mut arguments = Vec::new();
 
-            let calling = variables.functions.get(&effect.method).unwrap().1;
+            let fields: Vec<Rc<Types>>;
+            let calling;
+            {
+                let (temp_fields, temp_calling) = variables.functions.get(&effect.method).unwrap();
+                fields = temp_fields.fields.iter().map(|func| func.field_type.unwrap().clone()).collect();
+                calling = *temp_calling;
+            }
             if effect.return_type().is_some() && !calling.get_type().get_return_type().is_some() {
                 let pointer = compiler.builder.build_alloca(
-                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().types, &id.to_string());
+                    variables.llvm_types.get(effect.return_type().unwrap().unwrap()).unwrap().types.clone(), &id.to_string());
                 *id += 1;
                 arguments.push(BasicMetadataValueEnum::from(pointer.as_basic_value_enum()));
 
@@ -112,8 +119,25 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                     arguments.push(From::from(compile_effect(compiler, block, calling, variables, effect.calling.as_ref().unwrap(), id).unwrap()));
                 }
 
-                for argument in &effect.arguments.arguments {
-                    arguments.push(From::from(compile_effect(compiler, block, calling, variables, argument, id).unwrap()))
+                for i in 0..effect.arguments.arguments.len() {
+                    let argument = &effect.arguments.arguments.get(i).unwrap();
+                    let func_arg = fields.get(i).unwrap();
+                    let compiled = compile_effect(compiler, block, calling, variables, argument, id).unwrap();
+                    if func_arg.is_trait {
+                        let vtable;
+                        if argument.unwrap().return_type().unwrap().unwrap().is_trait {
+                            vtable = compiler.builder.build_struct_gep(compiled.into_pointer_value(), 1, &id.to_string())
+                                .unwrap().as_basic_value_enum();
+                            *id += 1;
+                        } else {
+                            vtable = variables.llvm_types.get(argument.unwrap().return_type().unwrap().unwrap())
+                                .unwrap().vtables.get(func_arg).unwrap().as_basic_value_enum();
+                        }
+                        let structure = compiler.context.const_struct(&[compiled, vtable], false);
+                        arguments.push(From::from(structure));
+                    } else {
+                        arguments.push(From::from(compiled));
+                    }
                 }
 
                 *id += 1;
@@ -132,7 +156,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                 Some(compiler.builder.build_call(calling, arguments.as_slice(),
                                                  &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
             }
-        },
+        }
         Effects::ForStatement(effect) => {
             let comparison_block = compiler.context.append_basic_block(function, id.to_string().as_str());
 
@@ -167,7 +191,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             *block = end;
             compiler.builder.position_at_end(*block);
             None
-        },
+        }
         Effects::SwitchStatement(effect) => {
             let mut if_effect: Option<IfStatement> = None;
 
@@ -206,7 +230,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             Some(compiler.builder.build_load(
                 compiler.builder.build_struct_gep(pointer, offset, &(*id - 2).to_string()).unwrap(),
                 &(*id - 1).to_string()).as_basic_value_enum())
-        },
+        }
         Effects::FieldSet(effect) => {
             let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
             let mut offset = 1;
@@ -229,9 +253,9 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             let gep = compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
             *id += 1;
             compiler.builder.build_store(gep,
-                compile_effect(compiler, block, function, variables, &effect.value, id)?);
+                                         compile_effect(compiler, block, function, variables, &effect.value, id)?);
             *id += 1;
-            Some(compiler.builder.build_load(gep, &(*id-1).to_string()))
+            Some(compiler.builder.build_load(gep, &(*id - 1).to_string()))
         }
         Effects::CreateStruct(effect) => {
             let types = effect.structure.unwrap();
@@ -347,14 +371,14 @@ fn compile_case(value: &Effects, input: &(Effects, Effects)) -> (CodeBody, Effec
     }
     let method = value.unwrap().return_type().unwrap().unwrap().name.clone() + "::equals";
     let calling = Effects::MethodCall(Box::new(MethodCall::new(Some(value.clone()), method,
-    Arguments::new(vec!(input.0.clone())), (0, 0))));
+                                                               Arguments::new(vec!(input.0.clone())), (0, 0))));
     return (body, calling);
 }
 
 //LLVM dies if the last instruction isn't a return, so this is weirdly structured
 //to make sure the end is created last.
 fn compile_elseifs<'a, 'ctx>(effects: &Vec<(Option<&CodeBody>, Option<&Effects>)>, index: usize, function: FunctionValue<'ctx>,
-                         variables: &mut CompilerTypeResolver<'a, 'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> (BasicBlock<'ctx>, BasicBlock<'ctx>) {
+                             variables: &mut CompilerTypeResolver<'a, 'ctx>, compiler: &Compiler<'ctx>, id: &mut u64) -> (BasicBlock<'ctx>, BasicBlock<'ctx>) {
     if effects.len() == 1 {
         return match effects.get(0).unwrap().0 {
             Some(effect) => {

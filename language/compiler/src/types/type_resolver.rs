@@ -344,16 +344,11 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
         let (function, function_value) = self.functions.get(function).unwrap();
 
         let params = function_value.get_params();
-        let offset = params.len() != function.fields.len();
+        let mut offset = (params.len() != function.fields.len()) as usize;
         for i in 0..function.fields.len() {
             let field = function.fields.get(i).unwrap();
-            if offset {
-                type_manager.variables.insert(field.name.clone(),
-                                              (field.field_type.unwrap().clone(), Some((*params.get(i + 1).unwrap()).clone())));
-            } else {
-                type_manager.variables.insert(field.name.clone(),
-                                              (field.field_type.unwrap().clone(), Some((*params.get(i).unwrap()).clone())));
-            }
+            type_manager.variables.insert(field.name.clone(), (field.field_type.unwrap().clone(),
+                                                               Some((*params.get(i + offset).unwrap()).clone())));
         }
         return type_manager;
     }
