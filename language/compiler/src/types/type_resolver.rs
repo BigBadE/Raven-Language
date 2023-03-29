@@ -370,7 +370,9 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
                 unsafe { Rc::get_mut_unchecked(&mut self.generics) }.insert(name, function);
                 continue;
             }
-            function.finalize(self);
+            let all: Vec<&str> = function.name.split("::").collect();
+            let all = &all[0..all.len()-2].to_vec();
+            function.finalize(Some(&display(all, "::")), self);
             let func_value = get_func_value(&function, module, context, &self.llvm_types);
             new_functions.insert(name, (function, func_value));
         }
@@ -500,7 +502,9 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
         }
 
         output.generics.clear();
-        output.finalize(self);
+        let all: Vec<&str> = function.split("::").collect();
+        let all = &all[0..all.len()-2].to_vec();
+        output.finalize(Some(&display(all, "::")), self);
 
         let name = output.name.clone();
         let func_val = get_func_value(&output, &self.module, self.context, &self.llvm_types);

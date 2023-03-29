@@ -80,7 +80,16 @@ impl Function {
         return output;
     }
 
-    pub fn finalize(&mut self, type_manager: &mut dyn FinalizedTypeResolver) {
+    pub fn finalize(&mut self, parent: Option<&String>, type_manager: &mut dyn FinalizedTypeResolver) {
+        let split: Vec<&str> = self.name.split("::").collect();
+        let mut output = vec!(split.get(split.len()-2).unwrap().to_string());
+        if let Some(parent) = parent {
+            let split: Vec<&str> = parent.split("::").collect();
+            if split.len() >= 2 {
+                output.push(split.get(split.len()-2).unwrap().to_string());
+            }
+        }
+        type_manager.start_file(output);
         if self.generics.is_empty() {
             type_manager.finalize_func(self);
         }
@@ -91,7 +100,9 @@ impl Function {
         let mut output = vec!(split.get(split.len()-2).unwrap().to_string());
         if let Some(parent) = parent {
             let split: Vec<&str> = parent.split("::").collect();
-            output.push(split.get(split.len()-2).unwrap().to_string());
+            if split.len() >= 2 {
+                output.push(split.get(split.len() - 2).unwrap().to_string());
+            }
         }
         type_manager.start_file(output);
         type_manager.finalize_code(&self.name);
