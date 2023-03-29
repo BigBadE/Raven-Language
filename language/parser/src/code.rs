@@ -169,8 +169,16 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
             Some(comparing) => {
                 match parse_effect(type_manager, &mut temp, escape) {
                     Some(effect) => {
-                        effects.push(effect);
-                        output += "{}";
+                        if let Effects::OperatorEffect(effect) = effect {
+                            output += effect.operator.as_str();
+                            for found in Box::into_inner(effect).effects {
+                                effects.push(found);
+                            }
+                            break
+                        } else {
+                            effects.push(effect);
+                            output += "{}";
+                        }
                         break;
                     }
                     None => {
@@ -192,5 +200,6 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
 
     //Update parsing and return
     *parsing = temp;
+    println!("Found operator {}", output);
     return Some(Box::new(OperatorEffect::new(output, effects, location)));
 }

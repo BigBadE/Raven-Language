@@ -605,11 +605,6 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
     }
 
     fn get_function(&self, name: &String) -> Option<&Function> {
-        let function = name.split("::").last().unwrap();
-        if function.len() == name.len() {
-            return self.generics.get(name);
-        }
-
         return match self.check_func_import(name, self.functions.deref()) {
             Some(found) => Some(&found.0),
             None => self.check_func_import(name, self.generics.deref())
