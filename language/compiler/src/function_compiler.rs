@@ -139,20 +139,20 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             compiler.builder.build_unconditional_branch(comparison_block);
             *id += 1;
 
+            //Set end check
+            let name = effect.effect.unwrap().return_type().unwrap().unwrap().structure.functions
+                .iter().find(|func: &&String| func.split("::").last().unwrap().contains("is_end")).unwrap().clone();
+
+            let mut comparison = MethodCall::new(Some(effect.effect.clone()), name,
+                                                 Arguments::new(vec!()), (0, 0));
+            comparison.finalize(variables);
+
             //Build for body
             let for_body = compile_block(&effect.code_block, function, variables, compiler, id);
             compiler.builder.build_unconditional_branch(for_body);
             //Build end
             let end = compiler.context.append_basic_block(function, id.to_string().as_str());
             *id += 1;
-
-            //Set end check
-            let name = effect.effect.unwrap().return_type().unwrap().unwrap().structure.functions
-                .iter().find(|func: &&String| func.split("::").last().unwrap().contains("is_end")).unwrap().clone();
-
-            let mut comparison = MethodCall::new(Some(effect.effect.clone()), name,
-                Arguments::new(vec!()), (0, 0));
-            comparison.finalize(variables);
 
             compiler.builder.position_at_end(comparison_block);
             let comparison = compile_effect(compiler, block, function, variables,
@@ -210,7 +210,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             for (index, effect) in effect.parsed_effects.as_ref().unwrap() {
                 let returned = compile_effect(compiler, block, function, variables, effect, id).unwrap();
                 let found_size = effect.unwrap().return_type().unwrap().unwrap().size;
-                arguments.insert(*index, MaybeUninit::new((returned, found_size)));
+                *arguments.get_mut(*index).unwrap() = MaybeUninit::new((returned, found_size));
             }
 
             let structure = variables.llvm_types.get(types).unwrap().types;
@@ -287,7 +287,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
                                              arguments.as_slice(), &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
         }
         Effects::VariableLoad(effect) =>
-            Some(variables.variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).1.clone()),
+            Some(variables.variables.get(&effect.name).expect(format!("Unknown variable called {}", effect.name).as_str()).1.unwrap().clone()),
         Effects::AssignVariable(variable) => {
             let pointer = compiler.builder.build_alloca(variables.llvm_types.get(
                 match variable.effect.unwrap().return_type() {
@@ -301,7 +301,7 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             let value = compile_effect(compiler, block, function, variables, &variable.effect, id).unwrap();
 
             variables.variables.insert(variable.variable.clone(),
-                                       (variable.effect.unwrap().return_type().unwrap().unwrap().clone(), value));
+                                       (variable.effect.unwrap().return_type().unwrap().unwrap().clone(), Some(value)));
             compiler.builder.build_store(pointer, value);
             Some(value)
         }

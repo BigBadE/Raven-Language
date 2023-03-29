@@ -38,6 +38,8 @@ pub trait FinalizedTypeResolver {
 
     fn get_variable(&self, name: &String) -> Option<ResolvableTypes>;
 
+    fn add_variable(&mut self, name: String, types: ResolvableTypes);
+
     fn get_operator(&self, effects: &Vec<Effects>, operator: String) -> Option<&Function>;
 
     fn get_function(&self, name: &String) -> Option<&Function>;

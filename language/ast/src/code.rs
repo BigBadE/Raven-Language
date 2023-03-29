@@ -611,6 +611,7 @@ impl Effect for AssignVariable {
 
     fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         self.effect.finalize(type_resolver);
+        type_resolver.add_variable(self.variable.clone(), self.effect.unwrap().return_type().unwrap());
     }
 
     fn return_type(&self) -> Option<ResolvableTypes> {

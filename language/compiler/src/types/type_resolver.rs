@@ -298,7 +298,7 @@ pub struct CompilerTypeResolver<'a, 'ctx> {
     pub generics: Rc<HashMap<String, Function>>,
     pub generic_types: Rc<HashMap<String, Rc<Types>>>,
     pub func_types: HashMap<String, ResolvableTypes>,
-    pub variables: HashMap<String, (Rc<Types>, BasicValueEnum<'ctx>)>,
+    pub variables: HashMap<String, (Rc<Types>, Option<BasicValueEnum<'ctx>>)>,
     pub imports: Rc<HashMap<String, HashMap<String, String>>>,
     pub current_file: Vec<String>
 }
@@ -349,10 +349,10 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
             let field = function.fields.get(i).unwrap();
             if offset {
                 type_manager.variables.insert(field.name.clone(),
-                                              (field.field_type.unwrap().clone(), (*params.get(i + 1).unwrap()).clone()));
+                                              (field.field_type.unwrap().clone(), Some((*params.get(i + 1).unwrap()).clone())));
             } else {
                 type_manager.variables.insert(field.name.clone(),
-                                              (field.field_type.unwrap().clone(), (*params.get(i).unwrap()).clone()));
+                                              (field.field_type.unwrap().clone(), Some((*params.get(i).unwrap()).clone())));
             }
         }
         return type_manager;
@@ -574,6 +574,10 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
 
     fn get_variable(&self, name: &String) -> Option<ResolvableTypes> {
         return self.variables.get(name).map(|found| ResolvableTypes::Resolved(found.0.clone()));
+    }
+
+    fn add_variable(&mut self, name: String, types: ResolvableTypes) {
+        self.variables.insert(name, (types.unwrap().clone(), None));
     }
 
     fn get_operator(&self, effects: &Vec<Effects>, operator: String) -> Option<&Function> {

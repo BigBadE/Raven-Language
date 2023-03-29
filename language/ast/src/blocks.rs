@@ -49,14 +49,16 @@ impl Effect for ForStatement {
     fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
         self.effect = Effects::AssignVariable(Box::new(AssignVariable::new("$for".to_string(),
                                                                          self.effect.clone(), (0, 0))));
+        let mut load_effect = Effects::VariableLoad(Box::new(VariableLoad::new("$for".to_string(), (0, 0))));
         self.effect.finalize(type_resolver);
-        let load_effect = Effects::VariableLoad(Box::new(VariableLoad::new("$for".to_string(), (0, 0))));
+        load_effect.finalize(type_resolver);
         let name = self.effect.unwrap().return_type().unwrap().unwrap().structure.functions
             .iter().find(|func: &&String| func.split("::").last().unwrap().contains("next")).unwrap().clone();
         let next = MethodCall::new(Some(load_effect.clone()),
                                    name, Arguments::new(vec!()), (0, 0));
-        let var_set = AssignVariable::new(self.variable.clone(),
+        let mut var_set = AssignVariable::new(self.variable.clone(),
                                           Effects::MethodCall(Box::new(next)), (0, 0));
+        var_set.finalize(type_resolver);
         self.code_block.expressions.insert(0, Expression::new(ExpressionType::Line,
                                                               Effects::AssignVariable(Box::new(var_set))));
         self.code_block.finalize(type_resolver);
