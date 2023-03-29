@@ -100,14 +100,15 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                 b'=' => {
                     let mut temp = parsing.clone();
                     temp.index -= 1;
-                    let test = parse_effect(type_manager, &mut temp, escape);
-                    if test.is_some() {
-                        if let Effects::OperatorEffect(found) = test.unwrap() {
-                            if found.operator.starts_with("{}=") {
-                                last = Some(Effects::OperatorEffect(found));
+                    match parse_operator(type_manager, &mut temp, &mut last.clone(), escape) {
+                        Some(operator) => {
+                            if !operator.operator.starts_with("{}={}") {
+                                last = Some(Effects::OperatorEffect(operator));
+                                *parsing = temp;
                                 break;
                             }
                         }
+                        None => {}
                     }
                     let next = parse_effect(type_manager, parsing, escape)?;
                     match last? {

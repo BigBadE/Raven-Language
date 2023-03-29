@@ -145,7 +145,8 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
 
             //Build for body
             let for_body = compile_block(&effect.code_block, function, &mut temp, compiler, id);
-            compiler.builder.build_unconditional_branch(for_body);
+            compiler.builder.build_unconditional_branch(comparison_block);
+
             //Build end
             let end = compiler.context.append_basic_block(function, id.to_string().as_str());
             *id += 1;
