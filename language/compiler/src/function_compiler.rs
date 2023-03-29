@@ -6,7 +6,7 @@ use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicType;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
-use ast::code::{Effect, Effects, Expression, ExpressionType, MethodCall};
+use ast::code::{Effect, Effects, Expression, ExpressionType, MethodCall, VariableLoad};
 use ast::function::{Arguments, CodeBody, display, Function};
 use ast::{is_modifier, Modifier};
 use ast::blocks::IfStatement;
@@ -135,20 +135,14 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
         },
         Effects::ForStatement(effect) => {
             let comparison_block = compiler.context.append_basic_block(function, id.to_string().as_str());
+
+            let mut temp = variables.clone();
+            compile_effect(compiler, block, function, &mut temp, &effect.effect, id);
+
             //Continue to comparison block
             compiler.builder.build_unconditional_branch(comparison_block);
             *id += 1;
 
-            //Set end check
-            let name = effect.effect.unwrap().return_type().unwrap().unwrap().structure.functions
-                .iter().find(|func: &&String| func.split("::").last().unwrap().contains("is_end")).unwrap().clone();
-
-            let mut comparison = MethodCall::new(Some(effect.effect.clone()), name,
-                                                 Arguments::new(vec!()), (0, 0));
-            comparison.finalize(variables);
-
-            let mut temp = variables.clone();
-            compile_effect(compiler, block, function, &mut temp, &effect.effect, id);
             //Build for body
             let for_body = compile_block(&effect.code_block, function, &mut temp, compiler, id);
             compiler.builder.build_unconditional_branch(for_body);
@@ -156,8 +150,16 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             let end = compiler.context.append_basic_block(function, id.to_string().as_str());
             *id += 1;
 
+            //Set end check
+            let name = effect.effect.unwrap().return_type().unwrap().unwrap().structure.functions
+                .iter().find(|func: &&String| func.split("::").last().unwrap().contains("is_end")).unwrap().clone();
+
+            let mut comparison = MethodCall::new(Some(
+                Effects::VariableLoad(Box::new(VariableLoad::new("$for".to_string(), (0, 0))))), name,
+                                                 Arguments::new(vec!()), (0, 0));
+            comparison.finalize(&mut temp);
             compiler.builder.position_at_end(comparison_block);
-            let comparison = compile_effect(compiler, block, function, variables,
+            let comparison = compile_effect(compiler, block, function, &mut temp,
                                             &Effects::MethodCall(Box::new(comparison)), id).unwrap();
             compiler.builder.build_conditional_branch(comparison.into_int_value(), end, for_body);
 
@@ -203,6 +205,32 @@ pub fn compile_effect<'a, 'ctx>(compiler: &Compiler<'ctx>, block: &mut BasicBloc
             Some(compiler.builder.build_load(
                 compiler.builder.build_struct_gep(pointer, offset, &(*id - 2).to_string()).unwrap(),
                 &(*id - 1).to_string()).as_basic_value_enum())
+        },
+        Effects::FieldSet(effect) => {
+            let from = compile_effect(compiler, block, function, variables, &effect.calling, id).unwrap();
+            let mut offset = 1;
+            for field in effect.calling.unwrap().return_type().unwrap().unwrap().get_fields() {
+                if field.field.name != effect.name {
+                    offset += 1;
+                } else {
+                    break;
+                }
+            }
+
+            let pointer;
+            if !from.is_pointer_value() {
+                pointer = compiler.builder.build_alloca(from.get_type(), &id.to_string());
+                *id += 1;
+                compiler.builder.build_store(pointer, from.into_struct_value().as_basic_value_enum());
+            } else {
+                pointer = from.into_pointer_value();
+            }
+            let gep = compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
+            *id += 1;
+            compiler.builder.build_store(gep,
+                compile_effect(compiler, block, function, variables, &effect.value, id)?);
+            *id += 1;
+            Some(compiler.builder.build_load(gep, &(*id-1).to_string()))
         }
         Effects::CreateStruct(effect) => {
             let types = effect.structure.unwrap();

@@ -1,5 +1,5 @@
 use std::mem;
-use ast::code::{AssignVariable, CreateStruct, Effects, Expression, ExpressionType, FieldLoad, MethodCall, OperatorEffect, VariableLoad};
+use ast::code::{AssignVariable, CreateStruct, Effects, Expression, ExpressionType, FieldLoad, FieldSet, MethodCall, OperatorEffect, VariableLoad};
 use ast::type_resolver::TypeResolver;
 use ast::types::ResolvableTypes;
 use crate::conditional::{parse_for, parse_if, parse_switch};
@@ -54,7 +54,7 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                                 let structure = variable_load.name;
                                 last = Some(Effects::CreateStruct(
                                     Box::new(CreateStruct::new(ResolvableTypes::Resolving(structure),
-                                                      parse_struct_args(type_manager, parsing), parsing.loc()))));
+                                                               parse_struct_args(type_manager, parsing), parsing.loc()))));
                             }
                             _ => {
                                 last = None;
@@ -79,21 +79,45 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                                 Effects::VariableLoad(variable) => {
                                     last = Some(Effects::MethodCall(Box::new(
                                         MethodCall::new(None, variable.name,
-                                                        parse_arguments(type_manager, parsing), parsing.loc()
+                                                        parse_arguments(type_manager, parsing), parsing.loc(),
                                         ))));
-                                },
+                                }
                                 _ => {
                                     last = None;
                                     parsing.create_error("Unknown parenthesis!".to_string());
                                 }
                             }
-                        },
+                        }
                         None => {
                             last = Some(Effects::Wrapped(Box::new(
                                 parse_effect(type_manager, parsing, &[b')', b'}', b';'])?)));
                             if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
                                 parsing.create_error("Missing end of parenthesis!".to_string());
                             }
+                        }
+                    }
+                }
+                b'=' => {
+                    let mut temp = parsing.clone();
+                    temp.index -= 1;
+                    let test = parse_effect(type_manager, &mut temp, escape);
+                    if test.is_some() {
+                        if let Effects::OperatorEffect(found) = test.unwrap() {
+                            if found.operator.starts_with("{}=") {
+                                last = Some(Effects::OperatorEffect(found));
+                                break;
+                            }
+                        }
+                    }
+                    let next = parse_effect(type_manager, parsing, escape)?;
+                    match last? {
+                        Effects::VariableLoad(variable) =>
+                            last = Some(Effects::AssignVariable(Box::new(AssignVariable::new(variable.name, next, parsing.loc())))),
+                        Effects::FieldLoad(field) =>
+                            last = Some(Effects::FieldSet(Box::new(FieldSet::new(field.calling, field.name, next, parsing.loc())))),
+                        _ => {
+                            parsing.create_error("Tried to set an unsettable value!".to_string());
+                            last = None;
                         }
                     }
                 }
@@ -174,7 +198,7 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
                             for found in Box::into_inner(effect).effects {
                                 effects.push(found);
                             }
-                            break
+                            break;
                         } else {
                             effects.push(effect);
                             output += "{}";
@@ -200,6 +224,5 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
 
     //Update parsing and return
     *parsing = temp;
-    println!("Found operator {}", output);
     return Some(Box::new(OperatorEffect::new(output, effects, location)));
 }

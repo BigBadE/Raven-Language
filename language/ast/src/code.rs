@@ -145,6 +145,7 @@ pub enum Effects {
     MethodCall(Box<MethodCall>),
     VariableLoad(Box<VariableLoad>),
     FieldLoad(Box<FieldLoad>),
+    FieldSet(Box<FieldSet>),
     CreateStruct(Box<CreateStruct>),
     FloatEffect(Box<NumberEffect<f64>>),
     IntegerEffect(Box<NumberEffect<i64>>),
@@ -164,6 +165,7 @@ impl Effects {
             Effects::MethodCall(effect) => effect.as_ref(),
             Effects::VariableLoad(effect) => effect.as_ref(),
             Effects::FieldLoad(effect) => effect.as_ref(),
+            Effects::FieldSet(effect) => effect.as_ref(),
             Effects::CreateStruct(effect) => effect.as_ref(),
             Effects::FloatEffect(effect) => effect.as_ref(),
             Effects::IntegerEffect(effect) => effect.as_ref(),
@@ -183,6 +185,7 @@ impl Effects {
             Effects::MethodCall(effect) => effect.as_mut(),
             Effects::VariableLoad(effect) => effect.as_mut(),
             Effects::FieldLoad(effect) => effect.as_mut(),
+            Effects::FieldSet(effect) => effect.as_mut(),
             Effects::CreateStruct(effect) => effect.as_mut(),
             Effects::FloatEffect(effect) => effect.as_mut(),
             Effects::IntegerEffect(effect) => effect.as_mut(),
@@ -268,6 +271,65 @@ impl DisplayIndented for FieldLoad {
     fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.calling.format(parsing, f)?;
         return write!(f, ".{}", self.name);
+    }
+}
+#[derive(Clone)]
+pub struct FieldSet {
+    pub calling: Effects,
+    pub name: String,
+    pub value: Effects,
+    loc: (u32, u32),
+}
+
+impl FieldSet {
+    pub fn new(calling: Effects, name: String, value: Effects, loc: (u32, u32)) -> Self {
+        return Self {
+            calling,
+            name,
+            value,
+            loc,
+        };
+    }
+}
+
+impl Effect for FieldSet {
+    fn is_return(&self) -> bool {
+        return false;
+    }
+
+    fn has_return(&self) -> bool {
+        return true;
+    }
+
+    fn finalize(&mut self, type_resolver: &mut dyn FinalizedTypeResolver) {
+        self.calling.finalize(type_resolver);
+        self.value.finalize(type_resolver);
+    }
+
+    fn return_type(&self) -> Option<ResolvableTypes> {
+        for field in self.calling.unwrap().return_type().as_ref().unwrap().unwrap().get_fields() {
+            if field.field.name == self.name {
+                return Some(field.field.field_type.clone());
+            }
+        }
+        panic!("Failed to find return type!")
+    }
+
+    fn get_location(&self) -> (u32, u32) {
+        return self.loc;
+    }
+
+    fn set_generics(&mut self, type_resolver: &mut dyn FinalizedTypeResolver, replacing: &HashMap<String, ResolvableTypes>) {
+        self.calling.as_mut().set_generics(type_resolver, replacing);
+        self.value.as_mut().set_generics(type_resolver, replacing);
+    }
+}
+
+impl DisplayIndented for FieldSet {
+    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.calling.format(parsing, f)?;
+        write!(f, ".{} = ", self.name)?;
+        return self.value.format(parsing, f);
     }
 }
 

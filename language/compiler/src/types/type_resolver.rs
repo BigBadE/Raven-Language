@@ -24,7 +24,7 @@ pub struct ParserTypeResolver {
     pub types_by_file: Rc<HashMap<String, Vec<Rc<Types>>>>,
     pub functions: Rc<HashMap<String, Function>>,
     pub operations: Rc<HashMap<String, Vec<String>>>,
-    pub unresolved: Rc<HashMap<String, (String, String, Vec<Function>)>>
+    pub unresolved: Rc<HashMap<String, (String, String, Vec<Function>)>>,
 }
 
 impl ParserTypeResolver {
@@ -35,7 +35,7 @@ impl ParserTypeResolver {
             types_by_file: Rc::new(HashMap::new()),
             functions: Rc::new(HashMap::new()),
             operations: Rc::new(HashMap::new()),
-            unresolved: Rc::new(HashMap::new())
+            unresolved: Rc::new(HashMap::new()),
         };
     }
 
@@ -256,7 +256,7 @@ impl TypeResolver for ParserTypeResolver {
         if !adding_types.name.contains("::") {
             return;
         }
-        let file = adding_types.name[..adding_types.name.len()-2-adding_types.name.split("::").last().unwrap().len()].to_string();
+        let file = adding_types.name[..adding_types.name.len() - 2 - adding_types.name.split("::").last().unwrap().len()].to_string();
         match unsafe { Rc::get_mut_unchecked(&mut self.types_by_file) }.get_mut(&file) {
             Some(vec) => vec.push(adding_types),
             None => {
@@ -300,7 +300,7 @@ pub struct CompilerTypeResolver<'a, 'ctx> {
     pub func_types: HashMap<String, ResolvableTypes>,
     pub variables: HashMap<String, (Rc<Types>, Option<BasicValueEnum<'ctx>>)>,
     pub imports: Rc<HashMap<String, HashMap<String, String>>>,
-    pub current_file: Vec<String>
+    pub current_file: Vec<String>,
 }
 
 impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
@@ -320,7 +320,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
             func_types: HashMap::new(),
             variables: HashMap::new(),
             imports,
-            current_file: Vec::new()
+            current_file: Vec::new(),
         };
     }
 
@@ -371,7 +371,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
                 continue;
             }
             let all: Vec<&str> = function.name.split("::").collect();
-            let all = &all[0..all.len()-2].to_vec();
+            let all = &all[0..all.len() - 2].to_vec();
             function.finalize(Some(&display(all, "::")), self);
             let func_value = get_func_value(&function, module, context, &self.llvm_types);
             new_functions.insert(name, (function, func_value));
@@ -394,7 +394,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
                 };
                 let mut type_manager = self.clone();
                 let all: Vec<&str> = function.split("::").collect();
-                let all = &all[0..all.len()-2].to_vec();
+                let all = &all[0..all.len() - 2].to_vec();
                 found.finalize_code(Some(&display(all, "::")), &mut type_manager);
             }
         }
@@ -413,7 +413,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
         if end_name.len() == name.len() {
             return input.get(name);
         }
-        let parent = &name[0..name.len()- end_name.len()-2].to_string();
+        let parent = &name[0..name.len() - end_name.len() - 2].to_string();
         return if parent.contains(":") {
             input.get(name)
         } else {
@@ -421,7 +421,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
                 Some(import) => {
                     let name = import.clone() + "::" + end_name;
                     input.get(&name)
-                },
+                }
                 None => {
                     for file in &self.current_file {
                         if let Some(found) = input.get(&(file.clone() + "::" + end_name)) {
@@ -442,7 +442,7 @@ impl<'a, 'ctx> CompilerTypeResolver<'a, 'ctx> {
                 Some(import) => {
                     let name = import.clone();
                     input.get(&name)
-                },
+                }
                 None => {
                     for file in &self.current_file {
                         if let Some(found) = input.get(&(file.clone() + "::" + name)) {
@@ -503,7 +503,7 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
 
         output.generics.clear();
         let all: Vec<&str> = function.split("::").collect();
-        let all = &all[0..all.len()-2].to_vec();
+        let all = &all[0..all.len() - 2].to_vec();
         output.finalize(Some(&display(all, "::")), self);
 
         let name = output.name.clone();

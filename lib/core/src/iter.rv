@@ -22,6 +22,7 @@ impl Iter<T> for NumberIter<T> {
     }
 
     pub fn is_end<T>(self: NumberIter<T>) -> bool {
+        self.last = self.last + 1;
         return self.last == self.end;
     }
 }

@@ -7,3 +7,7 @@ pub internal struct bool {}
 pub internal operation {}=={}(first: bool, second: bool) {
     return first == second;
 }
+
+pub internal operation {}+{}(first: i64, second: i64) {
+    return first + second;
+}
