@@ -390,7 +390,7 @@ impl Effect for MethodCall {
                     arguments.insert(0, self.calling.as_ref().unwrap().unwrap().return_type().unwrap())
                 }
 
-                let func = type_resolver.solidify_generics(&method, func.extract_generics(&arguments));
+                let func = type_resolver.solidify_generics(&method, &func.extract_generics(&arguments));
                 self.method = func.name.clone();
                 func.return_type.clone()
             },

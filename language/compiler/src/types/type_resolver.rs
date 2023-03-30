@@ -487,7 +487,7 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
         return None;
     }
 
-    fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function {
+    fn solidify_generics(&mut self, function: &String, generics: &HashMap<String, ResolvableTypes>) -> &Function {
         let mut output;
         {
             let temp = self.generics.clone();
@@ -535,8 +535,19 @@ impl<'a, 'ctx> FinalizedTypeResolver for CompilerTypeResolver<'a, 'ctx> {
                                         self.finalize(generic);
                                     }
 
-                                    let types = generic.structure.resolve_generics(self, generics);
-                                    *resolving = ResolvableTypes::Resolved(self.add_type(&generic, types));
+                                    let mut types = generic.structure.resolve_generics(self, &generics);
+                                    types.generics.clear();
+                                    let types = self.add_type(&generic, types);
+                                    let mut iter = ResolvableTypes::Resolved(self.types.get("iter::Iter").unwrap().clone());
+                                    if types.traits.contains(&iter) {
+                                        let mut temp_generics = HashMap::new();
+                                        temp_generics.insert("T".to_string(), generics.get(0).unwrap().clone());
+                                        self.solidify_generics(types.structure.functions
+                                                                   .iter().find(|func| func.contains("is_end")).unwrap(), &temp_generics);
+                                        self.solidify_generics(types.structure.functions
+                                                                   .iter().find(|func| func.contains("next")).unwrap(), &temp_generics);
+                                    }
+                                    *resolving = ResolvableTypes::Resolved(types);
                                 }
                                 None => {
                                     panic!("Unknown type {}!", name)

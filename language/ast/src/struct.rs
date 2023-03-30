@@ -37,7 +37,7 @@ impl Struct {
         }
     }
 
-    pub fn resolve_generics(&self, type_resolver: &mut dyn FinalizedTypeResolver, generics: Vec<ResolvableTypes>) -> Self {
+    pub fn resolve_generics(&self, type_resolver: &mut dyn FinalizedTypeResolver, generics: &Vec<ResolvableTypes>) -> Self {
         if generics.len() != self.generics.len() {
             panic!("Missing correct amount of generics for generic function!");
         }
@@ -65,6 +65,7 @@ impl Struct {
                 (returning.generics.get(i).unwrap().0.clone(), generics.get(i).unwrap().clone()));
         }
         returning.generics = Vec::new();
+
         return returning;
     }
 

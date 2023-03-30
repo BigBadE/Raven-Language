@@ -26,7 +26,7 @@ pub trait FinalizedTypeResolver {
 
     fn get_import(&self, name: &String) -> Option<&String>;
 
-    fn solidify_generics(&mut self, function: &String, generics: HashMap<String, ResolvableTypes>) -> &Function;
+    fn solidify_generics(&mut self, function: &String, generics: &HashMap<String, ResolvableTypes>) -> &Function;
 
     fn finalize(&mut self, resolving: &mut ResolvableTypes);
 
