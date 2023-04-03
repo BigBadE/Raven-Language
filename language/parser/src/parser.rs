@@ -1,11 +1,14 @@
 use std::fmt::{Display, Formatter};
-use ast::type_resolver::TypeResolver;
+use std::sync::{Arc, Mutex};
+use anyhow::Error;
+use syntax::syntax::Syntax;
+use syntax::type_resolver::TypeResolver;
+use syntax::types::UnresolvedGenericTypes;
 use crate::top_elements::{parse_top_elements};
 use crate::util::get_line;
 
 #[derive(Clone)]
 pub struct ParseInfo<'a> {
-    pub errors: Vec<ParseError>,
     pub buffer: &'a [u8],
     pub index: usize,
     pub indent: String,
@@ -17,7 +20,6 @@ pub struct ParseInfo<'a> {
 impl<'a> ParseInfo<'a> {
     pub fn new(buffer: &'a [u8]) -> Self {
         return Self {
-            errors: Vec::new(),
             len: buffer.len() as usize,
             buffer,
             index: 0,
@@ -25,6 +27,10 @@ impl<'a> ParseInfo<'a> {
             line: 1,
             line_index: 0
         }
+    }
+
+    pub fn create_error(_error: String) {
+        panic!("Missed error!");
     }
 
     pub fn find_next(&mut self, char: u8) -> bool {
@@ -164,12 +170,6 @@ impl<'a> ParseInfo<'a> {
         return true;
     }
 
-    pub fn create_error(&mut self, error: String) {
-        self.errors.push(ParseError::new(self.line, (self.index-self.line_index) as u64,
-                               get_line(self.buffer, self.line_index), error));
-        self.skip_line();
-    }
-
     pub fn skip_line(&mut self) {
         let line = self.line.clone();
         while line == self.line {
@@ -220,14 +220,7 @@ impl Display for ParseError {
     }
 }
 
-pub fn parse(type_manager: &mut dyn TypeResolver,
-                 name: &String, input: String) -> Result<(), Vec<ParseError>> {
-    let mut parsing = ParseInfo::new(input.as_bytes());
-
-    parse_top_elements(type_manager, name, &mut parsing);
-
-    if !parsing.errors.is_empty() {
-        return Err(parsing.errors);
-    }
-    return Ok(());
+pub async fn parse(syntax: &Arc<Mutex<Syntax>>,
+                 name: &String, input: String) -> Result<(), Error> {
+    return parse_top_elements(syntax, name, ParseInfo::new(input.as_bytes()));
 }

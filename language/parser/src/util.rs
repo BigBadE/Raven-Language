@@ -1,75 +1,70 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-use ast::code::{Effects, Field};
-use ast::function::{Arguments, CodeBody};
-use ast::type_resolver::TypeResolver;
-use ast::types::ResolvableTypes;
+use syntax::code::{Effects, Field};
+use syntax::function::{Arguments, CodeBody};
+use syntax::ParsingError;
+use syntax::r#struct::Struct;
+use syntax::syntax::Syntax;
+use syntax::type_resolver::TypeResolver;
+use syntax::types::{ResolvableTypes, Types};
 
 use crate::code::{parse_effect, parse_expression};
+use crate::imports::ImportManager;
 use crate::parser::ParseInfo;
 
-pub fn parse_fields(parent: Option<String>, parsing: &mut ParseInfo) -> Option<Vec<Field>> {
+pub fn parse_fields(parent: Option<String>, parsing: &mut ParseInfo) -> Result<Vec<(String, String)>, ParsingError> {
     let mut output = Vec::new();
     let mut info = parsing.clone();
     while let Some(found) = find_if_first(parsing, b',', b')') {
-        output.push(match parse_field(&parent, found, &mut info) {
-            Some(found) => found,
-            None => {
-                parsing.create_error(info.errors.get(0).unwrap().error.clone());
-                return None;
-            }
-        });
+        output.push(parse_field(&parent, found)?);
         info = parsing.clone();
     }
 
     if let Some(found) = parsing.parse_to(b')') {
         if !found.is_empty() {
-            output.push(match parse_field(&parent, found, &mut info) {
-                Some(found) => found,
-                None => {
-                    parsing.create_error(info.errors.get(0).unwrap().error.clone());
-                    return None;
-                }
-            })
+            output.push(parse_field(&parent, found)?)
         }
     }
 
-    return Some(output);
+    return Ok(output);
 }
 
 pub fn parse_struct_fields() {}
 
-fn parse_field(parent: &Option<String>, string: String, parser: &mut ParseInfo) -> Option<Field> {
+fn parse_field(parent: &Option<String>, string: String) -> Result<(String, String), ParsingError> {
     let mut parts = string.split(':');
     let name = parts.next().unwrap();
     if name.len() == string.len() {
-        parser.create_error("Missing type for field.".to_string());
-        return None;
+        return Err(ParsingError::new((0, 0), (0, 0), "Missing type for field.".to_string()));
     }
 
     let body = &string[name.len()+1..].to_string().replace(" ", "");
     if body.contains(")") {
-        if name == "self" {
+        return if name == "self" {
             match parent {
-                Some(parent) => return Some(Field::new("self".to_string(), ResolvableTypes::Resolving(parent.clone()))),
-                None => parser.create_error("Cannot have self outside of struct!".to_string())
+                Some(parent) => Ok(("self".to_string(), parent.clone())),
+                None =>
+                    Err(ParsingError::new((0, 0), (0, 0), "Cannot have self outside of struct!".to_string()))
             }
         } else {
-            parser.create_error("Field missing type!".to_string());
+            Err(ParsingError::new((0, 0), (0, 0), "Missing type for field.".to_string()))
         }
-        return None;
     }
-    return Some(Field::new(name.to_string(), ResolvableTypes::Resolving(body.to_string())));
+    return Ok((name.to_string(), body.to_string()));
 }
 
-pub fn parse_code_block(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<CodeBody> {
+/// Async code parsing. Parsing must continue while other parts wait to prevent deadlocks.
+/// To do this, the method provides a "done" callback it will use for the finalized result, but will
+/// return as soon as parsing is finished.
+pub async fn parse_code_block(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo) -> Option<CodeBody> {
     if let None = parsing.parse_to(b'{') {
         parsing.create_error("Expected code body".to_string());
         return None;
     }
 
     let mut expressions = Vec::new();
-    while let Some(expression) = parse_expression(type_manager, parsing) {
+    while let Some(expression) = parse_expression(syntax, import_manager, parsing) {
         expressions.push(expression);
 
         match parsing.next_included() {
@@ -82,7 +77,8 @@ pub fn parse_code_block(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo
         }
     }
 
-    return Some(CodeBody::new(expressions));
+    import_manager.code_block_id += 1;
+    return Some(CodeBody::new(expressions, import_manager.code_block_id.to_string()));
 }
 
 pub fn get_line(buffer: &[u8], start: usize) -> String {
@@ -104,23 +100,23 @@ pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<S
     return None;
 }
 
-pub fn parse_arguments(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Arguments {
+pub fn parse_arguments(syntax: &Arc<Mutex<Syntax>>, import_manger: &mut ImportManager, parsing: &mut ParseInfo) -> Vec<Effects> {
     let mut output = Vec::new();
     if parsing.matching(")") {
-        return Arguments::new(output);
+        return output;
     }
     while parsing.buffer[parsing.index - 1] != b')' {
-        if let Some(effect) = parse_effect(type_manager, parsing, &[b',', b')']) {
+        if let Some(effect) = parse_effect(syntax, import_manger, parsing, &[b',', b')']) {
             output.push(effect);
         } else {
             parsing.create_error("Missing effect!".to_string());
             break;
         }
     }
-    return Arguments::new(output);
+    return output;
 }
 
-pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Vec<(String, Effects)> {
+pub fn parse_struct_args(parsing: &mut ParseInfo) -> Vec<(String, Effects)> {
     let mut output = Vec::new();
     while parsing.len != parsing.index && !parsing.matching("}") {
         let found_name;
@@ -143,7 +139,7 @@ pub fn parse_struct_args(type_manager: &dyn TypeResolver, parsing: &mut ParseInf
             }
         }
 
-        output.push((found_name, parse_effect(type_manager, parsing, &[b',', b';', b'}']).expect("No effect!")));
+        output.push((found_name, parse_effect(syntax, parsing, &[b',', b';', b'}']).expect("No effect!")));
         parsing.index -= 1;
         if (parsing.buffer[parsing.index - 1] == b'}' && !parsing.find_next(b'}')) || parsing.buffer[parsing.index - 1] == b';' {
             parsing.create_error("Missing comma after structure initializer value".to_string());
@@ -168,7 +164,7 @@ pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Ve
     }
 }
 
-pub fn parse_generics_vec(parsing: &mut ParseInfo, generics: &mut Vec<(String, Vec<ResolvableTypes>)>) {
+pub fn parse_generics_vec(parsing: &mut ParseInfo, generics: &mut Vec<(String, Vec<String>)>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
         generics.push(parse_generic(value));
     }
@@ -180,7 +176,7 @@ pub fn parse_generics_vec(parsing: &mut ParseInfo, generics: &mut Vec<(String, V
     }
 }
 
-pub fn parse_generic(value: String) -> (String, Vec<ResolvableTypes>) {
+pub fn parse_generic(value: String) -> (String, Vec<String>) {
     let mut split = value.split(':');
     let name = split.next().unwrap();
     let mut found = Vec::new();
@@ -188,7 +184,7 @@ pub fn parse_generic(value: String) -> (String, Vec<ResolvableTypes>) {
         Some(constraint) => {
             let mut constraints = constraint.split('+');
             while let Some(constraint) = constraints.next() {
-                found.push(ResolvableTypes::Resolving(constraint.to_string().replace(" ", "")));
+                found.push(constraint.to_string().replace(" ", ""));
             }
         }
         None => {}

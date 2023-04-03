@@ -1,27 +1,32 @@
-use ast::blocks::{ForStatement, IfStatement, SwitchStatement};
-use ast::code::{Effect, Effects};
-use ast::type_resolver::TypeResolver;
+use std::future::Future;
+use std::process::Output;
+use std::sync::{Arc, Mutex};
+use syntax::blocks::{ForStatement, IfStatement, SwitchStatement};
+use syntax::code::{Effect, Effects};
+use syntax::ParsingError;
+use syntax::syntax::Syntax;
+use syntax::type_resolver::TypeResolver;
 use crate::code::parse_effect;
+use crate::imports::ImportManager;
 use crate::parser::ParseInfo;
 use crate::util::parse_code_block;
 
-pub fn parse_if(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Effects> {
+pub fn parse_if(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
+                -> Result<impl Future<Output=Effects>, ParsingError> {
     let type_manager = type_manager.clone();
-    let effect = parse_effect(type_manager, parsing, &[b'{', b'}', b';']);
+    let effect = parse_effect(syntax, import_manager, parsing, &[b'{', b'}', b';'])?;
     parsing.index -= 1;
 
     let mut statement;
     match effect {
-        Some(effect) => match parse_code_block(type_manager, parsing) {
+        Some(effect) => match parse_code_block(syntax, import_manager, parsing) {
             Some(body) => statement = IfStatement::new(body, effect, parsing.loc()),
             None => {
-                parsing.create_error("If statement lacks body".to_string());
-                return None;
+                return Err(ParsingError::new((0, 0), (0, 0), "If statement lacks body".to_string()));
             }
         },
         None => {
-            parsing.create_error("If statement lacks a condition".to_string());
-            return None;
+            return Err(ParsingError::new((0, 0), (0, 0), "If statement lacks a condition".to_string()));
         }
     }
 
@@ -112,7 +117,7 @@ pub fn parse_for(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Op
 
     let iterating = parse_effect(type_manager, parsing, &[b'{', b'}', b';']);
 
-    if parsing.buffer[parsing.index-1] != b'{' {
+    if parsing.buffer[parsing.index - 1] != b'{' {
         parsing.create_error("Unexpected end to for loop statement!".to_string());
         return None;
     }
@@ -144,7 +149,7 @@ pub fn parse_switch(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) ->
         }
     };
 
-    if parsing.buffer[parsing.index-1] != b'{' {
+    if parsing.buffer[parsing.index - 1] != b'{' {
         parsing.create_error("Unexpected end to switch!".to_string());
         return None;
     }

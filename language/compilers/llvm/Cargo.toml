@@ -1,0 +1,11 @@
+[package]
+name = "compiler-llvm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+parser = { path = "../../parser" }
+syntax = { path = "../../syntax" }
+
+llvm-sys = "130.0.0"
+inkwell = { version = "0.1.1", features = [ "llvm13-0" ] }

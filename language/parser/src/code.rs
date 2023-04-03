@@ -1,48 +1,57 @@
+use std::future::Future;
 use std::mem;
-use ast::code::{AssignVariable, CreateStruct, Effects, Expression, ExpressionType, FieldLoad, FieldSet, MethodCall, OperatorEffect, VariableLoad};
-use ast::type_resolver::TypeResolver;
-use ast::types::ResolvableTypes;
+use std::sync::{Arc, Mutex};
+use anyhow::Error;
+use syntax::code::{AssignVariable, CreateStruct, Effects, Expression, ExpressionType, FieldLoad, FieldSet, MethodCall, OperatorEffect, VariableLoad};
+use syntax::ParsingError;
+use syntax::syntax::Syntax;
+use syntax::type_resolver::TypeResolver;
+use syntax::types::ResolvableTypes;
 use crate::conditional::{parse_for, parse_if, parse_switch};
+use crate::imports::ImportManager;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
 use crate::parser::ParseInfo;
 use crate::util::{parse_arguments, parse_code_block, parse_struct_args};
 
-pub fn parse_expression(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Expression> {
-    return if parsing.matching("return") {
-        Some(Expression::new(ExpressionType::Return,
-                             parse_effect(type_manager, parsing, &[b';', b'}'])
-                                 .unwrap_or(Effects::NOP())))
+pub fn parse_expression(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
+                        -> Result<impl Future<Output=Effects>, ParsingError> {
+    let expression_type = if parsing.matching("return") {
+        ExpressionType::Return
     } else if parsing.matching("break") {
-        Some(Expression::new(ExpressionType::Break,
-                             parse_effect(type_manager, parsing, &[b';', b'}'])
-                                 .unwrap_or(Effects::NOP())))
+        ExpressionType::Break
     } else {
-        Some(Expression::new(ExpressionType::Line,
-                             parse_effect(type_manager, parsing, &[b';', b'}'])?))
+        ExpressionType::Line
     };
+    let handle = syntax.lock().unwrap().manager.handle().clone();
+    return Ok(handle.spawn(
+        async_parse_expression(expression_type, parse_effect(syntax, import_manager, parsing, &[b';', b'}'])?)));
 }
 
-pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, escape: &[u8]) -> Option<Effects> {
+async fn async_parse_expression(expression_type: ExpressionType, effect: impl Future<Output=Effects>) -> Expression {
+    return Expression::new(expression_type, effect.await);
+}
+
+pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo, escape: &[u8])
+                    -> Result<impl Future<Output=Effects>, ParsingError> {
     let mut last = None;
-    let mut assigning = None;
-    if parsing.matching("let") {
-        match parsing.parse_to(b'=') {
-            Some(name) => {
-                assigning = Some(name)
-            }
-            None => {
-                parsing.create_error("Missing name for variable assignment".to_string());
-                return None;
-            }
-        }
-    }
 
     if parsing.matching("if") {
-        last = parse_if(type_manager, parsing);
+        last = Some(parse_if(syntax, import_manager, parsing)?);
     } else if parsing.matching("for") {
         return parse_for(type_manager, parsing);
     } else if parsing.matching("switch") {
         last = parse_switch(type_manager, parsing);
+    } else if parsing.matching("let") {
+        match parsing.parse_to(b'=') {
+            Some(name) => {
+                return parse_effect(syntax, parsing, escape, |effect|
+                    done(Effects::Set(Effects::String(name), effect)));
+            }
+            None => {
+                parsing.create_error("Missing name for variable assignment".to_string());
+                return Ok(());
+            }
+        }
     } else {
         while let Some(next) = parsing.next_included() {
             match next {
@@ -50,8 +59,7 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                 b'{' => {
                     if last.is_some() {
                         match last.unwrap() {
-                            Effects::VariableLoad(variable_load) => {
-                                let structure = variable_load.name;
+                            Effects::Load(from, name) => {
                                 last = Some(Effects::CreateStruct(
                                     Box::new(CreateStruct::new(ResolvableTypes::Resolving(structure),
                                                                parse_struct_args(type_manager, parsing), parsing.loc()))));
@@ -147,9 +155,10 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                     parsing.index -= 1;
                     let name = parse_with_references(parsing);
                     match parsing.buffer[parsing.index] {
+                        //TODO macros
                         b'!' => todo!(),
                         _ => {
-                            last = Some(Effects::VariableLoad(Box::new(VariableLoad::new(name, parsing.loc()))));
+                            last = Some(Effects::Load(None, name));
                         }
                     }
                 }
@@ -157,7 +166,7 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
                     parsing.index -= 1;
                     match parse_operator(type_manager, parsing, &mut last, escape) {
                         Some(operator) => last = Some(Effects::OperatorEffect(operator)),
-                        None => return None
+                        None => return Ok(())
                     }
                     break;
                 }
@@ -165,14 +174,8 @@ pub fn parse_effect(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo, es
         }
     }
 
-    return match assigning {
-        Some(name) => match last {
-            Some(last) => Some(Effects::AssignVariable(Box::new(
-                AssignVariable::new(name, last, parsing.loc())))),
-            None => last
-        },
-        None => last
-    };
+    done(last);
+    return Ok(());
 }
 
 fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,

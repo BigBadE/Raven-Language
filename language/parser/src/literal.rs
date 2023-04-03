@@ -1,4 +1,4 @@
-use ast::code::{Effects, NumberEffect};
+use syntax::code::{Effects, NumberEffect};
 use crate::parser::ParseInfo;
 
 pub fn parse_string(parsing: &mut ParseInfo) -> Option<String> {

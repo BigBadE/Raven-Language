@@ -1,51 +1,43 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::rc::Rc;
-use ast::function::{CodeBody, Function};
-use ast::{Attribute, get_modifier, is_modifier, Modifier};
-use ast::code::{Field, MemberField};
-use ast::r#struct::Struct;
-use ast::type_resolver::TypeResolver;
-use ast::types::{ResolvableTypes, Types};
+use std::sync::{Arc, Mutex};
+use anyhow::Error;
+use syntax::function::{CodeBody, Function};
+use syntax::{Attribute, get_modifier, ImplManager, is_modifier, Modifier, ParsingError};
+use syntax::code::{Field, MemberField};
+use syntax::r#struct::Struct;
+use syntax::syntax::Syntax;
+use syntax::type_resolver::TypeResolver;
+use crate::imports::ImportManager;
 use crate::literal::{parse_ident, parse_with_references};
 use crate::parser::ParseInfo;
 use crate::util::{find_if_first, parse_code_block, parse_fields, parse_generics, parse_generics_vec};
 
-pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
-                          name: &String, parsing: &mut ParseInfo) {
+pub fn parse_top_elements(syntax: &Arc<Mutex<Syntax>>,
+                          name: &String, mut parsing: ParseInfo) -> Result<(), Error> {
+    let mut import_manager = ImportManager::new(name.clone());
     while let Some(_) = parsing.next_included() {
         parsing.index -= 1;
-        let attributes = parse_attributes(parsing, false);
-        let modifiers = get_modifier(parse_modifiers(parsing).as_slice());
+        let attributes = parse_attributes(&mut parsing, false);
+        let modifiers = get_modifier(parse_modifiers(&mut parsing).as_slice());
 
         if parsing.matching("import") {
-            let importing = parse_with_references(parsing);
-            type_manager.add_import(&name, importing.replace(" ", ""));
+            let mut importing = parse_with_references(&mut parsing);
+            import_manager.imports.insert(importing.split("::").last().unwrap().to_string(), importing);
             if !parsing.matching(";") {
                 parsing.create_error("Missing semicolon!".to_string());
             }
         } else if parsing.matching("impl") {
-            match parse_impl(type_manager, parsing) {
-                Some((original, implementing, functions)) => type_manager.add_unresolved_type(name.clone(), original, implementing, functions),
-                None => {}
-            };
+            parse_impl(syntax, &mut import_manager, &mut parsing)?;
         } else if parsing.matching("trait") {
-            match parse_struct_type(type_manager, name, modifiers, parsing, true) {
-                Some(trait_type) => type_manager.add_type(Rc::new(trait_type)),
-                None => {}
-            };
+            parse_struct_type(syntax, &mut import_manager, modifiers, &mut parsing, true)?;
         } else if parsing.matching("struct") {
-            match parse_struct_type(type_manager, name, modifiers, parsing, false) {
-                Some(struct_type) => type_manager.add_type(Rc::new(struct_type)),
-                None => {}
-            };
+            parse_struct_type(syntax, &mut import_manager, modifiers, &mut parsing, false)?;
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
-            match parse_function(type_manager, None, name, attributes, modifiers, parsing, true) {
+            match parse_function(&mut import_manager, attributes, modifiers, &mut parsing, true) {
                 Some(function) => {
-                    if is_modifier(modifiers, Modifier::Operation) {
-                        //Add only the method name.
-                        type_manager.add_operation(function.name[name.len() + 2..].to_string(), function.name.clone());
-                    }
-                    type_manager.add_function(function)
+                    syntax.add_function(function);
                 }
                 None => {}
             };
@@ -61,27 +53,32 @@ pub fn parse_top_elements(type_manager: &mut dyn TypeResolver,
             }
         }
     }
+    return Ok(());
 }
 
-fn parse_impl(type_manager: &mut dyn TypeResolver, parsing: &mut ParseInfo) -> Option<(String, String, Vec<Function>)> {
+fn parse_impl(syntax: &Arc<Mutex<Syntax>>,
+              import_manager: &mut ImportManager, parsing: &mut ParseInfo) -> Result<(), Error> {
     parsing.next_included();
     parsing.index -= 1;
+    let mut last = parsing.loc();
     let implementing = match parsing.parse_to_space() {
         Some(found) => found,
         None => {
-            parsing.create_error("Unexpected EOF".to_string());
-            return None;
+            syntax.lock().unwrap().structures.insert(import_manager.current.clone(),
+                                                     Arc::new(Struct::new_poisoned("$file".to_string(),
+                                                                                   ParsingError::new(last, parsing.loc(), "Unexpected EOF".to_string()))));
+            return Ok(());
         }
     }.split("<").next().unwrap().to_string();
     if !parsing.matching("for") {
         parsing.create_error("Expected for in impl".to_string());
-        return None;
+        return Ok(());
     }
-    let base = match parsing.parse_to(b'{')  {
+    let base = match parsing.parse_to(b'{') {
         Some(found) => found,
         None => {
             parsing.create_error("Unexpected EOF".to_string());
-            return None;
+            return Ok(());
         }
     }.split("<").next().unwrap().to_string();
     let mut functions = Vec::new();
@@ -89,16 +86,17 @@ fn parse_impl(type_manager: &mut dyn TypeResolver, parsing: &mut ParseInfo) -> O
         Some(character) => character != b'}',
         None => {
             parsing.create_error("Unexpected EOF before end of impl!".to_string());
-            return None;
+            return Ok(());
         }
     } {
         parsing.index -= 1;
         let attributes = parse_attributes(parsing, false);
         let modifiers = parse_modifiers(parsing);
-
+        let mut import_manager = import_manager.clone();
+        import_manager.current = implementing.clone();
         if parsing.matching("fn") {
-            match parse_function(type_manager, Some(implementing.clone()), &implementing, attributes,
-                                 get_modifier(modifiers.as_slice()), parsing, true) {
+            match parse_function(&mut import_manager, attributes,
+                                 get_modifier(modifiers.as_slice()), parsing, true)? {
                 Some(function) => {
                     functions.push(function);
                     continue;
@@ -107,11 +105,32 @@ fn parse_impl(type_manager: &mut dyn TypeResolver, parsing: &mut ParseInfo) -> O
             }
         }
     }
-    return Some((base, implementing, functions));
+    let locked = syntax.lock()?;
+    locked.manager.handle().spawn(add_impl(syntax.clone(), base,
+                                           implementing, functions,
+                                           import_manager.clone()));
+    return Ok(());
 }
 
-fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
-                     modifiers: u8, parsing: &mut ParseInfo, is_trait: bool) -> Option<Types> {
+async fn add_impl(syntax: Arc<Mutex<Syntax>>, base: String,
+                  implementing: String, functions: Vec<Arc<Function>>,
+                  import_manager: ImportManager) {
+    let import_manager = Box::new(import_manager);
+    let mut base = Syntax::get_struct(syntax.clone(), base, import_manager.clone()).await;
+    let implementing = Syntax::get_struct(syntax, implementing, import_manager).await;
+
+    //This is safe because it satisfies both requirements of get_mut_unchecked:
+    //1: No borrows of another type. Types don't ever return references to inner types.
+    //2: No dereferenced borrows. No borrows are dereferenced until after everything is parsed.
+    let mutable = unsafe { Arc::get_mut_unchecked(&mut base) };
+    mutable.traits.push(implementing);
+    for func in functions {
+        mutable.functions.push(func);
+    }
+}
+
+fn parse_struct_type(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager,
+                     mut modifiers: u8, parsing: &mut ParseInfo, is_trait: bool) -> Result<(), Error> {
     let mut fn_name = String::new();
     let mut generics = Vec::new();
 
@@ -129,14 +148,15 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
             Some(found) => found,
             None => {
                 parsing.create_error("Expected bracket!".to_string());
-                return None;
+                return Ok(());
             }
         };
-        let subtypes: Vec<ResolvableTypes> = subtypes.split("+").map(|found| ResolvableTypes::Resolving(found.to_string())).collect();
+        let subtypes: Vec<String> = subtypes.split("+").map(
+            |found| found.replace(" ", "").to_string()).collect();
 
         if subtypes.len() > 1 && !is_trait {
             parsing.create_error("Can't have multiple supertypes on a structure. Implement traits using the impl keyword!".to_string());
-            return None;
+            return Ok(());
         }
 
         parent_types = subtypes;
@@ -145,7 +165,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
             Some(name) => name.clone(),
             None => {
                 parsing.create_error("Expected bracket!".to_string());
-                return None;
+                return Ok(());
             }
         };
     } else {
@@ -162,7 +182,7 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
         Some(character) => character != b'}',
         None => {
             parsing.create_error("Unexpected EOF before end of struct!".to_string());
-            return None;
+            return Ok(());
         }
     } {
         parsing.index -= 1;
@@ -170,62 +190,74 @@ fn parse_struct_type(type_manager: &mut dyn TypeResolver, name: &String,
         let modifiers = parse_modifiers(parsing);
 
         if parsing.matching("fn") {
-            match parse_function(type_manager, Some(fn_name.clone()), &fn_name, attributes, get_modifier(modifiers.as_slice()),
-                                 parsing, !is_trait) {
-                Some(mut function) => {
-                    if function.fields.iter().any(|field| field.name == "self") {
-                        for (key, val) in &generics {
-                            function.generics.insert(key.clone(), val.clone());
-                        }
-                        functions.push(function.name.clone());
-                    }
-                    type_manager.add_function(function);
-                    continue;
-                }
-                None => {}
-            }
+            let mut import_manager = Box::new(import_manager.clone());
+            import_manager.current = fn_name.clone();
+            functions.push(parse_function(&mut import_manager, attributes, get_modifier(modifiers.as_slice()),
+                                 parsing, !is_trait)?);
         }
 
         let field_name = match parsing.parse_to(b':') {
             Some(field_name) => field_name,
             None => {
                 parsing.create_error("Expected field name!".to_string());
-                return None;
+                return Ok(());
             }
         };
-
 
         let field_type = match parsing.parse_to(b';') {
-            Some(field_type) => ResolvableTypes::Resolving(field_type),
+            Some(field_type) => field_type,
             None => {
                 parsing.create_error("Expected field type!".to_string());
-                return None;
+                return Ok(());
             }
         };
 
-        fields.push(MemberField::new(get_modifier(modifiers.as_slice()),
-                                     Field::new(field_name, field_type)));
+        fields.push((get_modifier(modifiers.as_slice()), field_name, field_type));
     }
 
-    return if is_trait {
-        //TODO figure out pointer size
+    if is_trait {
         if (modifiers & Modifier::Trait as u8) != 0 {
             panic!("Traits can't have internal or external modifiers!");
         }
-        let modifiers = modifiers + Modifier::Trait as u8;
-        Some(Types::new_trait(8, Struct::new(Some(fields), generics, functions, modifiers, fn_name),
-                              parent_types))
+        modifiers = modifiers + Modifier::Trait as u8;
     } else {
         if !parent_types.is_empty() && !fields.is_empty() {
             panic!("Subtypes can't declare new fields!");
         }
-        Some(Types::new_struct(Struct::new(Some(fields), generics, functions, modifiers, fn_name),
-                               parent_types.get(0).map(|found| found.clone()), Vec::new()))
     }
+    syntax.lock()?.manager.handle().spawn(add_struct(syntax.clone(), fields, generics,
+                                                     functions, modifiers, fn_name, Box::new(import_manager.clone())));
+    return Ok(());
 }
 
-fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name: &String, attributes: HashMap<String, Attribute>,
-                  modifiers: u8, parsing: &mut ParseInfo, parse_body: bool) -> Option<Function> {
+async fn add_struct(syntax: Arc<Mutex<Syntax>>, fields: Vec<(u8, String, String)>, generics: Vec<(String, Vec<String>)>,
+                    functions: Vec<impl Future<Output=Function>>, modifiers: u8, fn_name: String, import_manager: Box<ImportManager>) {
+    let fields = fields.iter().map(|(modifiers, name, field_type)|
+        MemberField::new(modifiers, Field::new(name,
+                                               Syntax::get_struct(syntax.clone(),
+                                                                  field_type, import_manager.clone()))))
+        .collect();
+    let generics = generics.iter().map(|(name, bounds)| bounds.iter().map(|bound|
+        Syntax::get_struct(syntax.clone(), bound, import_manager.clone())).collect()).collect();
+
+    let mut out_functions = Vec::new();
+    for mut function in functions {
+        let mut function = function.await;
+        
+        if function.fields.iter().any(|field| field.name == "self") {
+            for generic in generics {
+                function.generics.push(generic);
+            }
+            out_functions.push(Arc::new(function));
+        } else {
+            syntax.lock().unwrap().add_function(Arc::new(function));
+        }
+    }
+    syntax.lock().unwrap().add_struct(Arc::new(Struct::new(fields, generics, out_functions, modifiers, fn_name)));
+}
+
+fn parse_function(import_manager: &mut ImportManager, attributes: HashMap<String, Attribute>, modifiers: u8,
+                  parsing: &mut ParseInfo, parse_body: bool) -> Result<impl Future<Output=Function>, ParsingError> {
     let fn_name;
     let mut generics = HashMap::new();
 
@@ -242,14 +274,14 @@ fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name:
             Some(name) => name.clone(),
             None => {
                 parsing.create_error("Expected string name".to_string());
-                return None;
+                return Ok(None);
             }
         }.as_str();
     }
 
     let fields = match parse_fields(parent, parsing) {
         Some(fields) => fields,
-        None => return None
+        None => None
     };
 
     let return_type = if parsing.matching("->") {
@@ -261,7 +293,7 @@ fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name:
                 }
                 None => {
                     parsing.create_error("Expected code body".to_string());
-                    return None;
+                    return Ok(None);
                 }
             }
         } else {
@@ -272,7 +304,7 @@ fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name:
                 }
                 None => {
                     parsing.create_error("Expected no body on trait function".to_string());
-                    return None;
+                    return Ok(None);
                 }
             }
         }
@@ -284,20 +316,25 @@ fn parse_function(type_manager: &dyn TypeResolver, parent: Option<String>, name:
         if !parsing.matching(";") {
             parsing.create_error("Unexpected body on function!".to_string());
         }
-        return Some(Function::new(attributes, modifiers, fields, generics, CodeBody::new(Vec::new()), return_type, fn_name));
+        import_manager.code_block_id += 1;
+        return Ok(Some(Arc::new(Function::new(attributes, modifiers, fields, generics,
+                                              CodeBody::new(Vec::new(),
+                                                            import_manager.code_block_id.to_string()),
+                                              return_type, fn_name))));
     }
 
     let code = if !is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
-        match parse_code_block(type_manager, parsing) {
+        match parse_code_block(import_manager, parsing) {
             Some(code) => code,
-            None => return None
+            None => return Ok(None)
         }
     } else {
         parsing.find_end();
-        CodeBody::new(Vec::new())
+        import_manager.code_block_id += 1;
+        CodeBody::new(Vec::new(), import_manager.code_block_id.to_string())
     };
 
-    return Some(Function::new(attributes, modifiers, fields, generics, code, return_type, fn_name));
+    return Ok(Some(Arc::new(Function::new(attributes, modifiers, fields, generics, code, return_type, fn_name))));
 }
 
 fn parse_modifiers(parsing: &mut ParseInfo) -> Vec<Modifier> {

@@ -1,0 +1,11 @@
+[package]
+name = "compilers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+syntax = { path = "../../syntax" }
+
+# Util
+anyhow = "1.0.70"
+async-trait = "0.1.68"

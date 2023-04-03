@@ -1,7 +1,11 @@
 [workspace]
-
 members = [
-    "language/ast",
-    "language/compiler",
+    "language/checker",
+    "language/cli",
     "language/parser",
+    "language/runner",
+    "language/syntax",
+
+    "language/compilers/compilers",
+    "language/compilers/llvm",
 ]

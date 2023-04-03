@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ast = { path = "../ast" }
+syntax = { path = "../syntax" }
+
+anyhow = "1.0.70"
