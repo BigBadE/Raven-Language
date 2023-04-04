@@ -1,13 +1,10 @@
 use std::future::Future;
 use std::mem;
 use std::sync::{Arc, Mutex};
-use anyhow::Error;
-use syntax::code::{AssignVariable, CreateStruct, Effects, Expression, ExpressionType, FieldLoad, FieldSet, MethodCall, OperatorEffect, VariableLoad};
+use syntax::code::{Effects, ExpressionType};
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
-use syntax::type_resolver::TypeResolver;
-use syntax::types::ResolvableTypes;
-use crate::async_code::{async_create_struct, async_field_load, async_method_call, async_parse_expression, async_parse_operator, async_set};
+use crate::async_code::{async_create_struct, async_field_load, async_finished, async_method_call, async_parse_expression, async_parse_operator, async_set};
 use crate::conditional::{parse_for, parse_if, parse_switch};
 use crate::imports::ImportManager;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
@@ -15,7 +12,7 @@ use crate::parser::ParseInfo;
 use crate::util::{parse_arguments, parse_code_block, parse_struct_args};
 
 pub fn parse_expression(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
-                        -> Result<impl Future<Output=Effects>, ParsingError> {
+                        -> Result<impl Future<Output=Result<Effects, ParsingError>>, ParsingError> {
     let expression_type = if parsing.matching("return") {
         ExpressionType::Return
     } else if parsing.matching("break") {
@@ -30,7 +27,7 @@ pub fn parse_expression(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut Import
 
 pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo,
                     escape: &[u8], operators: bool)
-                    -> Result<impl Future<Output=Effects>, ParsingError> {
+                    -> Result<impl Future<Output=Result<Effects, ParsingError>>, ParsingError> {
     let mut last = None;
 
     if parsing.matching("if") {
@@ -38,15 +35,15 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
     } else if parsing.matching("for") {
         return parse_for(syntax, import_manager, parsing);
     } else if parsing.matching("switch") {
-        last = parse_switch(syntax, import_manager, parsing)?;
+        last = Some(parse_switch(syntax, import_manager, parsing)?);
     } else if parsing.matching("let") {
         return match parsing.parse_to(b'=') {
             Some(name) => {
-                Ok(async_set(name, parse_effect(syntax, import_manager, parsing, escape, operators)?))
+                Ok(async_set(name, parse_effect(syntax, import_manager, parsing, escape, true)?))
             }
             None => {
-                parsing.create_error("Missing name for variable assignment".to_string());
-                Ok(())
+                Err(ParsingError::new((0, 0), (0, 0),
+                                      "Missing name for variable assignment".to_string()))
             }
         };
     }
@@ -55,27 +52,20 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
             _ if escape.contains(&next) => break,
             b'{' => {
                 if let Some(found) = last {
-                    match found {
-                        Effects::Load(_from, name) => {
-                            last = Some(async_create_struct(syntax, Box::new(import_manager.clone()), name,
-                                                            parse_struct_args(syntax, import_manager, parsing)?));
-                        }
-                        _ => {
-                            last = None;
-                            parsing.create_error("Unexpected curly bracket!".to_string());
-                        }
-                    }
+                    last = Some(async_create_struct(syntax, Box::new(import_manager.clone()), found,
+                                        parse_struct_args(syntax, import_manager, parsing)?));
                 } else {
                     parsing.index -= 1;
-                    last = parse_code_block(syntax, import_manager, parsing)?;
+                    last = Some(parse_code_block(syntax, import_manager, parsing)?);
                 }
             }
             b'(' => {
                 if let Some(found) = last {
-                    last = Some(async_method_call(syntax, Box::new(import_manager.clone()), found, variable.name,
+                    last = Some(async_method_call(syntax,
+                                                  Box::new(import_manager.clone()), found, variable.name,
                                                   parse_arguments(syntax, import_manager, parsing)?));
                 } else {
-                    last = parse_effect(syntax, import_manager, parsing, escape, operators)?;
+                    last = parse_effect(syntax, import_manager, parsing, escape, true)?;
                     if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
                         parsing.create_error("Missing end of parenthesis!".to_string());
                     }
@@ -124,12 +114,12 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
             }
         }
     }
-    return Ok(last.unwrap());
+    return Ok(last);
 }
 
 fn parse_operator(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo,
-                  last: &mut Option<impl Future<Output=Effects>>, escape: &[u8])
-                  -> Result<impl Future<Output=Effects>, ParsingError> {
+                  last: &mut Option<impl Future<Output=Result<Effects, ParsingError>>>, escape: &[u8])
+                  -> Result<impl Future<Output=Result<Effects, ParsingError>>, ParsingError> {
     let mut temp = parsing.clone();
     let mut output = String::new();
     let mut effects = Vec::new();
@@ -146,7 +136,7 @@ fn parse_operator(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManage
                 match parse_effect(syntax, import_manager, &mut temp, escape, false) {
                     Ok(effect) => {
                         if output.ends_with("{}") {
-                            break
+                            break;
                         } else {
                             effects.push(effect);
                             output += "{}";

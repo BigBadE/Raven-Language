@@ -12,7 +12,7 @@ pub struct Struct {
     pub fields: Vec<MemberField>,
     pub functions: Vec<Arc<Function>>,
     pub traits: Vec<Arc<Struct>>,
-    pub poisoned: Option<ParsingError>
+    pub poisoned: Vec<ParsingError>
 }
 
 impl Struct {
@@ -25,7 +25,7 @@ impl Struct {
             functions,
             name,
             traits: Vec::new(),
-            poisoned: None
+            poisoned: Vec::new()
         }
     }
 
@@ -37,7 +37,7 @@ impl Struct {
             fields: Vec::new(),
             functions: Vec::new(),
             traits: Vec::new(),
-            poisoned: Some(error)
+            poisoned: vec!(error)
         };
     }
 }

@@ -9,11 +9,12 @@ pub enum Types {
 }
 
 impl Types {
-    pub fn into(&self) -> &Arc<Struct> {
+    pub fn into(&self) -> Arc<Struct> {
+        //Must be cloned so Arcs can be gotten mutably. See Arc::get_mut_unchecked.
         return match self {
             Types::Struct(structs) => structs,
             Types::Reference(structs) => structs
-        }
+        }.clone();
     }
 }
 

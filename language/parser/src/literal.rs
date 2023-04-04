@@ -1,13 +1,13 @@
-use syntax::code::{Effects, NumberEffect};
+use syntax::code::Effects;
+use syntax::ParsingError;
 use crate::parser::ParseInfo;
 
-pub fn parse_string(parsing: &mut ParseInfo) -> Option<String> {
+pub fn parse_string(parsing: &mut ParseInfo) -> Result<String, ParsingError> {
     let mut output = String::new();
     let mut escape = false;
     loop {
         if parsing.len == parsing.index {
-            parsing.create_error("Missing end to string!".to_string());
-            return None;
+            return Err(ParsingError::new((0, 0), (0, 0), "Missing end to string!".to_string()));
         }
         match parsing.buffer[parsing.index] {
             b'\\' => if escape {
@@ -27,7 +27,7 @@ pub fn parse_string(parsing: &mut ParseInfo) -> Option<String> {
         parsing.index += 1;
     }
 
-    return Some(output)
+    return Ok(output);
 }
 
 pub fn parse_number<'a>(parsing: &mut ParseInfo) -> Option<Effects> {
@@ -48,11 +48,9 @@ pub fn parse_number<'a>(parsing: &mut ParseInfo) -> Option<Effects> {
     return if parsing.index == start || parsing.index == start + 1 && float {
         None
     } else if float {
-        Some(Effects::FloatEffect(Box::new(NumberEffect::new(
-            String::from_utf8_lossy(&parsing.buffer[start..parsing.index]).parse::<f64>().unwrap()))))
+        Some(Effects::Float(String::from_utf8_lossy(&parsing.buffer[start..parsing.index]).parse::<f64>().unwrap()))
     } else {
-        Some(Effects::IntegerEffect(Box::new(NumberEffect::new(
-            String::from_utf8_lossy(&parsing.buffer[start..parsing.index]).parse::<i64>().unwrap()))))
+        Some(Effects::Int(String::from_utf8_lossy(&parsing.buffer[start..parsing.index]).parse::<i64>().unwrap()))
     }
 }
 

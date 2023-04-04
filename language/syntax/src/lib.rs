@@ -1,4 +1,5 @@
 #![feature(box_into_inner)]
+#![feature(get_mut_unchecked)]
 
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
@@ -118,7 +119,7 @@ pub trait ProcessManager: Send + Sync {
     fn add_func_to_next(&mut self, adding: Arc<Function>);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ParsingError {
     pub start: (u32, u32),
     pub end: (u32, u32),

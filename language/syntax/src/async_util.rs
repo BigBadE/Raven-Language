@@ -2,9 +2,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use lazy_static::lazy_static;
 
 use crate::function::Function;
+use crate::ParsingError;
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
 
@@ -25,13 +25,17 @@ impl StructureGetter {
 }
 
 impl Future for StructureGetter {
-    type Output = Arc<Struct>;
+    type Output = Result<Arc<Struct>, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
         let name = self.name_resolver.resolve(&self.getting);
         if let Some(found) = locked.structures.get(name) {
-            return Poll::Ready(found.clone());
+            return Poll::Ready(Ok(found.clone()));
+        }
+        if locked.finished {
+            return Poll::Ready(Err(ParsingError::new((0, 0), (0, 0),
+                                                     format!("Failed to find {}", name))));
         }
         if let Some(vectors) = locked.structure_wakers.get_mut(name) {
             vectors.push(cx.waker().clone());
@@ -59,13 +63,18 @@ impl FunctionGetter {
 }
 
 impl Future for FunctionGetter {
-    type Output = Arc<Function>;
+    type Output = Result<Arc<Function>, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
         let name = self.name_resolver.resolve(&self.getting);
         if let Some(found) = locked.static_functions.get(name) {
-            return Poll::Ready(found.clone());
+            return Poll::Ready(Ok(found.clone()));
+        }
+
+        if locked.finished {
+            return Poll::Ready(Err(ParsingError::new((0, 0), (0, 0),
+                                                     format!("Failed to find function {}", name))));
         }
         if let Some(vectors) = locked.function_wakers.get_mut(name) {
             vectors.push(cx.waker().clone());
@@ -76,14 +85,14 @@ impl Future for FunctionGetter {
     }
 }
 
-pub trait NameResolver {
-    fn resolve(&self, name: &String) -> &String;
+pub trait NameResolver: Send + Sync {
+    fn resolve<'a>(&self, name: &'a String) -> &'a String;
 }
 
 pub struct EmptyNameResolver {}
 
 impl NameResolver for EmptyNameResolver {
-    fn resolve(&self, name: &String) -> &String {
+    fn resolve<'a>(&self, name: &'a String) -> &'a String {
         name
     }
 }

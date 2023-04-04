@@ -2,10 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Mutex};
 use anyhow::Error;
 use syntax::syntax::Syntax;
-use syntax::type_resolver::TypeResolver;
-use syntax::types::UnresolvedGenericTypes;
-use crate::top_elements::{parse_top_elements};
-use crate::util::get_line;
+use crate::top_elements::parse_top_elements;
 
 #[derive(Clone)]
 pub struct ParseInfo<'a> {
@@ -147,7 +144,6 @@ impl<'a> ParseInfo<'a> {
             }
             self.index += 1;
         }
-        self.create_error("No end to block comment!".to_string());
     }
 
     pub fn loc(&self) -> (u32, u32) {

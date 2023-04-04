@@ -12,7 +12,7 @@ pub struct Function {
     pub code: CodeBody,
     pub return_type: Option<Types>,
     pub name: String,
-    pub poisoned: Option<ParsingError>
+    pub poisoned: Vec<ParsingError>
 }
 
 impl Function {
@@ -26,7 +26,7 @@ impl Function {
             code,
             return_type,
             name,
-            poisoned: None
+            poisoned: Vec::new()
         };
     }
     
@@ -39,7 +39,7 @@ impl Function {
             code: CodeBody::new(Vec::new(), "poison".to_string()),
             return_type: None,
             name,
-            poisoned: Some(error)
+            poisoned: vec!(error)
         }
     }
 }
@@ -90,7 +90,7 @@ impl DisplayIndented for Function {
         write!(f, "{} ", display(&self.fields, ", "))?;
 
         if self.return_type.is_some() {
-            write!(f, "-> {} ", self.return_type.as_ref().unwrap().name)?;
+            write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
         return self.code.format(indent, f);
     }
@@ -130,6 +130,17 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
     }
 
     return format!("({})", (&output[..output.len() - deliminator.len()]).to_string());
+}
+
+pub fn display_indented<T>(f: &mut Formatter<'_>, input: &Vec<T>, space: &str, deliminator: &str)
+    -> std::fmt::Result where T: DisplayIndented {
+    write!(f, "(")?;
+    for element in input {
+        element.format(space, f)?;
+        write!(f, "{}", deliminator)?;
+    }
+
+    return write!(f, ")");
 }
 
 pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {

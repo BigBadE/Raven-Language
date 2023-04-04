@@ -2,9 +2,9 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Mutex};
 use async_recursion::async_recursion;
 
-use crate::{DisplayIndented, Function, to_modifiers};
+use crate::{DisplayIndented, Function, ParsingError, to_modifiers};
 use crate::async_util::EmptyNameResolver;
-use crate::function::{CodeBody, display, display_joined};
+use crate::function::{CodeBody, display_indented, display_joined};
 use crate::syntax::Syntax;
 use crate::types::Types;
 
@@ -114,29 +114,29 @@ pub enum Effects {
 
 impl Effects {
     #[async_recursion]
-    pub async fn get_return(&self, syntax: &Arc<Mutex<Syntax>>) -> Option<Types> {
-        return match self {
+    pub async fn get_return(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<Types>, ParsingError> {
+        return Ok(match self {
             Effects::NOP() => None,
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
             Effects::CodeBody(_) => None,
             Effects::MethodCall(function, _) => function.return_type.clone(),
-            Effects::Set(_, to) => to.get_return(syntax).await,
+            Effects::Set(_, to) => to.get_return(syntax).await?,
             Effects::Load(from, _) => match from {
-                Some(found) => found.get_return(syntax).await,
+                Some(found) => found.get_return(syntax).await?,
                 None => None
             },
             Effects::CreateStruct(types, _) => Some(types.clone()),
             Effects::Float(_) => Some(Types::Struct(Syntax::get_struct(
-                syntax.clone(), "f64".to_string(), Box::new(EmptyNameResolver {})).await)),
+                syntax.clone(), "f64".to_string(), Box::new(EmptyNameResolver {})).await?)),
             Effects::Int(_) => Some(Types::Struct(Syntax::get_struct(
-                syntax.clone(), "i64".to_string(), Box::new(EmptyNameResolver {})).await)),
+                syntax.clone(), "i64".to_string(), Box::new(EmptyNameResolver {})).await?)),
             Effects::UInt(_) => Some(Types::Struct(Syntax::get_struct(
-                syntax.clone(), "u64".to_string(), Box::new(EmptyNameResolver {})).await)),
+                syntax.clone(), "u64".to_string(), Box::new(EmptyNameResolver {})).await?)),
             Effects::String(_) => Some(Types::Reference(
                 Syntax::get_struct(
-                    syntax.clone(), "str".to_string(), Box::new(EmptyNameResolver {})).await))
-        };
+                    syntax.clone(), "str".to_string(), Box::new(EmptyNameResolver {})).await?))
+        });
     }
 }
 
@@ -152,19 +152,24 @@ impl DisplayIndented for Effects {
                 write!(f, " jump {} else {}", label, other)
             }
             Effects::CodeBody(body) => body.format(&deeper, f),
-            Effects::MethodCall(function, args) =>
-                write!(f, "{}.{}", function.name, display(args, ", ")),
+            Effects::MethodCall(function, args) => {
+                write!(f, "{}.", function.name, )?;
+                display_indented(f, args, &deeper, ", ")
+            },
             Effects::Set(setting, value) => {
                 setting.format(&deeper, f)?;
                 write!(f, " = ")?;
                 value.format(&deeper, f)
             }
             Effects::Load(from, loading) => {
-                from.format(&deeper, f)?;
-                write!(".loading")
+                if let Some(found) = from {
+                    found.format(&deeper, f)?;
+                    write!(f, ".")?;
+                }
+                write!(f, "{}", loading)
             }
             Effects::CreateStruct(structure, arguments) => {
-                write!(f, "{} {{", structure.name)?;
+                write!(f, "{} {{", structure)?;
                 for (_, arg) in arguments {
                     arg.format(&deeper, f)?;
                 }

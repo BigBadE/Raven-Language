@@ -1,12 +1,11 @@
-use std::collections::HashMap;
 use std::sync::Arc;
+
 use tokio::runtime::Handle;
+
 use compilers::compiling::Compiler;
 use syntax::function::Function;
-use syntax::functions::Function;
 use syntax::ProcessManager;
-use syntax::structures::Structure;
-use syntax::types::FinalizedType;
+use syntax::r#struct::Struct;
 
 pub struct TypesCompiler {
     runtime: Handle
@@ -20,12 +19,12 @@ impl TypesCompiler {
     }
 }
 
-impl ProcessManager<FinalizedType> for TypesCompiler {
+impl ProcessManager for TypesCompiler {
     fn handle(&self) -> &Handle {
         return &self.runtime;
     }
 
-    fn add_to_next(&mut self, _adding: Arc<Structure<FinalizedType>>) {}
+    fn add_to_next(&mut self, _adding: Arc<Struct>) {}
 
-    fn add_func_to_next(&mut self, _adding: Arc<Function<FinalizedType>>) {}
+    fn add_func_to_next(&mut self, _adding: Arc<Function>) {}
 }

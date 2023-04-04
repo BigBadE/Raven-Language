@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use anyhow::Error;
 use syntax::function::{CodeBody, Function};
-use syntax::{Attribute, get_modifier, ImplManager, is_modifier, Modifier, ParsingError};
+use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError};
 use syntax::code::{Field, MemberField};
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
-use syntax::type_resolver::TypeResolver;
 use crate::imports::ImportManager;
 use crate::literal::{parse_ident, parse_with_references};
 use crate::parser::ParseInfo;
@@ -26,20 +24,36 @@ pub fn parse_top_elements(syntax: &Arc<Mutex<Syntax>>,
             let mut importing = parse_with_references(&mut parsing);
             import_manager.imports.insert(importing.split("::").last().unwrap().to_string(), importing);
             if !parsing.matching(";") {
-                parsing.create_error("Missing semicolon!".to_string());
+                let poisoned = Struct::new_poisoned(format!("${}", import_manager.current),
+                                                    ParsingError::new((0, 0), (0, 0), "Missing semicolon!".to_string()));
+                syntax.lock().unwrap().add_struct(Arc::new(poisoned));
+                return Ok(());
             }
         } else if parsing.matching("impl") {
             parse_impl(syntax, &mut import_manager, &mut parsing)?;
         } else if parsing.matching("trait") {
-            parse_struct_type(syntax, &mut import_manager, modifiers, &mut parsing, true)?;
+            match parse_struct_type(syntax, &mut import_manager, modifiers, &mut parsing, true) {
+                Ok(_) => {}
+                Err(error) => {
+                    let poisoned = Struct::new_poisoned(format!("${}", import_manager.current), error);
+                    syntax.lock().unwrap().add_struct(Arc::new(poisoned));
+                }
+            }
         } else if parsing.matching("struct") {
-            parse_struct_type(syntax, &mut import_manager, modifiers, &mut parsing, false)?;
+            match parse_struct_type(syntax, &mut import_manager, modifiers, &mut parsing, false) {
+                Ok(_) => {}
+                Err(error) => {
+                    let poisoned = Struct::new_poisoned(format!("${}", import_manager.current), error);
+                    syntax.lock().unwrap().add_struct(Arc::new(poisoned));
+                }
+            }
         } else if parsing.matching("fn") || is_modifier(modifiers, Modifier::Operation) {
             match parse_function(&mut import_manager, attributes, modifiers, &mut parsing, true) {
-                Some(function) => {
-                    syntax.add_function(function);
+                Ok(func) => syntax.lock().unwrap().add_function(func),
+                Err(error) => {
+                    let poisoned = Struct::new_poisoned(format!("${}", import_manager.current), error);
+                    syntax.lock().unwrap().add_struct(Arc::new(poisoned));
                 }
-                None => {}
             };
         } else {
             //Only error once for a big block of issues.
@@ -64,20 +78,24 @@ fn parse_impl(syntax: &Arc<Mutex<Syntax>>,
     let implementing = match parsing.parse_to_space() {
         Some(found) => found,
         None => {
-            syntax.lock().unwrap().structures.insert(import_manager.current.clone(),
-                                                     Arc::new(Struct::new_poisoned("$file".to_string(),
-                                                                                   ParsingError::new(last, parsing.loc(), "Unexpected EOF".to_string()))));
+            let poisoned = Struct::new_poisoned(format!("${}", import_manager.current),
+                                                ParsingError::new(last, parsing.loc(), "Unexpected EOF".to_string()));
+            syntax.lock().unwrap().add_struct(Arc::new(poisoned));
             return Ok(());
         }
     }.split("<").next().unwrap().to_string();
     if !parsing.matching("for") {
-        parsing.create_error("Expected for in impl".to_string());
+        let poisoned = Struct::new_poisoned(format!("${}", import_manager.current),
+                                            ParsingError::new(last, parsing.loc(), "Unexpected for in impl".to_string()));
+        syntax.lock().unwrap().add_struct(Arc::new(poisoned));
         return Ok(());
     }
     let base = match parsing.parse_to(b'{') {
         Some(found) => found,
         None => {
-            parsing.create_error("Unexpected EOF".to_string());
+            let poisoned = Struct::new_poisoned(format!("${}", import_manager.current),
+                                                ParsingError::new(last, parsing.loc(), "Unexpected EOF".to_string()));
+            syntax.lock().unwrap().add_struct(Arc::new(poisoned));
             return Ok(());
         }
     }.split("<").next().unwrap().to_string();
@@ -85,7 +103,9 @@ fn parse_impl(syntax: &Arc<Mutex<Syntax>>,
     while match parsing.next_included() {
         Some(character) => character != b'}',
         None => {
-            parsing.create_error("Unexpected EOF before end of impl!".to_string());
+            let poisoned = Struct::new_poisoned(format!("${}", import_manager.current),
+                                                ParsingError::new(last, parsing.loc(), "Unexpected EOF".to_string()));
+            syntax.lock().unwrap().add_struct(Arc::new(poisoned));
             return Ok(());
         }
     } {
@@ -95,17 +115,18 @@ fn parse_impl(syntax: &Arc<Mutex<Syntax>>,
         let mut import_manager = import_manager.clone();
         import_manager.current = implementing.clone();
         if parsing.matching("fn") {
-            match parse_function(&mut import_manager, attributes,
-                                 get_modifier(modifiers.as_slice()), parsing, true)? {
-                Some(function) => {
-                    functions.push(function);
-                    continue;
+            functions.push(match parse_function(&mut import_manager, attributes,
+                                                get_modifier(modifiers.as_slice()), parsing, true) {
+                Ok(out) => out,
+                Err(error) => {
+                    let poisoned = Struct::new_poisoned(format!("${}", import_manager.current), error);
+                    syntax.lock().unwrap().add_struct(Arc::new(poisoned));
+                    return Ok(());
                 }
-                None => {}
-            }
+            });
         }
     }
-    let locked = syntax.lock()?;
+    let locked = syntax.lock().unwrap();
     locked.manager.handle().spawn(add_impl(syntax.clone(), base,
                                            implementing, functions,
                                            import_manager.clone()));
@@ -113,11 +134,13 @@ fn parse_impl(syntax: &Arc<Mutex<Syntax>>,
 }
 
 async fn add_impl(syntax: Arc<Mutex<Syntax>>, base: String,
-                  implementing: String, functions: Vec<Arc<Function>>,
+                  implementing: String, functions: Vec<impl Future<Output=Function>>,
                   import_manager: ImportManager) {
     let import_manager = Box::new(import_manager);
-    let mut base = Syntax::get_struct(syntax.clone(), base, import_manager.clone()).await;
-    let implementing = Syntax::get_struct(syntax, implementing, import_manager).await;
+    let mut base = Syntax::get_struct(syntax.clone(), base, import_manager.clone())
+        .await.unwrap();
+    let implementing = Syntax::get_struct(syntax, implementing, import_manager)
+        .await.unwrap();
 
     //This is safe because it satisfies both requirements of get_mut_unchecked:
     //1: No borrows of another type. Types don't ever return references to inner types.
@@ -125,12 +148,20 @@ async fn add_impl(syntax: Arc<Mutex<Syntax>>, base: String,
     let mutable = unsafe { Arc::get_mut_unchecked(&mut base) };
     mutable.traits.push(implementing);
     for func in functions {
-        mutable.functions.push(func);
+        mutable.functions.push(func.await);
+    }
+
+    //If a trait function is needed for a struct, it will wait on that specific struct.
+    //So all of this trait's waiters are woken up.
+    if let Some(wakers) = syntax.lock().unwrap().structure_wakers.get(&implementing.name) {
+        for waker in wakers {
+            waker.wake();
+        }
     }
 }
 
 fn parse_struct_type(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager,
-                     mut modifiers: u8, parsing: &mut ParseInfo, is_trait: bool) -> Result<(), Error> {
+                     mut modifiers: u8, parsing: &mut ParseInfo, is_trait: bool) -> Result<(), ParsingError> {
     let mut fn_name = String::new();
     let mut generics = Vec::new();
 
@@ -147,16 +178,15 @@ fn parse_struct_type(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMan
         let subtypes = match parsing.parse_to(b'{') {
             Some(found) => found,
             None => {
-                parsing.create_error("Expected bracket!".to_string());
-                return Ok(());
+                return Err(ParsingError::new((0, 0), (0, 0), "Expected bracket!".to_string()));
             }
         };
         let subtypes: Vec<String> = subtypes.split("+").map(
             |found| found.replace(" ", "").to_string()).collect();
 
         if subtypes.len() > 1 && !is_trait {
-            parsing.create_error("Can't have multiple supertypes on a structure. Implement traits using the impl keyword!".to_string());
-            return Ok(());
+            return Err(ParsingError::new((0, 0), (0, 0), "Can't have multiple supertypes on a structure. \
+                                         Implement traits using the impl keyword!".to_string()));
         }
 
         parent_types = subtypes;
@@ -193,7 +223,7 @@ fn parse_struct_type(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMan
             let mut import_manager = Box::new(import_manager.clone());
             import_manager.current = fn_name.clone();
             functions.push(parse_function(&mut import_manager, attributes, get_modifier(modifiers.as_slice()),
-                                 parsing, !is_trait)?);
+                                          parsing, !is_trait)?);
         }
 
         let field_name = match parsing.parse_to(b':') {
@@ -231,7 +261,8 @@ fn parse_struct_type(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMan
 }
 
 async fn add_struct(syntax: Arc<Mutex<Syntax>>, fields: Vec<(u8, String, String)>, generics: Vec<(String, Vec<String>)>,
-                    functions: Vec<impl Future<Output=Function>>, modifiers: u8, fn_name: String, import_manager: Box<ImportManager>) {
+                    functions: Vec<impl Future<Output=Function>>, modifiers: u8, fn_name: String,
+                    import_manager: Box<ImportManager>) {
     let fields = fields.iter().map(|(modifiers, name, field_type)|
         MemberField::new(modifiers, Field::new(name,
                                                Syntax::get_struct(syntax.clone(),
@@ -243,7 +274,7 @@ async fn add_struct(syntax: Arc<Mutex<Syntax>>, fields: Vec<(u8, String, String)
     let mut out_functions = Vec::new();
     for mut function in functions {
         let mut function = function.await;
-        
+
         if function.fields.iter().any(|field| field.name == "self") {
             for generic in generics {
                 function.generics.push(generic);
@@ -279,10 +310,7 @@ fn parse_function(import_manager: &mut ImportManager, attributes: HashMap<String
         }.as_str();
     }
 
-    let fields = match parse_fields(parent, parsing) {
-        Some(fields) => fields,
-        None => None
-    };
+    let fields = parse_fields(parent, parsing)?;
 
     let return_type = if parsing.matching("->") {
         if parse_body {
@@ -317,10 +345,7 @@ fn parse_function(import_manager: &mut ImportManager, attributes: HashMap<String
             parsing.create_error("Unexpected body on function!".to_string());
         }
         import_manager.code_block_id += 1;
-        return Ok(Some(Arc::new(Function::new(attributes, modifiers, fields, generics,
-                                              CodeBody::new(Vec::new(),
-                                                            import_manager.code_block_id.to_string()),
-                                              return_type, fn_name))));
+        return Ok(async_make_fn());
     }
 
     let code = if !is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
@@ -334,7 +359,11 @@ fn parse_function(import_manager: &mut ImportManager, attributes: HashMap<String
         CodeBody::new(Vec::new(), import_manager.code_block_id.to_string())
     };
 
-    return Ok(Some(Arc::new(Function::new(attributes, modifiers, fields, generics, code, return_type, fn_name))));
+    return Ok(async_make_fn());
+}
+
+async fn async_make_fn() -> Function {
+    return Function::new(attributes, modifiers, fields, generics, code, return_type, fn_name);
 }
 
 fn parse_modifiers(parsing: &mut ParseInfo) -> Vec<Modifier> {

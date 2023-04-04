@@ -26,9 +26,6 @@ pub async fn run(settings: &RunnerSettings) -> Result<Box<dyn CompiledProject>, 
         }
     }
 
-    //Drop syntax so it'll be dropped when everything is parsed
-    drop(syntax);
-
     let mut errors = Vec::new();
     //Join any compilers errors
     for handle in handles {
@@ -45,12 +42,17 @@ pub async fn run(settings: &RunnerSettings) -> Result<Box<dyn CompiledProject>, 
         }
     }
 
+    //Set the syntax to finished because parsing is done.
+    //This starts deadlock detection
+    syntax.lock()?.finish()?;
+
     if !errors.is_empty() {
-        println!("Error detected, this likely poisoned the mutexes. Report any non-poison errors.");
+        println!("Error detected, this likely poisoned the mutexes. Report the non-poison errors.");
         for error in errors {
             println!(error)
         }
         return Err(Vec::new());
     }
+    
     return compiler.compile().await;
 }
