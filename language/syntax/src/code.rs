@@ -92,6 +92,8 @@ pub enum Effects {
     NOP(),
     //Label of jumping to body
     Jump(String),
+    //Comparison effect, and label to jump to the first if true, second if false
+    CompareJump(Effects, String, String),
     CodeBody(CodeBody),
     //Calling function, function arguments
     MethodCall(Arc<Function>, Effects),
@@ -113,6 +115,11 @@ impl DisplayIndented for Effects {
         return match self {
             Effects::NOP() => Ok(()),
             Effects::Jump(label) => write!(f, "jump {}", label),
+            Effects::CompareJump(comparing, label) => {
+                write!(f, "if ")?;
+                comparing.format(&deeper, f)?;
+                write!(f, " jump {}", label)
+            },
             Effects::CodeBody(body) => body.format(&deeper, f),
             Effects::MethodCall(function, args) =>
                 write!(f, "{}.{}", function.name, display(args, ", ")),

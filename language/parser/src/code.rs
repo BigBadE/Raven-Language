@@ -7,6 +7,7 @@ use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use syntax::type_resolver::TypeResolver;
 use syntax::types::ResolvableTypes;
+use crate::async_code::{async_create_struct, async_parse_expression, async_set};
 use crate::conditional::{parse_for, parse_if, parse_switch};
 use crate::imports::ImportManager;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
@@ -27,10 +28,6 @@ pub fn parse_expression(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut Import
         async_parse_expression(expression_type, parse_effect(syntax, import_manager, parsing, &[b';', b'}'])?)));
 }
 
-async fn async_parse_expression(expression_type: ExpressionType, effect: impl Future<Output=Effects>) -> Expression {
-    return Expression::new(expression_type, effect.await);
-}
-
 pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo, escape: &[u8])
                     -> Result<impl Future<Output=Effects>, ParsingError> {
     let mut last = None;
@@ -38,18 +35,17 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
     if parsing.matching("if") {
         last = Some(parse_if(syntax, import_manager, parsing)?);
     } else if parsing.matching("for") {
-        return parse_for(type_manager, parsing);
+        return parse_for(syntax, import_manager, parsing);
     } else if parsing.matching("switch") {
-        last = parse_switch(type_manager, parsing);
+        last = parse_switch(syntax, import_manager, parsing)?;
     } else if parsing.matching("let") {
-        match parsing.parse_to(b'=') {
+        return match parsing.parse_to(b'=') {
             Some(name) => {
-                return parse_effect(syntax, parsing, escape, |effect|
-                    done(Effects::Set(Effects::String(name), effect)));
+                Ok(async_set(name, parse_effect(syntax, import_manager, parsing, escape)?))
             }
             None => {
                 parsing.create_error("Missing name for variable assignment".to_string());
-                return Ok(());
+                Ok(())
             }
         }
     } else {
@@ -59,10 +55,9 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
                 b'{' => {
                     if last.is_some() {
                         match last.unwrap() {
-                            Effects::Load(from, name) => {
-                                last = Some(Effects::CreateStruct(
-                                    Box::new(CreateStruct::new(ResolvableTypes::Resolving(structure),
-                                                               parse_struct_args(type_manager, parsing), parsing.loc()))));
+                            Effects::Load(_from, name) => {
+                                last = Some(async_create_struct(syntax, Box::new(import_manager.clone()), name,
+                                                                parse_struct_args(syntax, import_manager, parsing)?));
                             }
                             _ => {
                                 last = None;
@@ -71,13 +66,7 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
                         }
                     } else {
                         parsing.index -= 1;
-                        match parse_code_block(type_manager, parsing) {
-                            Some(body) => last = Some(Effects::CodeBody(Box::new(body))),
-                            None => {
-                                parsing.create_error("Invalid code block!".to_string());
-                                return None;
-                            }
-                        }
+                        last = parse_code_block(syntax, import_manager, parsing)?;
                     }
                 }
                 b'(' => {
@@ -97,8 +86,8 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
                             }
                         }
                         None => {
-                            last = Some(Effects::Wrapped(Box::new(
-                                parse_effect(type_manager, parsing, &[b')', b'}', b';'])?)));
+                            last = Some(
+                                parse_effect(syntax, import_manager, parsing, &[b')', b'}', b';'])?);
                             if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
                                 parsing.create_error("Missing end of parenthesis!".to_string());
                             }

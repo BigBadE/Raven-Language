@@ -1,16 +1,15 @@
 use std::sync::Arc;
-use anyhow::Error;
 use crate::code::MemberField;
 use crate::function::Function;
 use crate::ParsingError;
-use crate::types::{Types, UnresolvedGenericTypes};
+use crate::types::Types;
 
 #[derive(Clone)]
 pub struct Struct {
     pub modifiers: u8,
     pub name: String,
     generics: Vec<(String, Vec<Types>)>,
-    fields: Vec<MemberField>,
+    pub fields: Vec<MemberField>,
     pub functions: Vec<Arc<Function>>,
     pub traits: Vec<Arc<Struct>>,
     pub poisoned: Option<ParsingError>

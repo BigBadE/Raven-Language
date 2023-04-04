@@ -2,7 +2,8 @@ use std::future::Future;
 use std::process::Output;
 use std::sync::{Arc, Mutex};
 use syntax::blocks::{ForStatement, IfStatement, SwitchStatement};
-use syntax::code::{Effect, Effects};
+use syntax::code::{Effect, Effects, Expression, ExpressionType};
+use syntax::function::CodeBody;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use syntax::type_resolver::TypeResolver;
@@ -17,89 +18,35 @@ pub fn parse_if(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager,
     let effect = parse_effect(syntax, import_manager, parsing, &[b'{', b'}', b';'])?;
     parsing.index -= 1;
 
-    let mut statement;
-    match effect {
-        Some(effect) => match parse_code_block(syntax, import_manager, parsing) {
-            Some(body) => statement = IfStatement::new(body, effect, parsing.loc()),
-            None => {
-                return Err(ParsingError::new((0, 0), (0, 0), "If statement lacks body".to_string()));
-            }
-        },
-        None => {
-            return Err(ParsingError::new((0, 0), (0, 0), "If statement lacks a condition".to_string()));
-        }
-    }
+    let if_body = parse_code_block(syntax, import_manager, parsing)?;
+    let mut else_ifs = Vec::new();
+    let mut else_body = None;
 
     while parsing.matching("elseif") {
-        let effect = parse_effect(type_manager, parsing, &[b'{', b'}', b';']);
+        let effect = parse_effect(type_manager, import_manager, parsing, &[b'{', b'}', b';'])?;
         parsing.index -= 1;
-        match effect {
-            Some(effect) => match parse_code_block(type_manager, parsing) {
-                Some(body) => statement.else_ifs.push((body, effect)),
-                None => {
-                    parsing.create_error("Else If statement lacks body".to_string());
-                    return None;
-                }
-            },
-            None => {
-                parsing.create_error("Else If statement lacks a condition".to_string());
-                return None;
-            }
-        }
+        else_ifs.push((effect, parse_code_block(type_manager, import_manager, parsing)?));
     }
 
     if parsing.matching("else") {
-        match parse_code_block(type_manager, parsing) {
-            Some(body) => statement.else_body = Some(body),
-            None => {
-                parsing.create_error("Else statement lacks body".to_string());
-                return None;
-            }
-        }
+        else_body = Some(parse_code_block(type_manager, import_manager, parsing)?);
     }
 
-    match statement.condition.unwrap().return_type() {
-        Some(return_type) => if return_type.to_string() != "bool" {
-            parsing.create_error("If expression isn't a boolean".to_string());
-            return None;
-        },
-        None => {
-            parsing.create_error("If expression has void return type".to_string());
-            return None;
-        }
-    }
-
-    let expected = statement.body.return_type();
-    match &statement.else_body {
-        Some(effect) => {
-            if effect.return_type() != expected {
-                parsing.create_error("Else has different return type from If".to_string());
-            }
-        }
-        None => {}
-    }
-
-    for (body, expression) in &statement.else_ifs {
-        match expression.unwrap().return_type() {
-            Some(return_type) => if return_type.to_string() != "bool" {
-                parsing.create_error("Else If expression isn't a boolean".to_string());
-                return None;
-            },
-            None => {
-                parsing.create_error("Else If expression has void return type".to_string());
-                return None;
-            }
-        }
-
-        if body.return_type() != expected {
-            parsing.create_error("Else If has different return type from If".to_string());
-        }
-    }
-
-    return Some(Effects::IfStatement(Box::new(statement)));
+    import_manager.code_block_id += 1;
+    return Ok(async_if(import_manager.code_block_id, effect, if_body, else_ifs, else_body));
 }
 
-pub fn parse_for(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Effects> {
+async fn async_if(label: u32, effect: impl Future<Output=Effects>, if_body: impl Future<Output=CodeBody>,
+                  else_ifs: Vec<(impl Future<Output=Effects>, impl Future<Output=CodeBody>)>,
+                  else_body: Option<impl Future<Output=Effects>>) -> Effects {
+    let end = CodeBody::new(Vec::new(), label.to_string());
+    let mut body = if_body.await;
+    todo!();
+    return Effects::CodeBody(body);
+}
+
+pub fn parse_for(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
+                 -> Result<impl Future<Output=Effects>, ParsingError> {
     parsing.next_included();
     parsing.index -= 1;
     let var_name = match parsing.parse_to_space() {
@@ -140,7 +87,8 @@ pub fn parse_for(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Op
     return Some(Effects::ForStatement(Box::new(ForStatement::new(var_name, iterating, code))));
 }
 
-pub fn parse_switch(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo) -> Option<Effects> {
+pub fn parse_switch(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
+                    -> Result<impl Future<Output=Effects>, ParsingError> {
     let effect = match parse_effect(type_manager, parsing, &[b'{', b'}', b';']) {
         Some(effect) => effect,
         None => {

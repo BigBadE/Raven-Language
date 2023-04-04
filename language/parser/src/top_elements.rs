@@ -324,7 +324,7 @@ fn parse_function(import_manager: &mut ImportManager, attributes: HashMap<String
     }
 
     let code = if !is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
-        match parse_code_block(import_manager, parsing) {
+        match parse_code_block(syntax, import_manager, parsing) {
             Some(code) => code,
             None => return Ok(None)
         }

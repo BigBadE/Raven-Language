@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::hash;
 use std::sync::{Arc, Mutex};
 
-use syntax::code::{Effects, Field};
+use syntax::code::{Effects, Expression, Field};
 use syntax::function::{Arguments, CodeBody};
 use syntax::ParsingError;
 use syntax::r#struct::Struct;
@@ -39,7 +41,7 @@ fn parse_field(parent: &Option<String>, string: String) -> Result<(String, Strin
         return Err(ParsingError::new((0, 0), (0, 0), "Missing type for field.".to_string()));
     }
 
-    let body = &string[name.len()+1..].to_string().replace(" ", "");
+    let body = &string[name.len() + 1..].to_string().replace(" ", "");
     if body.contains(")") {
         return if name == "self" {
             match parent {
@@ -49,7 +51,7 @@ fn parse_field(parent: &Option<String>, string: String) -> Result<(String, Strin
             }
         } else {
             Err(ParsingError::new((0, 0), (0, 0), "Missing type for field.".to_string()))
-        }
+        };
     }
     return Ok((name.to_string(), body.to_string()));
 }
@@ -57,10 +59,10 @@ fn parse_field(parent: &Option<String>, string: String) -> Result<(String, Strin
 /// Async code parsing. Parsing must continue while other parts wait to prevent deadlocks.
 /// To do this, the method provides a "done" callback it will use for the finalized result, but will
 /// return as soon as parsing is finished.
-pub async fn parse_code_block(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo) -> Option<CodeBody> {
+pub fn parse_code_block(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
+                        -> Result<impl Future<Output=CodeBody>, ParsingError> {
     if let None = parsing.parse_to(b'{') {
-        parsing.create_error("Expected code body".to_string());
-        return None;
+        return Err(ParsingError::new((0, 0), (0, 0), "Expected code body".to_string()));
     }
 
     let mut expressions = Vec::new();
@@ -78,7 +80,16 @@ pub async fn parse_code_block(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut 
     }
 
     import_manager.code_block_id += 1;
-    return Some(CodeBody::new(expressions, import_manager.code_block_id.to_string()));
+    let handle = syntax.lock().unwrap().manager.handle().clone();
+    return Ok(handle.spawn(async_code_block(expressions, import_manager.code_block_id.to_string())));
+}
+
+async fn async_code_block(expressions: Vec<impl Future<Output=Expression>>, label: String) -> CodeBody {
+    let mut parsed = Vec::new();
+    for expression in expressions {
+        parsed.push(expression.await);
+    }
+    return CodeBody::new(parsed, label);
 }
 
 pub fn get_line(buffer: &[u8], start: usize) -> String {
@@ -100,23 +111,20 @@ pub fn find_if_first(parsing: &mut ParseInfo, first: u8, second: u8) -> Option<S
     return None;
 }
 
-pub fn parse_arguments(syntax: &Arc<Mutex<Syntax>>, import_manger: &mut ImportManager, parsing: &mut ParseInfo) -> Vec<Effects> {
+pub fn parse_arguments(syntax: &Arc<Mutex<Syntax>>, import_manger: &mut ImportManager, parsing: &mut ParseInfo)
+                       -> Result<Vec<impl Future<Output=Effects>>, ParsingError> {
     let mut output = Vec::new();
     if parsing.matching(")") {
-        return output;
+        return Ok(output);
     }
     while parsing.buffer[parsing.index - 1] != b')' {
-        if let Some(effect) = parse_effect(syntax, import_manger, parsing, &[b',', b')']) {
-            output.push(effect);
-        } else {
-            parsing.create_error("Missing effect!".to_string());
-            break;
-        }
+        output.push(parse_effect(syntax, import_manger, parsing, &[b',', b')'])?);
     }
-    return output;
+    return Ok(output);
 }
 
-pub fn parse_struct_args(parsing: &mut ParseInfo) -> Vec<(String, Effects)> {
+pub fn parse_struct_args(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo)
+    -> Result<Vec<(String, impl Future<Output=Effects>)>, ParsingError> {
     let mut output = Vec::new();
     while parsing.len != parsing.index && !parsing.matching("}") {
         let found_name;
@@ -131,26 +139,24 @@ pub fn parse_struct_args(parsing: &mut ParseInfo) -> Vec<(String, Effects)> {
                 found_name = match parsing.parse_to(b'}') {
                     Some(name) => name,
                     None => {
-                        parsing.create_error("Missing end to Struct parameters!".to_string());
-                        return output;
+                        return Err(ParsingError::new((0, 0), (0, 0), "Missing end to Struct parameters!".to_string()));
                     }
                 };
                 parsing.index -= 1;
             }
         }
 
-        output.push((found_name, parse_effect(syntax, parsing, &[b',', b';', b'}']).expect("No effect!")));
+        output.push((found_name, parse_effect(syntax, import_manager, parsing, &[b',', b';', b'}'])?));
         parsing.index -= 1;
         if (parsing.buffer[parsing.index - 1] == b'}' && !parsing.find_next(b'}')) || parsing.buffer[parsing.index - 1] == b';' {
-            parsing.create_error("Missing comma after structure initializer value".to_string());
-            return output;
+            return Err(ParsingError::new((0, 0), (0, 0), "Missing comma after structure initializer value".to_string()));
         }
         parsing.matching(",");
     }
-    return output;
+    return Ok(output);
 }
 
-pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Vec<ResolvableTypes>>) {
+pub fn parse_generics(parsing: &mut ParseInfo, generics: &mut HashMap<String, Vec<String>>) {
     while let Some(value) = find_if_first(parsing, b',', b'>') {
         let (name, val) = parse_generic(value);
         generics.insert(name, val);
