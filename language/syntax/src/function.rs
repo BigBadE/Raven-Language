@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 
 use crate::{Attribute, DisplayIndented, ParsingError, to_modifiers, Types};
 use crate::code::{Expression, Field};

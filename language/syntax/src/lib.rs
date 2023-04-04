@@ -110,7 +110,7 @@ pub fn assign_with_priority(mut operator: Box<OperatorEffect>) -> OperatorEffect
     return Box::into_inner(operator);
 }*/
 
-pub trait ProcessManager {
+pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
     fn add_to_next(&mut self, adding: Arc<Struct>);

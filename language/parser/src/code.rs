@@ -7,7 +7,7 @@ use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use syntax::type_resolver::TypeResolver;
 use syntax::types::ResolvableTypes;
-use crate::async_code::{async_create_struct, async_parse_expression, async_set};
+use crate::async_code::{async_create_struct, async_field_load, async_method_call, async_parse_expression, async_parse_operator, async_set};
 use crate::conditional::{parse_for, parse_if, parse_switch};
 use crate::imports::ImportManager;
 use crate::literal::{parse_ident, parse_number, parse_with_references};
@@ -25,10 +25,11 @@ pub fn parse_expression(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut Import
     };
     let handle = syntax.lock().unwrap().manager.handle().clone();
     return Ok(handle.spawn(
-        async_parse_expression(expression_type, parse_effect(syntax, import_manager, parsing, &[b';', b'}'])?)));
+        async_parse_expression(expression_type, parse_effect(syntax, import_manager, parsing, &[b';', b'}'], true)?)));
 }
 
-pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo, escape: &[u8])
+pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo,
+                    escape: &[u8], operators: bool)
                     -> Result<impl Future<Output=Effects>, ParsingError> {
     let mut last = None;
 
@@ -41,140 +42,98 @@ pub fn parse_effect(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportMana
     } else if parsing.matching("let") {
         return match parsing.parse_to(b'=') {
             Some(name) => {
-                Ok(async_set(name, parse_effect(syntax, import_manager, parsing, escape)?))
+                Ok(async_set(name, parse_effect(syntax, import_manager, parsing, escape, operators)?))
             }
             None => {
                 parsing.create_error("Missing name for variable assignment".to_string());
                 Ok(())
             }
-        }
-    } else {
-        while let Some(next) = parsing.next_included() {
-            match next {
-                _ if escape.contains(&next) => break,
-                b'{' => {
-                    if last.is_some() {
-                        match last.unwrap() {
-                            Effects::Load(_from, name) => {
-                                last = Some(async_create_struct(syntax, Box::new(import_manager.clone()), name,
-                                                                parse_struct_args(syntax, import_manager, parsing)?));
-                            }
-                            _ => {
-                                last = None;
-                                parsing.create_error("Unexpected curly bracket!".to_string());
-                            }
+        };
+    }
+    while let Some(next) = parsing.next_included() {
+        match next {
+            _ if escape.contains(&next) => break,
+            b'{' => {
+                if let Some(found) = last {
+                    match found {
+                        Effects::Load(_from, name) => {
+                            last = Some(async_create_struct(syntax, Box::new(import_manager.clone()), name,
+                                                            parse_struct_args(syntax, import_manager, parsing)?));
                         }
-                    } else {
-                        parsing.index -= 1;
-                        last = parse_code_block(syntax, import_manager, parsing)?;
-                    }
-                }
-                b'(' => {
-                    match last {
-                        Some(found) => {
-                            match found {
-                                Effects::VariableLoad(variable) => {
-                                    last = Some(Effects::MethodCall(Box::new(
-                                        MethodCall::new(None, variable.name,
-                                                        parse_arguments(type_manager, parsing), parsing.loc(),
-                                        ))));
-                                }
-                                _ => {
-                                    last = None;
-                                    parsing.create_error("Unknown parenthesis!".to_string());
-                                }
-                            }
-                        }
-                        None => {
-                            last = Some(
-                                parse_effect(syntax, import_manager, parsing, &[b')', b'}', b';'])?);
-                            if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
-                                parsing.create_error("Missing end of parenthesis!".to_string());
-                            }
-                        }
-                    }
-                }
-                b'=' => {
-                    let mut temp = parsing.clone();
-                    temp.index -= 1;
-                    match parse_operator(type_manager, &mut temp, &mut last.clone(), escape) {
-                        Some(operator) => {
-                            if !operator.operator.starts_with("{}={}") {
-                                last = Some(Effects::OperatorEffect(operator));
-                                *parsing = temp;
-                                break;
-                            }
-                        }
-                        None => {}
-                    }
-                    let next = parse_effect(type_manager, parsing, escape)?;
-                    match last? {
-                        Effects::VariableLoad(variable) =>
-                            last = Some(Effects::AssignVariable(Box::new(AssignVariable::new(variable.name, next, parsing.loc())))),
-                        Effects::FieldLoad(field) =>
-                            last = Some(Effects::FieldSet(Box::new(FieldSet::new(field.calling, field.name, next, parsing.loc())))),
                         _ => {
-                            parsing.create_error("Tried to set an unsettable value!".to_string());
                             last = None;
+                            parsing.create_error("Unexpected curly bracket!".to_string());
                         }
                     }
-                }
-                b'0'..=b'9' => {
+                } else {
                     parsing.index -= 1;
-                    last = parse_number(parsing)
+                    last = parse_code_block(syntax, import_manager, parsing)?;
                 }
-                b'.' => {
-                    let found = parse_ident(parsing);
+            }
+            b'(' => {
+                if let Some(found) = last {
+                    last = Some(async_method_call(syntax, Box::new(import_manager.clone()), found, variable.name,
+                                                  parse_arguments(syntax, import_manager, parsing)?));
+                } else {
+                    last = parse_effect(syntax, import_manager, parsing, escape, operators)?;
+                    if parsing.buffer[parsing.index - 1] == b';' || parsing.buffer[parsing.index - 1] == b'}' {
+                        parsing.create_error("Missing end of parenthesis!".to_string());
+                    }
+                }
+            }
+            b'0'..=b'9' => {
+                parsing.index -= 1;
+                last = parse_number(parsing)
+            }
+            b'.' => {
+                let found = parse_ident(parsing);
 
-                    match parsing.buffer[parsing.index] {
-                        b'(' => {
-                            parsing.index += 1;
-                            let location = parsing.loc();
-                            last = Some(Effects::MethodCall(Box::new(
-                                MethodCall::new(last, found,
-                                                parse_arguments(type_manager, parsing), location))));
-                        }
-                        _ => {
-                            last = Some(Effects::FieldLoad(Box::new(
-                                FieldLoad::new(last.unwrap(), found, parsing.loc()))));
-                        }
+                match parsing.buffer[parsing.index] {
+                    b'(' => {
+                        parsing.index += 1;
+                        last = Some(async_method_call(
+                            syntax, Box::new(import_manager.clone()), last, found,
+                            parse_arguments(syntax, import_manager, parsing)?));
+                    }
+                    _ => {
+                        last = Some(async_field_load(last, found));
                     }
                 }
-                val if (val > b'a' && val < b'z') || (val > b'A' && val < b'Z') => {
-                    parsing.index -= 1;
-                    let name = parse_with_references(parsing);
-                    match parsing.buffer[parsing.index] {
-                        //TODO macros
-                        b'!' => todo!(),
-                        _ => {
-                            last = Some(Effects::Load(None, name));
-                        }
+            }
+            val
+            if (val > b'a' && val < b'z') || (val > b'A' && val < b'Z') => {
+                parsing.index -= 1;
+                let name = parse_with_references(parsing);
+                match parsing.buffer[parsing.index] {
+                    //TODO macros
+                    b'!' => todo!(),
+                    _ => {
+                        last = Some(Effects::Load(None, name));
                     }
                 }
-                _ => {
+            }
+            _ => {
+                if operators {
                     parsing.index -= 1;
-                    match parse_operator(type_manager, parsing, &mut last, escape) {
-                        Some(operator) => last = Some(Effects::OperatorEffect(operator)),
-                        None => return Ok(())
-                    }
-                    break;
+                    last = parse_operator(syntax, import_manager, parsing, &mut last, escape)?;
+                } else {
+                    //The operator ignores this error, so the user should never see this.
+                    return Err(ParsingError::new((0, 0), (0, 0),
+                                                 "If your seeing this, it's not your fault! Report this please!".to_string()));
                 }
             }
         }
     }
-
-    done(last);
-    return Ok(());
+    return Ok(last.unwrap());
 }
 
-fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
-                  last: &mut Option<Effects>, escape: &[u8]) -> Option<Box<OperatorEffect>> {
-    let location = parsing.loc();
+fn parse_operator(syntax: &Arc<Mutex<Syntax>>, import_manager: &mut ImportManager, parsing: &mut ParseInfo,
+                  last: &mut Option<impl Future<Output=Effects>>, escape: &[u8])
+                  -> Result<impl Future<Output=Effects>, ParsingError> {
     let mut temp = parsing.clone();
     let mut output = String::new();
     let mut effects = Vec::new();
 
-    //Skip if last is needed
     if last.is_some() {
         output += "{}";
     }
@@ -184,22 +143,19 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
     loop {
         match temp.next_included() {
             Some(comparing) => {
-                match parse_effect(type_manager, &mut temp, escape) {
-                    Some(effect) => {
-                        if let Effects::OperatorEffect(effect) = effect {
-                            output += effect.operator.as_str();
-                            for found in Box::into_inner(effect).effects {
-                                effects.push(found);
-                            }
-                            break;
+                match parse_effect(syntax, import_manager, &mut temp, escape, false) {
+                    Ok(effect) => {
+                        if output.ends_with("{}") {
+                            break
                         } else {
                             effects.push(effect);
                             output += "{}";
+                            *parsing = temp.clone();
                         }
-                        break;
                     }
-                    None => {
+                    Err(_) => {
                         output.push(comparing as char);
+                        *parsing = temp.clone();
                     }
                 }
             }
@@ -215,7 +171,5 @@ fn parse_operator(type_manager: &dyn TypeResolver, parsing: &mut ParseInfo,
         effects.push(temp_last);
     }
 
-    //Update parsing and return
-    *parsing = temp;
-    return Some(Box::new(OperatorEffect::new(output, effects, location)));
+    return async_parse_operator(syntax, Box::new(import_manager.clone()), output, effects);
 }
