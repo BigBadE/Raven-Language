@@ -15,3 +15,41 @@ pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
     }
     return None;
 }
+
+
+pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
+    loop {
+        if tokenizer.next_included()? == b'"' && tokenizer.last.token_type != TokenTypes::StringEscape {
+            tokenizer.state.pop();
+            return tokenizer.make_token(TokenTypes::StringEnd);
+        }
+    }
+}
+
+pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
+    return match tokenizer.last.token_type {
+        TokenTypes::GenericsStart =>
+            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>']),
+        TokenTypes::Generic => if tokenizer.last() == b':' {
+            parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>'])
+        } else if tokenizer.last() == b',' {
+            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>'])
+        } else if tokenizer.last() == b'>' {
+            tokenizer.state.pop();
+            tokenizer.make_token(TokenTypes::GenericEnd)
+        } else {
+            tokenizer.handle_invalid()
+        },
+        TokenTypes::GenericBound => if tokenizer.last() == b'+' {
+            parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>'])
+        } else if tokenizer.last() == b',' {
+            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>'])
+        } else if tokenizer.last() == b'>' {
+            tokenizer.state.pop();
+            tokenizer.make_token(TokenTypes::GenericEnd)
+        } else {
+            tokenizer.handle_invalid()
+        },
+        _ => panic!("How'd you get here?")
+    }
+}

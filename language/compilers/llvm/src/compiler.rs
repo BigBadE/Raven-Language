@@ -9,8 +9,6 @@ use inkwell::module::Module;
 use inkwell::OptimizationLevel;
 use inkwell::types::BasicType;
 use syntax::code::{Field, MemberField};
-use syntax::type_resolver::FinalizedTypeResolver;
-use syntax::types::ResolvableTypes::Resolved;
 use crate::function_compiler::compile_function;
 use crate::types::type_resolver::ParserTypeResolver;
 

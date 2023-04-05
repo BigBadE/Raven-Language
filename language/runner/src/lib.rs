@@ -2,11 +2,9 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 use anyhow::Error;
 use tokio::runtime::Runtime;
-use compiler_llvm::LLVMCompiler;
 use compilers::compiling::Compiler;
 
 pub mod runner;
@@ -22,7 +20,7 @@ pub struct RunnerSettings {
 impl RunnerSettings {
     pub fn get_compiler(&self) -> Arc<dyn Compiler> {
         match self.compiler.to_lowercase().as_str() {
-            "llvm" => Arc::new(LLVMCompiler::new()),
+            "llvm" => todo!() /*Arc::new(LLVMCompiler::new())*/,
             _ => panic!("Unknown compilers {}", self.compiler)
         }
     }

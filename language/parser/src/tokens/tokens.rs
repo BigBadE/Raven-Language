@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::ops::{ControlFlow, FromResidual, Try};
 
+#[derive(Clone)]
 pub struct Token {
     pub token_type: TokenTypes,
     pub start: usize,
@@ -42,30 +43,30 @@ impl FromResidual<Result<Infallible, Token>> for Token {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenTypes {
-    Start,
-    EOF,
-    InvalidCharacters,
-    StringStart,
-    StringEscape,
-    StringEnd,
-    ImportStart,
-    Identifier,
-    AttributesStart,
-    Attribute,
-    ModifiersStart,
-    Modifier,
-    ElemStart,
-    GenericsStart,
-    Generic,
-    GenericBound,
-    ArgumentsStart,
-    ArgumentName,
-    ArgumentType,
-    ArgumentEnd,
-    ArgumentsEnd,
-    ReturnTypeStart,
-    ReturnType,
-    CodeStart
+    Start = 0,
+    EOF = 1,
+    InvalidCharacters = 2,
+    StringStart = 3,
+    StringEscape = 4,
+    StringEnd = 5,
+    ImportStart = 6,
+    Identifier = 7,
+    AttributesStart = 8,
+    Attribute = 9,
+    ModifiersStart = 10,
+    Modifier = 11,
+    ElemStart = 12,
+    GenericsStart = 13,
+    Generic = 14,
+    GenericBound = 15,
+    GenericEnd = 16,
+    ArgumentsStart = 17,
+    ArgumentName = 18,
+    ArgumentType = 19,
+    ArgumentEnd = 20,
+    ArgumentsEnd = 21,
+    ReturnType = 22,
+    CodeStart = 23
 }

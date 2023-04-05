@@ -2,7 +2,6 @@
 extern crate core;
 
 pub mod internal;
-pub mod types;
 
 pub mod compiler;
 pub mod file;

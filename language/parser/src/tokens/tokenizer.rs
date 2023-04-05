@@ -1,6 +1,7 @@
 use crate::tokens::code_tokenizer::next_code_token;
 use crate::tokens::tokens::{Token, TokenTypes};
-use crate::tokens::top_tokenizer::next_top_token;
+use crate::tokens::top_tokenizer::{next_func_token, next_struct_token, next_top_token};
+use crate::tokens::util::{next_generic, next_string};
 
 pub struct Tokenizer<'a> {
     pub state: Vec<TokenizerState>,
@@ -21,21 +22,34 @@ impl<'a> Tokenizer<'a> {
         };
     }
 
-    pub fn next(&mut self) -> Token {
-        return match self.state.get(0).unwrap() {
-            TokenizerState::String => self.next_string(),
-            TokenizerState::TopElement => next_top_token(self),
-            _ => next_code_token(self),
-        };
+    pub fn serialize(&mut self) -> ParserState {
+        return ParserState {
+            state: self.state.clone(),
+            index: self.index.clone(),
+            last: self.last.clone()
+        }
     }
 
-    fn next_string(&mut self) -> Token {
-        loop {
-            if self.next_included()? == b'"' && self.last.token_type != TokenTypes::StringEscape {
-                self.state.pop();
-                return Token::new(TokenTypes::StringEnd, self.last.end + 1, self.index + 1);
-            }
-        }
+    pub fn load(&mut self, state: &ParserState) {
+        self.state = state.state.clone();
+        self.index = state.index.clone();
+        self.last = state.last.clone();
+    }
+
+    pub fn next(&mut self) -> Token {
+        self.last = match self.state.last().unwrap() {
+            TokenizerState::String => next_string(self),
+            TokenizerState::Generic => next_generic(self),
+            TokenizerState::TopElement => next_top_token(self),
+            TokenizerState::Function => next_func_token(self),
+            TokenizerState::Structure => next_struct_token(self),
+            TokenizerState::Code => next_code_token(self),
+        };
+        return self.last.clone();
+    }
+
+    pub fn last(&self) -> u8 {
+        return self.buffer[self.index-1];
     }
 
     pub fn next_included(&mut self) -> Result<u8, Token> {
@@ -67,13 +81,16 @@ impl<'a> Tokenizer<'a> {
     }
 
     pub fn handle_invalid(&mut self) -> Token {
+        if self.index == self.len {
+            return Token::new(TokenTypes::EOF, self.index, self.index);
+        }
+
         while self.index != self.len {
             if self.buffer[self.index] == b'\n' {
                 break
             }
             self.index += 1;
         }
-
         return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.index-1);
     }
 
@@ -82,11 +99,18 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
+pub struct ParserState {
+    pub state: Vec<TokenizerState>,
+    pub index: usize,
+    pub last: Token
+}
+
 #[derive(Clone)]
 pub enum TokenizerState {
     String = 0,
     TopElement = 1,
     Structure = 2,
     Function = 3,
-    Code = 4,
+    Generic = 4,
+    Code = 5,
 }

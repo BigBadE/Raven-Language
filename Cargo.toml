@@ -7,5 +7,7 @@ members = [
     "language/syntax",
 
     "language/compilers/compilers",
-    "language/compilers/llvm",
+    #"language/compilers/llvm",
+
+    "tools/intellij-plugin/raven-intellij-natives"
 ]
