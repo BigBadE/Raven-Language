@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::ops::{ControlFlow, FromResidual, Try};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub token_type: TokenTypes,
     pub start: usize,
@@ -76,5 +76,6 @@ pub enum TokenTypes {
     StructEnd = 28,
     FieldName = 29,
     FieldType = 30,
-    FieldValue = 31
+    FieldValue = 31,
+    FieldEnd = 32
 }

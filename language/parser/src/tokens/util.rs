@@ -31,7 +31,7 @@ pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
 }
 
 pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
-    return match tokenizer.last.token_type {
+    return match &tokenizer.last.token_type {
         TokenTypes::GenericsStart =>
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>']),
         TokenTypes::Generic | TokenTypes::GenericBound => if tokenizer.last() == b':' || tokenizer.last() == b'+' {
@@ -50,6 +50,6 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
         } else {
             tokenizer.handle_invalid()
         },
-        _ => panic!("How'd you get here?")
+        token_type => panic!("How'd you get here? {:?}", token_type)
     }
 }

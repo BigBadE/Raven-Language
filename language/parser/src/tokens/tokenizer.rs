@@ -122,7 +122,7 @@ pub struct ParserState {
     pub last: Token
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TokenizerState {
     String = 0,
     StringToCodeStructTop = 1,
