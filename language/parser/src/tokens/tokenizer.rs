@@ -4,7 +4,7 @@ use crate::tokens::top_tokenizer::{next_func_token, next_implementation_token, n
 use crate::tokens::util::{next_generic, next_string};
 
 pub struct Tokenizer<'a> {
-    pub state: TokenizerState,
+    pub state: u64,
     pub index: usize,
     pub last: Token,
     pub len: usize,
@@ -26,8 +26,8 @@ impl<'a> Tokenizer<'a> {
         return ParserState {
             state: self.state.clone(),
             index: self.index.clone(),
-            last: self.last.clone()
-        }
+            last: self.last.clone(),
+        };
     }
 
     pub fn load(&mut self, state: &ParserState) {
@@ -38,20 +38,24 @@ impl<'a> Tokenizer<'a> {
 
     pub fn next(&mut self) -> Token {
         self.last = match self.state {
-            TokenizerState::String | TokenizerState::StringToCodeStructTop => next_string(self),
             TokenizerState::GenericToFunc | TokenizerState::GenericToStruct
             | TokenizerState::GenericToImpl => next_generic(self),
             TokenizerState::TopElement | TokenizerState::TopElementToStruct => next_top_token(self),
             TokenizerState::Function | TokenizerState::FunctionToStructTop => next_func_token(self),
             TokenizerState::Structure => next_struct_token(self),
             TokenizerState::Implementation => next_implementation_token(self),
-            TokenizerState::Code | TokenizerState::CodeToStructTop => next_code_token(self),
+            state =>
+                if state & 0xFF <= 1 {
+                    next_string(self)
+                } else {
+                    next_code_token(self, state ^ 0xFF)
+                },
         };
         return self.last.clone();
     }
 
     pub fn last(&self) -> u8 {
-        return self.buffer[self.index-1];
+        return self.buffer[self.index - 1];
     }
 
     pub fn next_included(&mut self) -> Result<u8, Token> {
@@ -97,44 +101,39 @@ impl<'a> Tokenizer<'a> {
 
         while self.index != self.len {
             if self.buffer[self.index] == b'\n' {
-                break
+                break;
             }
             self.index += 1;
         }
-        return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.index-1);
+        return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.index - 1);
     }
 
     pub fn make_token(&self, token_type: TokenTypes) -> Token {
         return Token::new(token_type, self.last.end, self.index);
     }
-
-    pub fn parse_to_next_space(&mut self, token_type: TokenTypes) -> Token {
-        while self.buffer[self.index] != b' ' {
-            self.index += 1;
-        }
-        return Token::new(token_type, self.last.end, self.index);
-    }
 }
 
 pub struct ParserState {
-    pub state: TokenizerState,
+    pub state: u64,
     pub index: usize,
-    pub last: Token
+    pub last: Token,
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum TokenizerState {
-    String = 0,
-    StringToCodeStructTop = 1,
-    TopElement = 2,
-    Structure = 3,
-    Implementation = 4,
-    Function = 5,
-    FunctionToStructTop = 6,
-    Code = 7,
-    CodeToStructTop = 8,
-    GenericToFunc = 9,
-    GenericToStruct = 10,
-    GenericToImpl = 11,
-    TopElementToStruct = 12
+#[non_exhaustive]
+pub struct TokenizerState {}
+
+impl TokenizerState {
+    pub const String: u64 = 0;
+    pub const StringToCodeStructTop: u64 = 1;
+    pub const TopElement: u64 = 2;
+    pub const Structure: u64 = 3;
+    pub const Implementation: u64 = 4;
+    pub const Function: u64 = 5;
+    pub const FunctionToStructTop: u64 = 6;
+    pub const GenericToFunc: u64 = 7;
+    pub const GenericToStruct: u64 = 8;
+    pub const GenericToImpl: u64 = 9;
+    pub const TopElementToStruct: u64 = 10;
+    pub const Code: u64 = 11;
+    pub const CodeToStructTop: u64 = 12;
 }

@@ -77,5 +77,21 @@ pub enum TokenTypes {
     FieldName = 29,
     FieldType = 30,
     FieldValue = 31,
-    FieldEnd = 32
+    FieldEnd = 32,
+    LineEnd = 33,
+    Operator = 34,
+    CodeEnd = 35,
+    Variable = 36,
+    Integer = 37,
+    Float = 38,
+    CallingType = 39,
+    Return = 40,
+    Break = 41,
+    Switch = 42,
+    For = 43,
+    While = 44,
+    Else = 45,
+    If = 46,
+    ParenOpen = 47,
+    ParenClose = 48
 }

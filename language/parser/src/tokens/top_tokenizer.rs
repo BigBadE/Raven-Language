@@ -37,6 +37,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             if tokenizer.state == TokenizerState::TopElementToStruct {
                 tokenizer.handle_invalid()
             } else {
+                tokenizer.state = TokenizerState::Implementation;
                 tokenizer.make_token(TokenTypes::ImplStart)
             }
         } else {
@@ -48,11 +49,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.make_token(TokenTypes::FieldEnd)
         } else {
             tokenizer.handle_invalid()
-        }
-        TokenTypes::ImplStart => {
-            tokenizer.state = TokenizerState::GenericToImpl;
-            tokenizer.make_token(TokenTypes::GenericsStart)
-        }
+        },
         TokenTypes::FieldType => if tokenizer.last() == b'=' {
             if tokenizer.state == TokenizerState::TopElementToStruct {
                 tokenizer.state = TokenizerState::CodeToStructTop;
@@ -165,15 +162,16 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.state = TokenizerState::GenericToImpl;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else {
-            tokenizer.parse_to_next_space(TokenTypes::Identifier)
-        }
+            tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')
+        },
         TokenTypes::GenericEnd => if tokenizer.matches("for") {
             tokenizer.state = TokenizerState::Structure;
             tokenizer.make_token(TokenTypes::TraitStart)
         } else {
+            tokenizer.next_included()?;
             tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')
         }
-        TokenTypes::Identifier => if tokenizer.last() == b'<' {
+        TokenTypes::Identifier => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GenericToImpl;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("for") {
@@ -188,6 +186,7 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
 
 #[cfg(test)]
 mod tests {
+    use crate::tokens::util::check_types;
     use super::*;
 
     #[test]
@@ -196,7 +195,7 @@ mod tests {
         add_header(0, &mut types);
         types.push(TokenTypes::EOF);
         let testing = "";
-        check_types(&types, testing);
+        check_types(&types, testing, TokenizerState::TopElement);
     }
 
     #[test]
@@ -210,7 +209,7 @@ mod tests {
         types.push(TokenTypes::ReturnType);
         types.push(TokenTypes::CodeStart);
         let testing = "pub internal fn testing<T: Bound>(self, arg2: TypeAgain) -> ReturnType {}";
-        check_types(&types, testing);
+        check_types(&types, testing, TokenizerState::TopElement);
     }
 
     #[test]
@@ -239,7 +238,6 @@ mod tests {
         types.push(TokenTypes::FieldName);
         types.push(TokenTypes::FieldType);
         types.push(TokenTypes::FieldEnd);
-        add_header(0, &mut types);
         types.push(TokenTypes::StructEnd);
         //impl
         add_header(0, &mut types);
@@ -254,6 +252,7 @@ mod tests {
         //test_func
         add_header(1, &mut types);
         types.push(TokenTypes::FunctionStart);
+        types.push(TokenTypes::Identifier);
         add_arguments(0, false, &mut types);
         types.push(TokenTypes::CodeStart);
 
@@ -266,37 +265,7 @@ mod tests {
         impl<T: Bound, E: OtherBound> Test<T> for TestStruct<E> {\
             pub fn trait_func() {}\
         }";
-        check_types(&types, testing);
-    }
-
-    fn check_types(types: &[TokenTypes], testing: &str) {
-        let mut tokenizer = Tokenizer::new(testing.as_bytes());
-        let mut tokens: Vec<Token> = Vec::new();
-        loop {
-            let token = tokenizer.next();
-            match token.token_type.clone() {
-                TokenTypes::InvalidCharacters => assert!(false, "Failed at state {:?} (last: {:?}):\n{}\n from {:?}", tokenizer.state, tokens.last().unwrap().token_type,
-                                                         String::from_utf8_lossy(&tokenizer.buffer[tokens.last().unwrap().end..tokenizer.index]),
-                                                         &tokens[tokens.len() - 5.min(tokens.len())..tokens.len() - 1]),
-                TokenTypes::CodeStart | TokenTypes::EOF => {
-                    tokens.push(token);
-                    break;
-                }
-                _ => tokens.push(token)
-            }
-        }
-        println!("Start:");
-        for i in 0..types.len() {
-            if i > types.len() {
-                assert!(false, "Hit end of types!");
-            } else if i > tokens.len() {
-                assert!(false, "Hit end of tokens!");
-            }
-            println!("{:?} vs {:?} (\"{}\")", types[i], tokens.get(i).as_ref().unwrap().token_type,
-            String::from_utf8_lossy(&tokenizer.buffer[tokens.get(i).as_ref().unwrap().start..
-                tokens.get(i).as_ref().unwrap().end]));
-            assert_eq!(types[i], tokens.get(i).as_ref().unwrap().token_type);
-        }
+        check_types(&types, testing, TokenizerState::TopElement);
     }
 
     fn add_header(modifiers: u8, input: &mut Vec<TokenTypes>) {
