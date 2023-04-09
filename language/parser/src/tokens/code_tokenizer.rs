@@ -79,8 +79,9 @@ mod test {
 
     #[test]
     fn test_code() {
-        let mut types = [TokenTypes::If, TokenTypes::Operator, TokenTypes::Integer,
-        TokenTypes::Operator, TokenTypes::Float, TokenTypes::Operator, TokenTypes::CallingType];
+        let mut types = [TokenTypes::If, TokenTypes::ParenOpen, TokenTypes::Integer,
+        TokenTypes::Operator, TokenTypes::Float, TokenTypes::ParenClose, TokenTypes::CallingType, TokenTypes::ParenOpen,
+        TokenTypes::Variable, TokenTypes::ArgumentEnd, TokenTypes::Variable, TokenTypes::ParenClose, TokenTypes::CodeStart];
         let code = "if (1 + 2.2).function(arg, args) {\
         for testing in test {\
         while \"my_str\\\"continues!\"{\

@@ -4,7 +4,8 @@ use crate::tokens::tokens::{Token, TokenTypes};
 
 pub fn parse_ident(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]) -> Token {
     while !end.contains(&tokenizer.next_included()?) {}
-    return Token::new(token_type, tokenizer.last.end, tokenizer.index-1);
+    tokenizer.index -= 1;
+    return Token::new(token_type, tokenizer.last.end, tokenizer.index);
 }
 
 pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> Token {
@@ -13,10 +14,10 @@ pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> To
             return Token::new(TokenTypes::EOF, tokenizer.index, tokenizer.index);
         }
         let character = tokenizer.buffer[tokenizer.index] as char;
-        tokenizer.index += 1;
         if !character.is_alphabetic() && character != ':' && character != '_' {
             return tokenizer.make_token(token_type);
         }
+        tokenizer.index += 1;
     }
 }
 
@@ -28,28 +29,29 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
             return Token::new(TokenTypes::EOF, tokenizer.index, tokenizer.index);
         }
         let character = tokenizer.buffer[tokenizer.index] as char;
-        tokenizer.index += 1;
         if character == '.' {
             if float {
                 return tokenizer.make_token(TokenTypes::Float);
             } else {
                 float = true;
             }
-        }
-        if !character.is_numeric() {
-            return if float {
-                tokenizer.make_token(TokenTypes::Float)
-            } else {
-                tokenizer.make_token(TokenTypes::Integer)
+        } else {
+            if !character.is_numeric() {
+                return if float {
+                    tokenizer.make_token(TokenTypes::Float)
+                } else {
+                    tokenizer.make_token(TokenTypes::Integer)
+                }
             }
         }
+        tokenizer.index += 1;
     }
 }
 
 pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
     for modifier in MODIFIERS {
         if tokenizer.matches(format!("{}", modifier).as_str()) {
-            return Some(Token::new(TokenTypes::Modifier, tokenizer.last.end, tokenizer.index-1));
+            return Some(Token::new(TokenTypes::Modifier, tokenizer.last.end, tokenizer.index));
         }
     }
     return None;
@@ -72,11 +74,11 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::GenericsStart =>
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>']),
-        TokenTypes::Generic | TokenTypes::GenericBound => if tokenizer.last() == b':' || tokenizer.last() == b'+' {
+        TokenTypes::Generic | TokenTypes::GenericBound => if tokenizer.matches(":") || tokenizer.matches("+") {
             parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>'])
-        } else if tokenizer.last() == b',' {
+        } else if tokenizer.matches(",") {
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>'])
-        } else if tokenizer.last() == b'>' {
+        } else if tokenizer.matches(">") {
             if tokenizer.state == TokenizerState::GenericToImpl {
                 tokenizer.state = TokenizerState::Implementation;
             } else if tokenizer.state == TokenizerState::GenericToStruct {
@@ -111,7 +113,7 @@ pub fn check_types(types: &[TokenTypes], testing: &str, state: u64) {
         }
     }
     println!("Start:");
-    for i in 0..types.len() {
+    for i in 0..types.len().max(tokens.len()) {
         if i > types.len() {
             assert!(false, "Hit end of types!");
         } else if i > tokens.len() {

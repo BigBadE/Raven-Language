@@ -43,22 +43,24 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         } else {
             parse_ident(tokenizer, TokenTypes::FieldName, &[b':', b'='])
         },
-        TokenTypes::FieldName => if tokenizer.last() == b':' {
+        TokenTypes::FieldName => if tokenizer.matches(":") {
             parse_ident(tokenizer, TokenTypes::FieldType, &[b'=', b';'])
-        } else if tokenizer.last() == b';' {
+        } else if tokenizer.matches(";") {
             tokenizer.make_token(TokenTypes::FieldEnd)
         } else {
             tokenizer.handle_invalid()
         },
-        TokenTypes::FieldType => if tokenizer.last() == b'=' {
+        TokenTypes::FieldType => if tokenizer.matches("=") {
             if tokenizer.state == TokenizerState::TopElementToStruct {
                 tokenizer.state = TokenizerState::CodeToStructTop;
             } else {
                 tokenizer.state = TokenizerState::Code;
             }
             tokenizer.make_token(TokenTypes::FieldValue)
-        } else {
+        } else if tokenizer.matches(";") {
             tokenizer.make_token(TokenTypes::FieldEnd)
+        } else {
+            tokenizer.handle_invalid()
         }
         _ => {
             if tokenizer.matches("import") {
@@ -76,10 +78,10 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
 pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::FunctionStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'<', b'(']),
-        TokenTypes::Identifier => if tokenizer.last() == b'<' {
+        TokenTypes::Identifier => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GenericToFunc;
             tokenizer.make_token(TokenTypes::GenericsStart)
-        } else if tokenizer.last() == b'(' {
+        } else if tokenizer.matches("(") {
             tokenizer.make_token(TokenTypes::ArgumentsStart)
         } else {
             tokenizer.state = TokenizerState::TopElement;
@@ -88,65 +90,52 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
         TokenTypes::GenericEnd => {
             tokenizer.make_token(TokenTypes::ArgumentsStart)
         }
-        TokenTypes::ArgumentsStart | TokenTypes::ArgumentEnd => if tokenizer.last() == b')' || tokenizer.matches(")") {
+        TokenTypes::ArgumentsStart | TokenTypes::ArgumentEnd => if tokenizer.matches(")") {
             tokenizer.make_token(TokenTypes::ArgumentsEnd)
         } else {
             parse_ident(tokenizer, TokenTypes::ArgumentName, &[b':', b','])
         },
-        TokenTypes::ArgumentName => if tokenizer.last() == b':' {
+        TokenTypes::ArgumentName => if tokenizer.matches(":") {
             parse_ident(tokenizer, TokenTypes::ArgumentType, &[b',', b')'])
         } else {
             //Skip the comma if there is one
             tokenizer.matches(",");
             tokenizer.make_token(TokenTypes::ArgumentEnd)
         },
-        TokenTypes::ArgumentType => if tokenizer.last() == b',' {
+        TokenTypes::ArgumentType => if tokenizer.matches(",") {
             parse_ident(tokenizer, TokenTypes::ArgumentName, &[b':', b','])
         } else {
             tokenizer.make_token(TokenTypes::ArgumentEnd)
         },
-        TokenTypes::ArgumentsEnd => if tokenizer.matches("->") {
-            parse_ident(tokenizer, TokenTypes::ReturnType, &[b'{'])
-        } else if tokenizer.matches("{") {
-            tokenizer.state = TokenizerState::Code;
-            tokenizer.make_token(TokenTypes::CodeStart)
-        } else if tokenizer.matches(";") {
-            if tokenizer.state == TokenizerState::Function {
-                tokenizer.state = TokenizerState::TopElement;
-            } else if tokenizer.state == TokenizerState::FunctionToStructTop {
-                tokenizer.state = TokenizerState::TopElementToStruct;
+        TokenTypes::ArgumentsEnd | TokenTypes::ReturnType =>
+            if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
+                parse_ident(tokenizer, TokenTypes::ReturnType, &[b'{'])
+            } else if tokenizer.matches("{") {
+                tokenizer.state = TokenizerState::Code;
+                tokenizer.make_token(TokenTypes::CodeStart)
+            } else if tokenizer.matches(";") {
+                if tokenizer.state == TokenizerState::Function {
+                    tokenizer.state = TokenizerState::TopElement;
+                } else if tokenizer.state == TokenizerState::FunctionToStructTop {
+                    tokenizer.state = TokenizerState::TopElementToStruct;
+                }
+                next_top_token(tokenizer)
+            } else {
+                tokenizer.handle_invalid()
             }
-            next_top_token(tokenizer)
-        } else {
-            tokenizer.handle_invalid()
-        },
-        TokenTypes::ReturnType => if tokenizer.last() == b'{' {
-            tokenizer.state = TokenizerState::Code;
-            tokenizer.make_token(TokenTypes::CodeStart)
-        } else if tokenizer.last() == b';' {
-            if tokenizer.state == TokenizerState::Function {
-                tokenizer.state = TokenizerState::TopElement;
-            } else if tokenizer.state == TokenizerState::FunctionToStructTop {
-                tokenizer.state = TokenizerState::TopElementToStruct;
-            }
-            next_top_token(tokenizer)
-        } else {
-            tokenizer.handle_invalid()
-        }
         token => {
             panic!("How'd you get here? {:?}", token);
         }
     };
 }
 
-
 pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
         TokenTypes::StructStart | TokenTypes::TraitStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
-        TokenTypes::Identifier | TokenTypes::GenericEnd => if tokenizer.last() == b'<' {
+        TokenTypes::Identifier | TokenTypes::GenericEnd => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GenericToStruct;
             tokenizer.make_token(TokenTypes::GenericsStart)
-        } else if tokenizer.last() == b'{' || tokenizer.matches("{") {
+        } else if tokenizer.matches("{") {
             tokenizer.state = TokenizerState::TopElementToStruct;
             tokenizer.make_token(TokenTypes::StructTopElement)
         } else {

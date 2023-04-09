@@ -54,10 +54,6 @@ impl<'a> Tokenizer<'a> {
         return self.last.clone();
     }
 
-    pub fn last(&self) -> u8 {
-        return self.buffer[self.index - 1];
-    }
-
     pub fn next_included(&mut self) -> Result<u8, Token> {
         loop {
             if self.index == self.len {
