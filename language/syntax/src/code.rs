@@ -1,11 +1,8 @@
 use std::fmt::{Display, Formatter};
-use std::sync::{Arc, Mutex};
-use async_recursion::async_recursion;
+use std::sync::Arc;
 
-use crate::{DisplayIndented, Function, ParsingError, to_modifiers};
-use crate::async_util::EmptyNameResolver;
+use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers};
 use crate::function::{CodeBody, display_indented, display_joined};
-use crate::syntax::Syntax;
 use crate::types::Types;
 
 #[derive(Clone)]
@@ -24,27 +21,35 @@ pub enum ExpressionType {
 #[derive(Clone)]
 pub struct Field {
     pub name: String,
-    pub field_type: Arc<Types>,
+    pub field_type: Types,
 }
 
 #[derive(Clone)]
 pub struct MemberField {
     pub modifiers: u8,
+    pub attributes: Vec<Attribute>,
     pub field: Field,
 }
 
 impl MemberField {
-    pub fn new(modifiers: u8, field: Field) -> Self {
+    pub fn new(modifiers: u8, attributes: Vec<Attribute>, field: Field) -> Self {
         return Self {
             modifiers,
+            attributes,
             field,
         };
     }
 }
 
+impl Display for MemberField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return DisplayIndented::format(self, "", f);
+    }
+}
+
 impl DisplayIndented for MemberField {
     fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}{} {};", indent, display_joined(&to_modifiers(self.modifiers)), self.field);
+        return write!(f, "{}{} {}", indent, display_joined(&to_modifiers(self.modifiers)), self.field);
     }
 }
 
@@ -58,7 +63,7 @@ impl Expression {
 }
 
 impl Field {
-    pub fn new(name: String, field_type: Arc<Types>) -> Self {
+    pub fn new(name: String, field_type: Types) -> Self {
         return Self {
             name,
             field_type,
@@ -102,8 +107,8 @@ pub enum Effects {
     MethodCall(Arc<Function>, Vec<Effects>),
     //Sets pointer to value
     Set(Box<Effects>, Box<Effects>),
-    //Loads variable/field pointer from structure, or self if structure is None
-    Load(Option<Box<Effects>>, String),
+    //Loads variable/field pointer from structure
+    Load(Box<Effects>, String),
     //Struct to create and a tuple of the index of the argument and the argument
     CreateStruct(Types, Vec<(usize, Effects)>),
     Float(f64),
@@ -113,30 +118,21 @@ pub enum Effects {
 }
 
 impl Effects {
-    #[async_recursion]
-    pub async fn get_return(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<Types>, ParsingError> {
-        return Ok(match self {
+    pub fn get_return(&self, process_manager: &Box<dyn ProcessManager>) -> Option<Types> {
+        return match self {
             Effects::NOP() => None,
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
             Effects::CodeBody(_) => None,
             Effects::MethodCall(function, _) => function.return_type.clone(),
-            Effects::Set(_, to) => to.get_return(syntax).await?,
-            Effects::Load(from, _) => match from {
-                Some(found) => found.get_return(syntax).await?,
-                None => None
-            },
+            Effects::Set(_, to) => to.get_return(process_manager),
+            Effects::Load(from, _) => from.get_return(process_manager),
             Effects::CreateStruct(types, _) => Some(types.clone()),
-            Effects::Float(_) => Some(Types::Struct(Syntax::get_struct(
-                syntax.clone(), "f64".to_string(), Box::new(EmptyNameResolver {})).await?)),
-            Effects::Int(_) => Some(Types::Struct(Syntax::get_struct(
-                syntax.clone(), "i64".to_string(), Box::new(EmptyNameResolver {})).await?)),
-            Effects::UInt(_) => Some(Types::Struct(Syntax::get_struct(
-                syntax.clone(), "u64".to_string(), Box::new(EmptyNameResolver {})).await?)),
-            Effects::String(_) => Some(Types::Reference(
-                Syntax::get_struct(
-                    syntax.clone(), "str".to_string(), Box::new(EmptyNameResolver {})).await?))
-        });
+            Effects::Float(_) => Some(Types::Struct(process_manager.get_internal("f64"))),
+            Effects::Int(_) => Some(Types::Struct(process_manager.get_internal("i64"))),
+            Effects::UInt(_) => Some(Types::Struct(process_manager.get_internal("u64"))),
+            Effects::String(_) => Some(Types::Reference(Box::new(Types::Struct(process_manager.get_internal("str")))))
+        };
     }
 }
 
@@ -155,18 +151,15 @@ impl DisplayIndented for Effects {
             Effects::MethodCall(function, args) => {
                 write!(f, "{}.", function.name, )?;
                 display_indented(f, args, &deeper, ", ")
-            },
+            }
             Effects::Set(setting, value) => {
                 setting.format(&deeper, f)?;
                 write!(f, " = ")?;
                 value.format(&deeper, f)
             }
             Effects::Load(from, loading) => {
-                if let Some(found) = from {
-                    found.format(&deeper, f)?;
-                    write!(f, ".")?;
-                }
-                write!(f, "{}", loading)
+                from.format(&deeper, f)?;
+                write!(f, ".{}", loading)
             }
             Effects::CreateStruct(structure, arguments) => {
                 write!(f, "{} {{", structure)?;

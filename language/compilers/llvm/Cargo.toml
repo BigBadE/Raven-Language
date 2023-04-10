@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-parser = { path = "../../parser" }
+compilers = { path = "../compilers" }
 syntax = { path = "../../syntax" }
 
+async-trait = "0.1.68"
+
+tokio = { version = "1.27.0", features = ["rt"] }
+
 llvm-sys = "130.0.0"
-inkwell = { version = "0.1.1", features = [ "llvm13-0" ] }
+inkwell = { version = "0.1.1", features = ["llvm13-0"] }

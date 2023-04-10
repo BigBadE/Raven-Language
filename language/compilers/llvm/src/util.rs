@@ -1,6 +1,10 @@
-use std::collections::HashMap;
+use std::sync::Arc;
+use inkwell::AddressSpace;
+use inkwell::types::{BasicType, StructType};
 use inkwell::values::FunctionValue;
 use syntax::function::Function;
+use syntax::r#struct::Struct;
+use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
     let mut output = String::new();
@@ -23,4 +27,30 @@ pub fn print_formatted(input: String) {
         }
     }
     println!("{}", output);
+}
+
+pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
+    let mut params = Vec::new();
+
+    for param in &function.fields {
+        params.push(From::from(type_getter.get_type(&param.field_type.name())));
+    }
+
+    return type_getter.compiler.module.add_function(&function.name, match &function.return_type {
+        Some(returning) => {
+            let types = type_getter.get_type(&returning.name());
+            //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
+            if types.is_struct_type() {
+                params.insert(0, From::from(types.ptr_type(AddressSpace::default())));
+                type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
+            } else {
+                types.fn_type(params.as_slice(), false)
+            }
+        },
+        None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
+    }, None);
+}
+
+pub async fn create_struct_value<'ctx>(structure: &Struct, type_getter: &CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
+
 }

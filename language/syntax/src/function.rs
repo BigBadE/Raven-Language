@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
 use crate::{Attribute, DisplayIndented, ParsingError, to_modifiers, Types};
-use crate::code::{Expression, Field};
+use crate::code::{Expression, MemberField};
 
 pub struct Function {
-    pub attributes: HashMap<String, Attribute>,
-    pub generics: HashMap<String, Vec<Types>>,
+    pub attributes: Vec<Attribute>,
+    pub generics: HashMap<String, Types>,
     pub modifiers: u8,
-    pub fields: Vec<Field>,
+    pub fields: Vec<MemberField>,
     pub code: CodeBody,
     pub return_type: Option<Types>,
     pub name: String,
@@ -16,7 +16,7 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(attributes: HashMap<String, Attribute>, modifiers: u8, fields: Vec<Field>, generics: HashMap<String, Vec<Types>>,
+    pub fn new(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<MemberField>, generics: HashMap<String, Types>,
                code: CodeBody, return_type: Option<Types>, name: String) -> Self {
         return Self {
             attributes,
@@ -32,7 +32,7 @@ impl Function {
     
     pub fn poisoned(name: String, error: ParsingError) -> Self {
         return Self {
-            attributes: HashMap::new(),
+            attributes: Vec::new(),
             generics: HashMap::new(),
             modifiers: 0,
             fields: Vec::new(),
@@ -78,11 +78,8 @@ impl DisplayIndented for Function {
 
         if !self.generics.is_empty() {
             write!(f, "<")?;
-            for (name, bounds) in &self.generics {
-                write!(f, "{}", name)?;
-                if !bounds.is_empty() {
-                    write!(f, ": {}", display(bounds, " + "))?;
-                }
+            for (_name, generic) in &self.generics {
+                write!(f, "{}", generic)?;
             }
             write!(f, ">")?;
         }

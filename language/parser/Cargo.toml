@@ -7,3 +7,4 @@ edition = "2021"
 syntax = { path = "../syntax" }
 
 anyhow = "1.0.70"
+tokio = { version = "1.27.0", features = ["rt"] }

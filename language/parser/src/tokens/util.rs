@@ -1,17 +1,18 @@
 use syntax::MODIFIERS;
+use crate::tokens::tokenizer;
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
 
 pub fn parse_ident(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]) -> Token {
     while !end.contains(&tokenizer.next_included()?) {}
     tokenizer.index -= 1;
-    return Token::new(token_type, tokenizer.last.end, tokenizer.index);
+    return tokenizer.make_token(token_type);
 }
 
 pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> Token {
     loop {
         if tokenizer.index == tokenizer.len {
-            return Token::new(TokenTypes::EOF, tokenizer.index, tokenizer.index);
+            return tokenizer.make_token(TokenTypes::EOF);
         }
         let character = tokenizer.buffer[tokenizer.index] as char;
         if !character.is_alphabetic() && character != ':' && character != '_' {
@@ -26,7 +27,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
 
     loop {
         if tokenizer.index == tokenizer.len {
-            return Token::new(TokenTypes::EOF, tokenizer.index, tokenizer.index);
+            return tokenizer.make_token(TokenTypes::EOF);
         }
         let character = tokenizer.buffer[tokenizer.index] as char;
         if character == '.' {
@@ -51,7 +52,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
 pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
     for modifier in MODIFIERS {
         if tokenizer.matches(format!("{}", modifier).as_str()) {
-            return Some(Token::new(TokenTypes::Modifier, tokenizer.last.end, tokenizer.index));
+            return Some(tokenizer.make_token(TokenTypes::Modifier));
         }
     }
     return None;

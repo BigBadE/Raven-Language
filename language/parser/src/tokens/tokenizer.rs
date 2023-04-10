@@ -6,6 +6,8 @@ use crate::tokens::util::{next_generic, next_string};
 pub struct Tokenizer<'a> {
     pub state: u64,
     pub index: usize,
+    pub line: u32,
+    pub line_index: u32,
     pub last: Token,
     pub len: usize,
     pub buffer: &'a [u8],
@@ -16,7 +18,9 @@ impl<'a> Tokenizer<'a> {
         return Tokenizer {
             state: TokenizerState::TopElement,
             index: 0,
-            last: Token::new(TokenTypes::Start, 0, 0),
+            line: 1,
+            line_index: 0,
+            last: Token::new(TokenTypes::Start, (0, 0), 0, (0, 0), 0),
             len: buffer.len(),
             buffer,
         };
@@ -57,13 +61,17 @@ impl<'a> Tokenizer<'a> {
     pub fn next_included(&mut self) -> Result<u8, Token> {
         loop {
             if self.index == self.len {
-                return Err(Token::new(TokenTypes::EOF, self.index, self.index));
+                return Err(Token::new(TokenTypes::EOF, self.last.end, self.last.end_offset,
+                                      (self.line, self.index as u32 - self.line_index), self.index));
             }
             let character = self.buffer[self.index];
             self.index += 1;
             match character {
                 b' ' => {}
-                b'\n' => {}
+                b'\n' => {
+                    self.line_index = self.index as u32;
+                    self.line += 1;
+                }
                 b'\r' => {}
                 b'\t' => {}
                 _ => return Ok(character)
@@ -87,25 +95,31 @@ impl<'a> Tokenizer<'a> {
             self.index += 1;
         }
 
-        return Token::new(token, self.last.end, self.index);
+        return Token::new(token, self.last.end, self.last.end_offset,
+                          (self.line, self.index as u32 - self.line_index), self.index);
     }
 
     pub fn handle_invalid(&mut self) -> Token {
         if self.index == self.len {
-            return Token::new(TokenTypes::EOF, self.index, self.index);
+            return Token::new(TokenTypes::EOF, self.last.end, self.last.end_offset,
+                              (self.line, self.index as u32 - self.line_index), self.index);
         }
 
         while self.index != self.len {
             if self.buffer[self.index] == b'\n' {
+                self.line_index = self.index as u32;
+                self.line += 1;
                 break;
             }
             self.index += 1;
         }
-        return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.index - 1);
+        return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.last.end_offset,
+                          (self.line, self.index as u32 - self.line_index), self.index - 1);
     }
 
     pub fn make_token(&self, token_type: TokenTypes) -> Token {
-        return Token::new(token_type, self.last.end, self.index);
+        return Token::new(token_type, self.last.end, self.index,
+                          self.last.end, self.index);
     }
 }
 

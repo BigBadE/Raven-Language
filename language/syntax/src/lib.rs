@@ -114,23 +114,32 @@ pub fn assign_with_priority(mut operator: Box<OperatorEffect>) -> OperatorEffect
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    fn add_to_next(&mut self, adding: Arc<Struct>);
+    fn verify_func(&self, function: Arc<Function>);
 
-    fn add_func_to_next(&mut self, adding: Arc<Function>);
+    fn verify_struct(&self, structure: Arc<Struct>);
+
+    fn add_implementation(&self, base: Types, implementing: Types);
+
+    fn get_internal(&self, name: &str) -> Arc<Struct>;
 }
 
 #[derive(Clone, Debug)]
 pub struct ParsingError {
     pub start: (u32, u32),
+    pub start_offset: usize,
     pub end: (u32, u32),
+    pub end_offset: usize,
     pub message: String
 }
 
 impl ParsingError {
-    pub fn new(start: (u32, u32), end: (u32, u32), message: String) -> Self {
+    pub fn new(start: (u32, u32), start_offset: usize, end: (u32, u32),
+        end_offset: usize, message: String) -> Self {
         return Self {
             start,
+            start_offset,
             end,
+            end_offset,
             message
         };
     }

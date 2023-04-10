@@ -1,9 +1,10 @@
 use inkwell::IntPredicate;
 use inkwell::values::FunctionValue;
 use syntax::code::Field;
-use crate::compiler::Compiler;
+use syntax::ParsingError;
+use crate::compiler::CompilerImpl;
 
-pub fn compile_internal<'ctx>(compiler: &Compiler<'ctx>, name: &String, fields: &Vec<Field>, value: FunctionValue<'ctx>) {
+pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, fields: &Vec<Field>, value: FunctionValue<'ctx>) {
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
@@ -68,4 +69,5 @@ pub fn compile_internal<'ctx>(compiler: &Compiler<'ctx>, name: &String, fields: 
             _ => panic!("Unknown internal operation: {}", name)
         }
     }
+    return Ok(());
 }

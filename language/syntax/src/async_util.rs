@@ -7,17 +7,20 @@ use crate::function::Function;
 use crate::ParsingError;
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
+use crate::types::Types;
 
 pub struct StructureGetter {
     pub syntax: Arc<Mutex<Syntax>>,
+    pub error: ParsingError,
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>
 }
 
 impl StructureGetter {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
+            error,
             getting,
             name_resolver
         };
@@ -25,17 +28,16 @@ impl StructureGetter {
 }
 
 impl Future for StructureGetter {
-    type Output = Result<Arc<Struct>, ParsingError>;
+    type Output = Result<Types, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
         let name = self.name_resolver.resolve(&self.getting);
         if let Some(found) = locked.structures.get(name) {
-            return Poll::Ready(Ok(found.clone()));
+            return Poll::Ready(Ok(Types::Struct(found.clone())));
         }
         if locked.finished {
-            return Poll::Ready(Err(ParsingError::new((0, 0), (0, 0),
-                                                     format!("Failed to find {}", name))));
+            return Poll::Ready(Err(self.error.clone()));
         }
         if let Some(vectors) = locked.structure_wakers.get_mut(name) {
             vectors.push(cx.waker().clone());
@@ -48,14 +50,16 @@ impl Future for StructureGetter {
 
 pub struct FunctionGetter {
     pub syntax: Arc<Mutex<Syntax>>,
+    pub error: ParsingError,
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>
 }
 
 impl FunctionGetter {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
+            error,
             getting,
             name_resolver
         };
@@ -68,13 +72,12 @@ impl Future for FunctionGetter {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
         let name = self.name_resolver.resolve(&self.getting);
-        if let Some(found) = locked.static_functions.get(name) {
+        if let Some(found) = locked.functions.get(name) {
             return Poll::Ready(Ok(found.clone()));
         }
 
         if locked.finished {
-            return Poll::Ready(Err(ParsingError::new((0, 0), (0, 0),
-                                                     format!("Failed to find function {}", name))));
+            return Poll::Ready(Err(self.error.clone()));
         }
         if let Some(vectors) = locked.function_wakers.get_mut(name) {
             vectors.push(cx.waker().clone());

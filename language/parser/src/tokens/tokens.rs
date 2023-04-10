@@ -1,20 +1,33 @@
 use std::convert::Infallible;
 use std::ops::{ControlFlow, FromResidual, Try};
+use syntax::ParsingError;
 
 #[derive(Clone, Debug)]
 pub struct Token {
     pub token_type: TokenTypes,
-    pub start: usize,
-    pub end: usize
+    pub start: (u32, u32),
+    pub start_offset: usize,
+    pub end: (u32, u32),
+    pub end_offset: usize
 }
 
 impl Token {
-    pub fn new(token_type: TokenTypes, start: usize, end: usize) -> Self {
+    pub fn new(token_type: TokenTypes, start: (u32, u32), start_offset: usize, end: (u32, u32), end_offset: usize) -> Self {
         return Self {
             token_type,
             start,
-            end
+            start_offset,
+            end,
+            end_offset
         }
+    }
+
+    pub fn make_error(&self, error: String) -> ParsingError {
+        return ParsingError::new(self.start, self.start_offset, self.end, self.end_offset, error);
+    }
+
+    pub fn to_string(&self, buffer: &[u8]) -> String {
+        return String::from_utf8_lossy(&buffer[self.start_offset..self.end_offset]).to_string();
     }
 }
 

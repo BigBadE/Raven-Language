@@ -11,14 +11,14 @@ fn main() {
 }
 
 async fn run(arguments: &Arguments) {
-    match runner::runner::run(&arguments.runner_settings).await {
+    match runner::runner::run::<(), u64>(&arguments.runner_settings).await {
         Err(errors) => {
             for error in errors {
                 println!("{}", error);
             }
         },
         Ok(result) => {
-            todo!()
+            println!("Exit code: {}", result());
         }
     }
 }

@@ -1,10 +1,10 @@
-use alloc::borrow::Cow;
+use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::ptr;
 use std::mem::MaybeUninit;
+use inkwell::context::Context;
 use llvm_sys::execution_engine::{LLVMCreateJITCompilerForModule, LLVMExecutionEngineRef, LLVMGetExecutionEngineTargetData, LLVMGetFunctionAddress};
 use llvm_sys::target::LLVMTargetDataRef;
-use crate::context::Context;
 
 pub struct Executor {
     engine: LLVMExecutionEngineRef,

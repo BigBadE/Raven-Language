@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use tokio::runtime::Handle;
 
-use compilers::compiling::Compiler;
 use syntax::function::Function;
 use syntax::ProcessManager;
 use syntax::r#struct::Struct;
+use syntax::types::Types;
 
 pub struct TypesCompiler {
     runtime: Handle
 }
 
 impl TypesCompiler {
-    pub fn new(runtime: Handle, compiler: Arc<dyn Compiler>) -> Self {
+    pub fn new(runtime: Handle) -> Self {
         return Self {
             runtime
         }
@@ -24,7 +24,19 @@ impl ProcessManager for TypesCompiler {
         return &self.runtime;
     }
 
-    fn add_to_next(&mut self, _adding: Arc<Struct>) {}
+    fn verify_func(&self, function: Arc<Function>) {
+        todo!()
+    }
 
-    fn add_func_to_next(&mut self, _adding: Arc<Function>) {}
+    fn verify_struct(&self, structure: Arc<Struct>) {
+        todo!()
+    }
+
+    fn add_implementation(&self, base: Types, implementing: Types) {
+        todo!()
+    }
+
+    fn get_internal(&self, name: &str) -> Struct {
+        todo!()
+    }
 }
