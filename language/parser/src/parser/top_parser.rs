@@ -10,7 +10,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
     let mut modifiers = Vec::new();
     let mut attributes = Vec::new();
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.pop().unwrap();
+        let token = parser_utils.tokens.remove(0);
         match token.token_type {
             TokenTypes::Start => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
@@ -47,7 +47,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
 }
 
 pub fn parse_import(parser_utils: &mut ParserUtils) {
-    let next = parser_utils.tokens.pop().unwrap();
+    let next = parser_utils.tokens.remove(0);
     let name = next.to_string(parser_utils.buffer);
 
     match next.token_type {
@@ -62,7 +62,7 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
 
 pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attribute>) {
     loop {
-        let next = parser_utils.tokens.pop().unwrap();
+        let next = parser_utils.tokens.remove(0);
         if next.token_type != TokenTypes::Attribute {
             parser_utils.tokens.insert(0, next);
             return;
@@ -73,7 +73,7 @@ pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attr
 
 pub fn parse_modifier(parser_utils: &mut ParserUtils, modifiers: &mut Vec<Modifier>) {
     loop {
-        let next = parser_utils.tokens.pop().unwrap();
+        let next = parser_utils.tokens.remove(0);
         if next.token_type != TokenTypes::Modifier {
             parser_utils.tokens.insert(0, next);
             return;

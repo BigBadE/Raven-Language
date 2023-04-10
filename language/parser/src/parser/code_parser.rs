@@ -19,7 +19,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils) -> Option<(ExpressionType, Eff
     let expression_type = ExpressionType::Line;
     loop {
         //TODO add rest
-        let token = parser_utils.tokens.pop().unwrap();
+        let token = parser_utils.tokens.remove(0);
         match token.token_type {
             TokenTypes::ParenOpen => {
                 if let Some((_, in_effect)) = parse_line(parser_utils) {

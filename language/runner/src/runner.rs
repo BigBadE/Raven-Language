@@ -18,6 +18,9 @@ pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<UnsafeFn<Arg
     let mut handles = Vec::new();
     for source_set in &settings.sources {
         for file in source_set.get_files() {
+            if !file.as_path().to_str().unwrap().ends_with("rv") {
+                continue
+            }
             handles.push(settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
                                                          source_set.relative(&file).clone(),
                                                          fs::read_to_string(file.clone()).expect(

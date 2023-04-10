@@ -83,7 +83,9 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         instance_function(function, self);
 
         while !self.compiling.is_empty() {
-            let (function_type, function) = unsafe { Rc::get_mut_unchecked(&mut self.compiling) }.pop().unwrap();
+            let (function_type, function) = unsafe {
+                Rc::get_mut_unchecked(&mut self.compiling)
+            }.remove(0);
             compile_block(&function.code, function_type, self, &mut 0);
         }
 

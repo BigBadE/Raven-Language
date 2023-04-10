@@ -27,7 +27,8 @@ impl LLVMCompiler {
 impl<Args, Output> Compiler<Args, Output> for LLVMCompiler {
     fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>) -> Result<UnsafeFn<Args, Output>, Vec<ParsingError>> {
         let context = Context::create();
-        let result = CompilerTypeGetter::new(Rc::new(CompilerImpl::new(&context)), syntax.clone()).compile();
+        let result = CompilerTypeGetter::new(
+            Rc::new(CompilerImpl::new(&context)), syntax.clone()).compile();
         let locked = syntax.lock().unwrap();
 
         return if locked.errors.is_empty() {
