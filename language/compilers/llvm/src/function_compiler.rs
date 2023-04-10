@@ -28,7 +28,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut Co
 
 pub fn instance_struct<'ctx>(structure: Arc<Struct>, type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
     let mut fields = Vec::new();
-    for field in structure.fields {
+    for field in &structure.fields {
         fields.push(type_getter.get_type(&field.field.field_type));
     }
 
@@ -37,7 +37,7 @@ pub fn instance_struct<'ctx>(structure: Arc<Struct>, type_getter: &mut CompilerT
 
 pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>,
                            id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
-    let mut block = type_getter.compiler.context.append_basic_block(function, &code.label);
+    let block = type_getter.compiler.context.append_basic_block(function, &code.label);
     type_getter.blocks.insert(code.label.clone(), block);
     type_getter.compiler.builder.position_at_end(block);
     for line in &code.expressions {
@@ -46,7 +46,7 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                 match &line.effect {
                     Effects::NOP() => {}
                     _ => {
-                        let mut returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
+                        let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
                         if returned.is_struct_value() {
                             type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
@@ -88,8 +88,9 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Comparison effect, and label to jump to the first if true, second if false
         Effects::CompareJump(effect, then_body, else_body) => {
+            let effect = compile_effect(type_getter, function, effect, id).unwrap().into_int_value();
             type_getter.compiler.builder.build_conditional_branch(
-                compile_effect(type_getter, function, effect, id).unwrap().into_int_value(),
+                effect,
                 type_getter.blocks.get(then_body).unwrap().clone(),
                 type_getter.blocks.get(else_body).unwrap().clone());
             None
@@ -103,8 +104,9 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
             let calling = type_getter.get_function(calling_function);
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
+                let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
                 let pointer = type_getter.compiler.builder.build_alloca(
-                    type_getter.get_type(&calling_function.return_type.unwrap()), &id.to_string());
+                    types, &id.to_string());
                 *id += 1;
                 final_arguments.push(From::from(pointer.as_basic_value_enum()));
 
@@ -128,16 +130,16 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         //Sets pointer to value
         Effects::Set(setting, value) => {
             let output = compile_effect(type_getter, function, setting, id).unwrap();
-            type_getter.compiler.builder.build_store(output.into_pointer_value(),
-                                                     compile_effect(type_getter, function, value, id).unwrap());
+            let storing = compile_effect(type_getter, function, value, id).unwrap();
+            type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }
         //Loads variable/field pointer from structure, or self if structure is None
         Effects::Load(loading_from, field) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             let mut offset = 1;
-            let lock = type_getter.syntax.lock().as_ref().unwrap();
-            for struct_field in loading_from.get_return(&lock.process_manager).unwrap().clone_struct().fields {
+            let lock = type_getter.syntax.lock().unwrap();
+            for struct_field in &loading_from.get_return(&lock.process_manager).unwrap().clone_struct().fields {
                 if &struct_field.field.name != field {
                     offset += 1;
                 } else {
@@ -167,8 +169,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 *out_arguments.get_mut(*index).unwrap() = MaybeUninit::new(returned);
             }
 
-            let pointer = type_getter.compiler.builder.build_alloca(
-                type_getter.get_type(structure), &id.to_string());
+            let storing = type_getter.get_type(structure);
+            let pointer = type_getter.compiler.builder.build_alloca(storing, &id.to_string());
             *id += 1;
 
             let mut offset = 0;

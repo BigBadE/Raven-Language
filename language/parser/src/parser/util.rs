@@ -25,16 +25,17 @@ impl<'a> ParserUtils<'a> {
                                     name, Box::new(self.imports.clone()));
     }
 
-    pub async fn add_struct(&self, token: &Token, structure: impl Future<Output=Result<Struct, ParsingError>>) {
-        let mut locked = self.syntax.lock().unwrap();
+    pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, structure: impl Future<Output=Result<Struct, ParsingError>>) {
         let structure = match structure.await {
             Ok(structure) => structure,
             Err(error) => {
-                locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", self.file), error)));
+                let mut locked = syntax.lock().unwrap();
+                locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
             }
         };
 
+        let mut locked = syntax.lock().unwrap();
         for function in &structure.functions {
             locked.add_function(token.make_error(format!("Duplicate function {}", function.name)), function.clone());
         }
@@ -42,17 +43,18 @@ impl<'a> ParserUtils<'a> {
                                           Arc::new(structure));
     }
 
-    pub async fn add_function(&self, token: &Token, function: impl Future<Output=Result<Function, ParsingError>>) {
-        let mut locked = self.syntax.lock().unwrap();
+    pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token, function: impl Future<Output=Result<Function, ParsingError>>) {
         let function = match function.await {
             Ok(function) => function,
             Err(error) => {
-                locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", self.file), error)));
+                let mut locked = syntax.lock().unwrap();
+                locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
             }
         };
 
         let function = Arc::new(function);
+        let mut locked = syntax.lock().unwrap();
         locked.add_function(token.make_error(format!("Duplicate structure {}", function.name)),
                                                function);
     }

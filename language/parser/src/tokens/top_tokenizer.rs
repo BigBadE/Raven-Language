@@ -13,31 +13,31 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         TokenTypes::ModifiersStart | TokenTypes::Modifier => if let Some(modifier) = parse_modifier(tokenizer) {
             modifier
         } else if tokenizer.matches("fn") {
-            if tokenizer.state == TokenizerState::TopElementToStruct {
-                tokenizer.state = TokenizerState::FunctionToStructTop;
+            if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+                tokenizer.state = TokenizerState::FUNCTION_TO_STRUCT_TOP;
             } else {
-                tokenizer.state = TokenizerState::Function;
+                tokenizer.state = TokenizerState::FUNCTION;
             }
             tokenizer.make_token(TokenTypes::FunctionStart)
         } else if tokenizer.matches("struct") {
-            if tokenizer.state == TokenizerState::TopElementToStruct {
+            if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
-                tokenizer.state = TokenizerState::Structure;
+                tokenizer.state = TokenizerState::STRUCTURE;
                 tokenizer.make_token(TokenTypes::StructStart)
             }
         } else if tokenizer.matches("trait") {
-            if tokenizer.state == TokenizerState::TopElementToStruct {
+            if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
-                tokenizer.state = TokenizerState::Structure;
+                tokenizer.state = TokenizerState::STRUCTURE;
                 tokenizer.make_token(TokenTypes::TraitStart)
             }
         } else if tokenizer.matches("impl") {
-            if tokenizer.state == TokenizerState::TopElementToStruct {
+            if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
-                tokenizer.state = TokenizerState::Implementation;
+                tokenizer.state = TokenizerState::IMPLEMENTATION;
                 tokenizer.make_token(TokenTypes::ImplStart)
             }
         } else {
@@ -51,10 +51,10 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.handle_invalid()
         },
         TokenTypes::FieldType => if tokenizer.matches("=") {
-            if tokenizer.state == TokenizerState::TopElementToStruct {
-                tokenizer.state = TokenizerState::CodeToStructTop;
+            if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+                tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP;
             } else {
-                tokenizer.state = TokenizerState::Code;
+                tokenizer.state = TokenizerState::CODE;
             }
             tokenizer.make_token(TokenTypes::FieldValue)
         } else if tokenizer.matches(";") {
@@ -65,8 +65,8 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         _ => {
             if tokenizer.matches("import") {
                 tokenizer.make_token(TokenTypes::ImportStart)
-            } else if tokenizer.matches("}") && tokenizer.state == TokenizerState::TopElementToStruct {
-                tokenizer.state = TokenizerState::TopElement;
+            } else if tokenizer.matches("}") && tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+                tokenizer.state = TokenizerState::TOP_ELEMENT;
                 tokenizer.make_token(TokenTypes::StructEnd)
             } else {
                 tokenizer.make_token(TokenTypes::AttributesStart)
@@ -79,12 +79,12 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::FunctionStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'<', b'(']),
         TokenTypes::Identifier => if tokenizer.matches("<") {
-            tokenizer.state = TokenizerState::GenericToFunc;
+            tokenizer.state = TokenizerState::GENERIC_TO_FUNC;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("(") {
             tokenizer.make_token(TokenTypes::ArgumentsStart)
         } else {
-            tokenizer.state = TokenizerState::TopElement;
+            tokenizer.state = TokenizerState::TOP_ELEMENT;
             tokenizer.handle_invalid()
         },
         TokenTypes::GenericEnd => {
@@ -111,13 +111,13 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
             if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
                 parse_ident(tokenizer, TokenTypes::ReturnType, &[b'{'])
             } else if tokenizer.matches("{") {
-                tokenizer.state = TokenizerState::Code;
+                tokenizer.state = TokenizerState::CODE;
                 tokenizer.make_token(TokenTypes::CodeStart)
             } else if tokenizer.matches(";") {
-                if tokenizer.state == TokenizerState::Function {
-                    tokenizer.state = TokenizerState::TopElement;
-                } else if tokenizer.state == TokenizerState::FunctionToStructTop {
-                    tokenizer.state = TokenizerState::TopElementToStruct;
+                if tokenizer.state == TokenizerState::FUNCTION {
+                    tokenizer.state = TokenizerState::TOP_ELEMENT;
+                } else if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
+                    tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
                 }
                 next_top_token(tokenizer)
             } else {
@@ -133,10 +133,10 @@ pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
         TokenTypes::StructStart | TokenTypes::TraitStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
         TokenTypes::Identifier | TokenTypes::GenericEnd => if tokenizer.matches("<") {
-            tokenizer.state = TokenizerState::GenericToStruct;
+            tokenizer.state = TokenizerState::GENERIC_TO_STRUCT;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("{") {
-            tokenizer.state = TokenizerState::TopElementToStruct;
+            tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
             tokenizer.make_token(TokenTypes::StructTopElement)
         } else {
             tokenizer.handle_invalid()
@@ -148,25 +148,26 @@ pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
 pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
     match &tokenizer.last.token_type {
         TokenTypes::ImplStart => if tokenizer.matches("<") {
-            tokenizer.state = TokenizerState::GenericToImpl;
+            tokenizer.state = TokenizerState::GENERIC_TO_IMPL;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else {
             tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')
         },
         TokenTypes::GenericEnd => if tokenizer.matches("for") {
-            tokenizer.state = TokenizerState::Structure;
+            tokenizer.state = TokenizerState::STRUCTURE;
             tokenizer.make_token(TokenTypes::TraitStart)
         } else {
             tokenizer.next_included()?;
             tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')
         }
         TokenTypes::Identifier => if tokenizer.matches("<") {
-            tokenizer.state = TokenizerState::GenericToImpl;
+            tokenizer.state = TokenizerState::GENERIC_TO_IMPL;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("for") {
-            tokenizer.state = TokenizerState::Structure;
+            tokenizer.state = TokenizerState::STRUCTURE;
             tokenizer.make_token(TokenTypes::TraitStart)
         } else {
+            tokenizer.state = TokenizerState::TOP_ELEMENT;
             tokenizer.handle_invalid()
         },
         token => panic!("How'd you get here? {:?}", token)
@@ -184,7 +185,7 @@ mod tests {
         add_header(0, &mut types);
         types.push(TokenTypes::EOF);
         let testing = "";
-        check_types(&types, testing, TokenizerState::TopElement);
+        check_types(&types, testing, TokenizerState::TOP_ELEMENT);
     }
 
     #[test]
@@ -198,7 +199,7 @@ mod tests {
         types.push(TokenTypes::ReturnType);
         types.push(TokenTypes::CodeStart);
         let testing = "pub internal fn testing<T: Bound>(self, arg2: TypeAgain) -> ReturnType {}";
-        check_types(&types, testing, TokenizerState::TopElement);
+        check_types(&types, testing, TokenizerState::TOP_ELEMENT);
     }
 
     #[test]
@@ -254,7 +255,7 @@ mod tests {
         impl<T: Bound, E: OtherBound> Test<T> for TestStruct<E> {\
             pub fn trait_func() {}\
         }";
-        check_types(&types, testing, TokenizerState::TopElement);
+        check_types(&types, testing, TokenizerState::TOP_ELEMENT);
     }
 
     fn add_header(modifiers: u8, input: &mut Vec<TokenTypes>) {

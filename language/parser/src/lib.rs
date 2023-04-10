@@ -53,7 +53,7 @@ impl ImportNameResolver {
 }
 
 impl NameResolver for ImportNameResolver {
-    fn resolve<'a>(&self, name: &'a String) -> &'a String {
+    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
         return self.imports.get(name).unwrap_or(name);
     }
 }

@@ -16,7 +16,7 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<C
 
 pub fn parse_line(parser_utils: &mut ParserUtils) -> Option<(ExpressionType, Effects)> {
     let mut effect = None;
-    let mut expression_type = ExpressionType::Line;
+    let expression_type = ExpressionType::Line;
     loop {
         //TODO add rest
         let token = parser_utils.tokens.pop().unwrap();

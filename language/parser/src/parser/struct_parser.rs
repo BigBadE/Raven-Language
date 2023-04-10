@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use syntax::{Attribute, get_modifier, Modifier, ParsingError, to_modifiers};
-use syntax::async_util::{FunctionGetter, StructureGetter};
+use syntax::{Attribute, get_modifier, Modifier, ParsingError};
+use syntax::async_util::StructureGetter;
 use syntax::code::{Field, MemberField};
 use syntax::function::Function;
 use syntax::r#struct::Struct;
@@ -16,8 +16,8 @@ pub struct FutureField(pub StructureGetter, pub Vec<Attribute>, pub u8, pub Stri
 
 pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
                        -> impl Future<Output=Result<Struct, ParsingError>> {
-    let mut modifiers = Vec::new();
-    let mut attributes = Vec::new();
+    let mut member_modifiers = Vec::new();
+    let mut member_attributes = Vec::new();
 
     let mut name = String::new();
     let mut fields = Vec::new();
@@ -33,19 +33,19 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                 .add_struct(None, Arc::new(Struct::new_poisoned(format!("{}", parser_utils.file),
                                                                 token.make_error("Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
-            TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
-            TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
+            TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
+            TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
             TokenTypes::FunctionStart => {
-                let function = parse_function(parser_utils, attributes, modifiers);
+                let function = parse_function(parser_utils, member_attributes, member_modifiers);
                 functions.push(function);
-                attributes = Vec::new();
-                modifiers = Vec::new();
+                member_attributes = Vec::new();
+                member_modifiers = Vec::new();
             }
             TokenTypes::FieldName => {
                 fields.push(parse_field(parser_utils, token.to_string(parser_utils.buffer),
-                                                                           attributes, modifiers));
-                attributes = Vec::new();
-                modifiers = Vec::new();
+                                        member_attributes, member_modifiers));
+                member_attributes = Vec::new();
+                member_modifiers = Vec::new();
             }
             TokenTypes::EOF => break,
             _ => panic!("How'd you get here?")
@@ -78,9 +78,9 @@ pub async fn get_struct(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<F
     return Ok(Struct::new(attributes, done_fields, done_generics, done_functions, modifiers, name));
 }
 
-pub fn parse_implementor(parser_util: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
+pub fn parse_implementor(_parser_util: &mut ParserUtils, _attributes: Vec<Attribute>, _modifiers: Vec<Modifier>)
     -> (Types, Types) {
-
+    todo!()
 }
 
 pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut HashMap<String, Vec<StructureGetter>>) {
@@ -114,7 +114,10 @@ pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
     while !parser_utils.tokens.is_empty() {
         let token = parser_utils.tokens.pop().unwrap();
         match token.token_type {
-            TokenTypes::FieldType => types = Some(parser_utils.get_struct(token, token.to_string(parser_utils.buffer))),
+            TokenTypes::FieldType => {
+                let name = token.to_string(parser_utils.buffer).clone();
+                types = Some(parser_utils.get_struct(token, name))
+            },
             _ => panic!("How'd you get here?")
         }
     }

@@ -16,7 +16,7 @@ pub struct Tokenizer<'a> {
 impl<'a> Tokenizer<'a> {
     pub fn new(buffer: &'a [u8]) -> Self {
         return Tokenizer {
-            state: TokenizerState::TopElement,
+            state: TokenizerState::TOP_ELEMENT,
             index: 0,
             line: 1,
             line_index: 0,
@@ -42,12 +42,12 @@ impl<'a> Tokenizer<'a> {
 
     pub fn next(&mut self) -> Token {
         self.last = match self.state {
-            TokenizerState::GenericToFunc | TokenizerState::GenericToStruct
-            | TokenizerState::GenericToImpl => next_generic(self),
-            TokenizerState::TopElement | TokenizerState::TopElementToStruct => next_top_token(self),
-            TokenizerState::Function | TokenizerState::FunctionToStructTop => next_func_token(self),
-            TokenizerState::Structure => next_struct_token(self),
-            TokenizerState::Implementation => next_implementation_token(self),
+            TokenizerState::GENERIC_TO_FUNC | TokenizerState::GENERIC_TO_STRUCT
+            | TokenizerState::GENERIC_TO_IMPL => next_generic(self),
+            TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => next_top_token(self),
+            TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => next_func_token(self),
+            TokenizerState::STRUCTURE => next_struct_token(self),
+            TokenizerState::IMPLEMENTATION => next_implementation_token(self),
             state =>
                 if state & 0xFF <= 1 {
                     next_string(self)
@@ -133,17 +133,17 @@ pub struct ParserState {
 pub struct TokenizerState {}
 
 impl TokenizerState {
-    pub const String: u64 = 0;
-    pub const StringToCodeStructTop: u64 = 1;
-    pub const TopElement: u64 = 2;
-    pub const Structure: u64 = 3;
-    pub const Implementation: u64 = 4;
-    pub const Function: u64 = 5;
-    pub const FunctionToStructTop: u64 = 6;
-    pub const GenericToFunc: u64 = 7;
-    pub const GenericToStruct: u64 = 8;
-    pub const GenericToImpl: u64 = 9;
-    pub const TopElementToStruct: u64 = 10;
-    pub const Code: u64 = 11;
-    pub const CodeToStructTop: u64 = 12;
+    pub const STRING: u64 = 0;
+    pub const STRING_TO_CODE_STRUCT_TOP: u64 = 1;
+    pub const TOP_ELEMENT: u64 = 2;
+    pub const STRUCTURE: u64 = 3;
+    pub const IMPLEMENTATION: u64 = 4;
+    pub const FUNCTION: u64 = 5;
+    pub const FUNCTION_TO_STRUCT_TOP: u64 = 6;
+    pub const GENERIC_TO_FUNC: u64 = 7;
+    pub const GENERIC_TO_STRUCT: u64 = 8;
+    pub const GENERIC_TO_IMPL: u64 = 9;
+    pub const TOP_ELEMENT_TO_STRUCT: u64 = 10;
+    pub const CODE: u64 = 11;
+    pub const CODE_TO_STRUCT_TOP: u64 = 12;
 }

@@ -1,5 +1,4 @@
 #![feature(get_mut_unchecked, box_into_inner)]
-
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -13,7 +12,6 @@ use crate::type_getter::CompilerTypeGetter;
 pub mod internal;
 
 pub mod compiler;
-pub mod execution;
 pub mod function_compiler;
 pub mod type_getter;
 pub mod util;
@@ -29,6 +27,13 @@ impl LLVMCompiler {
 impl<Args, Output> Compiler<Args, Output> for LLVMCompiler {
     fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>) -> Result<UnsafeFn<Args, Output>, Vec<ParsingError>> {
         let context = Context::create();
-        return CompilerTypeGetter::new(Rc::new(CompilerImpl::new(&context)), syntax.clone()).compile();
+        let result = CompilerTypeGetter::new(Rc::new(CompilerImpl::new(&context)), syntax.clone()).compile();
+        let locked = syntax.lock().unwrap();
+
+        return if locked.errors.is_empty() {
+            result
+        } else {
+            Err(locked.errors.clone())
+        }
     }
 }

@@ -6,8 +6,8 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
     match tokenizer.last.token_type {
         _ => {
             if tokenizer.matches(";") {
-                if (tokenizer.state.clone() as u64 & TokenizerState::CodeToStructTop as u64) != 0 {
-                    tokenizer.state = TokenizerState::TopElementToStruct;
+                if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 0 {
+                    tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
                 }
                 tokenizer.make_token(TokenTypes::LineEnd)
             } else if tokenizer.matches("{") {
@@ -15,10 +15,10 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                 tokenizer.make_token(TokenTypes::CodeStart)
             } else if tokenizer.matches("}") {
                 if bracket_depth == 0 {
-                    if (tokenizer.state.clone() as u64 & TokenizerState::CodeToStructTop as u64) != 0 {
-                        tokenizer.state = TokenizerState::TopElementToStruct;
+                    if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 0 {
+                        tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
                     } else {
-                        tokenizer.state = TokenizerState::TopElement;
+                        tokenizer.state = TokenizerState::TOP_ELEMENT;
                     }
                 } else {
                     tokenizer.state -= 0x1FF;
@@ -89,6 +89,6 @@ mod test {
         }\
         }\
         }";
-        check_types(&types, code, TokenizerState::Code);
+        check_types(&types, code, TokenizerState::CODE);
     }
 }

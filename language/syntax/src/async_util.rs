@@ -5,7 +5,6 @@ use std::task::{Context, Poll};
 
 use crate::function::Function;
 use crate::ParsingError;
-use crate::r#struct::Struct;
 use crate::syntax::Syntax;
 use crate::types::Types;
 
@@ -89,13 +88,13 @@ impl Future for FunctionGetter {
 }
 
 pub trait NameResolver: Send + Sync {
-    fn resolve<'a>(&self, name: &'a String) -> &'a String;
+    fn resolve<'a>(&'a self, name: &'a String) -> &'a String;
 }
 
 pub struct EmptyNameResolver {}
 
 impl NameResolver for EmptyNameResolver {
-    fn resolve<'a>(&self, name: &'a String) -> &'a String {
+    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
         name
     }
 }

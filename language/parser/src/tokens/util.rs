@@ -1,5 +1,4 @@
 use syntax::MODIFIERS;
-use crate::tokens::tokenizer;
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
 
@@ -61,10 +60,10 @@ pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
 pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
     loop {
         if tokenizer.next_included()? == b'"' && tokenizer.last.token_type != TokenTypes::StringEscape {
-            if tokenizer.state == TokenizerState::StringToCodeStructTop {
-                tokenizer.state = TokenizerState::CodeToStructTop + (tokenizer.state ^ 0xFF);
+            if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
+                tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP + (tokenizer.state ^ 0xFF);
             } else {
-                tokenizer.state = TokenizerState::Code + (tokenizer.state ^ 0xFF);
+                tokenizer.state = TokenizerState::CODE + (tokenizer.state ^ 0xFF);
             }
             return tokenizer.make_token(TokenTypes::StringEnd);
         }
@@ -80,12 +79,12 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
         } else if tokenizer.matches(",") {
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>'])
         } else if tokenizer.matches(">") {
-            if tokenizer.state == TokenizerState::GenericToImpl {
-                tokenizer.state = TokenizerState::Implementation;
-            } else if tokenizer.state == TokenizerState::GenericToStruct {
-                tokenizer.state = TokenizerState::Structure;
+            if tokenizer.state == TokenizerState::GENERIC_TO_IMPL {
+                tokenizer.state = TokenizerState::IMPLEMENTATION;
+            } else if tokenizer.state == TokenizerState::GENERIC_TO_STRUCT {
+                tokenizer.state = TokenizerState::STRUCTURE;
             } else {
-                tokenizer.state = TokenizerState::Function;
+                tokenizer.state = TokenizerState::FUNCTION;
             }
             tokenizer.make_token(TokenTypes::GenericEnd)
         } else {

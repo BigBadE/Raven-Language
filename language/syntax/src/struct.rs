@@ -9,7 +9,7 @@ use crate::types::Types;
 pub struct Struct {
     pub modifiers: u8,
     pub name: String,
-    generics: HashMap<String, Types>,
+    _generics: HashMap<String, Types>,
     pub attributes: Vec<Attribute>,
     pub fields: Vec<MemberField>,
     pub functions: Vec<Arc<Function>>,
@@ -23,7 +23,7 @@ impl Struct {
         return Self {
             attributes,
             modifiers,
-            generics,
+            _generics: generics,
             fields,
             functions,
             name,
@@ -37,7 +37,7 @@ impl Struct {
             attributes: Vec::new(),
             modifiers: 0,
             name,
-            generics: HashMap::new(),
+            _generics: HashMap::new(),
             fields: Vec::new(),
             functions: Vec::new(),
             traits: Vec::new(),

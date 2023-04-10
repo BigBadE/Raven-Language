@@ -26,7 +26,7 @@ impl Arguments {
             let arg = arg.to_string();
             if arg.starts_with("--") {
                 if let Some((types, name)) = last {
-                    let mut found = all_args.get_mut(&types).unwrap();
+                    let found = all_args.get_mut(&types).unwrap();
                     found.insert(name, vec!("true".to_string()));
                 }
                 last = Some((ArgumentTypes::Runner, arg[2..].to_string()))

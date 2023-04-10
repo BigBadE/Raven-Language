@@ -33,12 +33,12 @@ pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut C
     let mut params = Vec::new();
 
     for param in &function.fields {
-        params.push(From::from(type_getter.get_type(&param.field_type.name())));
+        params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }
 
-    return type_getter.compiler.module.add_function(&function.name, match &function.return_type {
+    let llvm_function = match &function.return_type {
         Some(returning) => {
-            let types = type_getter.get_type(&returning.name());
+            let types = type_getter.get_type(&returning);
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             if types.is_struct_type() {
                 params.insert(0, From::from(types.ptr_type(AddressSpace::default())));
@@ -48,9 +48,11 @@ pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut C
             }
         },
         None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
-    }, None);
+    };
+
+    return type_getter.compiler.module.add_function(&function.name, llvm_function, None);
 }
 
-pub async fn create_struct_value<'ctx>(structure: &Struct, type_getter: &CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
-
+pub async fn create_struct_value<'ctx>(_structure: &Struct, _type_getter: &CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
+    todo!()
 }

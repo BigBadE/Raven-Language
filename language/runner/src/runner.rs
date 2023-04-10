@@ -1,8 +1,8 @@
 use std::fs;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 use anyhow::Error;
 use checker::output::TypesCompiler;
-use compilers::compiling::{CompiledProject, UnsafeFn};
+use compilers::compiling::UnsafeFn;
 use parser::parse;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
@@ -12,7 +12,7 @@ pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<UnsafeFn<Arg
     let compiler = settings.get_compiler();
 
     let syntax = Arc::new(Mutex::new(Syntax::new(
-        Box::new(TypesCompiler::new(settings.cpu_runtime.clone())))));
+        Box::new(TypesCompiler::new(settings.cpu_runtime.handle().clone())))));
 
     //Parse source, getting handles and building into the unresolved syntax.
     let mut handles = Vec::new();
@@ -52,5 +52,5 @@ pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<UnsafeFn<Arg
         return Err(Vec::new());
     }
 
-    return compiler.compile();
+    return compiler.compile(&syntax);
 }

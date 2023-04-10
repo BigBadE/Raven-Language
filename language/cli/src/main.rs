@@ -18,7 +18,7 @@ async fn run(arguments: &Arguments) {
             }
         },
         Ok(result) => {
-            println!("Exit code: {}", result());
+            println!("Exit code: {}", unsafe { result(()) });
         }
     }
 }

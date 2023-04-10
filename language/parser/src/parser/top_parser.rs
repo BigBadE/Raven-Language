@@ -21,12 +21,16 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, attributes, modifiers);
-                parser_utils.add_function(&token, function);
+                parser_utils.handle.spawn(ParserUtils::add_function(parser_utils.syntax.clone(),
+                                                                    parser_utils.file.clone(), token.clone(), function));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::StructStart => {
-                parser_utils.handle.spawn(parser_utils.add_struct(&token, parse_structure(parser_utils, attributes, modifiers)));
+                let structure = parse_structure(parser_utils, attributes, modifiers);
+                parser_utils.handle.spawn(
+                    ParserUtils::add_struct(parser_utils.syntax.clone(), token, parser_utils.file.clone(),
+                                            structure));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
