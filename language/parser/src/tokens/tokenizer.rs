@@ -30,6 +30,8 @@ impl<'a> Tokenizer<'a> {
         return ParserState {
             state: self.state.clone(),
             index: self.index.clone(),
+            line_index: self.line_index.clone(),
+            line: self.line.clone(),
             last: self.last.clone(),
         };
     }
@@ -37,6 +39,8 @@ impl<'a> Tokenizer<'a> {
     pub fn load(&mut self, state: &ParserState) {
         self.state = state.state.clone();
         self.index = state.index.clone();
+        self.line_index = state.line_index.clone();
+        self.line = state.line.clone();
         self.last = state.last.clone();
     }
 
@@ -118,15 +122,17 @@ impl<'a> Tokenizer<'a> {
     }
 
     pub fn make_token(&self, token_type: TokenTypes) -> Token {
-        return Token::new(token_type, self.last.end, self.index,
-                          self.last.end, self.index);
+        return Token::new(token_type, self.last.end, self.last.end_offset,
+                          (self.line, self.index as u32 - self.line_index), self.index);
     }
 }
 
 pub struct ParserState {
     pub state: u64,
     pub index: usize,
-    pub last: Token,
+    pub line_index: u32,
+    pub line: u32,
+    pub last: Token
 }
 
 #[non_exhaustive]

@@ -79,6 +79,7 @@ pub fn parse_modifier(parser_utils: &mut ParserUtils, modifiers: &mut Vec<Modifi
             return;
         }
         let name = next.to_string(parser_utils.buffer);
-        modifiers.push(MODIFIERS.iter().find(|modifier| modifier.to_string() == name).unwrap().clone());
+        modifiers.push(MODIFIERS.iter().find(|modifier| modifier.to_string() == name)
+            .expect(format!("Failed to find modifier {} ({}-{})", name, next.start_offset, next.end_offset).as_str()).clone());
     }
 }
