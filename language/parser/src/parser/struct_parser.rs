@@ -47,8 +47,9 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
             }
+            TokenTypes::StructEnd => {},
             TokenTypes::EOF => break,
-            _ => panic!("How'd you get here?")
+            _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
 

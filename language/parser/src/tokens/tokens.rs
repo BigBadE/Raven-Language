@@ -27,7 +27,17 @@ impl Token {
     }
 
     pub fn to_string(&self, buffer: &[u8]) -> String {
-        return String::from_utf8_lossy(&buffer[self.start_offset..self.end_offset]).to_string();
+        let mut start = self.start_offset;
+        let mut end = self.end_offset-1;
+        while buffer[start] == b' ' || buffer[start] == b'\t' || buffer[start] == b'\r' || buffer[start] == b'\n' &&
+            start < end {
+            start += 1;
+        }
+        while buffer[end] == b' ' || buffer[end] == b'\t' || buffer[end] == b'\r' || buffer[end] == b'\n' &&
+            start < end {
+            end -= 1;
+        }
+        return String::from_utf8_lossy(&buffer[start..end+1]).to_string();
     }
 }
 

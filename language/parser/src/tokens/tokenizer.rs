@@ -85,9 +85,13 @@ impl<'a> Tokenizer<'a> {
 
     pub fn matches(&mut self, input: &str) -> bool {
         let start = self.index;
+        let offset = self.line_index;
+        let line = self.line;
         for character in input.bytes() {
             if self.next_included().unwrap_or(b' ') != character {
                 self.index = start;
+                self.line_index = offset;
+                self.line = line;
                 return false;
             }
         }
