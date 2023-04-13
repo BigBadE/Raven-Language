@@ -79,13 +79,13 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
         } else if tokenizer.matches(",") {
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>'])
         } else if tokenizer.matches(">") {
-            if tokenizer.state == TokenizerState::GENERIC_TO_IMPL {
-                tokenizer.state = TokenizerState::IMPLEMENTATION;
-            } else if tokenizer.state == TokenizerState::GENERIC_TO_STRUCT {
-                tokenizer.state = TokenizerState::STRUCTURE;
-            } else {
-                tokenizer.state = TokenizerState::FUNCTION;
-            }
+            tokenizer.state = match tokenizer.state {
+                TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
+                TokenizerState::GENERIC_TO_FUNC_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
+                TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
+                TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
+                _ => panic!("Unexpected generic state!")
+            };
             tokenizer.make_token(TokenTypes::GenericEnd)
         } else {
             tokenizer.handle_invalid()

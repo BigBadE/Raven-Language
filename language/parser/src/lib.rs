@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 use syntax::async_util::NameResolver;
 use syntax::syntax::Syntax;
+use syntax::types::Types;
 use crate::parser::top_parser::parse_top;
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokenizer::Tokenizer;
@@ -38,6 +39,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
 #[derive(Clone)]
 pub struct ImportNameResolver {
     pub imports: HashMap<String, String>,
+    pub generics: HashMap<String, Types>,
     pub parent: Option<String>,
     pub last_id: u32
 }
@@ -46,6 +48,7 @@ impl ImportNameResolver {
     pub fn new() -> Self {
         return Self {
             imports: HashMap::new(),
+            generics: HashMap::new(),
             parent: None,
             last_id: 0
         }
@@ -55,5 +58,9 @@ impl ImportNameResolver {
 impl NameResolver for ImportNameResolver {
     fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
         return self.imports.get(name).unwrap_or(name);
+    }
+
+    fn generic(&self, name: &String) -> Option<Types> {
+        return self.generics.get(name).map(|types| types.clone());
     }
 }

@@ -1,57 +1,152 @@
 use std::future::Future;
+use std::pin::Pin;
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::ParsingError;
-use crate::parser::util::ParserUtils;
-use crate::tokens::tokens::TokenTypes;
+use syntax::types::Types;
+use crate::parser::util::{add_generics, ParserUtils};
+use crate::tokens::tokens::{Token, TokenTypes};
 
-pub fn parse_code(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<CodeBody, ParsingError>> {
+pub fn parse_code(parser_utils: &mut ParserUtils, depth: u8) -> impl Future<Output=Result<Vec<Expression>, ParsingError>> {
     let mut lines = Vec::new();
-    while let Some((expression, effect)) = parse_line(parser_utils) {
+    while let Some((expression, effect)) = parse_line(parser_utils, depth) {
         lines.push(get_line(effect, expression));
     }
     parser_utils.imports.last_id += 1;
-    return create_body(parser_utils.imports.last_id-1, lines);
+    return create_body(parser_utils.imports.last_id - 1, lines);
 }
 
-pub fn parse_line(parser_utils: &mut ParserUtils) -> Option<(ExpressionType, Effects)> {
+pub fn parse_line(parser_utils: &mut ParserUtils, mut depth: u8)
+                  -> Option<(ExpressionType, Pin<Box<dyn Future<Output=Result<Effects, ParsingError>>>>)> {
     let mut effect = None;
-    let expression_type = ExpressionType::Line;
+    let mut expression_type = ExpressionType::Line;
     loop {
         //TODO add rest
         let token = parser_utils.tokens.remove(0);
         match token.token_type {
             TokenTypes::ParenOpen => {
-                if let Some((_, in_effect)) = parse_line(parser_utils) {
+                if let Some((_, in_effect)) = parse_line(parser_utils, depth) {
                     effect = Some(in_effect);
                 } else {
                     effect = None;
                 }
-            },
+            }
             TokenTypes::Float => {
-                effect = Some(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap()))
-            },
+                effect = Some(constant_effect(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap())))
+            }
             TokenTypes::Integer => {
-                effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
-            },
+                effect = Some(constant_effect(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap())))
+            }
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
-            _ => panic!("How'd you get here?")
+            TokenTypes::Variable => {
+                effect = Some(constant_effect(Effects::LoadVariable(token.to_string(parser_utils.buffer))))
+            }
+            TokenTypes::Return => expression_type = ExpressionType::Return,
+            TokenTypes::New => effect = Some(Box::pin(parse_new(parser_utils))),
+            TokenTypes::BlockStart => if depth == 0 {
+                break
+            } else {
+                effect = Some(Box::pin(body_effect(parse_code(parser_utils, depth+1))))
+            },
+            TokenTypes::BlockEnd => depth -= 1,
+            //TODO
+            TokenTypes::Operator => {},
+            TokenTypes::CodeEnd | TokenTypes::ArgumentEnd => break,
+            _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
-    return match effect {
-        Some(effect) => Some((expression_type, effect)),
-        None => Some((expression_type, Effects::NOP()))
-    };
+    return Some((expression_type, effect.unwrap_or(constant_effect(Effects::NOP()))));
 }
 
-pub async fn get_line(effect: Effects, expression_type: ExpressionType) -> Expression {
-    return Expression::new(expression_type, effect);
+async fn body_effect(body: impl Future<Output=Result<CodeBody, ParsingError>>) -> Result<Effects, ParsingError> {
+    return Ok(Effects::CodeBody(body.await?));
 }
 
-pub async fn create_body(id: u32, lines: Vec<impl Future<Output=Expression>>) -> Result<CodeBody, ParsingError> {
+fn constant_effect(effect: Effects) -> Pin<Box<dyn Future<Output=Result<Effects, ParsingError>>>> {
+    return Box::pin(constant_effect_inner(Ok(effect)));
+}
+
+async fn constant_effect_inner(effect: Result<Effects, ParsingError>) -> Result<Effects, ParsingError> {
+    return effect;
+}
+
+fn parse_new(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<Effects, ParsingError>> {
+    let mut types: Option<Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>> = None;
+    let mut values = Vec::new();
+
+    loop {
+        let token = parser_utils.tokens.remove(0);
+        match token.token_type {
+            TokenTypes::Variable => {
+                types = Some(Box::pin(parser_utils
+                    .get_struct(token.clone(), token.to_string(parser_utils.buffer))))
+            },
+            //Handle making new structs with generics.
+            TokenTypes::Operator => {
+                types = Some(Box::pin(add_generics(types.unwrap(), parser_utils)));
+            }
+            TokenTypes::BlockStart => {
+                values = parse_new_args(parser_utils);
+                break
+            }
+            TokenTypes::InvalidCharacters => {}
+            _ => panic!("How'd you get here? {:?}", token.token_type)
+        }
+    }
+
+    return create_effect(Box::pin(types.unwrap()), values);
+}
+
+fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, Pin<Box<dyn Future<Output=Result<Effects, ParsingError>>>>)> {
+    let mut values = Vec::new();
+    let mut name = String::new();
+    loop {
+        let token = parser_utils.tokens.remove(0);
+        match token.token_type {
+            TokenTypes::Variable => name = token.to_string(parser_utils.buffer),
+            TokenTypes::Colon | TokenTypes::ArgumentEnd => {
+                let effect = if let TokenTypes::Colon = token.token_type {
+                    parse_line(parser_utils, 0).unwrap_or((ExpressionType::Line,
+                                                           Box::pin(expect_effect(token.clone())))).1
+                } else {
+                    constant_effect(Effects::LoadVariable(name))
+                };
+                name = String::new();
+                values.push((0, effect));
+            },
+            TokenTypes::BlockEnd => break,
+            TokenTypes::InvalidCharacters => {}
+            _ => panic!("How'd you get here? {:?}", token.token_type)
+        }
+    }
+
+    return values;
+}
+
+async fn expect_effect(token: Token) -> Result<Effects, ParsingError> {
+    return Err(token.make_error("Expected something, found void".to_string()))
+}
+
+async fn create_effect(types: Pin<Box<impl Future<Output=Result<Types, ParsingError>>>>,
+    inputs: Vec<(usize, Pin<Box<dyn Future<Output=Result<Effects, ParsingError>>>>)>)
+    -> Result<Effects, ParsingError> {
+    let mut final_inputs = Vec::new();
+    for input in inputs {
+        final_inputs.push((input.0, input.1.await?));
+    }
+    return Ok(Effects::CreateStruct(types.await?, final_inputs));
+}
+
+pub async fn get_line(effect: Pin<Box<dyn Future<Output=Result<Effects, ParsingError>>>>, expression_type: ExpressionType)
+    -> Result<Expression, ParsingError> {
+    return Ok(Expression::new(expression_type, effect.await?));
+}
+
+pub async fn create_body(id: u32, lines: Vec<impl Future<Output=Result<Expression, ParsingError>>>)
+    -> Result<CodeBody, ParsingError> {
     let mut body = Vec::new();
     for line in lines {
-        body.push(line.await);
+        body.push(line.await?);
     }
     return Ok(CodeBody::new(body, id.to_string()));
 }

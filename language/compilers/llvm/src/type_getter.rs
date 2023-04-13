@@ -7,7 +7,7 @@ use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use compilers::compiling::UnsafeFn;
 use syntax::function::Function;
-use syntax::ParsingError;
+use syntax::{ParsingError, VariableManager};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::compiler::CompilerImpl;
@@ -19,7 +19,7 @@ pub struct CompilerTypeGetter<'ctx> {
     pub compiler: Rc<CompilerImpl<'ctx>>,
     pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<Function>)>>,
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
-    pub variables: HashMap<String, BasicValueEnum<'ctx>>,
+    pub variables: HashMap<String, (Types, BasicValueEnum<'ctx>)>,
 }
 
 impl<'ctx> CompilerTypeGetter<'ctx> {
@@ -37,8 +37,9 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
         for i in 0..llvm_function.count_params() as usize {
-            variables.insert(function.fields.get(i + offset as usize).unwrap().field.name.clone(),
-                             llvm_function.get_nth_param(i as u32).unwrap());
+            let field = &function.fields.get(i + offset as usize).unwrap().field;
+            variables.insert(field.name.clone(),
+                             (field.field_type.clone(), llvm_function.get_nth_param(i as u32).unwrap()));
         }
         return Self {
             syntax: self.syntax.clone(),
@@ -90,5 +91,11 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         }
 
         return Ok(self.compiler.get_main().unwrap());
+    }
+}
+
+impl VariableManager for CompilerTypeGetter<'_> {
+    fn get_variable(&self, name: &String) -> Option<Types> {
+        return self.variables.get(name).map(|found| found.0.clone());
     }
 }

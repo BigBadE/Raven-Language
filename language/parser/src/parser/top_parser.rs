@@ -1,12 +1,15 @@
 use std::sync::Arc;
 use syntax::{Attribute, Modifier, MODIFIERS};
 use syntax::r#struct::Struct;
+use crate::parser::code_parser::parse_code;
 use crate::parser::function_parser::parse_function;
 use crate::parser::struct_parser::{parse_implementor, parse_structure};
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
 
 pub fn parse_top(parser_utils: &mut ParserUtils) {
+    let temp: Vec<TokenTypes> = parser_utils.tokens.iter().map(|found| found.token_type.clone()).collect();
+    println!("{}: {:?}", parser_utils.file, temp);
     let mut modifiers = Vec::new();
     let mut attributes = Vec::new();
     while !parser_utils.tokens.is_empty() {
@@ -21,12 +24,32 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, attributes, modifiers);
-                parser_utils.handle.spawn(ParserUtils::add_function(parser_utils.syntax.clone(),
-                                                                    parser_utils.file.clone(), token.clone(), function));
+                let code = parse_code(parser_utils, 0);
+                parser_utils.handle.spawn(
+                    ParserUtils::add_function(parser_utils.syntax.clone(), parser_utils.file.clone(),
+                                              token.clone(), function, code));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::StructStart => {
+                let structure = parse_structure(parser_utils, attributes, modifiers);
+                parser_utils.handle.spawn(
+                    ParserUtils::add_struct(parser_utils.syntax.clone(), token, parser_utils.file.clone(),
+                                            structure));
+                attributes = Vec::new();
+                modifiers = Vec::new();
+            }
+            TokenTypes::TraitStart => {
+                if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern) {
+                    drop(parse_structure(parser_utils, attributes, modifiers));
+                    parser_utils.syntax.lock().unwrap()
+                        .add_struct(None,
+                                    Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
+                                                                  token.make_error(
+                                                                      "Traits can't be internal/external!".to_string()))));
+                    break;
+                }
+                modifiers.push(Modifier::Trait);
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
                     ParserUtils::add_struct(parser_utils.syntax.clone(), token, parser_utils.file.clone(),

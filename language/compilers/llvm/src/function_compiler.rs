@@ -1,4 +1,5 @@
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -134,12 +135,17 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }
+        Effects::LoadVariable(name) => {
+            return Some(type_getter.variables.get(name).unwrap().1);
+        }
         //Loads variable/field pointer from structure, or self if structure is None
         Effects::Load(loading_from, field) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             let mut offset = 1;
             let lock = type_getter.syntax.lock().unwrap();
-            for struct_field in &loading_from.get_return(&lock.process_manager).unwrap().clone_struct().fields {
+            for struct_field in &loading_from
+                .get_return(lock.process_manager.deref(), type_getter)
+                .unwrap().clone_struct().fields {
                 if &struct_field.field.name != field {
                     offset += 1;
                 } else {

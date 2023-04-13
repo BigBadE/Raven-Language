@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers};
+use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers, VariableManager};
 use crate::function::{CodeBody, display_indented, display_joined};
 use crate::types::Types;
 
@@ -107,7 +107,9 @@ pub enum Effects {
     MethodCall(Arc<Function>, Vec<Effects>),
     //Sets pointer to value
     Set(Box<Effects>, Box<Effects>),
-    //Loads variable/field pointer from structure
+    //Loads variable
+    LoadVariable(String),
+    //Loads field pointer from structure
     Load(Box<Effects>, String),
     //Struct to create and a tuple of the index of the argument and the argument
     CreateStruct(Types, Vec<(usize, Effects)>),
@@ -118,15 +120,16 @@ pub enum Effects {
 }
 
 impl Effects {
-    pub fn get_return(&self, process_manager: &Box<dyn ProcessManager>) -> Option<Types> {
+    pub fn get_return(&self, process_manager: &dyn ProcessManager, variables: &dyn VariableManager) -> Option<Types> {
         return match self {
             Effects::NOP() => None,
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
             Effects::CodeBody(_) => None,
             Effects::MethodCall(function, _) => function.return_type.clone(),
-            Effects::Set(_, to) => to.get_return(process_manager),
-            Effects::Load(from, _) => from.get_return(process_manager),
+            Effects::Set(_, to) => to.get_return(process_manager, variables),
+            Effects::LoadVariable(name) => variables.get_variable(name),
+            Effects::Load(from, _) => from.get_return(process_manager, variables),
             Effects::CreateStruct(types, _) => Some(types.clone()),
             Effects::Float(_) => Some(Types::Struct(process_manager.get_internal("f64"))),
             Effects::Int(_) => Some(Types::Struct(process_manager.get_internal("i64"))),
@@ -146,7 +149,8 @@ impl DisplayIndented for Effects {
                 write!(f, "if ")?;
                 comparing.format(&deeper, f)?;
                 write!(f, " jump {} else {}", label, other)
-            }
+            },
+            Effects::LoadVariable(variable) => write!(f, "{}", variable),
             Effects::CodeBody(body) => body.format(&deeper, f),
             Effects::MethodCall(function, args) => {
                 write!(f, "{}.", function.name, )?;

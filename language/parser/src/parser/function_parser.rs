@@ -48,17 +48,21 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                 let name = token.to_string(parser_utils.buffer).clone();
                 return_type = Some(parser_utils.get_struct(token, name))
             },
-            TokenTypes::CodeStart => code = Some(parse_code(parser_utils)),
-            _ => panic!("How'd you get here?")
+            TokenTypes::CodeStart => {
+                code = Some(parse_code(parser_utils, 0));
+                break
+            },
+            TokenTypes::CodeEnd => break,
+            _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
-    return get_function(attributes, get_modifier(modifiers.as_slice()), fields, generics, code.unwrap(),
-                        return_type, name);
+    return get_function(attributes, get_modifier(modifiers.as_slice()), fields, generics,
+                        code, return_type, name);
 }
 
 pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
                           generics: HashMap<String, Vec<StructureGetter>>,
-                          code: impl Future<Output=Result<CodeBody, ParsingError>>,
+                          code: Option<impl Future<Output=Result<CodeBody, ParsingError>>>,
                           return_type: Option<StructureGetter>, name: String) -> Result<Function, ParsingError> {
     let mut done_generics = HashMap::new();
     for (name, generic) in generics {
@@ -76,6 +80,10 @@ pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8, fields: Vec
     for field in fields {
         done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)))
     }
-    return Ok(Function::new(attributes, modifiers, done_fields, done_generics, code.await?,
+    let code = match code {
+        Some(found) => found.await?,
+        None => CodeBody::new(Vec::new(), "empty_trait".to_string())
+    };
+    return Ok(Function::new(attributes, modifiers, done_fields, done_generics, code,
                             return_type, name));
 }

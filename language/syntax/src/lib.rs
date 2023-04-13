@@ -18,7 +18,7 @@ pub mod types;
 
 pub static MODIFIERS: [Modifier; 5] = [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal, Modifier::Operation];
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Modifier {
     Public = 0b1,
     Protected = 0b10,
@@ -149,4 +149,8 @@ impl Display for ParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "Error at {:?}-{:?}:\n{}", self.start, self.end, self.message);
     }
+}
+
+pub trait VariableManager {
+    fn get_variable(&self, name: &String) -> Option<Types>;
 }

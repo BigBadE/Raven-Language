@@ -9,7 +9,7 @@ pub struct NumberIter<T> {
     pub end: T;
 
     pub fn new<T>(start: T, end: T) -> NumberIter<T> {
-        return NumberIter<T> {
+        return new NumberIter<T> {
             last: start,
             end: end
         };

@@ -40,8 +40,10 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.state = TokenizerState::IMPLEMENTATION;
                 tokenizer.make_token(TokenTypes::ImplStart)
             }
-        } else {
+        } else if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
             parse_ident(tokenizer, TokenTypes::FieldName, &[b':', b'='])
+        } else {
+            tokenizer.handle_invalid()
         },
         TokenTypes::FieldName => if tokenizer.matches(":") {
             parse_ident(tokenizer, TokenTypes::FieldType, &[b'=', b';'])
@@ -79,7 +81,11 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::FunctionStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'<', b'(']),
         TokenTypes::Identifier => if tokenizer.matches("<") {
-            tokenizer.state = TokenizerState::GENERIC_TO_FUNC;
+            if tokenizer.state == TokenizerState::FUNCTION {
+                tokenizer.state = TokenizerState::GENERIC_TO_FUNC;
+            } else {
+                tokenizer.state = TokenizerState::GENERIC_TO_FUNC_TOP;
+            }
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("(") {
             tokenizer.make_token(TokenTypes::ArgumentsStart)
@@ -109,7 +115,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
         },
         TokenTypes::ArgumentsEnd | TokenTypes::ReturnType =>
             if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
-                parse_ident(tokenizer, TokenTypes::ReturnType, &[b'{'])
+                parse_ident(tokenizer, TokenTypes::ReturnType, &[b';', b'{'])
             } else if tokenizer.matches("{") {
                 tokenizer.state = TokenizerState::CODE;
                 tokenizer.make_token(TokenTypes::CodeStart)
@@ -119,7 +125,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
                 } else if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
                     tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
                 }
-                next_top_token(tokenizer)
+                tokenizer.make_token(TokenTypes::CodeEnd)
             } else {
                 tokenizer.handle_invalid()
             }

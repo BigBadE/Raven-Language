@@ -1,12 +1,16 @@
 use std::future::Future;
+use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 use syntax::async_util::StructureGetter;
-use syntax::function::Function;
+use syntax::code::Expression;
+use syntax::function::{CodeBody, Function};
 use syntax::ParsingError;
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
-use crate::ImportNameResolver;
+use syntax::types::Types;
+use crate::{ImportNameResolver, TokenTypes};
 use crate::tokens::tokens::Token;
 
 pub struct ParserUtils<'a> {
@@ -15,7 +19,7 @@ pub struct ParserUtils<'a> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub file: String,
     pub imports: ImportNameResolver,
-    pub handle: Handle
+    pub handle: Handle,
 }
 
 impl<'a> ParserUtils<'a> {
@@ -40,11 +44,13 @@ impl<'a> ParserUtils<'a> {
             locked.add_function(token.make_error(format!("Duplicate function {}", function.name)), function.clone());
         }
         locked.add_struct(Some(token.make_error(format!("Duplicate structure {}", structure.name))),
-                                          Arc::new(structure));
+                          Arc::new(structure));
     }
 
-    pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token, function: impl Future<Output=Result<Function, ParsingError>>) {
-        let function = match function.await {
+    pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
+                              function: impl Future<Output=Result<Function, ParsingError>>,
+                              code: impl Future<Output=Result<Vec<Expression>, ParsingError>>) {
+        let mut function = match function.await {
             Ok(function) => function,
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
@@ -53,9 +59,50 @@ impl<'a> ParserUtils<'a> {
             }
         };
 
+        function.code = match code.await {
+            Ok(code) => Some(code),
+            Err(error) => {
+                function.poisoned.push(error);
+                None
+            }
+        };
+
         let function = Arc::new(function);
         let mut locked = syntax.lock().unwrap();
         locked.add_function(token.make_error(format!("Duplicate structure {}", function.name)),
-                                               function);
+                            function);
     }
+}
+
+pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>, parser_utils: &mut ParserUtils)
+                    -> impl Future<Output=Result<Types, ParsingError>> {
+    let mut generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>> = Vec::new();
+    let mut last = None;
+    loop {
+        let token = parser_utils.tokens.remove(0);
+        match token.token_type {
+            TokenTypes::Variable => last =
+                Some(Box::pin(parser_utils.get_struct(token.clone(), token.to_string(parser_utils.buffer)))),
+            TokenTypes::Operator => if let Some(types) = last {
+                generics.push(add_generics(types, parser_utils));
+                last = None;
+            },
+            TokenTypes::ArgumentEnd => if let Some(types) = last {
+                generics.push(types);
+                last = None;
+            },
+            TokenTypes::ArgumentsEnd => break,
+            _ => panic!("How'd you get here? {:?}", token.token_type)
+        }
+    }
+    return Box::pin(to_generics(input, generics));
+}
+
+async fn to_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>,
+                     generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>>) -> Result<Types, ParsingError> {
+    let mut final_generics = Vec::new();
+    for generic in generics {
+        final_generics.push(generic.await?);
+    }
+    return Ok(Types::GenericStruct(Box::new(input.await?), final_generics));
 }

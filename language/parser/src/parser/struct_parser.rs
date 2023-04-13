@@ -47,7 +47,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
             }
-            TokenTypes::StructEnd => {},
+            TokenTypes::StructEnd => break,
             TokenTypes::EOF => break,
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
@@ -119,7 +119,8 @@ pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
                 let name = token.to_string(parser_utils.buffer).clone();
                 types = Some(parser_utils.get_struct(token, name))
             },
-            _ => panic!("How'd you get here?")
+            TokenTypes::FieldEnd => break,
+            _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
 

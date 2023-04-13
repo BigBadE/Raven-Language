@@ -31,6 +31,9 @@ impl Future for StructureGetter {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
+        if let Some(found) = self.name_resolver.generic(&self.getting) {
+            return Poll::Ready(Ok(found));
+        }
         let name = self.name_resolver.resolve(&self.getting);
         if let Some(found) = locked.structures.get(name) {
             return Poll::Ready(Ok(Types::Struct(found.clone())));
@@ -89,12 +92,6 @@ impl Future for FunctionGetter {
 
 pub trait NameResolver: Send + Sync {
     fn resolve<'a>(&'a self, name: &'a String) -> &'a String;
-}
-
-pub struct EmptyNameResolver {}
-
-impl NameResolver for EmptyNameResolver {
-    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
-        name
-    }
+    
+    fn generic(&self, name: &String) -> Option<Types>;
 }

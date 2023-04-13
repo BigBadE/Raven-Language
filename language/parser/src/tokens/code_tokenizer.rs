@@ -12,7 +12,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                 tokenizer.make_token(TokenTypes::LineEnd)
             } else if tokenizer.matches("{") {
                 tokenizer.state += 0x1FF;
-                tokenizer.make_token(TokenTypes::CodeStart)
+                tokenizer.make_token(TokenTypes::BlockStart)
             } else if tokenizer.matches("}") {
                 if bracket_depth == 0 {
                     if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 0 {
@@ -20,10 +20,11 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                     } else {
                         tokenizer.state = TokenizerState::TOP_ELEMENT;
                     }
+                    tokenizer.make_token(TokenTypes::CodeEnd)
                 } else {
                     tokenizer.state -= 0x1FF;
+                    tokenizer.make_token(TokenTypes::BlockEnd)
                 }
-                tokenizer.make_token(TokenTypes::CodeEnd)
             } else if tokenizer.matches(",") {
                 tokenizer.make_token(TokenTypes::ArgumentEnd)
             } else if tokenizer.matches("(") {
@@ -48,12 +49,16 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                 tokenizer.make_token(TokenTypes::Switch)
             } else if tokenizer.matches("for") {
                 tokenizer.make_token(TokenTypes::For)
+            } else if tokenizer.matches("new") {
+                tokenizer.make_token(TokenTypes::New)
             } else if tokenizer.matches("while") {
                 tokenizer.make_token(TokenTypes::While)
             } else if tokenizer.matches("if") {
                 tokenizer.make_token(TokenTypes::If)
             } else if tokenizer.matches("else") {
                 tokenizer.make_token(TokenTypes::Else)
+            } else if tokenizer.matches(":") {
+                tokenizer.make_token(TokenTypes::Colon)
             } else if tokenizer.matches("\"") {
                 tokenizer.state = tokenizer.state & 0xFF;
                 tokenizer.make_token(TokenTypes::StringStart)

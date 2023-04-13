@@ -116,5 +116,9 @@ pub enum TokenTypes {
     Else = 45,
     If = 46,
     ParenOpen = 47,
-    ParenClose = 48
+    ParenClose = 48,
+    BlockStart = 49,
+    BlockEnd = 50,
+    New = 51,
+    Colon = 52
 }
