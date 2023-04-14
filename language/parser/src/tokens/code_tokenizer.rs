@@ -6,12 +6,14 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
     match tokenizer.last.token_type {
         _ => {
             if tokenizer.matches(";") {
-                if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 0 {
+                if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 12 {
                     tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
+                    tokenizer.make_token(TokenTypes::CodeEnd)
+                } else {
+                    tokenizer.make_token(TokenTypes::LineEnd)
                 }
-                tokenizer.make_token(TokenTypes::LineEnd)
             } else if tokenizer.matches("{") {
-                tokenizer.state += 0x1FF;
+                tokenizer.state += 0x100;
                 tokenizer.make_token(TokenTypes::BlockStart)
             } else if tokenizer.matches("}") {
                 if bracket_depth == 0 {
@@ -22,7 +24,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                     }
                     tokenizer.make_token(TokenTypes::CodeEnd)
                 } else {
-                    tokenizer.state -= 0x1FF;
+                    tokenizer.state -= 0x100;
                     tokenizer.make_token(TokenTypes::BlockEnd)
                 }
             } else if tokenizer.matches(",") {
@@ -57,6 +59,8 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                 tokenizer.make_token(TokenTypes::If)
             } else if tokenizer.matches("else") {
                 tokenizer.make_token(TokenTypes::Else)
+            } else if tokenizer.matches("in") {
+                tokenizer.make_token(TokenTypes::In)
             } else if tokenizer.matches(":") {
                 tokenizer.make_token(TokenTypes::Colon)
             } else if tokenizer.matches("\"") {

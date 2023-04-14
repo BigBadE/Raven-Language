@@ -24,7 +24,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
     let mut generics = HashMap::new();
     let mut functions = Vec::new();
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.remove(0);
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Identifier => name = token.to_string(parser_utils.buffer),
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
@@ -88,7 +88,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut HashMap<Str
     let mut name = String::new();
     let mut bounds = Vec::new();
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.remove(0);
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Generic => {
                 name = token.to_string(parser_utils.buffer);
@@ -102,7 +102,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut HashMap<Str
                 bounds.push(parser_utils.get_struct(token, name))
             }
             _ => {
-                parser_utils.tokens.insert(0, token);
+                parser_utils.index -= 1;
                 return;
             }
         }
@@ -113,7 +113,7 @@ pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
                    attributes: Vec<Attribute>, modifiers: Vec<Modifier>) -> FutureField {
     let mut types = None;
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.remove(0);
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
         match token.token_type {
             TokenTypes::FieldType => {
                 let name = token.to_string(parser_utils.buffer).clone();

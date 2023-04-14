@@ -94,4 +94,6 @@ pub trait NameResolver: Send + Sync {
     fn resolve<'a>(&'a self, name: &'a String) -> &'a String;
     
     fn generic(&self, name: &String) -> Option<Types>;
+    
+    fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }

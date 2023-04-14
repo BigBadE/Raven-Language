@@ -7,11 +7,12 @@ use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
 
 pub fn parse_top(parser_utils: &mut ParserUtils) {
-
     let mut modifiers = Vec::new();
     let mut attributes = Vec::new();
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.remove(0);
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
+        println!("{:?}", token.token_type);
         match token.token_type {
             TokenTypes::Start => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
@@ -21,36 +22,40 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
+                let token = token.clone();
                 let function = parse_function(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
                     ParserUtils::add_function(parser_utils.syntax.clone(), parser_utils.file.clone(),
-                                              token.clone(), function));
+                                              token, function));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::StructStart => {
+                let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
-                    ParserUtils::add_struct(parser_utils.syntax.clone(), token, parser_utils.file.clone(),
-                                            structure));
+                    ParserUtils::add_struct(parser_utils.syntax.clone(), token,
+                                            parser_utils.file.clone(), structure));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::TraitStart => {
                 if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern) {
+                    let error = token.make_error(
+                        "Traits can't be internal/external!".to_string());
                     drop(parse_structure(parser_utils, attributes, modifiers));
                     parser_utils.syntax.lock().unwrap()
                         .add_struct(None,
                                     Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
-                                                                  token.make_error(
-                                                                      "Traits can't be internal/external!".to_string()))));
+                                                                  error)));
                     break;
                 }
                 modifiers.push(Modifier::Trait);
+                let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
-                    ParserUtils::add_struct(parser_utils.syntax.clone(), token, parser_utils.file.clone(),
-                                            structure));
+                    ParserUtils::add_struct(parser_utils.syntax.clone(), token,
+                                            parser_utils.file.clone(), structure));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
@@ -82,22 +87,22 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
 
 pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attribute>) {
     loop {
-        let next = parser_utils.tokens.remove(0);
+        let next = parser_utils.tokens.get(parser_utils.index).unwrap();
         if next.token_type != TokenTypes::Attribute {
-            parser_utils.tokens.insert(0, next);
             return;
         }
+        parser_utils.index += 1;
         attributes.push(Attribute::new(next.to_string(parser_utils.buffer)))
     }
 }
 
 pub fn parse_modifier(parser_utils: &mut ParserUtils, modifiers: &mut Vec<Modifier>) {
     loop {
-        let next = parser_utils.tokens.remove(0);
+        let next = parser_utils.tokens.get(parser_utils.index).unwrap();
         if next.token_type != TokenTypes::Modifier {
-            parser_utils.tokens.insert(0, next);
             return;
         }
+        parser_utils.index += 1;
         let name = next.to_string(parser_utils.buffer);
         modifiers.push(MODIFIERS.iter().find(|modifier| modifier.to_string() == name)
             .expect(format!("Failed to find modifier {} ({}-{})", name, next.start_offset, next.end_offset).as_str()).clone());

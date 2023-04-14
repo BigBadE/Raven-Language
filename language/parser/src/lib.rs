@@ -27,6 +27,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
     }
     let mut parser_utils = ParserUtils {
         buffer: file.as_bytes(),
+        index: 0,
         tokens,
         syntax,
         file: name,
@@ -62,5 +63,9 @@ impl NameResolver for ImportNameResolver {
 
     fn generic(&self, name: &String) -> Option<Types> {
         return self.generics.get(name).map(|types| types.clone());
+    }
+
+    fn boxed_clone(&self) -> Box<dyn NameResolver> {
+        return Box::new(self.clone());
     }
 }

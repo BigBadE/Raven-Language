@@ -56,7 +56,7 @@ impl<'a> Tokenizer<'a> {
                 if state & 0xFF <= 1 {
                     next_string(self)
                 } else {
-                    next_code_token(self, state ^ 0xFF)
+                    next_code_token(self, state & 0xFFFFFF00)
                 },
         };
         return self.last.clone();

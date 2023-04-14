@@ -22,7 +22,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
     let mut last_arg_type = String::new();
 
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.remove(0);
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Identifier => name = token.to_string(parser_utils.buffer),
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),

@@ -1,8 +1,12 @@
 import iter::NumberIter;
 
 pub fn main() -> i64 {
+    1             2              3    2 1
     for number in NumberIter::new(2, 5) {
+        2
         return 1;
+    1
     }
     return 0;
+0
 }

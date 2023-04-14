@@ -16,6 +16,7 @@ use crate::tokens::tokens::Token;
 
 pub struct ParserUtils<'a> {
     pub buffer: &'a [u8],
+    pub index: usize,
     pub tokens: Vec<Token>,
     pub syntax: Arc<Mutex<Syntax>>,
     pub file: String,
@@ -24,7 +25,7 @@ pub struct ParserUtils<'a> {
 }
 
 impl<'a> ParserUtils<'a> {
-    pub fn get_struct(&self, token: Token, name: String) -> StructureGetter {
+    pub fn get_struct(&self, token: &Token, name: String) -> StructureGetter {
         return StructureGetter::new(self.syntax.clone(),
                                     token.make_error(format!("Failed to find type named {}", &name)),
                                     name, Box::new(self.imports.clone()));
@@ -71,10 +72,10 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
     let mut generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>> = Vec::new();
     let mut last = None;
     loop {
-        let token = parser_utils.tokens.remove(0);
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => last =
-                Some(Box::pin(parser_utils.get_struct(token.clone(), token.to_string(parser_utils.buffer)))),
+                Some(Box::pin(parser_utils.get_struct(token, token.to_string(parser_utils.buffer)))),
             TokenTypes::Operator => if let Some(types) = last {
                 generics.push(add_generics(types, parser_utils));
                 last = None;
@@ -84,7 +85,7 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
                 last = None;
             },
             _ => {
-                parser_utils.tokens.insert(0, token);
+                parser_utils.index -= 1;
                 break
             }
         }

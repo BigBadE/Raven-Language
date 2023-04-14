@@ -120,5 +120,6 @@ pub enum TokenTypes {
     BlockStart = 49,
     BlockEnd = 50,
     New = 51,
-    Colon = 52
+    Colon = 52,
+    In = 53
 }
