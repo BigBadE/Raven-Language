@@ -7,8 +7,7 @@ use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
 
 pub fn parse_top(parser_utils: &mut ParserUtils) {
-    let temp: Vec<TokenTypes> = parser_utils.tokens.iter().map(|found| found.token_type.clone()).collect();
-    println!("{}: {:?}", parser_utils.file, temp);
+
     let mut modifiers = Vec::new();
     let mut attributes = Vec::new();
     while !parser_utils.tokens.is_empty() {

@@ -113,13 +113,13 @@ impl<'a> Tokenizer<'a> {
                               (self.line, self.index as u32 - self.line_index), self.index);
         }
 
-        while self.index != self.len {
-            if self.buffer[self.index] == b'\n' {
+        loop {
+            self.index += 1;
+            if self.index == self.len || self.buffer[self.index] == b'\n' {
                 self.line_index = self.index as u32;
                 self.line += 1;
                 break;
             }
-            self.index += 1;
         }
         return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.last.end_offset,
                           (self.line, self.index as u32 - self.line_index), self.index - 1);

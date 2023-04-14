@@ -31,6 +31,7 @@ impl Syntax {
     }
 
     pub fn finish(&mut self) {
+        println!("Locked!");
         self.finished = true;
         self.structure_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
         self.function_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));

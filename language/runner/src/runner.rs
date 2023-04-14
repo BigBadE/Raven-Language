@@ -19,15 +19,17 @@ pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<UnsafeFn<Arg
     for source_set in &settings.sources {
         for file in source_set.get_files() {
             if !file.as_path().to_str().unwrap().ends_with("rv") {
-                continue
+                continue;
             }
-            handles.push(settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
-                                                         source_set.relative(&file).clone(),
-                                                         fs::read_to_string(file.clone()).expect(
-                                                             &format!("Failed to read source file: {}", file.to_str().unwrap())))));
+            handles.push(
+                settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
+                                                source_set.relative(&file).clone(),
+                                                fs::read_to_string(file.clone()).expect(
+                                                    &format!("Failed to read source file: {}", file.to_str().unwrap())))));
         }
     }
 
+    println!("At errors!");
     let mut errors = Vec::new();
     //Join any compilers errors
     for handle in handles {
@@ -39,6 +41,7 @@ pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<UnsafeFn<Arg
         }
     }
 
+    println!("Trying to lock!");
     //Set the syntax to finished because parsing is done.
     //This starts deadlock detection
     match syntax.lock() {
