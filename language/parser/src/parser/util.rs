@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
@@ -84,8 +83,10 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
                 generics.push(types);
                 last = None;
             },
-            TokenTypes::ArgumentsEnd => break,
-            _ => panic!("How'd you get here? {:?}", token.token_type)
+            _ => {
+                parser_utils.tokens.insert(0, token);
+                break
+            }
         }
     }
     return Box::pin(to_generics(input, generics));

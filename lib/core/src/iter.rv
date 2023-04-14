@@ -15,14 +15,3 @@ pub struct NumberIter<T> {
         };
     }
 }
-
-impl Iter<T> for NumberIter<T> {
-    pub fn next<T>(self: NumberIter<T>) -> T {
-        return self.last;
-    }
-
-    pub fn is_end<T>(self: NumberIter<T>) -> bool {
-        self.last = self.last + 1;
-        return self.last == self.end;
-    }
-}

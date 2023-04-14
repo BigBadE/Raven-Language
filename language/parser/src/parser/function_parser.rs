@@ -49,7 +49,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                 return_type = Some(parser_utils.get_struct(token, name))
             },
             TokenTypes::CodeStart => {
-                code = Some(parse_code(parser_utils, 0));
+                code = Some(parse_code(parser_utils));
                 break
             },
             TokenTypes::CodeEnd => break,

@@ -7,16 +7,16 @@ use syntax::types::Types;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 
-pub fn parse_code(parser_utils: &mut ParserUtils, depth: u8) -> impl Future<Output=Result<CodeBody, ParsingError>> {
+pub fn parse_code(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<CodeBody, ParsingError>> {
     let mut lines = Vec::new();
-    while let Some((expression, effect)) = parse_line(parser_utils, depth) {
+    while let Some((expression, effect)) = parse_line(parser_utils) {
         lines.push(get_line(effect, expression));
     }
     parser_utils.imports.last_id += 1;
     return create_body(parser_utils.imports.last_id - 1, lines);
 }
 
-pub fn parse_line(parser_utils: &mut ParserUtils, mut depth: u8)
+pub fn parse_line(parser_utils: &mut ParserUtils)
                   -> Option<(ExpressionType, Pin<Box<dyn Future<Output=Result<Effects, ParsingError>> + Send>>)> {
     let mut effect = None;
     let mut expression_type = ExpressionType::Line;
@@ -25,7 +25,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, mut depth: u8)
         let token = parser_utils.tokens.remove(0);
         match token.token_type {
             TokenTypes::ParenOpen => {
-                if let Some((_, in_effect)) = parse_line(parser_utils, depth) {
+                if let Some((_, in_effect)) = parse_line(parser_utils) {
                     effect = Some(in_effect);
                 } else {
                     effect = None;
@@ -43,12 +43,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, mut depth: u8)
             }
             TokenTypes::Return => expression_type = ExpressionType::Return,
             TokenTypes::New => effect = Some(parse_new(parser_utils)),
-            TokenTypes::BlockStart => if depth == 0 {
-                break
-            } else {
-                effect = Some(Box::pin(body_effect(parse_code(parser_utils, depth+1))))
-            },
-            TokenTypes::BlockEnd => depth -= 1,
+            TokenTypes::BlockStart => effect = Some(Box::pin(body_effect(parse_code(parser_utils)))),
+            TokenTypes::BlockEnd => break,
             //TODO
             TokenTypes::Operator => {},
             TokenTypes::CodeEnd | TokenTypes::ArgumentEnd => break,
@@ -107,7 +103,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils)
             TokenTypes::Variable => name = token.to_string(parser_utils.buffer),
             TokenTypes::Colon | TokenTypes::ArgumentEnd => {
                 let effect = if let TokenTypes::Colon = token.token_type {
-                    parse_line(parser_utils, 0).unwrap_or((ExpressionType::Line,
+                    parse_line(parser_utils).unwrap_or((ExpressionType::Line,
                                                            Box::pin(expect_effect(token.clone())))).1
                 } else {
                     constant_effect(Effects::LoadVariable(name))
