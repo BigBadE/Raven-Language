@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use syntax::{Attribute, Modifier, MODIFIERS};
 use syntax::r#struct::Struct;
-use crate::parser::code_parser::parse_code;
 use crate::parser::function_parser::parse_function;
 use crate::parser::struct_parser::{parse_implementor, parse_structure};
 use crate::parser::util::ParserUtils;
@@ -24,10 +23,9 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, attributes, modifiers);
-                let code = parse_code(parser_utils, 0);
                 parser_utils.handle.spawn(
                     ParserUtils::add_function(parser_utils.syntax.clone(), parser_utils.file.clone(),
-                                              token.clone(), function, code));
+                                              token.clone(), function));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }

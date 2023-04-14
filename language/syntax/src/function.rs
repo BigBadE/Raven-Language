@@ -9,7 +9,7 @@ pub struct Function {
     pub generics: HashMap<String, Types>,
     pub modifiers: u8,
     pub fields: Vec<MemberField>,
-    pub code: Option<CodeBody>,
+    pub code: CodeBody,
     pub return_type: Option<Types>,
     pub name: String,
     pub poisoned: Vec<ParsingError>
@@ -17,13 +17,13 @@ pub struct Function {
 
 impl Function {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<MemberField>, generics: HashMap<String, Types>,
-               return_type: Option<Types>, name: String) -> Self {
+               code: CodeBody, return_type: Option<Types>, name: String) -> Self {
         return Self {
             attributes,
             generics,
             modifiers,
             fields,
-            code: None,
+            code,
             return_type,
             name,
             poisoned: Vec::new()
@@ -36,7 +36,7 @@ impl Function {
             generics: HashMap::new(),
             modifiers: 0,
             fields: Vec::new(),
-            code: Some(CodeBody::new(Vec::new(), "poison".to_string())),
+            code: CodeBody::new(Vec::new(), "poison".to_string()),
             return_type: None,
             name,
             poisoned: vec!(error)
@@ -89,11 +89,7 @@ impl DisplayIndented for Function {
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
-        return if let Some(code) = &self.code {
-            code.format(indent, f)
-        } else {
-            write!(f, ";")
-        }
+        return self.code.format(indent, f);
     }
 }
 

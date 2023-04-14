@@ -1,15 +1,17 @@
 use std::future::Future;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+
 use tokio::runtime::Handle;
+
 use syntax::async_util::StructureGetter;
-use syntax::code::Expression;
-use syntax::function::{CodeBody, Function};
+use syntax::function::Function;
 use syntax::ParsingError;
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
+
 use crate::{ImportNameResolver, TokenTypes};
 use crate::tokens::tokens::Token;
 
@@ -48,22 +50,13 @@ impl<'a> ParserUtils<'a> {
     }
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
-                              function: impl Future<Output=Result<Function, ParsingError>>,
-                              code: impl Future<Output=Result<Vec<Expression>, ParsingError>>) {
-        let mut function = match function.await {
+                              function: impl Future<Output=Result<Function, ParsingError>>) {
+        let function = match function.await {
             Ok(function) => function,
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
                 locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
-            }
-        };
-
-        function.code = match code.await {
-            Ok(code) => Some(code),
-            Err(error) => {
-                function.poisoned.push(error);
-                None
             }
         };
 
@@ -74,9 +67,9 @@ impl<'a> ParserUtils<'a> {
     }
 }
 
-pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>, parser_utils: &mut ParserUtils)
-                    -> impl Future<Output=Result<Types, ParsingError>> {
-    let mut generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>> = Vec::new();
+pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>, parser_utils: &mut ParserUtils)
+                    -> Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>> {
+    let mut generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>> = Vec::new();
     let mut last = None;
     loop {
         let token = parser_utils.tokens.remove(0);
@@ -98,8 +91,9 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
     return Box::pin(to_generics(input, generics));
 }
 
-async fn to_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>,
-                     generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>>>>>) -> Result<Types, ParsingError> {
+async fn to_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>,
+                     generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>>)
+    -> Result<Types, ParsingError> {
     let mut final_generics = Vec::new();
     for generic in generics {
         final_generics.push(generic.await?);
