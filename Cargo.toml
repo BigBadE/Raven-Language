@@ -9,5 +9,6 @@ members = [
     "language/compilers/compilers",
     "language/compilers/llvm",
 
-    "tools/intellij-plugin/raven-intellij-natives"
+    "tools/ide-plugins/raven-intellij-natives",
+    "tools/ide-plugins/raven-language-server"
 ]
