@@ -31,7 +31,8 @@ impl<'a> ParserUtils<'a> {
                                     name, Box::new(self.imports.clone()));
     }
 
-    pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, structure: impl Future<Output=Result<Struct, ParsingError>>) {
+    pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String,
+                            structure: impl Future<Output=Result<Struct, ParsingError>>) {
         let structure = match structure.await {
             Ok(structure) => structure,
             Err(error) => {

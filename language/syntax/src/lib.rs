@@ -114,9 +114,9 @@ pub fn assign_with_priority(mut operator: Box<OperatorEffect>) -> OperatorEffect
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    fn verify_func(&self, function: Arc<Function>);
+    fn verify_func(&self, function: &Arc<Function>);
 
-    fn verify_struct(&self, structure: Arc<Struct>);
+    fn verify_struct(&self, structure: &Arc<Struct>);
 
     fn add_implementation(&self, base: Types, implementing: Types);
 

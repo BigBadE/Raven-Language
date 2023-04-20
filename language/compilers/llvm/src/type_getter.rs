@@ -5,16 +5,15 @@ use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use tokio::runtime::Builder;
 use compilers::compiling::UnsafeFn;
 use syntax::function::Function;
 use syntax::{ParsingError, VariableManager};
-use syntax::async_util::{FunctionGetter, NameResolver};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_struct};
 use crate::internal::structs::get_internal_struct;
+use crate::type_waiter::TypeWaiter;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
@@ -56,7 +55,9 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         match self.compiler.module.get_function(&function.name) {
             Some(found) => found,
             None => {
-                instance_function(function.clone(), self)
+                let found = instance_function(function.clone(), self);
+                unsafe { Rc::get_mut_unchecked(&mut self.compiling) }.push((found, function.clone()));
+                return found;
             }
         }
     }
@@ -77,10 +78,13 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     }
 
     pub fn compile<T, A>(&mut self) -> Result<Option<UnsafeFn<T, A>>, Vec<ParsingError>> {
-        let function = match FunctionGetter::new(self.syntax.clone(), ParsingError::empty(),
-        "main::main".to_string(), Box::new(EmptyNameResolver {})).await {
-            Ok(main) => main,
-            Err(_) => return Ok(None)
+        if !&self.syntax.lock().unwrap().finished {
+            TypeWaiter::new(&mut self.syntax.lock().unwrap(), "main::main").wait();
+        }
+
+        let function = match self.syntax.lock().unwrap().functions.get("main::main") {
+            Some(found) => found,
+            None => return Ok(None)
         }.clone();
 
         instance_function(function, self);
@@ -99,21 +103,5 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
 impl VariableManager for CompilerTypeGetter<'_> {
     fn get_variable(&self, name: &String) -> Option<Types> {
         return self.variables.get(name).map(|found| found.0.clone());
-    }
-}
-
-pub struct EmptyNameResolver {}
-
-impl NameResolver for EmptyNameResolver {
-    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
-        return name;
-    }
-
-    fn generic(&self, name: &String) -> Option<Types> {
-        panic!("Unimplemented!")
-    }
-
-    fn boxed_clone(&self) -> Box<dyn NameResolver> {
-        panic!("Unimplemented!")
     }
 }

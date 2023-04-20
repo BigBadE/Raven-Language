@@ -31,7 +31,6 @@ impl Syntax {
     }
 
     pub fn finish(&mut self) {
-        println!("Locked!");
         self.finished = true;
         self.structure_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
         self.function_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
@@ -50,6 +49,9 @@ impl Syntax {
                 //Ignored if one is poisoned
             }
         } else {
+            if structure.poisoned.is_empty() {
+                self.process_manager.verify_struct(&structure);
+            }
             self.structures.insert(structure.name.clone(), structure.clone());
         }
         if let Some(wakers) = self.structure_wakers.remove(&structure.name) {
@@ -72,6 +74,9 @@ impl Syntax {
                 //Ignore if one is poisoned
             }
         } else {
+            if function.poisoned.is_empty() {
+                self.process_manager.verify_func(&function);
+            }
             self.functions.insert(function.name.clone(), function.clone());
         }
         if let Some(wakers) = self.function_wakers.remove(&function.name) {

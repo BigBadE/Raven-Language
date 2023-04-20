@@ -6,7 +6,6 @@ use compilers::compiling::{Compiler, UnsafeFn};
 
 use inkwell::context::Context;
 use syntax::ParsingError;
-use async_trait::async_trait;
 
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
@@ -16,6 +15,7 @@ pub mod internal;
 pub mod compiler;
 pub mod function_compiler;
 pub mod type_getter;
+pub mod type_waiter;
 pub mod util;
 
 pub struct LLVMCompiler {}

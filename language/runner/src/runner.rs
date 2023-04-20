@@ -1,7 +1,7 @@
 use std::fs;
 use std::sync::{Arc, Mutex};
 use anyhow::Error;
-use checker::output::TypesCompiler;
+use checker::output::TypesChecker;
 use compilers::compiling::UnsafeFn;
 use parser::parse;
 use syntax::ParsingError;
@@ -12,7 +12,7 @@ pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<Option<Unsaf
     let compiler = settings.get_compiler();
 
     let syntax = Arc::new(Mutex::new(Syntax::new(
-        Box::new(TypesCompiler::new(settings.cpu_runtime.handle().clone())))));
+        Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())))));
 
     //Parse source, getting handles and building into the unresolved syntax.
     let mut handles = Vec::new();
