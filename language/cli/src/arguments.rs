@@ -18,7 +18,7 @@ impl Arguments {
         arguments.next();
 
         let str_args = arguments.next().unwrap();
-        for arg in str_args[0..str_args.len() - 1].split(" ") {
+        for arg in str_args[0..str_args.len()].split(" ") {
             if arg.is_empty() {
                 continue;
             }

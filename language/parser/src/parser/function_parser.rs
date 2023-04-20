@@ -57,7 +57,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
         }
     }
     return get_function(attributes, get_modifier(modifiers.as_slice()), fields, generics,
-                        code, return_type, name);
+                        code, return_type, parser_utils.file.clone() + "::" + name.as_str());
 }
 
 pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,

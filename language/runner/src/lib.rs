@@ -1,6 +1,6 @@
 #![feature(fn_traits)]
 
-use std::fs;
+use std::{fs, path};
 use std::path::PathBuf;
 use std::sync::Arc;
 use anyhow::Error;
@@ -40,7 +40,10 @@ impl SourceSet {
     }
 
     pub fn relative(&self, other: &PathBuf) -> String {
-        return other.to_str().unwrap().replace(self.root.to_str().unwrap(), "").replace("/", "::");
+        let name = other.to_str().unwrap()
+            .replace(self.root.to_str().unwrap(), "")
+            .replace(path::MAIN_SEPARATOR, "::");
+        return name.as_str()[2..name.len()-3].to_string();
     }
 
     fn read_recursive(base: &PathBuf, output: &mut Vec<PathBuf>) -> Result<(), Error> {
