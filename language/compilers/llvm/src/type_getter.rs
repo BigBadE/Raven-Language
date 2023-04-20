@@ -5,9 +5,11 @@ use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
+use tokio::runtime::Builder;
 use compilers::compiling::UnsafeFn;
 use syntax::function::Function;
 use syntax::{ParsingError, VariableManager};
+use syntax::async_util::{FunctionGetter, NameResolver};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::compiler::CompilerImpl;
@@ -74,14 +76,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T, A>(&mut self) -> Result<UnsafeFn<T, A>, Vec<ParsingError>> {
-        let locked = self.syntax.lock().unwrap();
-        let function = match locked.functions.get("main::main") {
-            Some(main) => main,
-            None => return Err(vec!(ParsingError::new("main".to_string(), (0, 0), 0,
-                                                      (0, 0), 0, "No main!".to_string())))
+    pub fn compile<T, A>(&mut self) -> Result<Option<UnsafeFn<T, A>>, Vec<ParsingError>> {
+        let function = match FunctionGetter::new(self.syntax.clone(), ParsingError::empty(),
+        "main::main".to_string(), Box::new(EmptyNameResolver {})).await {
+            Ok(main) => main,
+            Err(_) => return Ok(None)
         }.clone();
-        drop(locked);
 
         instance_function(function, self);
 
@@ -92,12 +92,28 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             compile_block(&function.code, function_type, self, &mut 0);
         }
 
-        return Ok(self.compiler.get_main().unwrap());
+        return Ok(Some(self.compiler.get_main().unwrap()));
     }
 }
 
 impl VariableManager for CompilerTypeGetter<'_> {
     fn get_variable(&self, name: &String) -> Option<Types> {
         return self.variables.get(name).map(|found| found.0.clone());
+    }
+}
+
+pub struct EmptyNameResolver {}
+
+impl NameResolver for EmptyNameResolver {
+    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
+        return name;
+    }
+
+    fn generic(&self, name: &String) -> Option<Types> {
+        panic!("Unimplemented!")
+    }
+
+    fn boxed_clone(&self) -> Box<dyn NameResolver> {
+        panic!("Unimplemented!")
     }
 }

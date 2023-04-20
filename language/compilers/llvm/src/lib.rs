@@ -6,6 +6,8 @@ use compilers::compiling::{Compiler, UnsafeFn};
 
 use inkwell::context::Context;
 use syntax::ParsingError;
+use async_trait::async_trait;
+
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
 
@@ -25,7 +27,7 @@ impl LLVMCompiler {
 }
 
 impl<Args, Output> Compiler<Args, Output> for LLVMCompiler {
-    fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>) -> Result<UnsafeFn<Args, Output>, Vec<ParsingError>> {
+    fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>) -> Result<Option<UnsafeFn<Args, Output>>, Vec<ParsingError>> {
         let context = Context::create();
         let result = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&context)), syntax.clone()).compile();

@@ -18,7 +18,10 @@ async fn run(arguments: &Arguments) {
             }
         },
         Ok(result) => {
-            println!("Exit code: {}", unsafe { result(()) });
+            match result {
+                Some(result) => println!("Exit code: {}", unsafe { result(()) }),
+                None => println!("No main found!")
+            }
         }
     }
 }

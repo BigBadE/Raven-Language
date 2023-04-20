@@ -134,6 +134,17 @@ pub struct ParsingError {
 }
 
 impl ParsingError {
+    pub fn empty() -> Self {
+        return ParsingError {
+            file: String::new(),
+            start: (0, 0),
+            start_offset: 0,
+            end: (0, 0),
+            end_offset: 0,
+            message: "You shouldn't see this!".to_string()
+        }
+    }
+
     pub fn new(file: String, start: (u32, u32), start_offset: usize, end: (u32, u32),
         end_offset: usize, message: String) -> Self {
         return Self {

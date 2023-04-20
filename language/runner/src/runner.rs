@@ -8,7 +8,7 @@ use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use crate::RunnerSettings;
 
-pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<UnsafeFn<Args, Output>, Vec<ParsingError>> {
+pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<Option<UnsafeFn<Args, Output>>, Vec<ParsingError>> {
     let compiler = settings.get_compiler();
 
     let syntax = Arc::new(Mutex::new(Syntax::new(
