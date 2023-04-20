@@ -25,22 +25,17 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<C
 
 pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: bool)
                   -> Option<(ExpressionType, ParsingFuture<Effects>)> {
-    println!("Calling!");
     let mut effect = None;
     let mut expression_type = ExpressionType::Line;
     loop {
-        //TODO add rest
         let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
-        println!("Token: {:?}", token.token_type);
         match token.token_type {
             TokenTypes::ParenOpen => {
-                println!("Nesting");
                 if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
                     effect = Some(in_effect);
                 } else {
                     effect = None;
                 }
-                println!("Nest done");
             }
             TokenTypes::Float => {
                 effect = Some(constant_effect(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap())))
@@ -48,23 +43,18 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Integer => {
                 effect = Some(constant_effect(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap())))
             }
-            TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
-                println!("Breaking");
-                break;
-            }
+            TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::CodeEnd | TokenTypes::BlockEnd => break,
             TokenTypes::Variable => {
                 effect = Some(constant_effect(Effects::LoadVariable(token.to_string(parser_utils.buffer))))
             }
             TokenTypes::Return => expression_type = ExpressionType::Return,
             TokenTypes::New => effect = Some(parse_new(parser_utils)),
             TokenTypes::BlockStart => if break_at_body {
-                println!("Breaking!");
                 break;
             } else {
                 effect = Some(Box::pin(body_effect(parse_code(parser_utils))))
             },
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
-            //TODO
             TokenTypes::Operator => {}
             TokenTypes::ArgumentEnd => if !deep {
                 break;

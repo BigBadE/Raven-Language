@@ -12,7 +12,6 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
     while !parser_utils.tokens.is_empty() {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
-        println!("{:?}", token.token_type);
         match token.token_type {
             TokenTypes::Start => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()

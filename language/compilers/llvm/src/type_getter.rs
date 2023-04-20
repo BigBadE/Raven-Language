@@ -78,7 +78,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     }
 
     pub fn compile<T, A>(&mut self) -> Result<Option<UnsafeFn<T, A>>, Vec<ParsingError>> {
-        if !&self.syntax.lock().unwrap().finished {
+        if &self.syntax.lock().unwrap().remaining != &0 {
             TypeWaiter::new(&mut self.syntax.lock().unwrap(), "main::main").wait();
         }
 

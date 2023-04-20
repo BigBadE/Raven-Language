@@ -112,7 +112,6 @@ pub fn check_types(types: &[TokenTypes], testing: &str, state: u64) {
             _ => tokens.push(token)
         }
     }
-    println!("Start:");
     for i in 0..types.len().max(tokens.len()) {
         if i > types.len() {
             assert!(false, "Hit end of types!");

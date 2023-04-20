@@ -33,6 +33,7 @@ impl<'a> ParserUtils<'a> {
 
     pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String,
                             structure: impl Future<Output=Result<Struct, ParsingError>>) {
+        syntax.lock().unwrap().remaining += 1;
         let structure = match structure.await {
             Ok(structure) => structure,
             Err(error) => {
@@ -44,7 +45,7 @@ impl<'a> ParserUtils<'a> {
 
         let mut locked = syntax.lock().unwrap();
         for function in &structure.functions {
-            locked.add_function(token.make_error(file.clone(),
+            locked.add_function(false, token.make_error(file.clone(),
                                                  format!("Duplicate function {}", function.name)), function.clone());
         }
         locked.add_struct(Some(token.make_error(file.clone(),
@@ -54,6 +55,7 @@ impl<'a> ParserUtils<'a> {
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
                               function: impl Future<Output=Result<Function, ParsingError>>) {
+        syntax.lock().unwrap().remaining += 1;
         let function = match function.await {
             Ok(function) => function,
             Err(error) => {
@@ -65,7 +67,7 @@ impl<'a> ParserUtils<'a> {
 
         let function = Arc::new(function);
         let mut locked = syntax.lock().unwrap();
-        locked.add_function(token.make_error(file.clone(), format!("Duplicate structure {}", function.name)),
+        locked.add_function(true, token.make_error(file.clone(), format!("Duplicate structure {}", function.name)),
                             function);
     }
 }

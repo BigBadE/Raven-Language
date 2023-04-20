@@ -13,7 +13,9 @@ pub struct Syntax {
     pub functions: HashMap<String, Arc<Function>>,
     pub structure_wakers: HashMap<String, Vec<Waker>>,
     pub function_wakers: HashMap<String, Vec<Waker>>,
-    pub finished: bool,
+    pub done_parsing: bool,
+    pub remaining: usize,
+    pub finish: Vec<Waker>,
     pub process_manager: Box<dyn ProcessManager>
 }
 
@@ -25,19 +27,22 @@ impl Syntax {
             functions: HashMap::new(),
             structure_wakers: HashMap::new(),
             function_wakers: HashMap::new(),
-            finished: false,
+            done_parsing: false,
+            remaining: 0,
+            finish: Vec::new(),
             process_manager
         };
     }
 
     pub fn finish(&mut self) {
-        self.finished = true;
+        self.done_parsing = true;
         self.structure_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
         self.function_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
     }
 
     //noinspection DuplicatedCode I could use a poisonable trait to extract this code but too much work
     pub fn add_struct(&mut self, dupe_error: Option<ParsingError>, structure: Arc<Struct>) {
+        self.remaining -= 1;
         for poison in &structure.poisoned {
             self.errors.push(poison.clone());
         }
@@ -59,10 +64,19 @@ impl Syntax {
                 waker.wake();
             }
         }
+        if self.remaining == 0 {
+            for waker in &self.finish {
+                waker.wake_by_ref();
+            }
+        }
     }
 
     //noinspection DuplicatedCode I could use a poisonable trait to extract this code but too much work
-    pub fn add_function(&mut self, dupe_error: ParsingError, function: Arc<Function>) {
+    pub fn add_function(&mut self, decrement: bool, dupe_error: ParsingError, function: Arc<Function>) {
+        if decrement {
+            self.remaining -= 1;
+        }
+
         for poison in &function.poisoned {
             self.errors.push(poison.clone());
         }
@@ -82,6 +96,11 @@ impl Syntax {
         if let Some(wakers) = self.function_wakers.remove(&function.name) {
             for waker in wakers {
                 waker.wake();
+            }
+        }
+        if self.remaining == 0 {
+            for waker in &self.finish {
+                waker.wake_by_ref();
             }
         }
     }

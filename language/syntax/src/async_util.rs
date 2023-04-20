@@ -38,7 +38,7 @@ impl Future for StructureGetter {
         if let Some(found) = locked.structures.get(name) {
             return Poll::Ready(Ok(Types::Struct(found.clone())));
         }
-        if locked.finished {
+        if locked.done_parsing {
             return Poll::Ready(Err(self.error.clone()));
         }
         if let Some(vectors) = locked.structure_wakers.get_mut(name) {
@@ -78,7 +78,7 @@ impl Future for FunctionGetter {
             return Poll::Ready(Ok(found.clone()));
         }
 
-        if locked.finished {
+        if locked.done_parsing {
             return Poll::Ready(Err(self.error.clone()));
         }
         if let Some(vectors) = locked.function_wakers.get_mut(name) {
