@@ -1,0 +1,19 @@
+[package]
+name = "runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+syntax = { path = "../syntax" }
+parser = { path = "../parser" }
+checker = { path = "../checker" }
+
+# Compilers
+compilers = { path = "../compilers/compilers" }
+compiler-llvm = { path = "../compilers/llvm" }
+
+# Tokio is used for scheduling I/O and CPU operations
+tokio = { version = "1.25.0", features = ["rt-multi-thread"] }
+
+# Utility / Code Cleanliness
+anyhow = "1.0.69"

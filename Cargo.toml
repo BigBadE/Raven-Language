@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "language/checker",
+    "language/cli",
+    "language/parser",
+    "language/runner",
+    "language/syntax",
+
+    "language/compilers/compilers",
+    "language/compilers/llvm",
+
+    "tools/ide-plugins/raven-intellij-natives",
+    "tools/ide-plugins/raven-language-server"
+]

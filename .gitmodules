@@ -1,0 +1,3 @@
+[submodule "tools/ide-plugins/raven-intellij-plugin"]
+	path = tools/ide-plugins/raven-intellij-plugin
+	url = https://github.com/BigBadE/raven-intellij-plugin.git
