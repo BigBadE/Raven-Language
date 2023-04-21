@@ -15,7 +15,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         match token.token_type {
             TokenTypes::Start => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
-                .add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
+                .add_struct(false, None, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
                                                                 token.make_error(parser_utils.file.clone(),
                                                                                  "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
@@ -45,7 +45,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                         parser_utils.file.clone(), "Traits can't be internal/external!".to_string());
                     drop(parse_structure(parser_utils, attributes, modifiers));
                     parser_utils.syntax.lock().unwrap()
-                        .add_struct(None,
+                        .add_struct(false, None,
                                     Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
                                                                   error)));
                     break;

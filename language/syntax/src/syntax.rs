@@ -41,8 +41,10 @@ impl Syntax {
     }
 
     //noinspection DuplicatedCode I could use a poisonable trait to extract this code but too much work
-    pub fn add_struct(&mut self, dupe_error: Option<ParsingError>, structure: Arc<Struct>) {
-        self.remaining -= 1;
+    pub fn add_struct(&mut self, decrement: bool, dupe_error: Option<ParsingError>, structure: Arc<Struct>) {
+        if decrement {
+            self.remaining -= 1;
+        }
         for poison in &structure.poisoned {
             self.errors.push(poison.clone());
         }

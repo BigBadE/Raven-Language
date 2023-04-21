@@ -30,7 +30,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::StructTopElement => {},
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
-                .add_struct(None, Arc::new(Struct::new_poisoned(format!("{}", parser_utils.file),
+                .add_struct(false, None, Arc::new(Struct::new_poisoned(format!("{}", parser_utils.file),
                                                                 token.make_error(parser_utils.file.clone(),
                                                                                  "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),

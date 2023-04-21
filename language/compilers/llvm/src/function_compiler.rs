@@ -2,7 +2,6 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
-use inkwell::basic_block::BasicBlock;
 
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::types::StructType;
@@ -37,14 +36,9 @@ pub fn instance_struct<'ctx>(structure: Arc<Struct>, type_getter: &mut CompilerT
     return type_getter.compiler.context.struct_type(fields.as_slice(), true);
 }
 
-pub fn compile_block<'ctx>(top: Option<BasicBlock<'ctx>>, code: &CodeBody, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>,
+pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>,
                            id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
-    let block;
-    if let Some(found) = top {
-        block = found;
-    } else {
-        block = type_getter.compiler.context.append_basic_block(function, &code.label);
-    }
+    let block = type_getter.compiler.context.append_basic_block(function, &code.label);
     type_getter.blocks.insert(code.label.clone(), block);
     type_getter.compiler.builder.position_at_end(block);
     for line in &code.expressions {
@@ -103,7 +97,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             None
         }
         Effects::CodeBody(body) => {
-            compile_block(None, body, function, type_getter, id)
+            compile_block(body, function, type_getter, id)
         }
         //Calling function, function arguments
         Effects::MethodCall(calling_function, arguments) => {

@@ -38,7 +38,7 @@ impl<'a> ParserUtils<'a> {
             Ok(structure) => structure,
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
-                locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
+                locked.add_struct(true, None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
             }
         };
@@ -48,7 +48,7 @@ impl<'a> ParserUtils<'a> {
             locked.add_function(false, token.make_error(file.clone(),
                                                  format!("Duplicate function {}", function.name)), function.clone());
         }
-        locked.add_struct(Some(token.make_error(file.clone(),
+        locked.add_struct(true, Some(token.make_error(file.clone(),
             format!("Duplicate structure {}", structure.name))),
                           Arc::new(structure));
     }
@@ -60,7 +60,7 @@ impl<'a> ParserUtils<'a> {
             Ok(function) => function,
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
-                locked.add_struct(None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
+                locked.add_struct(true, None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
             }
         };

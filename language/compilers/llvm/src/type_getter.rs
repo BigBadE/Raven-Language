@@ -94,9 +94,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             let (function_type, function) = unsafe {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
-            compile_block(function_type.get_first_basic_block(), &function.code, function_type, self, &mut 0);
-            print_formatted(function_type.to_string());
+            compile_block(&function.code, function_type, self, &mut 0);
         }
+
+        print_formatted(self.compiler.module.to_string());
 
         return Ok(Some(self.compiler.get_main().unwrap()));
     }
