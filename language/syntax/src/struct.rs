@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use crate::code::MemberField;
 use crate::function::Function;
@@ -43,5 +44,11 @@ impl Struct {
             traits: Vec::new(),
             poisoned: vec!(error)
         };
+    }
+}
+
+impl Debug for Struct {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
     }
 }

@@ -14,10 +14,6 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<C
     let mut lines = Vec::new();
     while let Some((expression, effect)) = parse_line(parser_utils, false, false) {
         lines.push(get_line(effect, expression));
-        let last = &parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type;
-        if last == &TokenTypes::BlockEnd || last == &TokenTypes::CodeEnd {
-            break
-        }
     }
     parser_utils.imports.last_id += 1;
     return create_body(parser_utils.imports.last_id - 1, lines);
@@ -43,7 +39,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Integer => {
                 effect = Some(constant_effect(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap())))
             }
-            TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::CodeEnd | TokenTypes::BlockEnd => break,
+            TokenTypes::LineEnd | TokenTypes::ParenClose => break,
+            TokenTypes::CodeEnd | TokenTypes::BlockEnd => return None,
             TokenTypes::Variable => {
                 effect = Some(constant_effect(Effects::LoadVariable(token.to_string(parser_utils.buffer))))
             }

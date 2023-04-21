@@ -44,7 +44,7 @@ impl Function {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct CodeBody {
     pub label: String,
     pub expressions: Vec<Expression>,

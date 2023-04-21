@@ -5,13 +5,13 @@ use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers, 
 use crate::function::{CodeBody, display_indented, display_joined};
 use crate::types::Types;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Expression {
     pub expression_type: ExpressionType,
     pub effect: Effects,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ExpressionType {
     Break,
     Return,
@@ -95,7 +95,7 @@ impl Display for Field {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Effects {
     NOP(),
     //Label of jumping to body

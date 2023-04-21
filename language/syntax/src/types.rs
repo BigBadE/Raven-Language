@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::function::display;
 use crate::Struct;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Types {
     Struct(Arc<Struct>),
     GenericStruct(Box<Types>, Vec<Types>),
