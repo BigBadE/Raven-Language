@@ -111,6 +111,8 @@ pub enum Effects {
     LoadVariable(String),
     //Loads field pointer from structure
     Load(Box<Effects>, String),
+    //An unresolved operation, sent to the checker.
+    Operation(String, Vec<Effects>),
     //Struct to create and a tuple of the index of the argument and the argument
     CreateStruct(Types, Vec<(usize, Effects)>),
     Float(f64),
@@ -126,6 +128,7 @@ impl Effects {
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
             Effects::CodeBody(_) => None,
+            Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
             Effects::MethodCall(function, _) => function.return_type.clone(),
             Effects::Set(_, to) => to.get_return(process_manager, variables),
             Effects::LoadVariable(name) => variables.get_variable(name),
@@ -144,6 +147,21 @@ impl DisplayIndented for Effects {
         let deeper = parsing.to_string() + "    ";
         return match self {
             Effects::NOP() => Ok(()),
+            Effects::Operation(operation, effects) => {
+                let mut index = 0;
+                let mut effect = 0;
+                while index < operation.len() {
+                    if operation.as_bytes()[index] == b'{' {
+                        index += 1;
+                        effects.get(effect).unwrap().format(&deeper, f)?;
+                        effect += 1;
+                    } else {
+                        write!(f, "{}", operation.as_bytes()[index])?;
+                    }
+                    index += 1;
+                }
+                return Ok(());
+            }
             Effects::Jump(label) => write!(f, "jump {}", label),
             Effects::CompareJump(comparing, label, other) => {
                 write!(f, "if ")?;

@@ -5,6 +5,7 @@ use syntax::function::CodeBody;
 use syntax::ParsingError;
 use syntax::types::Types;
 use crate::parser::control_parser::parse_for;
+use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 
@@ -52,7 +53,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 effect = Some(Box::pin(body_effect(parse_code(parser_utils))))
             },
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
-            TokenTypes::Operator => {}
+            TokenTypes::Operator => return Some((expression_type, parse_operator(effect, parser_utils))),
             TokenTypes::ArgumentEnd => if !deep {
                 break;
             },

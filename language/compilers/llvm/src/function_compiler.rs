@@ -80,6 +80,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                             effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
+        Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
         //Label of jumping to body
         Effects::Jump(label) => {
             type_getter.compiler.builder.build_unconditional_branch(
