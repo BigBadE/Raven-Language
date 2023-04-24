@@ -40,14 +40,6 @@ pub async fn run(settings: &RunnerSettings)
         }
     }
 
-    //Set the syntax to finished because parsing is done.
-    //This starts deadlock detection
-    match syntax.lock() {
-        Ok(mut locked) => locked.finish(),
-        //Next line will print the errors
-        Err(_error) => {}
-    }
-
     if !errors.is_empty() {
         println!("Error detected, this likely poisoned the mutexes. Please report any non-poison errors");
         for error in errors {

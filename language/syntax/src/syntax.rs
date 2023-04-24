@@ -14,7 +14,10 @@ pub struct Syntax {
     pub structure_wakers: HashMap<String, Vec<Waker>>,
     pub function_wakers: HashMap<String, Vec<Waker>>,
     pub done_parsing: bool,
+    //The amount of tasks running.
     pub remaining: usize,
+    //The amount of running tasks locked waiting for their waker.
+    pub locked: usize,
     pub finish: Vec<Waker>,
     pub process_manager: Box<dyn ProcessManager>
 }
@@ -29,15 +32,10 @@ impl Syntax {
             function_wakers: HashMap::new(),
             done_parsing: false,
             remaining: 0,
+            locked: 0,
             finish: Vec::new(),
             process_manager
         };
-    }
-
-    pub fn finish(&mut self) {
-        self.done_parsing = true;
-        self.structure_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
-        self.function_wakers.values().for_each(|wakers| wakers.iter().for_each(|waker| waker.clone().wake()));
     }
 
     //noinspection DuplicatedCode I could use a poisonable trait to extract this code but too much work
@@ -62,13 +60,9 @@ impl Syntax {
             self.structures.insert(structure.name.clone(), structure.clone());
         }
         if let Some(wakers) = self.structure_wakers.remove(&structure.name) {
+            self.locked -= wakers.len();
             for waker in wakers {
                 waker.wake();
-            }
-        }
-        if self.remaining == 0 {
-            for waker in &self.finish {
-                waker.wake_by_ref();
             }
         }
     }
@@ -98,11 +92,6 @@ impl Syntax {
         if let Some(wakers) = self.function_wakers.remove(&function.name) {
             for waker in wakers {
                 waker.wake();
-            }
-        }
-        if self.remaining == 0 {
-            for waker in &self.finish {
-                waker.wake_by_ref();
             }
         }
     }

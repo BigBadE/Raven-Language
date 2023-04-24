@@ -31,16 +31,34 @@ impl Future for StructureGetter {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
+        println!("Woke for {}: {:?}", self.getting, locked.structures.keys());
+        //Look for a generic of that name
         if let Some(found) = self.name_resolver.generic(&self.getting) {
             return Poll::Ready(Ok(found));
         }
+        //Look for a structure of that name
         let name = self.name_resolver.resolve(&self.getting);
         if let Some(found) = locked.structures.get(name) {
             return Poll::Ready(Ok(Types::Struct(found.clone())));
         }
-        if locked.done_parsing {
+
+        locked.locked += 1;
+
+        //If this is the last running task, fail it all.
+        if locked.locked == locked.remaining {
+            locked.structure_wakers.values().for_each(|wakers| for waker in wakers {
+                waker.wake_by_ref();
+            });
+            locked.function_wakers.values().for_each(|wakers| for waker in wakers {
+                waker.wake_by_ref();
+            });
+        }
+
+        if locked.locked >= locked.remaining {
             return Poll::Ready(Err(self.error.clone()));
         }
+
+        //Add a waker for that type
         if let Some(vectors) = locked.structure_wakers.get_mut(name) {
             vectors.push(cx.waker().clone());
         } else {
