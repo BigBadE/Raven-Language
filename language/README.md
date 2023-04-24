@@ -1,3 +1,12 @@
+# Modules
+
+- Checker: Verifies all borrows, generics, method calls, returns, etc...
+- CLI: Command Line Interface for using Raven
+- Compilers: The compilers Raven uses
+- Parser: Raven's Lexer and Parser
+- Runner: Handles running compilation with the given arguments
+- Syntax: Contains the structures for the language's syntax
+
 # Compilation
 
 Compilation is done in the following steps:

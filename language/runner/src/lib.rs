@@ -1,5 +1,3 @@
-#![feature(fn_traits)]
-
 use std::{fs, path};
 use std::path::PathBuf;
 use anyhow::Error;

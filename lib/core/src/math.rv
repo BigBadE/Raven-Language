@@ -3,3 +3,7 @@ pub internal struct i32 {}
 pub internal struct i16 {}
 pub internal struct i8 {}
 pub internal struct bool {}
+
+pub internal operation fn {}+{}(first: i64, second: i64) {
+    return first + second;
+}
