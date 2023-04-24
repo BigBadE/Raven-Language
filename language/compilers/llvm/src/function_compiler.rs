@@ -78,7 +78,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
 
 pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function: FunctionValue<'ctx>,
                             effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
-    println!("Compiling {:?}", effect);
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         //Label of jumping to body

@@ -2,7 +2,7 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use compilers::compiling::{Compiler, UnsafeFn};
+use compilers::compiling::Compiler;
 
 use inkwell::context::Context;
 use syntax::ParsingError;
@@ -18,23 +18,34 @@ pub mod type_getter;
 pub mod type_waiter;
 pub mod util;
 
-pub struct LLVMCompiler {}
+pub struct LLVMCompiler {
+    context: Context
+}
 
 impl LLVMCompiler {
     pub fn new() -> Self {
-        return Self {}
+        return Self {
+            context: Context::create()
+        }
     }
 }
 
-impl<Args, Output> Compiler<Args, Output> for LLVMCompiler {
-    fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>) -> Result<Option<UnsafeFn<Args, Output>>, Vec<ParsingError>> {
-        let context = Context::create();
-        let result = CompilerTypeGetter::new(
-            Rc::new(CompilerImpl::new(&context)), syntax.clone()).compile();
+impl Compiler for LLVMCompiler {
+    fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>)
+        -> Result<Option<i64>, Vec<ParsingError>> {
+        let mut binding = CompilerTypeGetter::new(
+            Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
+        let result = binding.compile();
         let locked = syntax.lock().unwrap();
 
         return if locked.errors.is_empty() {
-            result
+            match result {
+                Ok(function) => match function {
+                    Some(function) => Ok(Some(unsafe { function.call() })),
+                    None => Ok(None)
+                },
+                Err(error) => Err(error)
+            }
         } else {
             Err(locked.errors.clone())
         }

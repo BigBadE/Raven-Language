@@ -2,7 +2,6 @@
 
 use std::{fs, path};
 use std::path::PathBuf;
-use std::sync::Arc;
 use anyhow::Error;
 use tokio::runtime::Runtime;
 use compiler_llvm::LLVMCompiler;
@@ -19,9 +18,9 @@ pub struct RunnerSettings {
 }
 
 impl RunnerSettings {
-    pub fn get_compiler<Args, Output>(&self) -> Arc<dyn Compiler<Args, Output>> {
+    pub fn get_compiler(&self) -> Box<dyn Compiler> {
         match self.compiler.to_lowercase().as_str() {
-            "llvm" => Arc::new(LLVMCompiler::new()),
+            "llvm" => Box::new(LLVMCompiler::new()),
             _ => panic!("Unknown compilers {}", self.compiler)
         }
     }

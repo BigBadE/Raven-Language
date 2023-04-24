@@ -11,7 +11,8 @@ fn main() {
 }
 
 async fn run(arguments: &Arguments) {
-    match runner::runner::run::<(), u64>(&arguments.runner_settings).await {
+    let compiler = runner::runner::run(&arguments.runner_settings).await;
+    match compiler {
         Err(errors) => {
             for error in errors {
                 println!("{}", error);
@@ -19,7 +20,7 @@ async fn run(arguments: &Arguments) {
         },
         Ok(result) => {
             match result {
-                Some(result) => println!("Exit code: {}", unsafe { result(()) }),
+                Some(result) => println!("Exit code: {}", result),
                 None => println!("No main found!")
             }
         }

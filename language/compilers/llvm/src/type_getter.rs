@@ -3,9 +3,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
+use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use compilers::compiling::UnsafeFn;
 use syntax::function::Function;
 use syntax::{ParsingError, VariableManager};
 use syntax::syntax::Syntax;
@@ -14,7 +14,8 @@ use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_struct};
 use crate::internal::structs::get_internal_struct;
 use crate::type_waiter::TypeWaiter;
-use crate::util::print_formatted;
+
+pub type Main = unsafe extern "C" fn() -> i64;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
@@ -78,7 +79,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T, A>(&mut self) -> Result<Option<UnsafeFn<T, A>>, Vec<ParsingError>> {
+    pub fn compile(&mut self) -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
         if &self.syntax.lock().unwrap().remaining != &0 {
             TypeWaiter::new(&mut self.syntax.lock().unwrap(), "main::main").wait();
         }
@@ -95,11 +96,19 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
             compile_block(&function.code, function_type, self, &mut 0);
+            self.compiler.builder.build_return(None);
         }
 
-        print_formatted(self.compiler.module.to_string());
+        return Ok(self.get_main());
+    }
 
-        return Ok(Some(self.compiler.get_main().unwrap()));
+    fn get_main(&self) -> Option<JitFunction<'_, Main>> {
+        return unsafe {
+            match self.compiler.execution_engine.get_function("main::main") {
+                Ok(value) => Some(value),
+                Err(_) => None
+            }
+        };
     }
 }
 

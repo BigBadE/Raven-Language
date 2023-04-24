@@ -2,13 +2,13 @@ use std::fs;
 use std::sync::{Arc, Mutex};
 use anyhow::Error;
 use checker::output::TypesChecker;
-use compilers::compiling::UnsafeFn;
 use parser::parse;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use crate::RunnerSettings;
 
-pub async fn run<Args, Output>(settings: &RunnerSettings) -> Result<Option<UnsafeFn<Args, Output>>, Vec<ParsingError>> {
+pub async fn run(settings: &RunnerSettings)
+    -> Result<Option<i64>, Vec<ParsingError>> {
     let compiler = settings.get_compiler();
 
     let syntax = Arc::new(Mutex::new(Syntax::new(
