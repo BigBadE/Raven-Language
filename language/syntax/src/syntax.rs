@@ -13,7 +13,6 @@ pub struct Syntax {
     pub functions: HashMap<String, Arc<Function>>,
     pub structure_wakers: HashMap<String, Vec<Waker>>,
     pub function_wakers: HashMap<String, Vec<Waker>>,
-    pub done_parsing: bool,
     //The amount of tasks running.
     pub remaining: usize,
     //The amount of running tasks locked waiting for their waker.
@@ -30,7 +29,6 @@ impl Syntax {
             functions: HashMap::new(),
             structure_wakers: HashMap::new(),
             function_wakers: HashMap::new(),
-            done_parsing: false,
             remaining: 0,
             locked: 0,
             finish: Vec::new(),
