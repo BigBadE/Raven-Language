@@ -27,7 +27,8 @@ pub struct ParserUtils<'a> {
 impl<'a> ParserUtils<'a> {
     pub fn get_struct(&self, token: &Token, name: String) -> StructureGetter {
         return StructureGetter::new(self.syntax.clone(),
-                                    token.make_error(self.file.clone(), format!("Failed to find type named {}", &name)),
+                                    token.make_error(self.file.clone(),
+                                                     format!("Failed to find type named {}", &name)),
                                     name, Box::new(self.imports.clone()));
     }
 
@@ -38,19 +39,20 @@ impl<'a> ParserUtils<'a> {
             Ok(structure) => structure,
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
-                locked.add_struct(true, None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
+                locked.add_poison_struct(true,
+                                         Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
             }
         };
 
-        let mut locked = syntax.lock().unwrap();
         for function in &structure.functions {
-            locked.add_function(false, token.make_error(file.clone(),
-                                                 format!("Duplicate function {}", function.name)), function.clone());
+            Syntax::add_function(&syntax, false, token.make_error(file.clone(),
+                                                                  format!("Duplicate function {}", function.name)),
+                                 function.clone()).await;
         }
-        locked.add_struct(true, Some(token.make_error(file.clone(),
-            format!("Duplicate structure {}", structure.name))),
-                          Arc::new(structure));
+        Syntax::add_struct(&syntax, true, token.make_error(file.clone(),
+                                                           format!("Duplicate structure {}", structure.name)),
+                           Arc::new(structure)).await;
     }
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
@@ -60,15 +62,15 @@ impl<'a> ParserUtils<'a> {
             Ok(function) => function,
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
-                locked.add_struct(true, None, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
+                locked.add_poison_struct(true, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
                 return;
             }
         };
 
         let function = Arc::new(function);
-        let mut locked = syntax.lock().unwrap();
-        locked.add_function(true, token.make_error(file.clone(), format!("Duplicate structure {}", function.name)),
-                            function);
+        Syntax::add_function(&syntax, true,
+                             token.make_error(file.clone(), format!("Duplicate structure {}", function.name)),
+                             function).await;
     }
 }
 
@@ -77,7 +79,8 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
     let mut generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>> = Vec::new();
     let mut last = None;
     loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => last =
                 Some(Box::pin(parser_utils.get_struct(token, token.to_string(parser_utils.buffer)))),
@@ -91,7 +94,7 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
             },
             _ => {
                 parser_utils.index -= 1;
-                break
+                break;
             }
         }
     }
@@ -100,10 +103,10 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
 
 async fn to_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>,
                      generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>>)
-    -> Result<Types, ParsingError> {
+                     -> Result<Types, ParsingError> {
     let mut final_generics = Vec::new();
     for generic in generics {
         final_generics.push(generic.await?);
     }
-    return Ok(Types::GenericStruct(Box::new(input.await?), final_generics));
+    return Ok(Types::GenericType(Box::new(input.await?), final_generics));
 }

@@ -15,9 +15,9 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         match token.token_type {
             TokenTypes::Start => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
-                .add_struct(false, None, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
-                                                                token.make_error(parser_utils.file.clone(),
-                                                                                 "Unexpected top element!".to_string())))),
+                .add_poison_struct(false, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
+                                                                        token.make_error(parser_utils.file.clone(),
+                                                                                         "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
@@ -45,7 +45,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                         parser_utils.file.clone(), "Traits can't be internal/external!".to_string());
                     drop(parse_structure(parser_utils, attributes, modifiers));
                     parser_utils.syntax.lock().unwrap()
-                        .add_struct(false, None,
+                        .add_poison_struct(false,
                                     Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
                                                                   error)));
                     break;
@@ -79,7 +79,7 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
     match next.token_type {
         TokenTypes::Identifier => {
             parser_utils.imports.imports.insert(name.split("::").last().unwrap().to_string(), name.parse().unwrap());
-        },
+        }
         _ => {
             parser_utils.index -= 1;
         }

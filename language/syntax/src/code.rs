@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers, VariableManager};
+use crate::{Attribute, DisplayIndented, ErrorProvider, Function, ProcessManager, to_modifiers, VariableManager};
 use crate::function::{CodeBody, display_indented, display_joined};
 use crate::types::Types;
 

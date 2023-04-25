@@ -38,7 +38,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                         parser_utils.get_struct(token, parser_utils.imports.parent.as_ref().unwrap().clone()),
                         Vec::new(), 0, last_arg));
                 } else {
-                    fields.push(FutureField(parser_utils.get_struct(token, last_arg_type), Vec::new(), 0, last_arg));
+                    fields.push(FutureField(parser_utils.get_struct(token, last_arg_type),
+                                            Vec::new(), 0, last_arg));
                     last_arg_type = String::new();
                 }
                 last_arg = String::new();

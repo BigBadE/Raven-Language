@@ -11,8 +11,11 @@ pub async fn run(settings: &RunnerSettings)
     -> Result<Option<i64>, Vec<ParsingError>> {
     let compiler = settings.get_compiler();
 
-    let syntax = Arc::new(Mutex::new(Syntax::new(
-        Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())))));
+    let syntax = Syntax::new(
+        Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())));
+    let syntax = Arc::new(Mutex::new(syntax));
+    syntax.lock().unwrap().process_manager.init(syntax.clone());
+
 
     //Parse source, getting handles and building into the unresolved syntax.
     let mut handles = Vec::new();
@@ -39,6 +42,8 @@ pub async fn run(settings: &RunnerSettings)
             Ok(_) => {}
         }
     }
+
+    syntax.lock().unwrap().finish();
 
     if !errors.is_empty() {
         println!("Error detected, this likely poisoned the mutexes. Please report any non-poison errors");

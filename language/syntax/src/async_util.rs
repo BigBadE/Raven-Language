@@ -13,17 +13,20 @@ pub struct StructureGetter {
     pub syntax: Arc<Mutex<Syntax>>,
     pub error: ParsingError,
     pub getting: String,
-    pub name_resolver: Box<dyn NameResolver>
+    pub name_resolver: Box<dyn NameResolver>,
+    pub finished: Option<Types>
 }
 
 impl StructureGetter {
     pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         syntax.lock().unwrap().locked += 1;
+        
         return Self {
             syntax,
             error,
             getting,
-            name_resolver
+            name_resolver,
+            finished: None
         };
     }
 }
@@ -31,27 +34,32 @@ impl StructureGetter {
 impl Future for StructureGetter {
     type Output = Result<Types, ParsingError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.syntax.lock().unwrap();
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if let Some(finished) = &self.finished {
+            return Poll::Ready(Ok(finished.clone()));
+        }
+
+        let locked = self.syntax.clone();
+        let mut locked = locked.lock().unwrap();
+
         locked.locked -= 1;
 
-        println!("Woke for {}: {:?}", self.getting, locked.structures.keys());
         //Look for a generic of that name
         if let Some(found) = self.name_resolver.generic(&self.getting) {
+            self.finished = Some(found.clone());
             return Poll::Ready(Ok(found));
         }
+
         //Look for a structure of that name
         let name = self.name_resolver.resolve(&self.getting);
         if let Some(found) = locked.structures.get(name) {
-            println!("Found!");
+            self.finished = Some(Types::Struct(found.clone()));
             return Poll::Ready(Ok(Types::Struct(found.clone())));
         }
 
-        println!("Failed!");
         check_wake(locked.deref_mut());
 
-        if locked.locked >= locked.remaining {
-            println!("Error");
+        if locked.finished && locked.locked >= locked.remaining {
             return Poll::Ready(Err(self.error.clone()));
         }
 
@@ -61,7 +69,6 @@ impl Future for StructureGetter {
         } else {
             locked.structure_wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
         }
-        println!("Pending");
         return Poll::Pending;
     }
 }
@@ -76,6 +83,7 @@ pub struct FunctionGetter {
 impl FunctionGetter {
     pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         syntax.lock().unwrap().locked += 1;
+
         return Self {
             syntax,
             error,
@@ -100,7 +108,7 @@ impl Future for FunctionGetter {
 
         check_wake(locked.deref_mut());
 
-        if locked.locked >= locked.remaining {
+        if locked.finished && locked.locked >= locked.remaining {
             return Poll::Ready(Err(self.error.clone()));
         }
 

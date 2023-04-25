@@ -52,3 +52,9 @@ impl Debug for Struct {
         write!(f, "{}", self.name)
     }
 }
+
+impl PartialEq for Struct {
+    fn eq(&self, other: &Self) -> bool {
+        return self.name == other.name;
+    }
+}

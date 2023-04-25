@@ -80,6 +80,8 @@ name = "checker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-recursion",
+ "async-trait",
  "compilers",
  "syntax",
  "tokio",
@@ -448,6 +450,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-recursion",
+ "async-trait",
  "tokio",
 ]
 

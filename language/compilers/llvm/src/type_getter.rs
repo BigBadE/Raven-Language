@@ -74,7 +74,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         return match types {
             Types::Struct(_) => found,
             Types::Reference(_) => found.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-            Types::GenericStruct(_, _) => panic!("Can't compile a generic!"),
+            Types::GenericType(_, _) => panic!("Can't compile a generic!"),
             Types::Generic(_, _) => panic!("Can't compile a generic!")
         };
     }

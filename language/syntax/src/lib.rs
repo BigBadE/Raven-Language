@@ -1,11 +1,13 @@
 #![feature(box_into_inner)]
 #![feature(get_mut_unchecked)]
 
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use std::fmt::{Debug, Display, Formatter};
+use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
+use async_trait::async_trait;
 use crate::function::Function;
 use crate::r#struct::Struct;
+use crate::syntax::Syntax;
 use crate::types::Types;
 
 pub mod async_util;
@@ -111,16 +113,21 @@ pub fn assign_with_priority(mut operator: Box<OperatorEffect>) -> OperatorEffect
     return Box::into_inner(operator);
 }*/
 
+#[async_trait]
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    fn verify_func(&self, function: &Arc<Function>);
+    async fn verify_func(&self, function: Arc<Function>) -> Result<(), ParsingError>;
 
-    fn verify_struct(&self, structure: &Arc<Struct>);
+    async fn verify_struct(&self, structure: Arc<Struct>) -> Result<(), ParsingError>;
 
     fn add_implementation(&self, base: Types, implementing: Types);
 
     fn get_internal(&self, name: &str) -> Arc<Struct>;
+
+    fn cloned(&self) -> Box<dyn ProcessManager>;
+
+    fn init(&mut self, syntax: Arc<Mutex<Syntax>>);
 }
 
 #[derive(Clone, Debug)]
@@ -156,6 +163,10 @@ impl ParsingError {
             message
         };
     }
+}
+
+pub trait ErrorProvider {
+    fn get_error(&self, error: String) -> ParsingError;
 }
 
 impl Display for ParsingError {
