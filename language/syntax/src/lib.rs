@@ -74,44 +74,28 @@ pub trait DisplayIndented {
 }
 
 #[derive(Clone)]
-pub struct Attribute {
-    pub value: String
+pub enum Attribute {
+    Basic(String),
+    Integer(String, i64),
+    Bool(String, bool),
+    String(String, String)
 }
 
 impl Attribute {
-    pub fn new(value: String) -> Self {
-        return Self {
-            value
-        }
-    }
-}
-
-/*
-pub fn assign_with_priority(mut operator: Box<OperatorEffect>) -> OperatorEffect {
-    //Needs ownership of the value
-    let mut temp_lhs = Effects::NOP();
-    mem::swap(&mut temp_lhs, operator.effects.first_mut().unwrap());
-    match temp_lhs {
-        // Code explained using the following example: 1 + 2 / 2
-        Effects::OperatorEffect(mut lhs) => {
-            // temp_lhs = (1 + 2), operator = {} / 2
-            if lhs.priority < operator.priority || (!operator.parse_left && lhs.priority == operator.priority) {
-                // temp_lhs = 1 + {}, operator = 2 / 2
-                mem::swap(lhs.effects.last_mut().unwrap(), operator.effects.first_mut().unwrap());
-
-                // 1 + (2 / 2)
-                mem::swap(lhs.effects.last_mut().unwrap(), &mut Effects::OperatorEffect(operator));
-
-                return Box::into_inner(lhs);
-            } else {
-                mem::swap(&mut Effects::OperatorEffect(lhs), operator.effects.get_mut(0).unwrap());
+    pub fn find_attribute<'a>(name: &str, attributes: &'a Vec<Attribute>) -> Option<&'a Attribute> {
+        for attribute in attributes {
+            if match attribute {
+                Attribute::Basic(found) => found == name,
+                Attribute::Integer(found, _) => found == name,
+                Attribute::Bool(found, _) => found == name,
+                Attribute::String(found, _) => found == name
+            } {
+                return Some(attribute);
             }
         }
-        _ => mem::swap(&mut temp_lhs, operator.effects.get_mut(0).unwrap())
+        return None;
     }
-
-    return Box::into_inner(operator);
-}*/
+}
 
 #[async_trait]
 pub trait ProcessManager: Send + Sync {

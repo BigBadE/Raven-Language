@@ -1,7 +1,8 @@
+use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::code::Effects;
 use syntax::function::{CodeBody, Function};
-use syntax::ParsingError;
+use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
 use crate::EmptyNameResolver;
 use async_recursion::async_recursion;
@@ -34,7 +35,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 if let Some(operations) = locked.operations.get(operation) {
                     for potential_operation in operations {
                         if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
-                            *effect = new_effect;
+                            *effect = assign_with_priority(new_effect);
                             return Ok(());
                         }
                     }
@@ -90,4 +91,64 @@ fn check_args(process_manager: &TypesChecker, function: &Arc<Function>, args: &V
     }
 
     return true;
+}
+
+pub fn assign_with_priority(operator: Effects) -> Effects {
+    //Needs ownership of the value
+    let (func, mut effects) = if let Effects::MethodCall(func, effects) = operator {
+        (func, effects)
+    } else {
+        panic!("Not an operator somehow?");
+    };
+    if effects.len() != 2 {
+        return Effects::MethodCall(func, effects);
+    }
+
+    let op_priority = match Attribute::find_attribute("priority", &func.attributes) {
+        Some(found) => match found {
+            Attribute::Integer(_, priority) => *priority,
+            _ => 0,
+        },
+        None => 0
+    };
+
+    let op_parse_left = match Attribute::find_attribute("parse_left", &func.attributes) {
+        Some(found) => match found {
+            Attribute::Bool(_, priority) => *priority,
+            _ => true,
+        },
+        None => true
+    };
+
+    let lhs = effects.remove(0);
+
+    let lhs_priority = match Attribute::find_attribute("priority", &func.attributes) {
+        Some(found) => match found {
+            Attribute::Integer(_, priority) => *priority,
+            _ => 0,
+        },
+        None => 0
+    };
+
+    match lhs {
+        // Code explained using the following example: 1 + 2 / 2
+        Effects::MethodCall(lhs_func, mut lhs) => {
+            // temp_lhs = (1 + 2), operator = {} / 2
+            if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
+                // temp_lhs = 1 + {}, operator = 2 / 2
+                mem::swap(lhs.last_mut().unwrap(), effects.first_mut().unwrap());
+
+                // 1 + (2 / 2)
+                mem::swap(lhs.last_mut().unwrap(), &mut Effects::MethodCall(func, effects));
+
+                return Effects::MethodCall(lhs_func.clone(), lhs);
+            } else {
+                mem::swap(&mut Effects::MethodCall(lhs_func.clone(), lhs),
+                          effects.get_mut(0).unwrap());
+            }
+        },
+        _ => effects.insert(0, lhs)
+    }
+
+    return Effects::MethodCall(func, effects);
 }

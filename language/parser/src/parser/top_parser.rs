@@ -99,7 +99,22 @@ pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attr
             return;
         }
         parser_utils.index += 1;
-        attributes.push(Attribute::new(next.to_string(parser_utils.buffer)))
+        let string = next.to_string(parser_utils.buffer);
+        attributes.push(if string.contains("(") {
+            let mut split = string.split("(");
+            let name = split.next().unwrap().to_string();
+            let value = split.next().unwrap();
+            let value = &value[0..value.len()-1];
+            match value.parse::<i64>() {
+                Ok(value) => Attribute::Integer(name, value),
+                Err(_) => match value.parse::<bool>() {
+                    Ok(value) => Attribute::Bool(name, value),
+                    Err(_) => Attribute::String(name, value.to_string())
+                }
+            }
+        } else {
+            Attribute::Basic(string)
+        });
     }
 }
 
