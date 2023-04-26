@@ -5,7 +5,12 @@ use crate::tokens::util::{parse_ident, parse_modifier};
 pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
     return match tokenizer.last.token_type {
         TokenTypes::ImportStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b';']),
-        TokenTypes::AttributesStart | TokenTypes::Attribute => if tokenizer.matches("#[") {
+        TokenTypes::Attribute => if tokenizer.matches("]") {
+            tokenizer.make_token(TokenTypes::AttributeEnd)
+        } else {
+            tokenizer.handle_invalid()
+        },
+        TokenTypes::AttributesStart | TokenTypes::AttributeEnd => if tokenizer.matches("#[") {
             parse_ident(tokenizer, TokenTypes::Attribute, &[b']'])
         } else {
             tokenizer.make_token(TokenTypes::ModifiersStart)

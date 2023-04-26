@@ -127,5 +127,6 @@ pub enum TokenTypes {
     ArgumentTypeSeparator = 56,
     ArgumentSeparator = 57,
     Let = 58,
-    Equals = 59
+    Equals = 59,
+    AttributeEnd = 60
 }

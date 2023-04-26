@@ -98,7 +98,7 @@ pub fn assign_with_priority(operator: Effects) -> Effects {
     let (func, mut effects) = if let Effects::MethodCall(func, effects) = operator {
         (func, effects)
     } else {
-        panic!("Not an operator somehow?");
+        panic!("If your seeing this, something went VERY wrong");
     };
     if effects.len() != 2 {
         return Effects::MethodCall(func, effects);

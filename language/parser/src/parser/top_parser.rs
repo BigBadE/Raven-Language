@@ -13,7 +13,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Start => {}
+            TokenTypes::Start | TokenTypes::AttributeEnd => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
                 .add_poison_struct(false, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
                                                                         token.make_error(parser_utils.file.clone(),
@@ -102,7 +102,7 @@ pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attr
         let string = next.to_string(parser_utils.buffer);
         attributes.push(if string.contains("(") {
             let mut split = string.split("(");
-            let name = split.next().unwrap().to_string();
+            let name = split.next().unwrap()[2..].to_string();
             let value = split.next().unwrap();
             let value = &value[0..value.len()-1];
             match value.parse::<i64>() {
