@@ -1,10 +1,23 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use lazy_static::lazy_static;
+use crate::Modifier;
 use crate::code::MemberField;
 use crate::function::Function;
 use crate::{Attribute, ParsingError};
 use crate::types::Types;
+
+lazy_static! {
+pub static ref I64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+        Modifier::Internal as u8, "i64".to_string()));
+pub static ref F64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+        Modifier::Internal as u8, "f64".to_string()));
+pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+        Modifier::Internal as u8, "u64".to_string()));
+pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+        Modifier::Internal as u8, "str".to_string()));
+}
 
 #[derive(Clone)]
 pub struct Struct {
@@ -15,7 +28,7 @@ pub struct Struct {
     pub fields: Vec<MemberField>,
     pub functions: Vec<Arc<Function>>,
     pub traits: Vec<Arc<Struct>>,
-    pub poisoned: Vec<ParsingError>
+    pub poisoned: Vec<ParsingError>,
 }
 
 impl Struct {
@@ -29,8 +42,8 @@ impl Struct {
             functions,
             name,
             traits: Vec::new(),
-            poisoned: Vec::new()
-        }
+            poisoned: Vec::new(),
+        };
     }
 
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
@@ -42,7 +55,7 @@ impl Struct {
             fields: Vec::new(),
             functions: Vec::new(),
             traits: Vec::new(),
-            poisoned: vec!(error)
+            poisoned: vec!(error),
         };
     }
 }

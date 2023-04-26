@@ -451,6 +451,7 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "async-trait",
+ "lazy_static",
  "tokio",
 ]
 

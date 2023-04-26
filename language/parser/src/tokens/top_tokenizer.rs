@@ -110,8 +110,11 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.make_token(TokenTypes::ArgumentTypeSeparator)
         } else {
             //Skip the comma if there is one
-            tokenizer.matches(",");
-            tokenizer.make_token(TokenTypes::ArgumentEnd)
+            if tokenizer.matches(",") {
+                tokenizer.make_token(TokenTypes::ArgumentSeparator)
+            } else {
+                tokenizer.make_token(TokenTypes::ArgumentEnd)
+            }
         },
         TokenTypes::ArgumentTypeSeparator =>
             parse_ident(tokenizer, TokenTypes::ArgumentType, &[b',', b')']),
@@ -120,8 +123,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
         } else {
             tokenizer.make_token(TokenTypes::ArgumentEnd)
         },
-        TokenTypes::ArgumentSeparator =>
-            parse_ident(tokenizer, TokenTypes::ArgumentName, &[b':', b',']),
+        TokenTypes::ArgumentSeparator => tokenizer.make_token(TokenTypes::ArgumentEnd),
         TokenTypes::ReturnTypeArrow => {
             parse_ident(tokenizer, TokenTypes::ReturnType, &[b';', b'{'])
         }

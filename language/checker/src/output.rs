@@ -5,8 +5,8 @@ use tokio::runtime::Handle;
 use async_trait::async_trait;
 
 use syntax::function::Function;
-use syntax::{ParsingError, ProcessManager};
-use syntax::r#struct::Struct;
+use syntax::ProcessManager;
+use syntax::r#struct::{F64, I64, STR, Struct, U64};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::check_function::verify_function;
@@ -32,21 +32,29 @@ impl ProcessManager for TypesChecker {
         return &self.runtime;
     }
 
-    async fn verify_func(&self, function: Arc<Function>) -> Result<(), ParsingError> {
-        return verify_function(self, function, self.syntax.as_ref().unwrap()).await;
+    async fn verify_func(&self, mut function: Arc<Function>) {
+        if let Err(error) = verify_function(self, &mut function,
+                                            self.syntax.as_ref().unwrap()).await {
+            unsafe { Arc::get_mut_unchecked(&mut function) }.poisoned.push(error);
+        }
     }
 
-    async fn verify_struct(&self, _structure: Arc<Struct>) -> Result<(), ParsingError> {
+    async fn verify_struct(&self, _structure: Arc<Struct>) {
         //TODO
-        return Ok(())
     }
 
     fn add_implementation(&self, _base: Types, _implementing: Types) {
         todo!()
     }
 
-    fn get_internal(&self, _name: &str) -> Arc<Struct> {
-        todo!()
+    fn get_internal(&self, name: &str) -> Arc<Struct> {
+        return match name {
+            "i64" => I64.clone(),
+            "u64" => U64.clone(),
+            "f64" => F64.clone(),
+            "str" => STR.clone(),
+            _ => panic!("Unknown internal {}", name)
+        };
     }
 
     fn cloned(&self) -> Box<dyn ProcessManager> {

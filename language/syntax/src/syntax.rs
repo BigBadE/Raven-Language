@@ -154,7 +154,7 @@ impl Syntax {
         }
 
         if let Some(process_manager) = process_manager {
-            process_manager.verify_func(function).await;
+            process_manager.verify_func(function).await
         }
     }
 
