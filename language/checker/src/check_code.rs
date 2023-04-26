@@ -24,6 +24,11 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
             verify_effect(process_manager, second, syntax, variables).await?;
         }
         Effects::Operation(operation, values) => {
+            for value in &mut *values {
+                verify_effect(process_manager, value, syntax, variables).await?;
+            }
+
+            let getter;
             {
                 let locked = syntax.lock().unwrap();
                 if let Some(operations) = locked.operations.get(operation) {
@@ -34,17 +39,18 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                         }
                     }
                 }
+                //Syntax must stay locked until getter is created to avoid race conditions.
+                getter = Syntax::get_function(syntax.clone(), true,
+                                              ParsingError::new(String::new(), (0, 0), 0,
+                                                                (0, 0), 0,
+                                                                format!("Failed to find operation {}", operation)),
+                                              operation.clone(), Box::new(EmptyNameResolver {}));
             }
 
-            loop {
-                let func = Syntax::get_function(syntax.clone(),
-                                                ParsingError::new(String::new(), (0, 0), 0,
-                                                                  (0, 0), 0, "Temp".to_string()),
-                                                operation.clone(), Box::new(EmptyNameResolver {})).await?;
-                if let Some(new_effect) = check_operation(process_manager, &func, values, variables) {
-                    *effect = new_effect;
-                    return Ok(());
-                }
+            let func = getter.await?;
+            if let Some(new_effect) = check_operation(process_manager, &func, values, variables) {
+                *effect = new_effect;
+                return Ok(());
             }
         }
         Effects::MethodCall(_, effects) => for effect in effects {

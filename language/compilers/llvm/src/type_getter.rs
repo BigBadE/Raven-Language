@@ -23,6 +23,7 @@ pub struct CompilerTypeGetter<'ctx> {
     pub compiler: Rc<CompilerImpl<'ctx>>,
     pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<Function>)>>,
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
+    pub current_block: Option<BasicBlock<'ctx>>,
     pub variables: HashMap<String, (Types, BasicValueEnum<'ctx>)>,
 }
 
@@ -33,6 +34,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             syntax,
             compiling: Rc::new(Vec::new()),
             blocks: HashMap::new(),
+            current_block: None,
             variables: HashMap::new(),
         };
     }
@@ -50,6 +52,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             compiler: self.compiler.clone(),
             compiling: self.compiling.clone(),
             blocks: self.blocks.clone(),
+            current_block: self.current_block.clone(),
             variables,
         };
     }
@@ -101,7 +104,6 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 }
                 continue
             }
-            println!("Compiling {}", function.name);
             compile_block(&function.code, function_type, self, &mut 0);
             self.compiler.builder.build_return(None);
         }

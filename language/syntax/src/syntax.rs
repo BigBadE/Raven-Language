@@ -21,7 +21,7 @@ pub struct Syntax {
     //The amount of running tasks locked waiting for their waker.
     pub locked: usize,
     pub finish: Vec<Waker>,
-    pub process_manager: Box<dyn ProcessManager>
+    pub process_manager: Box<dyn ProcessManager>,
 }
 
 impl Syntax {
@@ -37,7 +37,7 @@ impl Syntax {
             finished: false,
             locked: 0,
             finish: Vec::new(),
-            process_manager
+            process_manager,
         };
     }
 
@@ -119,12 +119,12 @@ impl Syntax {
                 if old.poisoned.is_empty() && function.poisoned.is_empty() {
                     locked.errors.push(dupe_error.clone());
                     unsafe { Arc::get_mut_unchecked(&mut old) }.poisoned.push(dupe_error);
-                } else {
-                    //Ignore if one is poisoned
                 }
+                //Ignore if one is poisoned
             } else {
                 locked.functions.insert(function.name.clone(), function.clone());
             }
+
             if is_modifier(function.modifiers, Modifier::Operation) {
                 let operation = function.name.split("::").last().unwrap();
 
@@ -134,7 +134,6 @@ impl Syntax {
                         locked.operations.insert(operation.to_string(), vec!(function.clone()));
                     }
                 }
-
                 if let Some(wakers) = locked.function_wakers.remove(operation) {
                     for waker in wakers {
                         waker.wake();
@@ -158,8 +157,9 @@ impl Syntax {
         }
     }
 
-    pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError, name: String, name_resolver: Box<dyn NameResolver>)
+    pub async fn get_function(syntax: Arc<Mutex<Syntax>>, operation: bool, error: ParsingError,
+                              name: String, name_resolver: Box<dyn NameResolver>)
                               -> Result<Arc<Function>, ParsingError> {
-        return FunctionGetter::new(syntax, error, name, name_resolver).await;
+        return FunctionGetter::new(syntax, operation, error, name, name_resolver).await;
     }
 }

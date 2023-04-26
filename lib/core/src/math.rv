@@ -7,3 +7,7 @@ pub internal struct bool {}
 pub internal operation fn {}+{}(first: i64, second: i64) -> i64 {
     return first + second;
 }
+
+pub internal operation fn {}/{}(first: i64, second: i64) -> i64 {
+    return first / second;
+}

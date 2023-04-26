@@ -40,6 +40,7 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                            id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     let block = type_getter.compiler.context.append_basic_block(function, &code.label);
     type_getter.blocks.insert(code.label.clone(), block);
+    type_getter.current_block = Some(block);
     type_getter.compiler.builder.position_at_end(block);
     for line in &code.expressions {
         match line.expression_type {
@@ -105,6 +106,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let mut final_arguments = Vec::new();
 
             let calling = type_getter.get_function(calling_function);
+            type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
+
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
                 let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
                 let pointer = type_getter.compiler.builder.build_alloca(

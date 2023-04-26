@@ -41,7 +41,7 @@ async fn create_for(name: String, file: String, effect: ParsingFuture<Effects>,
     let effect = effect.await?;
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
     Effects::Set(Box::new(Effects::LoadVariable(name)), Box::new(Effects::MethodCall(
-        FunctionGetter::new(syntax.clone(),
+        FunctionGetter::new(syntax.clone(), false,
                             ParsingError::new(file.clone(), (0, 0), 0, (0, 0), 0,
                                               "No core found! Report this!".to_string()),
                             "iter::Iter::next".to_string(),
@@ -49,7 +49,7 @@ async fn create_for(name: String, file: String, effect: ParsingFuture<Effects>,
         vec!(effect.clone()))))));
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::MethodCall(
-        FunctionGetter::new(syntax.clone(),
+        FunctionGetter::new(syntax.clone(), false,
                             ParsingError::new(file, (0, 0), 0, (0, 0), 0,
                                               "No core found! Report this!".to_string()),
                             "iter::Iter::has_next".to_string(),

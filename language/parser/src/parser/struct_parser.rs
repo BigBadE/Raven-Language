@@ -37,6 +37,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
             TokenTypes::FunctionStart => {
+                parser_utils.syntax.lock().unwrap().remaining += 1;
                 let function = parse_function(parser_utils, member_attributes, member_modifiers);
                 functions.push(function);
                 member_attributes = Vec::new();

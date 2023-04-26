@@ -34,7 +34,6 @@ impl<'a> ParserUtils<'a> {
 
     pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String,
                             structure: impl Future<Output=Result<Struct, ParsingError>>) {
-        syntax.lock().unwrap().remaining += 1;
         let structure = match structure.await {
             Ok(structure) => structure,
             Err(error) => {
@@ -57,7 +56,6 @@ impl<'a> ParserUtils<'a> {
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
                               function: impl Future<Output=Result<Function, ParsingError>>) {
-        syntax.lock().unwrap().remaining += 1;
         let function = match function.await {
             Ok(function) => function,
             Err(error) => {

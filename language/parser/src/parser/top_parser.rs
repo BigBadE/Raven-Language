@@ -24,6 +24,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::FunctionStart => {
                 let token = token.clone();
                 let function = parse_function(parser_utils, attributes, modifiers);
+                parser_utils.syntax.lock().unwrap().remaining += 1;
                 parser_utils.handle.spawn(
                     ParserUtils::add_function(parser_utils.syntax.clone(), parser_utils.file.clone(),
                                               token, function));
@@ -33,6 +34,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::StructStart => {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
+                parser_utils.syntax.lock().unwrap().remaining += 1;
                 parser_utils.handle.spawn(
                     ParserUtils::add_struct(parser_utils.syntax.clone(), token,
                                             parser_utils.file.clone(), structure));

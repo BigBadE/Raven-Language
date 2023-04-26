@@ -75,17 +75,20 @@ impl Future for StructureGetter {
 
 pub struct FunctionGetter {
     pub syntax: Arc<Mutex<Syntax>>,
+    pub operation: bool,
     pub error: ParsingError,
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>
 }
 
 impl FunctionGetter {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, operation: bool, error: ParsingError,
+               getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         syntax.lock().unwrap().locked += 1;
 
         return Self {
             syntax,
+            operation,
             error,
             getting,
             name_resolver
@@ -100,10 +103,18 @@ impl Future for FunctionGetter {
         let mut locked = self.syntax.lock().unwrap();
         locked.locked -= 1;
 
-        let name = self.name_resolver.resolve(&self.getting);
+        let mut name = &self.getting;
+        if self.operation {
+            if let Some(found) = locked.operations.get(name) {
+                //TODO don't use last
+                return Poll::Ready(Ok(found.last().unwrap().clone()));
+            }
+        } else {
+            name = self.name_resolver.resolve(name);
 
-        if let Some(found) = locked.functions.get(name) {
-            return Poll::Ready(Ok(found.clone()));
+            if let Some(found) = locked.functions.get(name) {
+                return Poll::Ready(Ok(found.clone()));
+            }
         }
 
         check_wake(locked.deref_mut());
@@ -134,6 +145,7 @@ fn check_wake(locked: &mut Syntax) {
 
     //If this is the last running task, fail it all.
     if locked.locked == locked.remaining {
+        println!("Deadlock detected! {} vs {}", locked.locked, locked.remaining);
         locked.structure_wakers.values().for_each(|wakers| for waker in wakers {
             waker.wake_by_ref();
         });
@@ -141,5 +153,4 @@ fn check_wake(locked: &mut Syntax) {
             waker.wake_by_ref();
         });
     }
-
 }
