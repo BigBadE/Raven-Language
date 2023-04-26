@@ -12,7 +12,7 @@ pub fn parse_operator(last: Option<ParsingFuture<Effects>>, parser_utils: &mut P
 
     parser_utils.index -= 1;
     while let Some(token) = parser_utils.tokens.get(parser_utils.index) {
-        if token.token_type == TokenTypes::Operator {
+        if token.token_type == TokenTypes::Operator || token.token_type == TokenTypes::Equals {
             operation += token.to_string(parser_utils.buffer).as_str();
         } else {
             break

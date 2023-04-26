@@ -6,6 +6,7 @@ use compilers::compiling::Compiler;
 
 use inkwell::context::Context;
 use syntax::ParsingError;
+use syntax::syntax::Syntax;
 
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
@@ -31,7 +32,7 @@ impl LLVMCompiler {
 }
 
 impl Compiler for LLVMCompiler {
-    fn compile(&self, syntax: &Arc<Mutex<syntax::syntax::Syntax>>)
+    fn compile(&self, syntax: &Arc<Mutex<Syntax>>)
         -> Result<Option<i64>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());

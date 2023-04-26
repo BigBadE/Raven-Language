@@ -31,8 +31,8 @@ impl Types {
                 Types::GenericType(base, _) => self.of_type(base),
                 _ => false
             },
-            Types::GenericType(base, generics) => match other {
-                Types::GenericType(other_base, other_generics) => {
+            Types::GenericType(base, _generics) => match other {
+                Types::GenericType(_other_base, _other_generics) => {
                     if !base.of_type(self) {
                         return false;
                     }

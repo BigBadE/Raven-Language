@@ -25,7 +25,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
     let mut effect = None;
     let mut expression_type = ExpressionType::Line;
     loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
         match token.token_type {
             TokenTypes::ParenOpen => {
                 if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
@@ -52,7 +53,20 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             } else {
                 effect = Some(Box::pin(body_effect(parse_code(parser_utils))))
             },
+            TokenTypes::Let => return Some((expression_type, parse_let(parser_utils))),
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
+            TokenTypes::Equals => if effect.is_some() &&
+                parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type != TokenTypes::Operator {
+                let error = token.make_error(parser_utils.file.clone(), "Tried to assign a void value!".to_string());
+                let value = parse_line(parser_utils, false, false);
+                if let Some(value) = value {
+                    effect = Some(Box::pin(create_assign(effect.unwrap(), value.1)));
+                } else {
+                    effect = Some(constant_error(error));
+                }
+            } else {
+                return Some((expression_type, parse_operator(effect, parser_utils)));
+            },
             TokenTypes::Operator => return Some((expression_type, parse_operator(effect, parser_utils))),
             TokenTypes::ArgumentEnd => if !deep {
                 break;
@@ -71,8 +85,43 @@ fn constant_effect(effect: Effects) -> ParsingFuture<Effects> {
     return Box::pin(constant_effect_inner(Ok(effect)));
 }
 
+fn constant_error(error: ParsingError) -> ParsingFuture<Effects> {
+    return Box::pin(constant_effect_inner(Err(error)));
+}
+
 async fn constant_effect_inner(effect: Result<Effects, ParsingError>) -> Result<Effects, ParsingError> {
     return effect;
+}
+
+async fn create_assign(last: ParsingFuture<Effects>, effect: ParsingFuture<Effects>) -> Result<Effects, ParsingError> {
+    return Ok(Effects::Set(Box::new(last.await?), Box::new(effect.await?)));
+}
+
+fn parse_let(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
+    let name;
+    {
+        let next = parser_utils.tokens.get(parser_utils.index).unwrap();
+        if let TokenTypes::Variable = next.token_type {
+            name = next.to_string(parser_utils.buffer);
+        } else {
+            return constant_error(next.make_error(parser_utils.file.clone(), "Unexpected token, expected variable name!".to_string()));
+        }
+
+        if let TokenTypes::Equals = next.token_type {} else {
+            return constant_error(next.make_error(parser_utils.file.clone(), "Unexpected token, expected equals!".to_string()));
+        }
+    }
+
+    return match parse_line(parser_utils, false, false) {
+        Some(line) => Box::pin(create_let(name, line.1)),
+        None => constant_error(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected value, found void!".to_string()))
+    };
+}
+
+async fn create_let(name: String, value: ParsingFuture<Effects>) -> Result<Effects, ParsingError> {
+    let value = value.await?;
+    return Ok(Effects::CreateVariable(name, Box::new(value)));
 }
 
 fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
@@ -80,7 +129,8 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
     let values;
 
     loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap(); parser_utils.index += 1;
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => {
                 types = Some(Box::pin(parser_utils
@@ -114,7 +164,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<E
                 let effect = if let TokenTypes::Colon = token.token_type {
                     let token = token.clone();
                     parse_line(parser_utils, false, false).unwrap_or((ExpressionType::Line,
-                                                               Box::pin(expect_effect(parser_utils.file.clone(), token)))).1
+                                                                      Box::pin(expect_effect(parser_utils.file.clone(), token)))).1
                 } else {
                     constant_effect(Effects::LoadVariable(name))
                 };

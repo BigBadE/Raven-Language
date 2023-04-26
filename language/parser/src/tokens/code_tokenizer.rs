@@ -63,6 +63,10 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
                 tokenizer.make_token(TokenTypes::In)
             } else if tokenizer.matches(":") {
                 tokenizer.make_token(TokenTypes::Colon)
+            } else if tokenizer.matches("let") {
+                tokenizer.make_token(TokenTypes::Let)
+            } else if tokenizer.matches("=") {
+                tokenizer.make_token(TokenTypes::Equals)
             } else if tokenizer.matches("\"") {
                 tokenizer.state = tokenizer.state & 0xFF;
                 tokenizer.make_token(TokenTypes::StringStart)

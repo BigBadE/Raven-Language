@@ -125,5 +125,7 @@ pub enum TokenTypes {
     ImportEnd = 54,
     ReturnTypeArrow = 55,
     ArgumentTypeSeparator = 56,
-    ArgumentSeparator = 57
+    ArgumentSeparator = 57,
+    Let = 58,
+    Equals = 59
 }

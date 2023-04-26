@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::{Attribute, DisplayIndented, ErrorProvider, Function, ProcessManager, to_modifiers, VariableManager};
+use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers, VariableManager};
 use crate::function::{CodeBody, display_indented, display_joined};
 use crate::types::Types;
 
@@ -98,6 +98,8 @@ impl Display for Field {
 #[derive(Clone, Debug)]
 pub enum Effects {
     NOP(),
+    //Creates a variable
+    CreateVariable(String, Box<Effects>),
     //Label of jumping to body
     Jump(String),
     //Comparison effect, and label to jump to the first if true, second if false
@@ -128,6 +130,7 @@ impl Effects {
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
             Effects::CodeBody(_) => None,
+            Effects::CreateVariable(_, effect) => effect.get_return(process_manager, variables),
             Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
             Effects::MethodCall(function, _) => function.return_type.clone(),
             Effects::Set(_, to) => to.get_return(process_manager, variables),
@@ -147,6 +150,10 @@ impl DisplayIndented for Effects {
         let deeper = parsing.to_string() + "    ";
         return match self {
             Effects::NOP() => Ok(()),
+            Effects::CreateVariable(name, effect) => {
+                write!(f, "{} = ", name)?;
+                return effect.format(&deeper, f);
+            },
             Effects::Operation(operation, effects) => {
                 let mut index = 0;
                 let mut effect = 0;

@@ -5,28 +5,30 @@ use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use crate::EmptyNameResolver;
 use async_recursion::async_recursion;
+use crate::check_function::CheckerVariableManager;
+use crate::output::TypesChecker;
 
-pub async fn verify_code(code: &mut CodeBody, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
     for line in &mut code.expressions {
-        verify_effect(&mut line.effect, syntax).await?;
+        verify_effect(process_manager, &mut line.effect, syntax, variables).await?;
     }
     return Ok(());
 }
 
 #[async_recursion]
-async fn verify_effect(effect: &mut Effects, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
     match effect {
-        Effects::CodeBody(body) => verify_code(body, syntax).await?,
+        Effects::CodeBody(body) => verify_code(process_manager, body, syntax, &mut variables.clone()).await?,
         Effects::Set(first, second) => {
-            verify_effect(first, syntax).await?;
-            verify_effect(second, syntax).await?;
+            verify_effect(process_manager, first, syntax, variables).await?;
+            verify_effect(process_manager, second, syntax, variables).await?;
         },
         Effects::Operation(operation, values) => {
             {
                 let locked = syntax.lock().unwrap();
                 if let Some(operations) = locked.operations.get(operation) {
                     for potential_operation in operations {
-                        if let Some(new_effect) = check_operation(potential_operation, values) {
+                        if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
                             *effect = new_effect;
                             return Ok(());
                         }
@@ -39,32 +41,45 @@ async fn verify_effect(effect: &mut Effects, syntax: &Arc<Mutex<Syntax>>) -> Res
                                      ParsingError::new(String::new(), (0, 0), 0,
                                                        (0, 0), 0, "Temp".to_string()),
                                      operation.clone(), Box::new(EmptyNameResolver {})).await?;
-                if let Some(new_effect) = check_operation(&func, values) {
+                if let Some(new_effect) = check_operation(process_manager, &func, values, variables) {
                     *effect = new_effect;
                     return Ok(());
                 }
             }
         },
         Effects::MethodCall(_, effects) => for effect in effects {
-            verify_effect(effect, syntax).await?;
+            verify_effect(process_manager, effect, syntax, variables).await?;
         },
-        Effects::CompareJump(effect, _, _) => verify_effect(effect, syntax).await?,
+        Effects::CompareJump(effect, _, _) => verify_effect(process_manager, effect, syntax, variables).await?,
         Effects::CreateStruct(_, effects) => for (_, effect) in effects {
-            verify_effect(effect, syntax).await?;
+            verify_effect(process_manager, effect, syntax, variables).await?;
         },
-        Effects::Load(effect, _) => verify_effect(effect, syntax).await?,
+        Effects::Load(effect, _) => verify_effect(process_manager, effect, syntax, variables).await?,
         _ => {}
     }
     return Ok(());
 }
 
-fn check_operation(operation: &Arc<Function>, values: &Vec<Effects>) -> Option<Effects> {
-    if check_args(operation, values) {
+fn check_operation(process_manager: &TypesChecker, operation: &Arc<Function>, values: &Vec<Effects>,
+variables: &mut CheckerVariableManager) -> Option<Effects> {
+    if check_args(process_manager, operation, values, variables) {
         return Some(Effects::MethodCall(operation.clone(), values.clone()));
     }
     return None;
 }
 
-fn check_args(function: &Arc<Function>, args: &Vec<Effects>) -> bool {
-    todo!()
+fn check_args(process_manager: &TypesChecker, function: &Arc<Function>, args: &Vec<Effects>, variables: &mut CheckerVariableManager) -> bool {
+    if function.fields.len() != args.len() {
+        return false;
+    }
+
+    for i in 0..function.fields.len() {
+        let returning = args.get(i).unwrap().get_return(process_manager, variables);
+        if returning.is_none() && !function.fields.get(i).unwrap().field.field_type.of_type(
+            &returning.unwrap()) {
+            return false;
+        }
+    }
+
+    return true;
 }

@@ -81,6 +81,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
+        Effects::CreateVariable(_, _) => panic!("Checker failed to resolve variable!"),
         //Label of jumping to body
         Effects::Jump(label) => {
             type_getter.compiler.builder.build_unconditional_branch(

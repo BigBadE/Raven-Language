@@ -33,11 +33,12 @@ impl ProcessManager for TypesChecker {
     }
 
     async fn verify_func(&self, function: Arc<Function>) -> Result<(), ParsingError> {
-        return verify_function(function, self.syntax.as_ref().unwrap()).await;
+        return verify_function(self, function, self.syntax.as_ref().unwrap()).await;
     }
 
     async fn verify_struct(&self, _structure: Arc<Struct>) -> Result<(), ParsingError> {
         //TODO
+        return Ok(())
     }
 
     fn add_implementation(&self, _base: Types, _implementing: Types) {

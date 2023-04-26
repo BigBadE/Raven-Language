@@ -16,7 +16,7 @@ impl NameResolver for EmptyNameResolver {
         return name;
     }
 
-    fn generic(&self, name: &String) -> Option<Types> {
+    fn generic(&self, _name: &String) -> Option<Types> {
         return None;
     }
 
