@@ -125,8 +125,9 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 }
 
                 *id += 1;
-                Some(type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
-                                                             &(*id - 1).to_string()).try_as_basic_value().left().unwrap())
+                type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
+                                                             &(*id - 1).to_string()).try_as_basic_value().left()
+                    .map_or(None, |value| Some(value))
             }
         }
         //Sets pointer to value

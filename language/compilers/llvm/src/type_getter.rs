@@ -14,6 +14,7 @@ use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_struct};
 use crate::internal::structs::get_internal_struct;
 use crate::type_waiter::TypeWaiter;
+use crate::util::print_formatted;
 
 pub type Main = unsafe extern "C" fn() -> i64;
 
@@ -57,9 +58,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         match self.compiler.module.get_function(&function.name) {
             Some(found) => found,
             None => {
-                let found = instance_function(function.clone(), self);
-                unsafe { Rc::get_mut_unchecked(&mut self.compiling) }.push((found, function.clone()));
-                return found;
+                return instance_function(function.clone(), self);
             }
         }
     }
@@ -102,10 +101,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 }
                 continue
             }
+            println!("Compiling {}", function.name);
             compile_block(&function.code, function_type, self, &mut 0);
             self.compiler.builder.build_return(None);
         }
 
+        print_formatted(self.compiler.module.to_string());
         return Ok(self.get_main());
     }
 

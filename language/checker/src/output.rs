@@ -32,14 +32,15 @@ impl ProcessManager for TypesChecker {
         return &self.runtime;
     }
 
-    async fn verify_func(&self, mut function: Arc<Function>) {
+    async fn verify_func(&self, mut function: Arc<Function>, syntax: &Arc<Mutex<Syntax>>) {
         if let Err(error) = verify_function(self, &mut function,
                                             self.syntax.as_ref().unwrap()).await {
+            syntax.lock().unwrap().errors.push(error.clone());
             unsafe { Arc::get_mut_unchecked(&mut function) }.poisoned.push(error);
         }
     }
 
-    async fn verify_struct(&self, _structure: Arc<Struct>) {
+    async fn verify_struct(&self, _structure: Arc<Struct>, _syntax: &Arc<Mutex<Syntax>>) {
         //TODO
     }
 

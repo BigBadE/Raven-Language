@@ -46,7 +46,7 @@ pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut C
             } else {
                 types.fn_type(params.as_slice(), false)
             }
-        },
+        }
         None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
     };
 
