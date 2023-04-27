@@ -4,35 +4,34 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
-use crate::function::Function;
-use crate::ParsingError;
+use crate::{ParsingError, TopElement};
 use crate::syntax::Syntax;
 use crate::types::Types;
 
-pub struct StructureGetter {
+pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub error: ParsingError,
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>,
-    pub finished: Option<Types>
+    pub finished: Option<Arc<T>>,
 }
 
-impl StructureGetter {
+impl<T: TopElement> AsyncTypesGetter<T> {
     pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
-        syntax.lock().unwrap().locked += 1;
-        
+        syntax.lock().unwrap().async_manager.locked += 1;
+
         return Self {
             syntax,
             error,
             getting,
             name_resolver,
-            finished: None
+            finished: None,
         };
     }
 }
 
-impl Future for StructureGetter {
-    type Output = Result<Types, ParsingError>;
+impl<T: TopElement> Future for AsyncTypesGetter<T> {
+    type Output = Result<Arc<T>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if let Some(finished) = &self.finished {
@@ -41,91 +40,29 @@ impl Future for StructureGetter {
 
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
+        locked.async_manager.locked -= 1;
 
-        locked.locked -= 1;
-
-        //Look for a generic of that name
-        if let Some(found) = self.name_resolver.generic(&self.getting) {
-            self.finished = Some(found.clone());
-            return Poll::Ready(Ok(found));
-        }
+        let name = self.name_resolver.resolve(&self.getting);
 
         //Look for a structure of that name
-        let name = self.name_resolver.resolve(&self.getting);
-        if let Some(found) = locked.structures.get(name) {
-            self.finished = Some(Types::Struct(found.clone()));
-            return Poll::Ready(Ok(Types::Struct(found.clone())));
+        if let Some(found) = T::get_manager(locked.deref_mut()).types.get(name) {
+            self.finished = Some(found.clone());
+            return Poll::Ready(Ok(found.clone()));
         }
 
         check_wake(locked.deref_mut());
 
-        if locked.finished && locked.locked >= locked.remaining {
+        if locked.async_manager.finished && locked.async_manager.locked >= locked.async_manager.remaining {
             return Poll::Ready(Err(self.error.clone()));
         }
+
+        let targets = T::get_manager(locked.deref_mut());
 
         //Add a waker for that type
-        if let Some(vectors) = locked.structure_wakers.get_mut(name) {
+        if let Some(vectors) = targets.wakers.get_mut(name) {
             vectors.push(cx.waker().clone());
         } else {
-            locked.structure_wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
-        }
-        return Poll::Pending;
-    }
-}
-
-pub struct FunctionGetter {
-    pub syntax: Arc<Mutex<Syntax>>,
-    pub operation: bool,
-    pub error: ParsingError,
-    pub getting: String,
-    pub name_resolver: Box<dyn NameResolver>
-}
-
-impl FunctionGetter {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, operation: bool, error: ParsingError,
-               getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
-        syntax.lock().unwrap().locked += 1;
-
-        return Self {
-            syntax,
-            operation,
-            error,
-            getting,
-            name_resolver
-        };
-    }
-}
-
-impl Future for FunctionGetter {
-    type Output = Result<Arc<Function>, ParsingError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.syntax.lock().unwrap();
-        locked.locked -= 1;
-
-        let mut name = &self.getting;
-        if self.operation {
-            if let Some(found) = locked.operations.get(name) {
-                return Poll::Ready(Ok(found.last().unwrap().clone()));
-            }
-        } else {
-            name = self.name_resolver.resolve(name);
-
-            if let Some(found) = locked.functions.get(name) {
-                return Poll::Ready(Ok(found.clone()));
-            }
-        }
-
-        check_wake(locked.deref_mut());
-
-        if locked.finished && locked.locked >= locked.remaining {
-            return Poll::Ready(Err(self.error.clone()));
-        }
-
-        if let Some(vectors) = locked.function_wakers.get_mut(name) {
-            vectors.push(cx.waker().clone());
-        } else {
-            locked.function_wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
+            targets.wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
         }
         return Poll::Pending;
     }
@@ -133,22 +70,22 @@ impl Future for FunctionGetter {
 
 pub trait NameResolver: Send + Sync {
     fn resolve<'a>(&'a self, name: &'a String) -> &'a String;
-    
+
     fn generic(&self, name: &String) -> Option<Types>;
-    
+
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }
 
 fn check_wake(locked: &mut Syntax) {
-    locked.locked += 1;
+    locked.async_manager.locked += 1;
 
     //If this is the last running task, fail it all.
-    if locked.locked == locked.remaining {
-        println!("Deadlock detected! {} vs {}", locked.locked, locked.remaining);
-        locked.structure_wakers.values().for_each(|wakers| for waker in wakers {
+    if locked.async_manager.locked == locked.async_manager.remaining {
+        println!("Deadlock detected! {} vs {}", locked.async_manager.locked, locked.async_manager.remaining);
+        locked.structures.wakers.values().for_each(|wakers| for waker in wakers {
             waker.wake_by_ref();
         });
-        locked.function_wakers.values().for_each(|wakers| for waker in wakers {
+        locked.functions.wakers.values().for_each(|wakers| for waker in wakers {
             waker.wake_by_ref();
         });
     }

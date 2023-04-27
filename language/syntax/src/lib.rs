@@ -5,6 +5,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 use async_trait::async_trait;
+use crate::async_getters::AsyncGetter;
 use crate::function::Function;
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
@@ -165,23 +166,16 @@ pub trait VariableManager {
 }
 
 #[async_trait]
-pub trait TopElement {
+pub trait TopElement where Self: Sized {
     fn poison(&mut self, error: ParsingError);
 
     fn errors(&self) -> &Vec<ParsingError>;
 
     fn name(&self) -> &String;
 
+    fn new_poisoned(name: String, error: ParsingError) -> Self;
+
     async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager);
-}
 
-#[async_trait]
-impl<T> TopElement for Arc<T> where T: TopElement + Send + Sync {
-    fn poison(&mut self, error: ParsingError) {
-        T::poison(self, error);
-    }
-
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
-        T::verify(self, syntax, process_manager).await;
-    }
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
 }

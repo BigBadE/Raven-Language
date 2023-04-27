@@ -4,14 +4,14 @@ use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Handle;
 
-use syntax::async_util::StructureGetter;
 use syntax::function::Function;
-use syntax::ParsingError;
+use syntax::{ParsingError, TopElement};
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 
 use crate::{ImportNameResolver, TokenTypes};
+use crate::parser::code_parser::ParsingFuture;
 use crate::tokens::tokens::Token;
 
 pub struct ParserUtils<'a> {
@@ -25,50 +25,42 @@ pub struct ParserUtils<'a> {
 }
 
 impl<'a> ParserUtils<'a> {
-    pub fn get_struct(&self, token: &Token, name: String) -> StructureGetter {
-        return StructureGetter::new(self.syntax.clone(),
-                                    token.make_error(self.file.clone(),
-                                                     format!("Failed to find type named {}", &name)),
-                                    name, Box::new(self.imports.clone()));
+    pub fn get_struct(&self, token: &Token, name: String) -> ParsingFuture<Types> {
+        return Box::pin(Syntax::get_struct(self.syntax.clone(),
+                                           token.make_error(self.file.clone(),
+                                                            format!("Failed to find type named {}", &name)),
+                                           name, Box::new(self.imports.clone())));
     }
 
     pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String,
-                            structure: impl Future<Output=Result<Struct, ParsingError>>) {
-        let structure = match structure.await {
-            Ok(structure) => structure,
-            Err(error) => {
-                let mut locked = syntax.lock().unwrap();
-                locked.add_poison_struct(true,
-                                         Arc::new(Struct::new_poisoned(format!("${}", file), error)));
-                return;
-            }
-        };
+                            structure: ParsingFuture<Struct>) {
+        let structure = Self::get_elem(&file, structure).await;
 
         for function in &structure.functions {
-            Syntax::add_function(&syntax, false, token.make_error(file.clone(),
-                                                                  format!("Duplicate function {}", function.name)),
-                                 function.clone()).await;
+            Syntax::add(&syntax, false,
+                       token.make_error(file.clone(), format!("Duplicate function {}", function.name)),
+                       function.clone()).await;
         }
-        Syntax::add_struct(&syntax, true, token.make_error(file.clone(),
-                                                           format!("Duplicate structure {}", structure.name)),
-                           Arc::new(structure)).await;
+
+        Syntax::add(&syntax, true, token.make_error(file,
+                                          format!("Duplicate structure {}", structure.name)),
+                   structure).await;
     }
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
                               function: impl Future<Output=Result<Function, ParsingError>>) {
-        let function = match function.await {
-            Ok(function) => function,
-            Err(error) => {
-                let mut locked = syntax.lock().unwrap();
-                locked.add_poison_struct(true, Arc::new(Struct::new_poisoned(format!("${}", file), error)));
-                return;
-            }
-        };
+        let adding = Self::get_elem(&file, function).await;
+        Syntax::add(&syntax, true,
+                                   token.make_error(file, format!("Duplicate {}", adding.name())),
+                                   adding).await;
+    }
 
-        let function = Arc::new(function);
-        Syntax::add_function(&syntax, true,
-                             token.make_error(file.clone(), format!("Duplicate structure {}", function.name)),
-                             function).await;
+    async fn get_elem<T: TopElement>(file: &String, adding: impl Future<Output=Result<T, ParsingError>>)
+                                     -> Arc<T> {
+        return Arc::new(match adding.await {
+            Ok(adding) => adding,
+            Err(error) => T::new_poisoned(format!("${}", file), error)
+        });
     }
 }
 

@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::future::Future;
 use syntax::{Attribute, get_modifier, Modifier, ParsingError};
-use syntax::async_util::StructureGetter;
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
 use syntax::types::Types;
-use crate::parser::code_parser::parse_code;
+use crate::parser::code_parser::{parse_code, ParsingFuture};
 use crate::parser::struct_parser::{FutureField, parse_generics};
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
@@ -62,17 +61,10 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
 }
 
 pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
-                          generics: HashMap<String, Vec<StructureGetter>>,
+                          generics: HashMap<String, Vec<ParsingFuture<Types>>>,
                           code: Option<impl Future<Output=Result<CodeBody, ParsingError>>>,
-                          return_type: Option<StructureGetter>, name: String) -> Result<Function, ParsingError> {
-    let mut done_generics = HashMap::new();
-    for (name, generic) in generics {
-        let mut generics = Vec::new();
-        for found in generic {
-            generics.push(found.await?);
-        }
-        done_generics.insert(name.clone(), Types::Generic(name, generics));
-    }
+                          return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
+    let generics = get_generics(generics).await?;
     let return_type = match return_type {
         Some(found) => Some(found.await?),
         None => None
@@ -85,6 +77,18 @@ pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8, fields: Vec
         Some(found) => found.await?,
         None => CodeBody::new(Vec::new(), "empty_trait".to_string())
     };
-    return Ok(Function::new(attributes, modifiers, done_fields, done_generics, code,
+    return Ok(Function::new(attributes, modifiers, done_fields, generics, code,
                             return_type, name));
+}
+
+pub async fn get_generics(generics: HashMap<String, Vec<ParsingFuture<Types>>>) -> Result<HashMap<String, Types>, ParsingError> {
+    let mut done_generics = HashMap::new();
+    for (name, generic) in generics {
+        let mut generics = Vec::new();
+        for found in generic {
+            generics.push(found.await?);
+        }
+        done_generics.insert(name.clone(), Types::Generic(name, generics));
+    }
+    return Ok(done_generics);
 }

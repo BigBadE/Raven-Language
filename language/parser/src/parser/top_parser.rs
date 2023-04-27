@@ -15,7 +15,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         match token.token_type {
             TokenTypes::Start | TokenTypes::AttributeEnd => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
-                .add_poison_struct(false, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
+                .add_poison(false, Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
                                                                         token.make_error(parser_utils.file.clone(),
                                                                                          "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
@@ -24,20 +24,20 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::FunctionStart => {
                 let token = token.clone();
                 let function = parse_function(parser_utils, attributes, modifiers);
-                parser_utils.syntax.lock().unwrap().remaining += 1;
+                parser_utils.syntax.lock().unwrap().async_manager.remaining += 1;
                 parser_utils.handle.spawn(
                     ParserUtils::add_function(parser_utils.syntax.clone(), parser_utils.file.clone(),
-                                              token, function));
+                                              token, Box::pin(function)));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::StructStart => {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                parser_utils.syntax.lock().unwrap().remaining += 1;
+                parser_utils.syntax.lock().unwrap().async_manager.remaining += 1;
                 parser_utils.handle.spawn(
                     ParserUtils::add_struct(parser_utils.syntax.clone(), token,
-                                            parser_utils.file.clone(), structure));
+                                            parser_utils.file.clone(), Box::pin(structure)));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
@@ -47,7 +47,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                         parser_utils.file.clone(), "Traits can't be internal/external!".to_string());
                     drop(parse_structure(parser_utils, attributes, modifiers));
                     parser_utils.syntax.lock().unwrap()
-                        .add_poison_struct(false,
+                        .add_poison(false,
                                     Arc::new(Struct::new_poisoned(format!("${}", parser_utils.file),
                                                                   error)));
                     break;
@@ -57,7 +57,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
                     ParserUtils::add_struct(parser_utils.syntax.clone(), token,
-                                            parser_utils.file.clone(), structure));
+                                            parser_utils.file.clone(), Box::pin(structure)));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }

@@ -41,7 +41,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                     }
                 }
                 //Syntax must stay locked until getter is created to avoid race conditions.
-                getter = Syntax::get_function(syntax.clone(), true,
+                getter = Syntax::get_function(syntax.clone(),
                                               ParsingError::new(String::new(), (0, 0), 0,
                                                                 (0, 0), 0,
                                                                 format!("Failed to find operation {}", operation)),

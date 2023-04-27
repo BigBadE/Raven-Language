@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use async_trait::async_trait;
-use crate::{Modifier, ProcessManager, Syntax, TopElement};
+use crate::{AsyncGetter, Modifier, ProcessManager, Syntax, TopElement};
 use crate::code::MemberField;
 use crate::function::Function;
 use crate::{Attribute, ParsingError};
@@ -67,8 +67,24 @@ impl TopElement for Struct {
         self.poisoned.push(error);
     }
 
+    fn errors(&self) -> &Vec<ParsingError> {
+        return &self.poisoned;
+    }
+
+    fn name(&self) -> &String {
+        return &self.name;
+    }
+
+    fn new_poisoned(name: String, error: ParsingError) -> Self {
+        return Struct::new_poisoned(name, error);
+    }
+
     async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
-        process_manager.verify_struct(self, syntax);
+        process_manager.verify_struct(self, syntax).await;
+    }
+
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
+        return &mut syntax.structures;
     }
 }
 

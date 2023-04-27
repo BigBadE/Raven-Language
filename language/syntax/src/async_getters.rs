@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::task::Waker;
-use crate::{ParsingError, Syntax, TopElement};
+use crate::TopElement;
 
 #[derive(Default)]
 pub struct GetterManager {

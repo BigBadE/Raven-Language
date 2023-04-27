@@ -23,11 +23,11 @@ impl TypeWaiter {
             data: false
         };
         let waker = unsafe { Waker::from_raw(clone(&returning.data as *const bool as *const ())) };
-        syntax.finish.push(waker.clone());
-        match syntax.function_wakers.get_mut(function) {
+        syntax.async_manager.finish.push(waker.clone());
+        match syntax.functions.wakers.get_mut(function) {
             Some(wakers) => wakers.push(waker),
             None => {
-                syntax.function_wakers.insert(function.to_string(), vec!(waker));
+                syntax.functions.wakers.insert(function.to_string(), vec!(waker));
             }
         }
         return returning;

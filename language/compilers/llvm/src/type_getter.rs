@@ -82,11 +82,11 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     }
 
     pub fn compile(&mut self) -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
-        if &self.syntax.lock().unwrap().remaining != &0 {
+        if &self.syntax.lock().unwrap().async_manager.remaining != &0 {
             TypeWaiter::new(&mut self.syntax.lock().unwrap(), "main::main").wait();
         }
 
-        let function = match self.syntax.lock().unwrap().functions.get("main::main") {
+        let function = match self.syntax.lock().unwrap().functions.types.get("main::main") {
             Some(found) => found,
             None => return Ok(None)
         }.clone();
