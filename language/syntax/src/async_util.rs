@@ -106,7 +106,6 @@ impl Future for FunctionGetter {
         let mut name = &self.getting;
         if self.operation {
             if let Some(found) = locked.operations.get(name) {
-                //TODO don't use last
                 return Poll::Ready(Ok(found.last().unwrap().clone()));
             }
         } else {

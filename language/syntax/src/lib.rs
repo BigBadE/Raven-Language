@@ -10,6 +10,7 @@ use crate::r#struct::Struct;
 use crate::syntax::Syntax;
 use crate::types::Types;
 
+pub mod async_getters;
 pub mod async_util;
 pub mod blocks;
 pub mod code;
@@ -101,9 +102,9 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: Arc<Function>, syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_func(&self, function: &mut Function, syntax: &Arc<Mutex<Syntax>>);
 
-    async fn verify_struct(&self, structure: Arc<Struct>, syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_struct(&self, structure: &mut Struct, syntax: &Arc<Mutex<Syntax>>);
 
     fn add_implementation(&self, base: Types, implementing: Types);
 
@@ -161,4 +162,26 @@ impl Display for ParsingError {
 
 pub trait VariableManager {
     fn get_variable(&self, name: &String) -> Option<Types>;
+}
+
+#[async_trait]
+pub trait TopElement {
+    fn poison(&mut self, error: ParsingError);
+
+    fn errors(&self) -> &Vec<ParsingError>;
+
+    fn name(&self) -> &String;
+
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager);
+}
+
+#[async_trait]
+impl<T> TopElement for Arc<T> where T: TopElement + Send + Sync {
+    fn poison(&mut self, error: ParsingError) {
+        T::poison(self, error);
+    }
+
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
+        T::verify(self, syntax, process_manager).await;
+    }
 }

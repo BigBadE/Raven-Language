@@ -2,25 +2,18 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
 
-use crate::{is_modifier, Modifier, ParsingError, ProcessManager};
+use crate::{is_modifier, Modifier, ParsingError, ProcessManager, TopElement};
+use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{FunctionGetter, NameResolver};
 use crate::function::Function;
 use crate::r#struct::Struct;
 
 pub struct Syntax {
     pub errors: Vec<ParsingError>,
-    pub structures: HashMap<String, Arc<Struct>>,
-    pub functions: HashMap<String, Arc<Function>>,
-    pub structure_wakers: HashMap<String, Vec<Waker>>,
-    pub function_wakers: HashMap<String, Vec<Waker>>,
+    pub structures: AsyncGetter<Arc<Struct>>,
+    pub functions: AsyncGetter<Arc<Function>>,
+    pub async_manager: GetterManager,
     pub operations: HashMap<String, Vec<Arc<Function>>>,
-    //The amount of tasks running.
-    pub remaining: usize,
-    //If parsing is finished
-    pub finished: bool,
-    //The amount of running tasks locked waiting for their waker.
-    pub locked: usize,
-    pub finish: Vec<Waker>,
     pub process_manager: Box<dyn ProcessManager>,
 }
 
@@ -28,58 +21,39 @@ impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
             errors: Vec::new(),
-            structures: HashMap::new(),
-            functions: HashMap::new(),
-            structure_wakers: HashMap::new(),
-            function_wakers: HashMap::new(),
+            structures: AsyncGetter::new(),
+            functions: AsyncGetter::new(),
+            async_manager: GetterManager::default(),
             operations: HashMap::new(),
-            remaining: 0,
-            finished: false,
-            locked: 0,
-            finish: Vec::new(),
             process_manager,
         };
     }
 
     pub fn finish(&mut self) {
-        self.finished = true;
+        self.async_manager.finished = true;
     }
 
-    //noinspection DuplicatedCode I could use a poisonable trait to extract this code but too much work
-    pub async fn add_struct(syntax: &Arc<Mutex<Syntax>>, decrement: bool, dupe_error: ParsingError, structure: Arc<Struct>) {
-        let mut process_manager = None;
-
-        {
-            let mut locked = syntax.lock().unwrap();
-            if decrement {
-                locked.remaining -= 1;
-            }
-            for poison in &structure.poisoned {
-                locked.errors.push(poison.clone());
-            }
-            if let Some(mut old) = locked.structures.get_mut(&structure.name).cloned() {
-                if old.poisoned.is_empty() && structure.poisoned.is_empty() {
-                    locked.errors.push(dupe_error.clone());
-                    unsafe { Arc::get_mut_unchecked(&mut old) }.poisoned.push(dupe_error);
-                } else {
-                    //Ignored if one is poisoned
-                }
-            } else {
-                locked.structures.insert(structure.name.clone(), structure.clone());
-            }
-            if let Some(wakers) = locked.structure_wakers.remove(&structure.name) {
-                for waker in wakers {
-                    waker.wake();
-                }
-            }
-
-            if structure.poisoned.is_empty() {
-                process_manager = Some(locked.process_manager.cloned());
-            }
+    pub async fn add<T: TopElement>(&mut self, getter: &mut AsyncGetter<T>, decrement: bool, dupe_error: ParsingError, adding: Arc<T>) {
+        if decrement {
+            self.async_manager.remaining -= 1;
         }
-
-        if let Some(process_manager) = process_manager {
-            process_manager.verify_struct(structure, syntax).await;
+        for poison in adding.errors() {
+            self.errors.push(poison.clone());
+        }
+        if let Some(mut old) = getter.types.get_mut(adding.name()).cloned() {
+            if adding.errors().is_empty() && adding.errors().is_empty() {
+                self.errors.push(dupe_error.clone());
+                unsafe { Arc::get_mut_unchecked(&mut old) }.poison(dupe_error);
+            } else {
+                //Ignored if one is poisoned
+            }
+        } else {
+            getter.types.insert(adding.name().clone(), adding.clone());
+        }
+        if let Some(wakers) = getter.wakers.remove(adding.name()) {
+            for waker in wakers {
+                waker.wake();
+            }
         }
     }
 

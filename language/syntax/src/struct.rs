@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
-use crate::Modifier;
+use async_trait::async_trait;
+use crate::{Modifier, ProcessManager, Syntax, TopElement};
 use crate::code::MemberField;
 use crate::function::Function;
 use crate::{Attribute, ParsingError};
@@ -57,6 +58,17 @@ impl Struct {
             traits: Vec::new(),
             poisoned: vec!(error),
         };
+    }
+}
+
+#[async_trait]
+impl TopElement for Struct {
+    fn poison(&mut self, error: ParsingError) {
+        self.poisoned.push(error);
+    }
+
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
+        process_manager.verify_struct(self, syntax);
     }
 }
 

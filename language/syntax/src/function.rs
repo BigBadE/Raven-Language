@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
+use std::sync::{Arc, Mutex};
 
-use crate::{Attribute, DisplayIndented, ParsingError, to_modifiers, Types};
+use async_trait::async_trait;
+
+use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax};
 use crate::code::{Expression, MemberField};
 
 pub struct Function {
@@ -41,6 +44,17 @@ impl Function {
             name,
             poisoned: vec!(error)
         }
+    }
+}
+
+#[async_trait]
+impl TopElement for Function {
+    fn poison(&mut self, error: ParsingError) {
+        self.poisoned.push(error);
+    }
+
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
+        process_manager.verify_func(self, syntax).await;
     }
 }
 
