@@ -30,16 +30,14 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::StructTopElement => {},
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
-                .add_poison(false, Arc::new(Struct::new_poisoned(format!("{}", parser_utils.file),
-                                                                token.make_error(parser_utils.file.clone(),
+                .add_poison(Arc::new(Struct::new_poisoned(format!("{}", parser_utils.file),
+                                                          token.make_error(parser_utils.file.clone(),
                                                                                  "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
             TokenTypes::FunctionStart => {
-                parser_utils.syntax.lock().unwrap().async_manager.remaining += 1;
-                let function = parse_function(parser_utils, member_attributes, member_modifiers);
-                functions.push(function);
+                functions.push(parse_function(parser_utils, member_attributes, member_modifiers));
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
             }

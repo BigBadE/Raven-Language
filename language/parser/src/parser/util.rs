@@ -37,21 +37,21 @@ impl<'a> ParserUtils<'a> {
         let structure = Self::get_elem(&file, structure).await;
 
         for function in &structure.functions {
-            Syntax::add(&syntax, false,
-                       token.make_error(file.clone(), format!("Duplicate function {}", function.name)),
+            Syntax::add(&syntax,
+                        token.make_error(file.clone(), format!("Duplicate function {}", function.name)),
                        function.clone()).await;
         }
 
-        Syntax::add(&syntax, true, token.make_error(file,
-                                          format!("Duplicate structure {}", structure.name)),
-                   structure).await;
+        Syntax::add(&syntax, token.make_error(file,
+                                              format!("Duplicate structure {}", structure.name)),
+                    structure).await;
     }
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
                               function: impl Future<Output=Result<Function, ParsingError>>) {
         let adding = Self::get_elem(&file, function).await;
-        Syntax::add(&syntax, true,
-                                   token.make_error(file, format!("Duplicate {}", adding.name())),
+        Syntax::add(&syntax,
+                    token.make_error(file, format!("Duplicate {}", adding.name())),
                                    adding).await;
     }
 

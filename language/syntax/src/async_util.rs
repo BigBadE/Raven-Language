@@ -18,7 +18,11 @@ pub(crate) struct AsyncTypesGetter<T: TopElement> {
 
 impl<T: TopElement> AsyncTypesGetter<T> {
     pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
-        syntax.lock().unwrap().async_manager.locked += 1;
+        {
+            let mut locked = syntax.lock().unwrap();
+            locked.async_manager.locked += 1;
+            locked.async_manager.remaining += 1;
+        }
 
         return Self {
             syntax,
@@ -45,9 +49,11 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         let name = self.name_resolver.resolve(&self.getting);
 
         //Look for a structure of that name
-        if let Some(found) = T::get_manager(locked.deref_mut()).types.get(name) {
+        if let Some(found) = T::get_manager(locked.deref_mut()).types.get(name).cloned() {
             self.finished = Some(found.clone());
-            return Poll::Ready(Ok(found.clone()));
+            locked.async_manager.remaining -= 1;
+
+            return Poll::Ready(Ok(found));
         }
 
         check_wake(locked.deref_mut());
@@ -80,8 +86,7 @@ fn check_wake(locked: &mut Syntax) {
     locked.async_manager.locked += 1;
 
     //If this is the last running task, fail it all.
-    if locked.async_manager.locked == locked.async_manager.remaining {
-        println!("Deadlock detected! {} vs {}", locked.async_manager.locked, locked.async_manager.remaining);
+    if locked.async_manager.locked == locked.async_manager.remaining && locked.async_manager.finished {
         locked.structures.wakers.values().for_each(|wakers| for waker in wakers {
             waker.wake_by_ref();
         });

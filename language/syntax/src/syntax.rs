@@ -33,11 +33,11 @@ impl Syntax {
         self.async_manager.finished = true;
     }
 
-    pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, decrement: bool, dupe_error: ParsingError, adding: Arc<T>) {
+    pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, mut adding: Arc<T>) {
+        let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
+        unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, process_manager.deref_mut()).await;
+
         let mut locked = syntax.lock().unwrap();
-        if decrement {
-            locked.async_manager.remaining -= 1;
-        }
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
         }
@@ -58,11 +58,7 @@ impl Syntax {
         }
     }
 
-    pub fn add_poison<T: TopElement>(&mut self, decrement: bool, element: Arc<T>) {
-        if decrement {
-            self.async_manager.remaining -= 1;
-        }
-
+    pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {
         for poison in element.errors() {
             self.errors.push(poison.clone());
         }
