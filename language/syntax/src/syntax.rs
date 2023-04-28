@@ -30,6 +30,7 @@ impl Syntax {
     }
 
     pub fn finish(&mut self) {
+        println!("Finished!");
         self.async_manager.finished = true;
     }
 
@@ -54,6 +55,27 @@ impl Syntax {
         if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(adding.name()) {
             for waker in wakers {
                 waker.wake();
+            }
+        }
+
+        if adding.is_operator() {
+            //Only functions can be operators. This will break if something else is.
+            //These is no better way to do this because Rust.
+            let adding: Arc<Function> = unsafe { std::mem::transmute(adding) };
+
+            let name = adding.name().split("::").last().unwrap().to_string();
+            match locked.operations.get_mut(&name) {
+                Some(found) => found.push(adding),
+                None => {
+                    locked.operations.insert(name.clone(), vec!(adding));
+                }
+            }
+
+            println!("Waking for {} ({:?})", name, locked.functions.wakers);
+            if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
+                for waker in wakers {
+                    waker.wake();
+                }
             }
         }
     }

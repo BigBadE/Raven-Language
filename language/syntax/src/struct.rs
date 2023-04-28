@@ -67,6 +67,10 @@ impl TopElement for Struct {
         self.poisoned.push(error);
     }
 
+    fn is_operator(&self) -> bool {
+        return false;
+    }
+
     fn errors(&self) -> &Vec<ParsingError> {
         return &self.poisoned;
     }

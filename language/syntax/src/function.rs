@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter};
+use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier};
 use crate::code::{Expression, MemberField};
 
 pub struct Function {
@@ -51,6 +51,10 @@ impl Function {
 impl TopElement for Function {
     fn poison(&mut self, error: ParsingError) {
         self.poisoned.push(error);
+    }
+
+    fn is_operator(&self) -> bool {
+        return is_modifier(self.modifiers, Modifier::Operation);
     }
 
     fn errors(&self) -> &Vec<ParsingError> {

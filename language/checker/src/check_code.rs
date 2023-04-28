@@ -29,29 +29,23 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 verify_effect(process_manager, value, syntax, variables).await?;
             }
 
-            let getter;
-            {
-                let locked = syntax.lock().unwrap();
-                if let Some(operations) = locked.operations.get(operation) {
-                    for potential_operation in operations {
-                        if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
-                            *effect = assign_with_priority(new_effect);
-                            return Ok(());
+            loop {
+
+                {
+                    let locked = syntax.lock().unwrap();
+                    if let Some(operations) = locked.operations.get(operation) {
+                        for potential_operation in operations {
+                            if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
+                                *effect = assign_with_priority(new_effect);
+                                return Ok(());
+                            }
                         }
                     }
                 }
-                //Syntax must stay locked until getter is created to avoid race conditions.
-                getter = Syntax::get_function(syntax.clone(),
-                                              ParsingError::new(String::new(), (0, 0), 0,
-                                                                (0, 0), 0,
-                                                                format!("Failed to find operation {}", operation)),
-                                              operation.clone(), Box::new(EmptyNameResolver {}));
-            }
 
-            let func = getter.await?;
-            if let Some(new_effect) = check_operation(process_manager, &func, values, variables) {
-                *effect = new_effect;
-                return Ok(());
+                Syntax::get_function(syntax.clone(), ParsingError::new(String::new(), (0, 0), 0,
+                                                                  (0, 0), 0, format!("Failed to find operation {}", operation)),
+                                                operation.clone(), Box::new(EmptyNameResolver {})).await?;
             }
         }
         Effects::MethodCall(_, effects) => for effect in effects {

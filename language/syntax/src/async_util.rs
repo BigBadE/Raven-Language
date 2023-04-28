@@ -22,6 +22,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
             let mut locked = syntax.lock().unwrap();
             locked.async_manager.locked += 1;
             locked.async_manager.remaining += 1;
+            println!("Started looking for {} ({}, {})", getting, locked.async_manager.locked, locked.async_manager.remaining);
         }
 
         return Self {
@@ -44,7 +45,9 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
+
         locked.async_manager.locked -= 1;
+        println!("Started looking for {} ({}, {})", self.getting, locked.async_manager.locked, locked.async_manager.remaining);
 
         let name = self.name_resolver.resolve(&self.getting);
 
@@ -52,11 +55,13 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         if let Some(found) = T::get_manager(locked.deref_mut()).types.get(name).cloned() {
             self.finished = Some(found.clone());
             locked.async_manager.remaining -= 1;
+            println!("Passed for {} ({}, {})", self.getting, locked.async_manager.locked, locked.async_manager.remaining);
 
             return Poll::Ready(Ok(found));
         }
 
         check_wake(locked.deref_mut());
+        println!("Failed for {} ({}, {})", self.getting, locked.async_manager.locked, locked.async_manager.remaining);
 
         if locked.async_manager.finished && locked.async_manager.locked >= locked.async_manager.remaining {
             return Poll::Ready(Err(self.error.clone()));

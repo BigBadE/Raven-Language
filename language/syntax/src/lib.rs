@@ -169,6 +169,8 @@ pub trait VariableManager {
 pub trait TopElement where Self: Sized {
     fn poison(&mut self, error: ParsingError);
 
+    fn is_operator(&self) -> bool;
+    
     fn errors(&self) -> &Vec<ParsingError>;
 
     fn name(&self) -> &String;
