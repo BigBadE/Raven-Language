@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::future::Future;
-use syntax::{Attribute, get_modifier, Modifier, ParsingError};
+use std::sync::{Arc, Mutex};
+use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError};
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
+use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::parser::code_parser::{parse_code, ParsingFuture};
 use crate::parser::struct_parser::{FutureField, parse_generics};
@@ -56,14 +58,19 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
-    return get_function(attributes, get_modifier(modifiers.as_slice()), fields, generics,
+    return get_function(parser_utils.syntax.clone(), attributes,
+                        get_modifier(modifiers.as_slice()), fields, generics,
                         code, return_type, parser_utils.file.clone() + "::" + name.as_str());
 }
 
-pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
+pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
                           generics: HashMap<String, Vec<ParsingFuture<Types>>>,
                           code: Option<impl Future<Output=Result<CodeBody, ParsingError>>>,
                           return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
+    syntax.lock().unwrap().functions.parsing.push(name.clone());
+    if is_modifier(modifiers, Modifier::Operation) {
+        syntax.lock().unwrap().functions.parsing.push(name.split("::").last().unwrap().to_string());
+    }
     let generics = get_generics(generics).await?;
     let return_type = match return_type {
         Some(found) => Some(found.await?),

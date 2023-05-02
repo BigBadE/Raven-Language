@@ -70,7 +70,9 @@ impl TopElement for Function {
     }
 
     async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
+        println!("Verifying {}", self.name);
         process_manager.verify_func(self, syntax).await;
+        println!("Done!");
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {

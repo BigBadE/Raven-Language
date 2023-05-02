@@ -30,7 +30,6 @@ impl Syntax {
     }
 
     pub fn finish(&mut self) {
-        println!("Finished!");
         self.async_manager.finished = true;
     }
 
@@ -71,7 +70,6 @@ impl Syntax {
                 }
             }
 
-            println!("Waking for {} ({:?})", name, locked.functions.wakers);
             if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
                 for waker in wakers {
                     waker.wake();

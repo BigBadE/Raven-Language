@@ -84,8 +84,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn compile(&mut self) -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
         let found = self.syntax.lock().unwrap().functions.types.contains_key("main::main");
 
-        if !found && self.syntax.lock().unwrap().async_manager.remaining != 0 {
-            TypeWaiter::new(&mut self.syntax.lock().unwrap(), "main::main").wait();
+        if !found {
+            TypeWaiter::new(&self.syntax, "main::main").wait();
         }
 
         let function = match self.syntax.lock().unwrap().functions.types.get("main::main") {

@@ -10,9 +10,13 @@ use crate::check_function::CheckerVariableManager;
 use crate::output::TypesChecker;
 
 pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
+    println!("1");
     for line in &mut code.expressions {
+        println!("2");
         verify_effect(process_manager, &mut line.effect, syntax, variables).await?;
+        println!("5");
     }
+    println!("6");
     return Ok(());
 }
 
@@ -30,7 +34,6 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
             }
 
             loop {
-
                 {
                     let locked = syntax.lock().unwrap();
                     if let Some(operations) = locked.operations.get(operation) {
