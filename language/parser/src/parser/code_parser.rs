@@ -1,7 +1,10 @@
 use std::future::Future;
+use std::sync::{Arc, Mutex};
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::{ParsingError, ParsingFuture};
+use syntax::async_util::NameResolver;
+use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::parser::control_parser::parse_for;
 use crate::parser::operator_parser::parse_operator;
@@ -19,17 +22,34 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> ParsingFuture<CodeBody> {
 
 pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: bool)
                   -> Option<(ExpressionType, ParsingFuture<Effects>)> {
-    let mut effect = None;
+    let mut effect: Option<ParsingFuture<Effects>> = None;
     let mut expression_type = ExpressionType::Line;
     loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap().clone();
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::ParenOpen => {
-                if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
-                    effect = Some(in_effect);
-                } else {
-                    effect = None;
+                let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
+                match last.token_type {
+                    TokenTypes::Variable => {
+                        let mut effects = Vec::new();
+                        while let Some((_, effect)) = parse_line(parser_utils, false, false) {
+                            effects.push(effect);
+                            if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
+                            } else {
+                                break
+                            }
+                        }
+                        let name = last.to_string(parser_utils.buffer);
+                        effect = Some(Box::pin(method_call(parser_utils.syntax.clone(), name.clone(),
+                                                           token.make_error(parser_utils.file.clone(), format!("Unknown method {}!", name)),
+                                                           parser_utils.imports.boxed_clone(), effects)))
+                    },
+                    _ => if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
+                            effect = Some(in_effect);
+                        } else {
+                            effect = None;
+                        }
                 }
             }
             TokenTypes::Float => {
@@ -72,6 +92,15 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
         }
     }
     return Some((expression_type, effect.unwrap_or(constant_effect(Effects::NOP()))));
+}
+
+async fn method_call(syntax: Arc<Mutex<Syntax>>, variable: String, error: ParsingError,
+                     resolver: Box<dyn NameResolver>, inner: Vec<ParsingFuture<Effects>>) -> Result<Effects, ParsingError> {
+    let mut output = Vec::new();
+    for possible in inner {
+        output.push(possible.await?);
+    }
+    return Ok(Effects::MethodCall(Syntax::get_function(syntax, error, variable, false, resolver).await?, output));
 }
 
 async fn body_effect(body: impl Future<Output=Result<CodeBody, ParsingError>>) -> Result<Effects, ParsingError> {
@@ -153,7 +182,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<E
     let mut values = Vec::new();
     let mut name = String::new();
     loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => name = token.to_string(parser_utils.buffer),

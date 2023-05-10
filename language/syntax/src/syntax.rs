@@ -66,7 +66,6 @@ impl Syntax {
             match locked.operations.get_mut(&name) {
                 Some(found) => found.push(adding),
                 None => {
-                    println!("Added op");
                     locked.operations.insert(name.clone(), vec!(adding));
                 }
             }

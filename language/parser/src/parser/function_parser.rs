@@ -74,7 +74,6 @@ pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>
         if is_modifier(modifiers, Modifier::Operation) {
             for i in 0.. {
                 let name = format!("{}${}", name.split("::").last().unwrap().to_string(), i);
-                println!("Added {} to parsing", name);
                 if !locked.functions.parsing.contains(&name) {
                     locked.functions.parsing.push(name);
                     break

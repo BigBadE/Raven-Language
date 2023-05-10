@@ -11,6 +11,7 @@ pub struct Tokenizer<'a> {
     pub last: Token,
     pub len: usize,
     pub buffer: &'a [u8],
+    pub for_loop: bool
 }
 
 impl<'a> Tokenizer<'a> {
@@ -23,6 +24,7 @@ impl<'a> Tokenizer<'a> {
             last: Token::new(TokenTypes::Start, (0, 0), 0, (0, 0), 0),
             len: buffer.len(),
             buffer,
+            for_loop: false
         };
     }
 
@@ -95,6 +97,18 @@ impl<'a> Tokenizer<'a> {
                 return false;
             }
         }
+        return true;
+    }
+
+    pub fn matches_nospace(&mut self, input: &str) -> bool {
+        let mut start = self.index;
+        for character in input.bytes() {
+            if start == self.len || self.buffer[start] != character {
+                return false;
+            }
+            start += 1;
+        }
+        self.matches(input);
         return true;
     }
 

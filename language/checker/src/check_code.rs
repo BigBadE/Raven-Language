@@ -11,13 +11,9 @@ use crate::output::TypesChecker;
 
 pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody,
                          syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
-    println!("1");
     for line in &mut code.expressions {
-        println!("2");
         verify_effect(process_manager, &mut line.effect, syntax, variables).await?;
-        println!("5");
     }
-    println!("6");
     return Ok(());
 }
 
@@ -43,21 +39,17 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                     let locked = syntax.lock().unwrap();
                     if let Some(operations) = locked.operations.get(&operation) {
                         ops = operations.len();
-                        println!("3");
                         for potential_operation in operations {
-                            println!("3-1: {}", potential_operation.name);
                             if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
-                                println!("3-2");
                                 *effect = assign_with_priority(new_effect);
                                 return Ok(());
                             }
                         }
                     }
                 }
-                println!("4-1");
+
                 Syntax::get_function(syntax.clone(), error.clone(),
                                      operation, true, Box::new(EmptyNameResolver {})).await?;
-                println!("4-2");
             }
         }
         Effects::MethodCall(_, effects) => for effect in effects {
@@ -78,7 +70,6 @@ fn check_operation(process_manager: &TypesChecker, operation: &Arc<Function>, va
     if check_args(process_manager, operation, values, variables) {
         return Some(Effects::MethodCall(operation.clone(), values.clone()));
     }
-    println!("Failed {}", operation.name);
     return None;
 }
 
@@ -149,8 +140,7 @@ pub fn assign_with_priority(operator: Effects) -> Effects {
 
                 return Effects::MethodCall(lhs_func.clone(), lhs);
             } else {
-                mem::swap(&mut Effects::MethodCall(lhs_func.clone(), lhs),
-                          effects.get_mut(0).unwrap());
+                effects.insert(0,  Effects::MethodCall(lhs_func.clone(), lhs));
             }
         },
         _ => effects.insert(0, lhs)
