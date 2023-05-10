@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier};
+use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture};
 use crate::code::{Expression, MemberField};
 
 pub struct Function {
@@ -12,21 +12,43 @@ pub struct Function {
     pub generics: HashMap<String, Types>,
     pub modifiers: u8,
     pub fields: Vec<MemberField>,
-    pub code: CodeBody,
+    pub code: CodeStatus,
     pub return_type: Option<Types>,
     pub name: String,
     pub poisoned: Vec<ParsingError>
 }
 
+pub enum CodeStatus {
+    Parsing(ParsingFuture<CodeBody>),
+    Finished(CodeBody),
+    Swapping()
+}
+
+impl CodeStatus {
+    pub fn assume_finished_mut(&mut self) -> &mut CodeBody {
+        return match self {
+            CodeStatus::Finished(found) => found,
+            _ => panic!("Assumed finished on unfinished code parsing!")
+        }
+    }
+
+    pub fn assume_finished(&self) -> &CodeBody {
+        return match self {
+            CodeStatus::Finished(found) => found,
+            _ => panic!("Assumed finished on unfinished code parsing!")
+        }
+    }
+}
+
 impl Function {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<MemberField>, generics: HashMap<String, Types>,
-               code: CodeBody, return_type: Option<Types>, name: String) -> Self {
+               code: ParsingFuture<CodeBody>, return_type: Option<Types>, name: String) -> Self {
         return Self {
             attributes,
             generics,
             modifiers,
             fields,
-            code,
+            code: CodeStatus::Parsing(code),
             return_type,
             name,
             poisoned: Vec::new()
@@ -39,7 +61,7 @@ impl Function {
             generics: HashMap::new(),
             modifiers: 0,
             fields: Vec::new(),
-            code: CodeBody::new(Vec::new(), "poison".to_string()),
+            code: CodeStatus::Finished(CodeBody::new(Vec::new(), "poison".to_string())),
             return_type: None,
             name,
             poisoned: vec!(error)
@@ -125,7 +147,8 @@ impl DisplayIndented for Function {
         if self.return_type.is_some() {
             write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
         }
-        return self.code.format(indent, f);
+        // self.code.format(indent, f)
+        return write!(f, " TODO");
     }
 }
 

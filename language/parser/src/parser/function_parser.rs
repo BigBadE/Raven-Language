@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError};
+use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
-use crate::parser::code_parser::{parse_code, ParsingFuture};
+
+use crate::parser::code_parser::parse_code;
 use crate::parser::struct_parser::{FutureField, parse_generics};
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
@@ -65,11 +66,21 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
 
 pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
                           generics: HashMap<String, Vec<ParsingFuture<Types>>>,
-                          code: Option<impl Future<Output=Result<CodeBody, ParsingError>>>,
+                          code: Option<ParsingFuture<CodeBody>>,
                           return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
-    syntax.lock().unwrap().functions.parsing.push(name.clone());
-    if is_modifier(modifiers, Modifier::Operation) {
-        syntax.lock().unwrap().functions.parsing.push(name.split("::").last().unwrap().to_string());
+    {
+        let mut locked = syntax.lock().unwrap();
+        locked.functions.parsing.push(name.clone());
+        if is_modifier(modifiers, Modifier::Operation) {
+            for i in 0.. {
+                let name = format!("{}${}", name.split("::").last().unwrap().to_string(), i);
+                println!("Added {} to parsing", name);
+                if !locked.functions.parsing.contains(&name) {
+                    locked.functions.parsing.push(name);
+                    break
+                }
+            }
+        }
     }
     let generics = get_generics(generics).await?;
     let return_type = match return_type {
@@ -80,13 +91,11 @@ pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>
     for field in fields {
         done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)))
     }
-    let code = match code {
-        Some(found) => found.await?,
-        None => CodeBody::new(Vec::new(), "empty_trait".to_string())
-    };
-    return Ok(Function::new(attributes, modifiers, done_fields, generics, code,
+    return Ok(Function::new(attributes, modifiers, done_fields, generics, code.unwrap_or(Box::pin(const_empty())),
                             return_type, name));
 }
+
+async fn const_empty() -> Result<CodeBody, ParsingError> { Ok(CodeBody::new(Vec::new(), "empty_trait".to_string())) }
 
 pub async fn get_generics(generics: HashMap<String, Vec<ParsingFuture<Types>>>) -> Result<HashMap<String, Types>, ParsingError> {
     let mut done_generics = HashMap::new();

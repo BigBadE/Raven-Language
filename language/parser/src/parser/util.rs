@@ -1,17 +1,15 @@
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Handle;
 
 use syntax::function::Function;
-use syntax::{ParsingError, TopElement};
+use syntax::{ParsingError, ParsingFuture, TopElement};
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 
 use crate::{ImportNameResolver, TokenTypes};
-use crate::parser::code_parser::ParsingFuture;
 use crate::tokens::tokens::Token;
 
 pub struct ParserUtils<'a> {
@@ -64,9 +62,9 @@ impl<'a> ParserUtils<'a> {
     }
 }
 
-pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>, parser_utils: &mut ParserUtils)
-                    -> Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>> {
-    let mut generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>> = Vec::new();
+pub fn add_generics(input: ParsingFuture<Types>, parser_utils: &mut ParserUtils)
+                    -> ParsingFuture<Types> {
+    let mut generics = Vec::new();
     let mut last = None;
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -91,8 +89,7 @@ pub fn add_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>
     return Box::pin(to_generics(input, generics));
 }
 
-async fn to_generics(input: Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>,
-                     generics: Vec<Pin<Box<dyn Future<Output=Result<Types, ParsingError>> + Send>>>)
+async fn to_generics(input: ParsingFuture<Types>, generics: Vec<ParsingFuture<Types>>)
                      -> Result<Types, ParsingError> {
     let mut final_generics = Vec::new();
     for generic in generics {

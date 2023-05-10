@@ -36,7 +36,6 @@ impl Syntax {
     pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, mut adding: Arc<T>) {
         let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
         unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, process_manager.deref_mut()).await;
-
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
@@ -63,9 +62,11 @@ impl Syntax {
             let adding: Arc<Function> = unsafe { std::mem::transmute(adding) };
 
             let name = adding.name().split("::").last().unwrap().to_string();
+            let name = format!("{}${}", name, locked.operations.get(&name).map(|found| found.len()).unwrap_or(0));
             match locked.operations.get_mut(&name) {
                 Some(found) => found.push(adding),
                 None => {
+                    println!("Added op");
                     locked.operations.insert(name.clone(), vec!(adding));
                 }
             }
@@ -95,8 +96,8 @@ impl Syntax {
     }
 
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Arc<Function>, ParsingError> {
-        return AsyncTypesGetter::new(syntax, error, getting, name_resolver).await;
+                              getting: String, operatrion: bool, name_resolver: Box<dyn NameResolver>) -> Result<Arc<Function>, ParsingError> {
+        return AsyncTypesGetter::new_func(syntax, error, getting, operatrion, name_resolver).await;
     }
 
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
@@ -104,6 +105,6 @@ impl Syntax {
         if let Some(found) = name_resolver.generic(&getting) {
             return Ok(found);
         }
-        return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver).await?));
+        return Ok(Types::Struct(AsyncTypesGetter::new_struct(syntax, error, getting, name_resolver).await?));
     }
 }

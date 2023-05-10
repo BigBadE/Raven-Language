@@ -9,7 +9,8 @@ use async_recursion::async_recursion;
 use crate::check_function::CheckerVariableManager;
 use crate::output::TypesChecker;
 
-pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
+pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody,
+                         syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
     println!("1");
     for line in &mut code.expressions {
         println!("2");
@@ -33,22 +34,30 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 verify_effect(process_manager, value, syntax, variables).await?;
             }
 
+            let error = ParsingError::new(String::new(), (0, 0), 0,
+                                          (0, 0), 0, format!("Failed to find operation {}", operation));
+            let mut ops = 0;
             loop {
+                let operation = format!("{}${}", operation, ops);
                 {
                     let locked = syntax.lock().unwrap();
-                    if let Some(operations) = locked.operations.get(operation) {
+                    if let Some(operations) = locked.operations.get(&operation) {
+                        ops = operations.len();
+                        println!("3");
                         for potential_operation in operations {
+                            println!("3-1: {}", potential_operation.name);
                             if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
+                                println!("3-2");
                                 *effect = assign_with_priority(new_effect);
                                 return Ok(());
                             }
                         }
                     }
                 }
-
-                Syntax::get_function(syntax.clone(), ParsingError::new(String::new(), (0, 0), 0,
-                                                                  (0, 0), 0, format!("Failed to find operation {}", operation)),
-                                                operation.clone(), Box::new(EmptyNameResolver {})).await?;
+                println!("4-1");
+                Syntax::get_function(syntax.clone(), error.clone(),
+                                     operation, true, Box::new(EmptyNameResolver {})).await?;
+                println!("4-2");
             }
         }
         Effects::MethodCall(_, effects) => for effect in effects {

@@ -2,6 +2,8 @@
 #![feature(get_mut_unchecked)]
 
 use std::fmt::{Debug, Display, Formatter};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 use async_trait::async_trait;
@@ -19,6 +21,8 @@ pub mod function;
 pub mod r#struct;
 pub mod syntax;
 pub mod types;
+
+pub type ParsingFuture<T> = Pin<Box<dyn Future<Output=Result<T, ParsingError>> + Send + Sync>>;
 
 pub static MODIFIERS: [Modifier; 5] = [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal, Modifier::Operation];
 

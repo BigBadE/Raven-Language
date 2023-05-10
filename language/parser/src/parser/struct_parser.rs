@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use syntax::{Attribute, get_modifier, Modifier, ParsingError};
+use syntax::{Attribute, get_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::code::{Field, MemberField};
 use syntax::function::Function;
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
-use crate::parser::code_parser::ParsingFuture;
 use crate::parser::function_parser::{get_generics, parse_function};
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
 use crate::parser::util::ParserUtils;

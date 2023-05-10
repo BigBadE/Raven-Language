@@ -1,10 +1,11 @@
 use std::future::Future;
-use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use crate::{ParsingError, TopElement};
+use crate::function::Function;
+use crate::r#struct::Struct;
 use crate::syntax::Syntax;
 use crate::types::Types;
 
@@ -12,24 +13,39 @@ pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub error: ParsingError,
     pub getting: String,
+    pub operation: bool,
     pub name_resolver: Box<dyn NameResolver>,
     pub finished: Option<Arc<T>>,
 }
 
-impl<T: TopElement> AsyncTypesGetter<T> {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
+impl AsyncTypesGetter<Function> {
+    pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
             error,
             getting,
+            operation,
             name_resolver,
             finished: None,
         };
     }
 }
 
-impl<T: TopElement> Future for AsyncTypesGetter<T> {
-    type Output = Result<Arc<T>, ParsingError>;
+impl AsyncTypesGetter<Struct> {
+    pub fn new_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
+        return Self {
+            syntax,
+            error,
+            getting,
+            operation: false,
+            name_resolver,
+            finished: None,
+        };
+    }
+}
+
+impl Future for AsyncTypesGetter<Function> {
+    type Output = Result<Arc<Function>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if let Some(finished) = &self.finished {
@@ -42,29 +58,68 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         let name = self.name_resolver.resolve(&self.getting);
 
         //Look for a structure of that name
-        if let Some(found) = T::get_manager(locked.deref_mut()).types.get(name).cloned() {
-            self.finished = Some(found.clone());
+        if self.operation {
+            if let Some(found) = locked.operations.get(name) {
+                return Poll::Ready(Ok(found.get(0).unwrap().clone()));
+            }
+        } else {
+            if let Some(found) = locked.functions.types.get(name).cloned() {
+                self.finished = Some(found.clone());
 
-            return Poll::Ready(Ok(found));
+                return Poll::Ready(Ok(found));
+            }
         }
 
-        if locked.async_manager.finished && !T::get_manager(locked.deref_mut()).parsing.contains(name) {
-            locked.structures.wakers.values().for_each(|wakers| for waker in wakers {
-                waker.wake_by_ref();
-            });
+        println!("Checking {}", name);
+        if locked.async_manager.finished && !locked.functions.parsing.contains(&name) {
             locked.functions.wakers.values().for_each(|wakers| for waker in wakers {
                 waker.wake_by_ref();
             });
             return Poll::Ready(Err(self.error.clone()));
         }
 
-        let targets = T::get_manager(locked.deref_mut());
-
         //Add a waker for that type
-        if let Some(vectors) = targets.wakers.get_mut(name) {
+        if let Some(vectors) = locked.functions.wakers.get_mut(name) {
             vectors.push(cx.waker().clone());
         } else {
-            targets.wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
+            locked.functions.wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
+        }
+        return Poll::Pending;
+    }
+}
+
+impl Future for AsyncTypesGetter<Struct> {
+    type Output = Result<Arc<Struct>, ParsingError>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if let Some(finished) = &self.finished {
+            return Poll::Ready(Ok(finished.clone()));
+        }
+
+        let locked = self.syntax.clone();
+        let mut locked = locked.lock().unwrap();
+
+        let name = self.name_resolver.resolve(&self.getting);
+
+        //Look for a structure of that name
+        if let Some(found) = locked.structures.types.get(name).cloned() {
+            self.finished = Some(found.clone());
+
+            return Poll::Ready(Ok(found));
+        }
+
+        if locked.async_manager.finished && !locked.structures.parsing.contains(&name) {
+            locked.structures.wakers.values().for_each(|wakers| for waker in wakers {
+                waker.wake_by_ref();
+            });
+            return Poll::Ready(Err(self.error.clone()));
+        }
+
+        //Add a waker for that type
+        if let Some(vectors) = locked.structures.wakers.get_mut(name) {
+            vectors.push(cx.waker().clone());
+        } else {
+            locked.structures.wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
         }
         return Poll::Pending;
     }

@@ -1,7 +1,7 @@
 use syntax::code::Effects;
-use syntax::ParsingError;
+use syntax::{ParsingError, ParsingFuture};
 
-use crate::parser::code_parser::{parse_line, ParsingFuture};
+use crate::parser::code_parser::parse_line;
 use crate::{ParserUtils, TokenTypes};
 
 pub fn parse_operator(last: Option<ParsingFuture<Effects>>, parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {

@@ -4,9 +4,9 @@ use syntax::async_util::NameResolver;
 
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
-use syntax::ParsingError;
+use syntax::{ParsingError, ParsingFuture};
 use syntax::syntax::Syntax;
-use crate::parser::code_parser::{parse_code, parse_line, ParsingFuture};
+use crate::parser::code_parser::{parse_code, parse_line};
 
 use crate::{ParserUtils, TokenTypes};
 
@@ -45,7 +45,7 @@ async fn create_for(name: String, file: String, effect: ParsingFuture<Effects>,
                             ParsingError::new(file.clone(), (0, 0), 0, (0, 0), 0,
                                               "No core found! Report this!".to_string()),
                             "iter::Iter::next".to_string(),
-                            name_resolver.boxed_clone()).await?,
+                            false, name_resolver.boxed_clone()).await?,
         vec!(effect.clone()))))));
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::MethodCall(
@@ -53,7 +53,7 @@ async fn create_for(name: String, file: String, effect: ParsingFuture<Effects>,
                             ParsingError::new(file, (0, 0), 0, (0, 0), 0,
                                               "No core found! Report this!".to_string()),
                             "iter::Iter::has_next".to_string(),
-                            name_resolver.boxed_clone()).await?,
+                            false, name_resolver.boxed_clone()).await?,
         vec!(effect))),
                                   body.label.clone(), (id + 1).to_string())));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));

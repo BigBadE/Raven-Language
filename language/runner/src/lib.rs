@@ -12,20 +12,18 @@ pub struct RunnerSettings {
     pub cpu_runtime: Runtime,
     pub sources: Vec<SourceSet>,
     pub debug: bool,
-    pub compiler: String
+    pub compiler: String,
 }
 
-impl RunnerSettings {
-    pub fn get_compiler(&self) -> Box<dyn Compiler> {
-        match self.compiler.to_lowercase().as_str() {
-            "llvm" => Box::new(LLVMCompiler::new()),
-            _ => panic!("Unknown compilers {}", self.compiler)
-        }
+pub fn get_compiler(name: String) -> Box<dyn Compiler> {
+    match name.to_lowercase().as_str() {
+        "llvm" => Box::new(LLVMCompiler::new()),
+        _ => panic!("Unknown compilers {}", name)
     }
 }
 
 pub struct SourceSet {
-    pub root: PathBuf
+    pub root: PathBuf,
 }
 
 impl SourceSet {
@@ -40,7 +38,7 @@ impl SourceSet {
         let name = other.to_str().unwrap()
             .replace(self.root.to_str().unwrap(), "")
             .replace(path::MAIN_SEPARATOR, "::");
-        return name.as_str()[2..name.len()-3].to_string();
+        return name.as_str()[2..name.len() - 3].to_string();
     }
 
     fn read_recursive(base: &PathBuf, output: &mut Vec<PathBuf>) -> Result<(), Error> {

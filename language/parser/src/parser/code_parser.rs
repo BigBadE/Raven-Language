@@ -1,23 +1,20 @@
 use std::future::Future;
-use std::pin::Pin;
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
-use syntax::ParsingError;
+use syntax::{ParsingError, ParsingFuture};
 use syntax::types::Types;
 use crate::parser::control_parser::parse_for;
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 
-pub type ParsingFuture<T> = Pin<Box<dyn Future<Output=Result<T, ParsingError>> + Send>>;
-
-pub fn parse_code(parser_utils: &mut ParserUtils) -> impl Future<Output=Result<CodeBody, ParsingError>> {
+pub fn parse_code(parser_utils: &mut ParserUtils) -> ParsingFuture<CodeBody> {
     let mut lines = Vec::new();
     while let Some((expression, effect)) = parse_line(parser_utils, false, false) {
         lines.push(get_line(effect, expression));
     }
     parser_utils.imports.last_id += 1;
-    return create_body(parser_utils.imports.last_id - 1, lines);
+    return Box::pin(create_body(parser_utils.imports.last_id - 1, lines));
 }
 
 pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: bool)
@@ -138,7 +135,7 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             }
             //Handle making new structs with generics.
             TokenTypes::Operator => {
-                types = Some(add_generics(types.unwrap(), parser_utils));
+                types = Some(Box::pin(add_generics(types.unwrap(), parser_utils)));
             }
             TokenTypes::BlockStart => {
                 values = parse_new_args(parser_utils);

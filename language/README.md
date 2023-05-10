@@ -12,6 +12,7 @@
 Compilation is done in the following steps:
 - Tokenizer tokenizes the input files (async)
 - Parser turns the tokens into the syntax (async)
+  - Types are added to the syntax first, then code is resolved later
   - Types are resolved with an async waker system
 - Checker verifies code doesn't have undefined behavior
   - Checks lifetimes and generic bounds

@@ -106,7 +106,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 }
                 continue
             }
-            compile_block(&function.code, function_type, self, &mut 0);
+            compile_block(function.code.assume_finished(), function_type, self, &mut 0);
             self.compiler.builder.build_return(None);
         }
 
