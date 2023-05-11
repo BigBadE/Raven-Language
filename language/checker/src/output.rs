@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Handle;
@@ -14,14 +15,16 @@ use crate::check_function::verify_function;
 #[derive(Clone)]
 pub struct TypesChecker {
     runtime: Handle,
-    syntax: Option<Arc<Mutex<Syntax>>>
+    syntax: Option<Arc<Mutex<Syntax>>>,
+    pub generics: HashMap<String, Types>
 }
 
 impl TypesChecker {
     pub fn new(runtime: Handle) -> Self {
         return Self {
             runtime,
-            syntax: None
+            syntax: None,
+            generics: HashMap::new()
         }
     }
 }
@@ -56,6 +59,10 @@ impl ProcessManager for TypesChecker {
             "str" => STR.clone(),
             _ => panic!("Unknown internal {}", name)
         };
+    }
+
+    fn get_generic(&self, name: &str) -> Option<Types> {
+        return self.generics.get(name).map(|inner| inner.clone());
     }
 
     fn cloned(&self) -> Box<dyn ProcessManager> {

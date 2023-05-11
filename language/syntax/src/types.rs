@@ -38,7 +38,7 @@ impl Types {
                     }
 
                     //TODO check generics, I have no clue how to with respect to subtypes.
-                    true
+                    todo!()
                 },
                 Types::Generic(_, bounds) => {
                     for bound in bounds {

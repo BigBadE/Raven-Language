@@ -1,7 +1,7 @@
 use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::code::Effects;
-use syntax::function::{CodeBody, Function};
+use syntax::function::{CodeBody, display_parenless, Function};
 use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
 use crate::EmptyNameResolver;
@@ -26,14 +26,10 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
             verify_effect(process_manager, second, syntax, variables).await?;
         }
         Effects::Operation(operation, values) => {
-            for value in &mut *values {
-                verify_effect(process_manager, value, syntax, variables).await?;
-            }
-
             let error = ParsingError::new(String::new(), (0, 0), 0,
                                           (0, 0), 0, format!("Failed to find operation {}", operation));
             let mut ops = 0;
-            loop {
+            'outer: loop {
                 let operation = format!("{}${}", operation, ops);
                 {
                     let locked = syntax.lock().unwrap();
@@ -42,7 +38,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                         for potential_operation in operations {
                             if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
                                 *effect = assign_with_priority(new_effect);
-                                return Ok(());
+                                break 'outer
                             }
                         }
                     }
@@ -51,9 +47,49 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 Syntax::get_function(syntax.clone(), error.clone(),
                                      operation, true, Box::new(EmptyNameResolver {})).await?;
             }
+            return verify_effect(process_manager, effect, syntax, variables).await;
         }
-        Effects::MethodCall(_, effects) => for effect in effects {
-            verify_effect(process_manager, effect, syntax, variables).await?;
+        Effects::MethodCall(method, effects) => {
+            if !method.generics.is_empty() {
+                let mut manager = process_manager.clone();
+                for (key, value) in &method.generics {
+                    if manager.generics.contains_key(key) {
+                        return Err(placeholder_error(format!("Duplicate generic named {}", key)));
+                    }
+                    manager.generics.insert(key.clone(), value.clone());
+                }
+
+                let name = format!("{}_{}", method.name, display_parenless(&process_manager.generics.keys().collect(), "_"));
+
+                for effect in &mut *effects {
+                    verify_effect(&mut manager, effect, syntax, variables).await?;
+                }
+
+                let mut temp = Vec::new();
+                mem::swap(&mut temp, effects);
+                {
+                    let mut locked = syntax.lock().unwrap();
+                    if let Some(found) = locked.functions.types.get(&name) {
+                        *method = found.clone()
+                    } else {
+                        let mut new_method = Function::clone(method);
+                        new_method.generics.clear();
+                        *method = Arc::new(new_method);
+                        locked.functions.types.insert(name, method.clone());
+                    };
+                }
+
+                *effect = Effects::MethodCall(method.clone(), temp);
+                return verify_effect(&mut manager, effect, syntax, variables).await;
+            }
+
+            for effect in &mut *effects {
+                verify_effect(process_manager, effect, syntax, variables).await?;
+            }
+
+            if !check_args(process_manager, &method, effects, variables) {
+                return Err(placeholder_error(format!("Incorrect args to method {}", method.name)));
+            }
         },
         Effects::CompareJump(effect, _, _) => verify_effect(process_manager, effect, syntax, variables).await?,
         Effects::CreateStruct(_, effects) => for (_, effect) in effects {
@@ -63,6 +99,10 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
         _ => {}
     }
     return Ok(());
+}
+
+pub fn placeholder_error(message: String) -> ParsingError {
+    return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
 fn check_operation(process_manager: &TypesChecker, operation: &Arc<Function>, values: &Vec<Effects>,

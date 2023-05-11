@@ -60,13 +60,13 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
-    println!("Finishing {}", name);
     return get_function(parser_utils.syntax.clone(), attributes,
                         get_modifier(modifiers.as_slice()), fields, generics,
                         code, return_type, parser_utils.file.clone() + "::" + name.as_str());
 }
 
-pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
+pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8,
+                          fields: Vec<FutureField>,
                           generics: HashMap<String, Vec<ParsingFuture<Types>>>,
                           code: Option<ParsingFuture<CodeBody>>,
                           return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {

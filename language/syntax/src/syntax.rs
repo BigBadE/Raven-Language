@@ -36,7 +36,6 @@ impl Syntax {
     }
 
     pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, mut adding: Arc<T>) {
-        println!("Adding {}!", adding.name());
         let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
         unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, process_manager.deref_mut()).await;
         let mut locked = syntax.lock().unwrap();

@@ -134,7 +134,27 @@ impl Effects {
             Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
             Effects::MethodCall(function, _) => function.return_type.clone(),
             Effects::Set(_, to) => to.get_return(process_manager, variables),
-            Effects::LoadVariable(name) => variables.get_variable(name),
+            Effects::LoadVariable(name) => {
+                let variable = variables.get_variable(name);
+                if let Some(found) = variable {
+                    match found {
+                        Types::Generic(name, bounds) => {
+                            let real = process_manager.get_generic(&name)?;
+                            for bound in &bounds {
+                                if !real.of_type(bound) {
+                                    return None;
+                                }
+                            }
+                            return Some(real);
+                        },
+                        Types::GenericType(base, generics) => {
+                            todo!()
+                        }
+                        _ => return Some(found)
+                    }
+                }
+                return None;
+            },
             Effects::Load(from, _) => from.get_return(process_manager, variables),
             Effects::CreateStruct(types, _) => Some(types.clone()),
             Effects::Float(_) => Some(Types::Struct(process_manager.get_internal("f64"))),

@@ -1,5 +1,5 @@
 pub fn main() -> i64 {
-    return test(1 + 6 / 2);
+    return main::test(1 + 6 / 2);
 }
 
 pub fn test<T>(input: T) -> T {

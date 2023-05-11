@@ -1,4 +1,4 @@
-#![feature(try_trait_v2)]
+#![feature(try_trait_v2, get_mut_unchecked)]
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;

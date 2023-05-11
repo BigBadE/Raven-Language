@@ -6,8 +6,11 @@ use async_trait::async_trait;
 
 use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture};
 use crate::code::{Expression, MemberField};
+use crate::r#struct::Struct;
 
+#[derive(Clone)]
 pub struct Function {
+    pub parent: Option<Arc<Struct>>,
     pub attributes: Vec<Attribute>,
     pub generics: HashMap<String, Types>,
     pub modifiers: u8,
@@ -22,6 +25,15 @@ pub enum CodeStatus {
     Parsing(ParsingFuture<CodeBody>),
     Finished(CodeBody),
     Swapping()
+}
+
+impl Clone for CodeStatus {
+    fn clone(&self) -> Self {
+        match self {
+            CodeStatus::Finished(body) => CodeStatus::Finished(body.clone()),
+            _ => panic!("Tried to clone unfinished code body!")
+        }
+    }
 }
 
 impl CodeStatus {
@@ -41,9 +53,11 @@ impl CodeStatus {
 }
 
 impl Function {
-    pub fn new(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<MemberField>, generics: HashMap<String, Types>,
+    pub fn new(attributes: Vec<Attribute>, modifiers: u8,
+               fields: Vec<MemberField>, generics: HashMap<String, Types>,
                code: ParsingFuture<CodeBody>, return_type: Option<Types>, name: String) -> Self {
         return Self {
+            parent: None,
             attributes,
             generics,
             modifiers,
@@ -57,6 +71,7 @@ impl Function {
     
     pub fn poisoned(name: String, error: ParsingError) -> Self {
         return Self {
+            parent: None,
             attributes: Vec::new(),
             generics: HashMap::new(),
             modifiers: 0,

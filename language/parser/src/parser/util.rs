@@ -36,6 +36,7 @@ impl<'a> ParserUtils<'a> {
         let structure = Self::get_elem(&file, structure).await;
 
         for function in &structure.functions {
+            unsafe { Arc::get_mut_unchecked(&mut function.clone()) }.parent = Some(structure.clone());
             Syntax::add(&syntax,
                         token.make_error(file.clone(), format!("Duplicate function {}", function.name)),
                        function.clone()).await;
