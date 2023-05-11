@@ -5,7 +5,7 @@ use tokio::runtime::Handle;
 
 use syntax::function::Function;
 use syntax::{ParsingError, ParsingFuture, TopElement};
-use syntax::async_util::NameResolver;
+use syntax::async_util::UnparsedType;
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -25,13 +25,10 @@ pub struct ParserUtils<'a> {
 
 impl<'a> ParserUtils<'a> {
     pub fn get_struct(&self, token: &Token, name: String) -> ParsingFuture<Types> {
-        if let Some(found) = self.imports.generic(&name) {
-            return Box::pin(const_type(found));
-        }
-        return Box::pin(Syntax::get_struct(self.syntax.clone(),
-                                           token.make_error(self.file.clone(),
-                                                            format!("Failed to find type named {}", &name)),
-                                           name, Box::new(self.imports.clone())));
+        return Box::pin(Syntax::get_struct(
+            self.syntax.clone(), token.make_error(self.file.clone(),
+                                                  format!("Failed to find type named {}", &name)),
+            name, Box::new(self.imports.clone())));
     }
 
     pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String,
@@ -70,16 +67,15 @@ async fn const_type(input: Types) -> Result<Types, ParsingError> {
     return Ok(input);
 }
 
-pub fn add_generics(input: ParsingFuture<Types>, parser_utils: &mut ParserUtils)
-                    -> ParsingFuture<Types> {
+pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils)
+                    -> UnparsedType {
     let mut generics = Vec::new();
     let mut last = None;
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Variable => last =
-                Some(Box::pin(parser_utils.get_struct(token, token.to_string(parser_utils.buffer)))),
+            TokenTypes::Variable => last = Some(UnparsedType::Basic(token.to_string(parser_utils.buffer))),
             TokenTypes::Operator => if let Some(types) = last {
                 generics.push(add_generics(types, parser_utils));
                 last = None;
@@ -94,7 +90,7 @@ pub fn add_generics(input: ParsingFuture<Types>, parser_utils: &mut ParserUtils)
             }
         }
     }
-    return Box::pin(to_generics(input, generics));
+    return UnparsedType::Generic(Box::new(input), generics);
 }
 
 async fn to_generics(input: ParsingFuture<Types>, generics: Vec<ParsingFuture<Types>>)

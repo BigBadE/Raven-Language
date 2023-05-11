@@ -3,9 +3,8 @@ use std::sync::{Arc, Mutex};
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::{ParsingError, ParsingFuture};
-use syntax::async_util::NameResolver;
+use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
-use syntax::types::Types;
 use crate::parser::control_parser::parse_for;
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
@@ -151,7 +150,8 @@ async fn create_let(name: String, value: ParsingFuture<Effects>) -> Result<Effec
 }
 
 fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
-    let mut types: Option<ParsingFuture<Types>> = None;
+    let mut types: Option<UnparsedType> = None;
+
     let values;
 
     loop {
@@ -159,12 +159,11 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => {
-                types = Some(Box::pin(parser_utils
-                    .get_struct(token, token.to_string(parser_utils.buffer))))
+                types = Some(UnparsedType::Basic(token.to_string(parser_utils.buffer)))
             }
             //Handle making new structs with generics.
             TokenTypes::Operator => {
-                types = Some(Box::pin(add_generics(types.unwrap(), parser_utils)));
+                types = Some(add_generics(types.unwrap(), parser_utils));
             }
             TokenTypes::BlockStart => {
                 values = parse_new_args(parser_utils);
@@ -175,7 +174,11 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
         }
     }
 
-    return Box::pin(create_effect(Box::pin(types.unwrap()), values));
+    return Box::pin(create_effect(parser_utils.syntax.clone(),
+                                  parser_utils.tokens.get(parser_utils.index).unwrap()
+                                      .make_error(parser_utils.file.clone(), "Unknown type!".to_string()),
+                                  parser_utils.imports.boxed_clone(),
+                                  types.unwrap(), values));
 }
 
 fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<Effects>)> {
@@ -210,13 +213,14 @@ async fn expect_effect(file: String, token: Token) -> Result<Effects, ParsingErr
     return Err(token.make_error(file, "Expected something, found void".to_string()));
 }
 
-async fn create_effect(types: ParsingFuture<Types>, inputs: Vec<(usize, ParsingFuture<Effects>)>)
+async fn create_effect(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
+                       types: UnparsedType, inputs: Vec<(usize, ParsingFuture<Effects>)>)
                        -> Result<Effects, ParsingError> {
     let mut final_inputs = Vec::new();
     for input in inputs {
         final_inputs.push((input.0, input.1.await?));
     }
-    return Ok(Effects::CreateStruct(types.await?, final_inputs));
+    return Ok(Effects::CreateStruct(Syntax::parse_type(syntax, error, resolver, types).await?, final_inputs));
 }
 
 pub async fn get_line(effect: ParsingFuture<Effects>, expression_type: ExpressionType)

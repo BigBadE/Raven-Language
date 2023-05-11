@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use syntax::{Attribute, get_modifier, Modifier, ParsingError, ParsingFuture};
+use syntax::async_util::UnparsedType;
 use syntax::code::{Field, MemberField};
 use syntax::function::Function;
 use syntax::r#struct::Struct;
@@ -9,7 +10,7 @@ use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::parser::function_parser::{get_generics, parse_function};
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
-use crate::parser::util::ParserUtils;
+use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::TokenTypes;
 
 pub struct FutureField(pub ParsingFuture<Types>, pub Vec<Attribute>, pub u8, pub String);
@@ -81,6 +82,7 @@ pub fn parse_implementor(_parser_util: &mut ParserUtils, _attributes: Vec<Attrib
 
 pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut HashMap<String, Vec<ParsingFuture<Types>>>) {
     let mut name = String::new();
+    let mut unfinished_bounds = Vec::new();
     let mut bounds = Vec::new();
     while !parser_utils.tokens.is_empty() {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -90,13 +92,15 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut HashMap<Str
                 name = token.to_string(parser_utils.buffer);
             }
             TokenTypes::GenericEnd => {
-                parser_utils.imports.generics.insert()
+                parser_utils.imports.generics.insert(name.clone(), unfinished_bounds);
                 generics.insert(name.clone(), bounds);
                 bounds = Vec::new();
+                unfinished_bounds = Vec::new();
             }
             TokenTypes::GenericBound => {
                 let name = token.to_string(parser_utils.buffer);
-                bounds.push(parser_utils.get_struct(token, name))
+                bounds.push(parser_utils.get_struct(token, name.clone()));
+                unfinished_bounds.push(add_generics(UnparsedType::Basic(name), parser_utils))
             }
             _ => {
                 parser_utils.index -= 1;

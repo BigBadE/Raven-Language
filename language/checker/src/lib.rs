@@ -1,7 +1,6 @@
 #![feature(get_mut_unchecked)]
 
-use syntax::async_util::NameResolver;
-use syntax::types::Types;
+use syntax::async_util::{NameResolver, UnparsedType};
 
 pub mod check_code;
 pub mod check_function;
@@ -16,7 +15,7 @@ impl NameResolver for EmptyNameResolver {
         return name;
     }
 
-    fn generic(&self, _name: &String) -> Option<Types> {
+    fn generic(&self, _name: &String) -> Option<Vec<UnparsedType>> {
         return None;
     }
 

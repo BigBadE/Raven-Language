@@ -1,13 +1,9 @@
 #![feature(try_trait_v2)]
-
-extern crate core;
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
-use syntax::async_util::NameResolver;
+use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
-use syntax::types::Types;
 use crate::parser::top_parser::parse_top;
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokenizer::Tokenizer;
@@ -40,7 +36,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
 #[derive(Clone)]
 pub struct ImportNameResolver {
     pub imports: HashMap<String, String>,
-    pub generics: HashMap<String, Types>,
+    pub generics: HashMap<String, Vec<UnparsedType>>,
     pub parent: Option<String>,
     pub last_id: u32
 }
@@ -61,7 +57,7 @@ impl NameResolver for ImportNameResolver {
         return self.imports.get(name).unwrap_or(name);
     }
 
-    fn generic(&self, name: &String) -> Option<Types> {
+    fn generic(&self, name: &String) -> Option<Vec<UnparsedType>> {
         return self.generics.get(name).map(|types| types.clone());
     }
 

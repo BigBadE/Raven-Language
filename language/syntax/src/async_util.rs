@@ -7,7 +7,6 @@ use crate::{ParsingError, TopElement};
 use crate::function::Function;
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
-use crate::types::Types;
 
 pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
@@ -124,10 +123,16 @@ impl Future for AsyncTypesGetter<Struct> {
     }
 }
 
+#[derive(Clone)]
+pub enum UnparsedType {
+    Basic(String),
+    Generic(Box<UnparsedType>, Vec<UnparsedType>)
+}
+
 pub trait NameResolver: Send + Sync {
     fn resolve<'a>(&'a self, name: &'a String) -> &'a String;
 
-    fn generic(&self, name: &String) -> Option<Types>;
+    fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
 
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }

@@ -7,3 +7,7 @@ Please download LLVM from https://github.com/PLC-lang/llvm-package-windows/relea
 C++ is also required to be installed somewhere on your system, for Windows get it from https://visualstudio.microsoft.com/vs/community/
 
 Nightly is required for building the compiler
+
+# Running
+
+```cargo run -- "--root ../../lib/core/src"```
