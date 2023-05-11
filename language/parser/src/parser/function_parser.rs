@@ -59,6 +59,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
+    println!("Finishing {}", name);
     return get_function(parser_utils.syntax.clone(), attributes,
                         get_modifier(modifiers.as_slice()), fields, generics,
                         code, return_type, parser_utils.file.clone() + "::" + name.as_str());

@@ -10,7 +10,7 @@ pub fn main() {
     loop {
         input.read_line(&mut line).unwrap();
         let input = match Packet::parse(&line) {
-            Some(output) => output,
+            Ok(output) => output,
             Err(error) => panic!("Malformed JSON!")
         };
     }

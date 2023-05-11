@@ -16,7 +16,7 @@ pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_start
 
 pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getState
 (_environment: JNIEnv, _class: JClass, reference: jlong) -> jint {
-    return Box::leak(unsafe { Box::from_raw(reference as *mut Tokenizer) }).state.last().unwrap().clone() as jint;
+    return Box::leak(unsafe { Box::from_raw(reference as *mut Tokenizer) }).state as jint;
 }
 
 pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getTokenType
@@ -26,12 +26,12 @@ pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getToke
 
 pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getTokenStart
 (_environment: JNIEnv, _class: JClass, reference: jlong) -> jint {
-    return Box::leak(unsafe { Box::from_raw(reference as *mut Tokenizer) }).last.start as jint;
+    return Box::leak(unsafe { Box::from_raw(reference as *mut Tokenizer) }).last.start.1 as jint;
 }
 
 pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getTokenEnd
 (_environment: JNIEnv, _class: JClass, reference: jlong) -> jint {
-    return Box::leak(unsafe { Box::from_raw(reference as *mut Tokenizer) }).last.end as jint;
+    return Box::leak(unsafe { Box::from_raw(reference as *mut Tokenizer) }).last.end.1 as jint;
 }
 
 pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_advance
@@ -57,5 +57,5 @@ pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getPosi
 
 pub fn Java_bigbade_raven_ravenintellijplugin_natives_NativeParserRunner_getPositionState
 (_environment: JNIEnv, _class: JClass, reference: jlong) -> jint {
-    return Box::leak(unsafe { Box::from_raw(reference as *mut ParserState) }).state.last().unwrap().clone() as jint;
+    return Box::leak(unsafe { Box::from_raw(reference as *mut ParserState) }).state as jint;
 }

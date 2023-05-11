@@ -103,7 +103,7 @@ pub fn check_types(types: &[TokenTypes], testing: &str, state: u64) {
         let token = tokenizer.next();
         match token.token_type.clone() {
             TokenTypes::InvalidCharacters => assert!(false, "Failed at state {:?} (last: {:?}):\n{}\n from {:?}", tokenizer.state, tokens.last().unwrap().token_type,
-                                                     String::from_utf8_lossy(&tokenizer.buffer[tokens.last().unwrap().end..tokenizer.index]),
+                                                     String::from_utf8_lossy(&tokenizer.buffer[tokens.last().unwrap().end.1 as usize..tokenizer.index as usize]),
                                                      &tokens[tokens.len() - 5.min(tokens.len())..tokens.len() - 1]),
             TokenTypes::CodeStart | TokenTypes::EOF => {
                 tokens.push(token);
@@ -119,8 +119,8 @@ pub fn check_types(types: &[TokenTypes], testing: &str, state: u64) {
             assert!(false, "Hit end of tokens!");
         }
         println!("{:?} vs {:?} (\"{}\")", types[i], tokens.get(i).as_ref().unwrap().token_type,
-                 String::from_utf8_lossy(&tokenizer.buffer[tokens.get(i).as_ref().unwrap().start..
-                     tokens.get(i).as_ref().unwrap().end]));
+                 String::from_utf8_lossy(&tokenizer.buffer[tokens.get(i).as_ref().unwrap().start.1 as usize..
+                     tokens.get(i).as_ref().unwrap().end.1 as usize]));
         assert_eq!(types[i], tokens.get(i).as_ref().unwrap().token_type);
     }
 }

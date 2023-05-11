@@ -7,7 +7,7 @@ pub struct Body {
 
 impl Body {
     pub fn from_json(json: JsonValue) -> Self {
-
+        todo!()
     }
 }
 impl Jsonable for Body {

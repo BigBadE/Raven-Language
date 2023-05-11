@@ -5,6 +5,7 @@ use tokio::runtime::Handle;
 
 use syntax::function::Function;
 use syntax::{ParsingError, ParsingFuture, TopElement};
+use syntax::async_util::NameResolver;
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -24,6 +25,9 @@ pub struct ParserUtils<'a> {
 
 impl<'a> ParserUtils<'a> {
     pub fn get_struct(&self, token: &Token, name: String) -> ParsingFuture<Types> {
+        if let Some(found) = self.imports.generic(&name) {
+            return Box::pin(const_type(found));
+        }
         return Box::pin(Syntax::get_struct(self.syntax.clone(),
                                            token.make_error(self.file.clone(),
                                                             format!("Failed to find type named {}", &name)),
@@ -60,6 +64,10 @@ impl<'a> ParserUtils<'a> {
             Err(error) => T::new_poisoned(format!("${}", file), error)
         });
     }
+}
+
+async fn const_type(input: Types) -> Result<Types, ParsingError> {
+    return Ok(input);
 }
 
 pub fn add_generics(input: ParsingFuture<Types>, parser_utils: &mut ParserUtils)

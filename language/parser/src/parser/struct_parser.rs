@@ -90,6 +90,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut HashMap<Str
                 name = token.to_string(parser_utils.buffer);
             }
             TokenTypes::GenericEnd => {
+                parser_utils.imports.generics.insert()
                 generics.insert(name.clone(), bounds);
                 bounds = Vec::new();
             }

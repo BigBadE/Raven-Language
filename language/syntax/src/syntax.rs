@@ -34,6 +34,7 @@ impl Syntax {
     }
 
     pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, mut adding: Arc<T>) {
+        println!("Adding {}!", adding.name());
         let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
         unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, process_manager.deref_mut()).await;
         let mut locked = syntax.lock().unwrap();
@@ -95,8 +96,8 @@ impl Syntax {
     }
 
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, operatrion: bool, name_resolver: Box<dyn NameResolver>) -> Result<Arc<Function>, ParsingError> {
-        return AsyncTypesGetter::new_func(syntax, error, getting, operatrion, name_resolver).await;
+                              getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Result<Arc<Function>, ParsingError> {
+        return AsyncTypesGetter::new_func(syntax, error, getting, operation, name_resolver).await;
     }
 
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
