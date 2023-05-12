@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use crate::function::display;
-use crate::Struct;
+use crate::{ParsingError, Struct};
 
 #[derive(Clone, Debug)]
 pub enum Types {
@@ -69,6 +70,28 @@ impl Types {
                 _ => other.of_type(self)
             }
         }
+    }
+
+    pub fn degeneric(&mut self, generics: &HashMap<String, Types>, none_error: ParsingError, bounds_error: ParsingError) -> Result<(), ParsingError> {
+        match self {
+            Types::Generic(name, bounds) => {
+                if let Some(types) = generics.get(name) {
+                    for bound in bounds {
+                        if !types.of_type(bound) {
+                            return Err(bounds_error);
+                        }
+                    }
+                    *self = types.clone();
+                } else {
+                    return Err(none_error);
+                }
+            },
+            Types::GenericType(base, generics) => {
+                todo!()
+            },
+            _ => {}
+        }
+        return Ok(());
     }
 
     pub fn clone_struct(&self) -> Arc<Struct> {

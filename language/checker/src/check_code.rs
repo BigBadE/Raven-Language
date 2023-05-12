@@ -26,8 +26,13 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
             verify_effect(process_manager, second, syntax, variables).await?;
         }
         Effects::Operation(operation, values) => {
+            for arg in &mut *values {
+                verify_effect(process_manager, arg, syntax, variables).await?;
+            }
+
             let error = ParsingError::new(String::new(), (0, 0), 0,
                                           (0, 0), 0, format!("Failed to find operation {}", operation));
+            //Keeps track of the last operation notified of.
             let mut ops = 0;
             'outer: loop {
                 let operation = format!("{}${}", operation, ops);
@@ -38,7 +43,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                         for potential_operation in operations {
                             if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
                                 *effect = assign_with_priority(new_effect);
-                                break 'outer
+                                break 'outer;
                             }
                         }
                     }
@@ -52,13 +57,6 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
         Effects::MethodCall(method, effects) => {
             if !method.generics.is_empty() {
                 let mut manager = process_manager.clone();
-                for (key, value) in &method.generics {
-                    if manager.generics.contains_key(key) {
-                        return Err(placeholder_error(format!("Duplicate generic named {}", key)));
-                    }
-                    manager.generics.insert(key.clone(), value.clone());
-                }
-
                 let name = format!("{}_{}", method.name, display_parenless(&process_manager.generics.keys().collect(), "_"));
 
                 for effect in &mut *effects {
@@ -73,14 +71,26 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                         *method = found.clone()
                     } else {
                         let mut new_method = Function::clone(method);
-                        new_method.generics.clear();
+                        for field in &mut new_method.fields {
+                            field.field.field_type.degeneric(&manager.generics,
+                                                             placeholder_error("No generic!".to_string()),
+                                                             placeholder_error("Invalid bounds!".to_string()))?;
+                        }
+                        if let Some(returning) = &mut new_method.return_type {
+                            returning.degeneric(&manager.generics,
+                                                placeholder_error("No generic!".to_string()),
+                                                placeholder_error("Invalid bounds!".to_string()))?;
+                        }
                         *method = Arc::new(new_method);
                         locked.functions.types.insert(name, method.clone());
                     };
                 }
 
-                *effect = Effects::MethodCall(method.clone(), temp);
-                return verify_effect(&mut manager, effect, syntax, variables).await;
+                let mut temp_effect = Effects::MethodCall(method.clone(), temp);
+                verify_effect(&mut manager, &mut temp_effect, syntax, variables).await?;
+                unsafe { Arc::get_mut_unchecked(&mut method.clone()) }.generics.clear();
+                *effect = temp_effect;
+                return Ok(());
             }
 
             for effect in &mut *effects {
@@ -90,7 +100,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
             if !check_args(process_manager, &method, effects, variables) {
                 return Err(placeholder_error(format!("Incorrect args to method {}", method.name)));
             }
-        },
+        }
         Effects::CompareJump(effect, _, _) => verify_effect(process_manager, effect, syntax, variables).await?,
         Effects::CreateStruct(_, effects) => for (_, effect) in effects {
             verify_effect(process_manager, effect, syntax, variables).await?;
@@ -180,9 +190,9 @@ pub fn assign_with_priority(operator: Effects) -> Effects {
 
                 return Effects::MethodCall(lhs_func.clone(), lhs);
             } else {
-                effects.insert(0,  Effects::MethodCall(lhs_func.clone(), lhs));
+                effects.insert(0, Effects::MethodCall(lhs_func.clone(), lhs));
             }
-        },
+        }
         _ => effects.insert(0, lhs)
     }
 
