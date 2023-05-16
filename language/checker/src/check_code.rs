@@ -43,7 +43,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                     if let Some(operations) = locked.operations.get(&operation) {
                         ops = operations.len();
                         for potential_operation in operations {
-                            if let Some(new_effect) = check_operation(process_manager, potential_operation, values, variables) {
+                            if let Some(new_effect) = check_operation(potential_operation, values, variables) {
                                 *effect = assign_with_priority(new_effect);
                                 break 'outer;
                             }
@@ -65,7 +65,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 }
 
                 for i in 0..method.fields.len() {
-                    let effect = effects.get(i).unwrap().get_return(&manager, variables).unwrap();
+                    let effect = effects.get(i).unwrap().get_return(variables).unwrap();
                     if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
                         &effect, placeholder_error("Invalid bounds!".to_string()))? {
                         if let Types::Generic(name, _) = old {
@@ -114,7 +114,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 verify_effect(process_manager, effect, syntax, variables).await?;
             }
 
-            if !check_args(process_manager, &method, effects, variables) {
+            if !check_args(&method, effects, variables) {
                 return Err(placeholder_error(format!("Incorrect args to method {}", method.name)));
             }
         }
@@ -130,7 +130,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
         Effects::Load(effect, _) => verify_effect(process_manager, effect, syntax, variables).await?,
         Effects::CreateVariable(name, effect) => {
             verify_effect(process_manager, effect, syntax, variables).await?;
-            return if let Some(found) = effect.get_return(process_manager, variables) {
+            return if let Some(found) = effect.get_return(variables) {
                 variables.variables.insert(name.clone(), found);
                 Ok(())
             } else {
@@ -146,21 +146,21 @@ pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
-fn check_operation(process_manager: &TypesChecker, operation: &Arc<Function>, values: &Vec<Effects>,
+fn check_operation(operation: &Arc<Function>, values: &Vec<Effects>,
                    variables: &mut CheckerVariableManager) -> Option<Effects> {
-    if check_args(process_manager, operation, values, variables) {
+    if check_args(operation, values, variables) {
         return Some(Effects::MethodCall(operation.clone(), values.clone()));
     }
     return None;
 }
 
-fn check_args(process_manager: &TypesChecker, function: &Arc<Function>, args: &Vec<Effects>, variables: &mut CheckerVariableManager) -> bool {
+fn check_args(function: &Arc<Function>, args: &Vec<Effects>, variables: &mut CheckerVariableManager) -> bool {
     if function.fields.len() != args.len() {
         return false;
     }
 
     for i in 0..function.fields.len() {
-        let returning = args.get(i).unwrap().get_return(process_manager, variables);
+        let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() && !function.fields.get(i).unwrap().field.field_type.of_type(
             returning.as_ref().unwrap()) {
             println!("{} != {}", function.fields.get(i).unwrap().field.field_type, returning.as_ref().unwrap());

@@ -113,8 +113,6 @@ pub trait ProcessManager: Send + Sync {
 
     fn add_implementation(&self, base: Types, implementing: Types);
 
-    fn get_internal(&self, name: &str) -> Arc<Struct>;
-
     fn get_generic(&self, name: &str) -> Option<Types>;
 
     fn cloned(&self) -> Box<dyn ProcessManager>;

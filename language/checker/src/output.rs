@@ -7,7 +7,6 @@ use async_trait::async_trait;
 
 use syntax::function::Function;
 use syntax::ProcessManager;
-use syntax::r#struct::{F64, I64, STR, Struct, U64};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::check_function::verify_function;
@@ -54,16 +53,6 @@ impl ProcessManager for TypesChecker {
 
     fn add_implementation(&self, _base: Types, _implementing: Types) {
         todo!()
-    }
-
-    fn get_internal(&self, name: &str) -> Arc<Struct> {
-        return match name {
-            "i64" => I64.clone(),
-            "u64" => U64.clone(),
-            "f64" => F64.clone(),
-            "str" => STR.clone(),
-            _ => panic!("Unknown internal {}", name)
-        };
     }
 
     fn get_generic(&self, name: &str) -> Option<Types> {

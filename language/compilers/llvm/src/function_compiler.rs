@@ -1,5 +1,4 @@
 use std::mem::MaybeUninit;
-use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -82,7 +81,15 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
-        Effects::CreateVariable(_, _) => panic!("Checker failed to resolve variable!"),
+        Effects::CreateVariable(name, inner) => {
+            let compiled = compile_effect(type_getter, function, effect, id).unwrap();
+            let output = type_getter.compiler.builder.build_alloca(compiled.get_type(), &id.to_string());
+            *id += 1;
+            type_getter.variables.insert(name.clone(),
+                                         (inner.get_return(type_getter).unwrap(),
+                                          output.as_basic_value_enum()));
+            Some(output.as_basic_value_enum())
+        },
         //Label of jumping to body
         Effects::Jump(label) => {
             type_getter.compiler.builder.build_unconditional_branch(
@@ -147,9 +154,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         Effects::Load(loading_from, field) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             let mut offset = 1;
-            let lock = type_getter.syntax.lock().unwrap();
             for struct_field in &loading_from
-                .get_return(lock.process_manager.deref(), type_getter)
+                .get_return(type_getter)
                 .unwrap().clone_struct().fields {
                 if &struct_field.field.name != field {
                     offset += 1;

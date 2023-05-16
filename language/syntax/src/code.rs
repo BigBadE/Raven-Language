@@ -1,8 +1,9 @@
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::{Attribute, DisplayIndented, Function, ProcessManager, to_modifiers, VariableManager};
+use crate::{Attribute, DisplayIndented, Function, to_modifiers, VariableManager};
 use crate::function::{CodeBody, display_indented, display_joined};
+use crate::r#struct::{F64, I64, STR, U64};
 use crate::types::Types;
 
 #[derive(Clone, Debug)]
@@ -124,16 +125,16 @@ pub enum Effects {
 }
 
 impl Effects {
-    pub fn get_return(&self, process_manager: &dyn ProcessManager, variables: &dyn VariableManager) -> Option<Types> {
+    pub fn get_return(&self, variables: &dyn VariableManager) -> Option<Types> {
         return match self {
             Effects::NOP() => None,
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
             Effects::CodeBody(_) => None,
-            Effects::CreateVariable(_, effect) => effect.get_return(process_manager, variables),
+            Effects::CreateVariable(_, effect) => effect.get_return(variables),
             Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
             Effects::MethodCall(function, _) => function.return_type.clone(),
-            Effects::Set(_, to) => to.get_return(process_manager, variables),
+            Effects::Set(_, to) => to.get_return(variables),
             Effects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
                 if let Some(found) = variable {
@@ -149,12 +150,12 @@ impl Effects {
                 }
                 panic!("Unresolved variable {}", name);
             },
-            Effects::Load(from, _) => from.get_return(process_manager, variables),
+            Effects::Load(from, _) => from.get_return(variables),
             Effects::CreateStruct(types, _) => Some(types.clone()),
-            Effects::Float(_) => Some(Types::Struct(process_manager.get_internal("f64"))),
-            Effects::Int(_) => Some(Types::Struct(process_manager.get_internal("i64"))),
-            Effects::UInt(_) => Some(Types::Struct(process_manager.get_internal("u64"))),
-            Effects::String(_) => Some(Types::Reference(Box::new(Types::Struct(process_manager.get_internal("str")))))
+            Effects::Float(_) => Some(Types::Struct(F64.clone())),
+            Effects::Int(_) => Some(Types::Struct(I64.clone())),
+            Effects::UInt(_) => Some(Types::Struct(U64.clone())),
+            Effects::String(_) => Some(Types::Reference(Box::new(Types::Struct(STR.clone()))))
         };
     }
 }
