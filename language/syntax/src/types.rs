@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::mem;
 use std::sync::Arc;
 use crate::function::display;
 use crate::{ParsingError, Struct};
@@ -28,7 +29,7 @@ impl Types {
                         }
                     }
                     true
-                },
+                }
                 Types::GenericType(base, _) => self.of_type(base),
                 _ => false
             },
@@ -40,15 +41,15 @@ impl Types {
 
                     //TODO check generics, I have no clue how to with respect to subtypes.
                     todo!()
-                },
+                }
                 Types::Generic(_, bounds) => {
                     for bound in bounds {
-                        if !self.of_type(bound)  {
+                        if !self.of_type(bound) {
                             return false;
                         }
                     }
                     true
-                },
+                }
                 _ => false
             }
             Types::Reference(referencing) => match other {
@@ -60,35 +61,51 @@ impl Types {
                     'outer: for bound in bounds {
                         for other_bound in other_bounds {
                             if other_bound.of_type(bound) {
-                                continue 'outer
+                                continue 'outer;
                             }
                         }
                         return false;
                     }
                     true
-                },
+                }
                 _ => other.of_type(self)
             }
+        };
+    }
+
+    pub fn resolve_generic(&mut self, other: &Types, bounds_error: ParsingError) -> Result<Option<Types>, ParsingError> {
+        match self {
+            Types::Generic(_name, bounds) => {
+                for bound in bounds {
+                    if !other.of_type(bound) {
+                        return Err(bounds_error);
+                    }
+                }
+                let mut old = other.clone();
+                mem::swap(self, &mut old);
+                return Ok(Some(old));
+            }
+            _ => {}
         }
+        return Ok(None);
     }
 
     pub fn degeneric(&mut self, generics: &HashMap<String, Types>, none_error: ParsingError, bounds_error: ParsingError) -> Result<(), ParsingError> {
         match self {
             Types::Generic(name, bounds) => {
-                if let Some(types) = generics.get(name) {
+                if let Some(found) = generics.get(name) {
                     for bound in bounds {
-                        if !types.of_type(bound) {
+                        if !found.of_type(bound) {
                             return Err(bounds_error);
                         }
                     }
-                    *self = types.clone();
+                    *self = found.clone();
+                    return Ok(());
                 } else {
+                    println!("Failed to find {} in {:?}", name, generics.keys());
                     return Err(none_error);
                 }
-            },
-            Types::GenericType(base, generics) => {
-                todo!()
-            },
+            }
             _ => {}
         }
         return Ok(());

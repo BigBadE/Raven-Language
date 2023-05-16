@@ -64,10 +64,6 @@ impl<'a> ParserUtils<'a> {
     }
 }
 
-async fn const_type(input: Types) -> Result<Types, ParsingError> {
-    return Ok(input);
-}
-
 pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils)
                     -> UnparsedType {
     let mut generics = Vec::new();
@@ -92,13 +88,4 @@ pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils)
         }
     }
     return UnparsedType::Generic(Box::new(input), generics);
-}
-
-async fn to_generics(input: ParsingFuture<Types>, generics: Vec<ParsingFuture<Types>>)
-                     -> Result<Types, ParsingError> {
-    let mut final_generics = Vec::new();
-    for generic in generics {
-        final_generics.push(generic.await?);
-    }
-    return Ok(Types::GenericType(Box::new(input.await?), final_generics));
 }

@@ -6,6 +6,7 @@ use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
 use crate::EmptyNameResolver;
 use async_recursion::async_recursion;
+use syntax::types::Types;
 use crate::check_function::CheckerVariableManager;
 use crate::output::TypesChecker;
 
@@ -71,10 +72,16 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                         *method = found.clone()
                     } else {
                         let mut new_method = Function::clone(method);
-                        for field in &mut new_method.fields {
-                            field.field.field_type.degeneric(&manager.generics,
-                                                             placeholder_error("No generic!".to_string()),
-                                                             placeholder_error("Invalid bounds!".to_string()))?;
+                        for i in 0..new_method.fields.len() {
+                            let effect = temp.get(i).unwrap().get_return(&manager, variables).unwrap();
+                            if let Some(old) = new_method.fields.get_mut(i).unwrap().field.field_type.resolve_generic(
+                                &effect, placeholder_error("Invalid bounds!".to_string()))? {
+                                if let Types::Generic(name, _) = old {
+                                    manager.generics.insert(name, effect);
+                                } else {
+                                    panic!("Guh?");
+                                }
+                            }
                         }
                         if let Some(returning) = &mut new_method.return_type {
                             returning.degeneric(&manager.generics,
@@ -93,6 +100,7 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 return Ok(());
             }
 
+            println!("Resolving {:?}", effects);
             for effect in &mut *effects {
                 verify_effect(process_manager, effect, syntax, variables).await?;
             }

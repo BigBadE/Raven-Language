@@ -147,7 +147,7 @@ impl Effects {
                             }
                             return Some(real);
                         },
-                        Types::GenericType(base, generics) => {
+                        Types::GenericType(_base, _generics) => {
                             todo!()
                         }
                         _ => return Some(found)
