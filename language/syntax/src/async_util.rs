@@ -123,7 +123,7 @@ impl Future for AsyncTypesGetter<Struct> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum UnparsedType {
     Basic(String),
     Generic(Box<UnparsedType>, Vec<UnparsedType>)

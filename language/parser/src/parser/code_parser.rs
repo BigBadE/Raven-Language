@@ -57,8 +57,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Integer => {
                 effect = Some(constant_effect(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap())))
             }
-            TokenTypes::LineEnd | TokenTypes::ParenClose => break,
-            TokenTypes::CodeEnd | TokenTypes::BlockEnd => return None,
+            TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::BlockEnd => break,
+            TokenTypes::CodeEnd => return None,
             TokenTypes::Variable => {
                 effect = Some(constant_effect(Effects::LoadVariable(token.to_string(parser_utils.buffer))))
             }
@@ -133,9 +133,10 @@ fn parse_let(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             return constant_error(next.make_error(parser_utils.file.clone(), "Unexpected token, expected variable name!".to_string()));
         }
 
-        if let TokenTypes::Equals = next.token_type {} else {
-            return constant_error(next.make_error(parser_utils.file.clone(), "Unexpected token, expected equals!".to_string()));
+        if let TokenTypes::Equals = parser_utils.tokens.get(parser_utils.index+1).unwrap().token_type {} else {
+            return constant_error(next.make_error(parser_utils.file.clone(), format!("Unexpected {:?}, expected equals!", next)));
         }
+        parser_utils.index += 2;
     }
 
     return match parse_line(parser_utils, false, false) {
@@ -193,8 +194,9 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<E
             TokenTypes::Colon | TokenTypes::ArgumentEnd => {
                 let effect = if let TokenTypes::Colon = token.token_type {
                     let token = token.clone();
-                    parse_line(parser_utils, false, false).unwrap_or((ExpressionType::Line,
-                                                                      Box::pin(expect_effect(parser_utils.file.clone(), token)))).1
+                    parse_line(parser_utils, false, false)
+                        .unwrap_or((ExpressionType::Line,
+                                    Box::pin(expect_effect(parser_utils.file.clone(), token)))).1
                 } else {
                     constant_effect(Effects::LoadVariable(name))
                 };

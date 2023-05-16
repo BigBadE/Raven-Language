@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use crate::function::display;
+use std::sync::{Arc, Mutex};
+use crate::function::{display, display_parenless};
 use crate::{ParsingError, Struct};
+use crate::syntax::Syntax;
 
 #[derive(Clone, Debug)]
 pub enum Types {
@@ -118,6 +119,28 @@ impl Types {
         };
     }
 
+    pub fn flatten(&self, generics: &Vec<Types>, syntax: &Arc<Mutex<Syntax>>) -> Types {
+        return match self {
+            Types::Struct(found) => {
+                let name = format!("{}_{}", found.name, display_parenless(generics, "_"));
+                let mut locked = syntax.lock().unwrap();
+                return if let Some(found) = locked.structures.types.get(&name) {
+                    Types::Struct(found.clone())
+                } else {
+                    let mut other = Struct::clone(found);
+                    other.degeneric(generics);
+                    other.name = name.clone();
+                    let other = Arc::new(other);
+                    locked.structures.types.insert(name, other.clone());
+                    Types::Struct(other)
+                }
+            },
+            Types::Reference(other) => other.flatten(generics, syntax),
+            Types::Generic(_, _) => panic!("Unresolved generic!"),
+            Types::GenericType(base, effects) =>
+                base.flatten(effects, syntax)
+        }
+    }
     pub fn name(&self) -> String {
         return match self {
             Types::Struct(structs) => structs.name.clone(),
@@ -136,7 +159,7 @@ impl Display for Types {
             Types::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
             Types::GenericType(types, generics) =>
-                write!(f, "{}<{}>", types, display(generics, ", "))
+                write!(f, "{}<{}>", types, display_parenless(generics, "_"))
         }
     }
 }

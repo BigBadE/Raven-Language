@@ -51,12 +51,12 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.handle_invalid()
         },
         TokenTypes::FieldName => if tokenizer.matches(":") {
-            parse_ident(tokenizer, TokenTypes::FieldType, &[b'=', b';'])
-        } else if tokenizer.matches(";") {
-            tokenizer.make_token(TokenTypes::FieldEnd)
+            tokenizer.make_token(TokenTypes::FieldSeparator)
         } else {
             tokenizer.handle_invalid()
         },
+        TokenTypes::FieldSeparator =>
+            parse_ident(tokenizer, TokenTypes::FieldType, &[b'=', b';']),
         TokenTypes::FieldType => if tokenizer.matches("=") {
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP;

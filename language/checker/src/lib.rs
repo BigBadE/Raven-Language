@@ -4,6 +4,7 @@ use syntax::async_util::{NameResolver, UnparsedType};
 
 pub mod check_code;
 pub mod check_function;
+pub mod check_struct;
 pub mod output;
 
 pub struct EmptyNameResolver {

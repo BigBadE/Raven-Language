@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
+use indexmap::IndexMap;
 use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
@@ -98,8 +99,9 @@ pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>
 
 async fn const_empty() -> Result<CodeBody, ParsingError> { Ok(CodeBody::new(Vec::new(), "empty_trait".to_string())) }
 
-pub async fn get_generics(generics: HashMap<String, Vec<ParsingFuture<Types>>>) -> Result<HashMap<String, Types>, ParsingError> {
-    let mut done_generics = HashMap::new();
+pub async fn get_generics(generics: HashMap<String, Vec<ParsingFuture<Types>>>)
+    -> Result<IndexMap<String, Types>, ParsingError> {
+    let mut done_generics = IndexMap::new();
     for (name, generic) in generics {
         let mut generics = Vec::new();
         for found in generic {

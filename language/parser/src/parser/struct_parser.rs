@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use syntax::{Attribute, get_modifier, Modifier, ParsingError, ParsingFuture};
+use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::async_util::UnparsedType;
 use syntax::code::{Field, MemberField};
 use syntax::function::Function;
@@ -55,7 +55,12 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         }
     }
 
-    return get_struct(parser_utils.syntax.clone(), attributes, get_modifier(modifiers.as_slice()), fields, generics, functions, name);
+    let modifiers = get_modifier(modifiers.as_slice());
+    if !is_modifier(modifiers, Modifier::Internal) {
+        name = parser_utils.file.clone() + "::" + name.as_str();
+    }
+    return get_struct(parser_utils.syntax.clone(), attributes,
+                      modifiers, fields, generics, functions, name);
 }
 
 pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
@@ -120,7 +125,8 @@ pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
             TokenTypes::FieldType => {
                 let name = token.to_string(parser_utils.buffer).clone();
                 types = Some(parser_utils.get_struct(token, name))
-            }
+            },
+            TokenTypes::FieldSeparator => {},
             TokenTypes::FieldEnd => break,
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }

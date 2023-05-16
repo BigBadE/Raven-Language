@@ -20,6 +20,7 @@ pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody,
 
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
+    println!("Matching {:?}", effect);
     match effect {
         Effects::CodeBody(body) => verify_code(process_manager, body, syntax, &mut variables.clone()).await?,
         Effects::Set(first, second) => {
@@ -118,10 +119,24 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
             }
         }
         Effects::CompareJump(effect, _, _) => verify_effect(process_manager, effect, syntax, variables).await?,
-        Effects::CreateStruct(_, effects) => for (_, effect) in effects {
-            verify_effect(process_manager, effect, syntax, variables).await?;
+        Effects::CreateStruct(target, effects) => {
+            if let Types::GenericType(base, bounds) = target {
+                *target = base.flatten(bounds, syntax);
+            }
+            for (_, effect) in effects {
+                verify_effect(process_manager, effect, syntax, variables).await?;
+            }
         },
         Effects::Load(effect, _) => verify_effect(process_manager, effect, syntax, variables).await?,
+        Effects::CreateVariable(name, effect) => {
+            verify_effect(process_manager, effect, syntax, variables).await?;
+            return if let Some(found) = effect.get_return(process_manager, variables) {
+                variables.variables.insert(name.clone(), found);
+                Ok(())
+            } else {
+                Err(placeholder_error("No return type!".to_string()))
+            }
+        },
         _ => {}
     }
     return Ok(());

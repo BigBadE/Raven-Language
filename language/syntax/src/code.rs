@@ -138,22 +138,16 @@ impl Effects {
                 let variable = variables.get_variable(name);
                 if let Some(found) = variable {
                     match found {
-                        Types::Generic(name, bounds) => {
-                            let real = process_manager.get_generic(&name)?;
-                            for bound in &bounds {
-                                if !real.of_type(bound) {
-                                    return None;
-                                }
-                            }
-                            return Some(real);
-                        },
-                        Types::GenericType(_base, _generics) => {
-                            todo!()
+                        Types::Generic(name, _) => {
+                            panic!("Unresolved generic {}", name)
+                        }
+                        Types::GenericType(name, _) => {
+                            panic!("Unresolved generic {:?}", name)
                         }
                         _ => return Some(found)
                     }
                 }
-                return None;
+                panic!("Unresolved variable {}", name);
             },
             Effects::Load(from, _) => from.get_return(process_manager, variables),
             Effects::CreateStruct(types, _) => Some(types.clone()),

@@ -11,6 +11,7 @@ use syntax::r#struct::{F64, I64, STR, Struct, U64};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::check_function::verify_function;
+use crate::check_struct::verify_struct;
 
 #[derive(Clone)]
 pub struct TypesChecker {
@@ -43,8 +44,12 @@ impl ProcessManager for TypesChecker {
         }
     }
 
-    async fn verify_struct(&self, _structure: &mut Struct, _syntax: &Arc<Mutex<Syntax>>) {
-        //TODO
+    async fn verify_struct(&self, structure: &mut Struct, syntax: &Arc<Mutex<Syntax>>) {
+        if let Err(error) = verify_struct(self, structure,
+                                            &self.syntax.clone().unwrap()).await {
+            syntax.lock().unwrap().errors.push(error.clone());
+            structure.poisoned.push(error);
+        }
     }
 
     fn add_implementation(&self, _base: Types, _implementing: Types) {

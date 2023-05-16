@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use indexmap::IndexMap;
 
 use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture};
 use crate::code::{Expression, MemberField};
@@ -12,7 +12,7 @@ use crate::r#struct::Struct;
 pub struct Function {
     pub parent: Option<Arc<Struct>>,
     pub attributes: Vec<Attribute>,
-    pub generics: HashMap<String, Types>,
+    pub generics: IndexMap<String, Types>,
     pub modifiers: u8,
     pub fields: Vec<MemberField>,
     pub code: CodeStatus,
@@ -54,7 +54,7 @@ impl CodeStatus {
 
 impl Function {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8,
-               fields: Vec<MemberField>, generics: HashMap<String, Types>,
+               fields: Vec<MemberField>, generics: IndexMap<String, Types>,
                code: ParsingFuture<CodeBody>, return_type: Option<Types>, name: String) -> Self {
         return Self {
             parent: None,
@@ -73,7 +73,7 @@ impl Function {
         return Self {
             parent: None,
             attributes: Vec::new(),
-            generics: HashMap::new(),
+            generics: IndexMap::new(),
             modifiers: 0,
             fields: Vec::new(),
             code: CodeStatus::Finished(CodeBody::new(Vec::new(), "poison".to_string())),

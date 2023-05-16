@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Mutex};
+use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
 use crate::{AsyncGetter, Modifier, ProcessManager, Syntax, TopElement};
@@ -10,13 +10,13 @@ use crate::{Attribute, ParsingError};
 use crate::types::Types;
 
 lazy_static! {
-pub static ref I64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+pub static ref I64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
         Modifier::Internal as u8, "i64".to_string()));
-pub static ref F64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+pub static ref F64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
         Modifier::Internal as u8, "f64".to_string()));
-pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
         Modifier::Internal as u8, "u64".to_string()));
-pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), HashMap::new(), Vec::new(),
+pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
         Modifier::Internal as u8, "str".to_string()));
 }
 
@@ -24,7 +24,7 @@ pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), H
 pub struct Struct {
     pub modifiers: u8,
     pub name: String,
-    _generics: HashMap<String, Types>,
+    pub generics: IndexMap<String, Types>,
     pub attributes: Vec<Attribute>,
     pub fields: Vec<MemberField>,
     pub functions: Vec<Arc<Function>>,
@@ -33,15 +33,15 @@ pub struct Struct {
 }
 
 impl Struct {
-    pub fn new(attributes: Vec<Attribute>, fields: Vec<MemberField>, generics: HashMap<String, Types>,
+    pub fn new(attributes: Vec<Attribute>, fields: Vec<MemberField>, generics: IndexMap<String, Types>,
                functions: Vec<Arc<Function>>, modifiers: u8, name: String) -> Self {
         return Self {
             attributes,
             modifiers,
-            _generics: generics,
             fields,
             functions,
             name,
+            generics,
             traits: Vec::new(),
             poisoned: Vec::new(),
         };
@@ -52,12 +52,38 @@ impl Struct {
             attributes: Vec::new(),
             modifiers: 0,
             name,
-            _generics: HashMap::new(),
+            generics: IndexMap::new(),
             fields: Vec::new(),
             functions: Vec::new(),
             traits: Vec::new(),
             poisoned: vec!(error),
         };
+    }
+
+    pub fn degeneric(&mut self, generics: &Vec<Types>) {
+        let mut i = 0;
+        for value in self.generics.values_mut() {
+            if let Types::Generic(name, bounds) = value {
+                let name = name.clone();
+                let temp = generics.get(i).unwrap().clone();
+                for bound in bounds {
+                    if !temp.of_type(bound) {
+                        panic!("Generic {} set to a {} which isn't a {}", name, temp, bound);
+                    }
+                }
+                *value = temp;
+                i += 1;
+            } else {
+                panic!("Guhh?????");
+            }
+        }
+
+        for field in &mut self.fields {
+            let types = &mut field.field.field_type;
+            if let Types::Generic(name, _) = types {
+                *types = self.generics.get(name).unwrap().clone();
+            }
+        }
     }
 }
 

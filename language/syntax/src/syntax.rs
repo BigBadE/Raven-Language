@@ -120,16 +120,23 @@ impl Syntax {
                         types: UnparsedType) -> Result<Types, ParsingError> {
         return match types {
             UnparsedType::Basic(name) =>
-                Syntax::get_struct(syntax, error, name, resolver).await,
+                Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::new();
                 for arg in args {
-                    generics.push(Self::parse_type(syntax.clone(), error.clone(), resolver.boxed_clone(), arg).await?);
+                    generics.push(Self::parse_type(syntax.clone(),
+                                                   error.clone(), resolver.boxed_clone(), arg).await?);
                 }
                 Ok(Types::GenericType(Box::new(
                     Self::parse_type(syntax, error, resolver, *name).await?),
                                       generics))
             }
         }
+    }
+
+    fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {
+        let mut error = error.clone();
+        error.message = format!("Unknown type {}!", new_type);
+        return error;
     }
 }
