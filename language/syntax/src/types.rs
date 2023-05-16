@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::mem;
 use std::sync::Arc;
 use crate::function::display;
 use crate::{ParsingError, Struct};
@@ -73,7 +72,7 @@ impl Types {
         };
     }
 
-    pub fn resolve_generic(&mut self, other: &Types, bounds_error: ParsingError) -> Result<Option<Types>, ParsingError> {
+    pub fn resolve_generic(&self, other: &Types, bounds_error: ParsingError) -> Result<Option<Types>, ParsingError> {
         match self {
             Types::Generic(_name, bounds) => {
                 for bound in bounds {
@@ -81,9 +80,7 @@ impl Types {
                         return Err(bounds_error);
                     }
                 }
-                let mut old = other.clone();
-                mem::swap(self, &mut old);
-                return Ok(Some(old));
+                return Ok(Some(self.clone()));
             }
             _ => {}
         }
@@ -93,17 +90,17 @@ impl Types {
     pub fn degeneric(&mut self, generics: &HashMap<String, Types>, none_error: ParsingError, bounds_error: ParsingError) -> Result<(), ParsingError> {
         match self {
             Types::Generic(name, bounds) => {
-                if let Some(found) = generics.get(name) {
+                return if let Some(found) = generics.get(name) {
                     for bound in bounds {
                         if !found.of_type(bound) {
                             return Err(bounds_error);
                         }
                     }
                     *self = found.clone();
-                    return Ok(());
+                    Ok(())
                 } else {
                     println!("Failed to find {} in {:?}", name, generics.keys());
-                    return Err(none_error);
+                    Err(none_error)
                 }
             }
             _ => {}

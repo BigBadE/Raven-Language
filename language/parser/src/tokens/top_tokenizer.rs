@@ -104,7 +104,11 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.handle_invalid()
         },
         TokenTypes::GenericEnd => {
-            tokenizer.make_token(TokenTypes::ArgumentsStart)
+            if !tokenizer.matches("(") {
+                tokenizer.handle_invalid()
+            } else {
+                tokenizer.make_token(TokenTypes::ArgumentsStart)
+            }
         }
         TokenTypes::ArgumentsStart | TokenTypes::ArgumentEnd => if tokenizer.matches(")") {
             tokenizer.make_token(TokenTypes::ArgumentsEnd)

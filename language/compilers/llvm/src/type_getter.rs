@@ -39,7 +39,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn for_function(&self, function: Function, llvm_function: FunctionValue<'ctx>) -> Self {
+    pub fn for_function(&self, function: &Arc<Function>, llvm_function: FunctionValue<'ctx>) -> Self {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
         for i in 0..llvm_function.count_params() as usize {
@@ -105,7 +105,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 }
                 continue
             }
-            compile_block(function.code.assume_finished(), function_type, self, &mut 0);
+            compile_block(function.code.assume_finished(), function_type,
+                          &mut self.for_function(&function, function_type), &mut 0);
             self.compiler.builder.build_return(None);
         }
 

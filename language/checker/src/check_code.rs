@@ -58,12 +58,25 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
         Effects::MethodCall(method, effects) => {
             if !method.generics.is_empty() {
                 let mut manager = process_manager.clone();
-                let name = format!("{}_{}", method.name, display_parenless(&process_manager.generics.keys().collect(), "_"));
 
                 for effect in &mut *effects {
                     verify_effect(&mut manager, effect, syntax, variables).await?;
                 }
 
+                for i in 0..method.fields.len() {
+                    let effect = effects.get(i).unwrap().get_return(&manager, variables).unwrap();
+                    if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
+                        &effect, placeholder_error("Invalid bounds!".to_string()))? {
+                        if let Types::Generic(name, _) = old {
+                            manager.generics.insert(name, effect);
+                        } else {
+                            panic!("Guh?");
+                        }
+                    }
+                }
+
+                let name = format!("{}_{}", method.name, display_parenless(
+                    &manager.generics.values().collect(), "_"));
                 let mut temp = Vec::new();
                 mem::swap(&mut temp, effects);
                 {
@@ -72,16 +85,12 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                         *method = found.clone()
                     } else {
                         let mut new_method = Function::clone(method);
-                        for i in 0..new_method.fields.len() {
-                            let effect = temp.get(i).unwrap().get_return(&manager, variables).unwrap();
-                            if let Some(old) = new_method.fields.get_mut(i).unwrap().field.field_type.resolve_generic(
-                                &effect, placeholder_error("Invalid bounds!".to_string()))? {
-                                if let Types::Generic(name, _) = old {
-                                    manager.generics.insert(name, effect);
-                                } else {
-                                    panic!("Guh?");
-                                }
-                            }
+                        new_method.generics.clear();
+                        new_method.name = name.clone();
+                        for field in &mut new_method.fields {
+                            field.field.field_type.degeneric(&manager.generics,
+                                             placeholder_error("No generic!".to_string()),
+                                             placeholder_error("Invalid bounds!".to_string()))?;
                         }
                         if let Some(returning) = &mut new_method.return_type {
                             returning.degeneric(&manager.generics,
@@ -100,7 +109,6 @@ async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syn
                 return Ok(());
             }
 
-            println!("Resolving {:?}", effects);
             for effect in &mut *effects {
                 verify_effect(process_manager, effect, syntax, variables).await?;
             }
