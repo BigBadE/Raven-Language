@@ -1,6 +1,6 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
-use crate::tokens::util::{parse_acceptable, parse_ident, parse_numbers};
+use crate::tokens::util::{parse_acceptable, parse_numbers};
 
 pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
     if tokenizer.matches(";") {
@@ -41,7 +41,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
             tokenizer.index -= 1;
             parse_numbers(tokenizer)
         } else {
-            parse_ident(tokenizer, TokenTypes::CallingType, &[b'(', b';', b'}'])
+            parse_acceptable(tokenizer, TokenTypes::CallingType)
         }
     } else if tokenizer.matches("return") {
         tokenizer.make_token(TokenTypes::Return)

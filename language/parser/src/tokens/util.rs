@@ -15,6 +15,9 @@ pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> To
         }
         let character = tokenizer.buffer[tokenizer.index] as char;
         if !character.is_alphabetic() && character != ':' && character != '_' {
+            if tokenizer.buffer[tokenizer.index-1] == b':' {
+                tokenizer.index -= 1;
+            }
             return tokenizer.make_token(token_type);
         }
         tokenizer.index += 1;

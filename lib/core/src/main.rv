@@ -1,5 +1,8 @@
 pub fn main() -> i64 {
-    return main::test(1 + 6 / 2);
+    let iter = new iter::Iter {
+        field: 2
+    }
+    return test(iter.field);
 }
 
 pub fn test<T>(input: T) -> T {

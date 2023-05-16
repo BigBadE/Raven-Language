@@ -1,0 +1,3 @@
+pub struct Iter<T> {
+    pub field: T;
+}

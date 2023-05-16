@@ -87,6 +87,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::ArgumentEnd => if !deep {
                 break;
             },
+            TokenTypes::CallingType => {},
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
@@ -199,6 +200,9 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<E
                 };
                 name = String::new();
                 values.push((0, effect));
+                if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::BlockEnd {
+                    break
+                }
             }
             TokenTypes::BlockEnd => break,
             TokenTypes::InvalidCharacters => {}
