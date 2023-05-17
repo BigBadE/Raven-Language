@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
-use inkwell::types::StructType;
+use inkwell::types::{BasicType, StructType};
 
 use syntax::{is_modifier, Modifier};
 use syntax::code::{Effects, ExpressionType};
@@ -28,7 +28,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut Co
 }
 
 pub fn instance_struct<'ctx>(structure: Arc<Struct>, type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
-    let mut fields = Vec::new();
+    let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
     for field in &structure.fields {
         fields.push(type_getter.get_type(&field.field.field_type));
     }
@@ -80,6 +80,7 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
 
 pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function: FunctionValue<'ctx>,
                             effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
+    println!("Compiling: {:?}", effect);
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
@@ -153,7 +154,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         //Loads variable/field pointer from structure, or self if structure is None
         Effects::Load(loading_from, field) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
-            let mut offset = from.is_struct_value() as u32;
+            //Compensate for type id
+            let mut offset = 1;
             for struct_field in &loading_from
                 .get_return(type_getter)
                 .unwrap().clone_struct().fields {
@@ -190,7 +192,11 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let pointer = type_getter.compiler.builder.build_alloca(storing, &id.to_string());
             *id += 1;
 
-            let mut offset = 0;
+            type_getter.compiler.builder.build_store(pointer,
+                                                     type_getter.compiler.context.i64_type()
+                .const_int(structure.id(), false));
+
+            let mut offset = 1;
             for argument in out_arguments {
                 let value = unsafe { argument.assume_init() };
 

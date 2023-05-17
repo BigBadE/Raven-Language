@@ -240,7 +240,8 @@ async fn create_effect(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver
     for input in inputs {
         final_inputs.push((input.0, input.1.await?));
     }
-    return Ok(Effects::CreateStruct(Syntax::parse_type(syntax, error, resolver, types).await?, final_inputs));
+    return Ok(Effects::CreateStruct(Syntax::parse_type(syntax, error, resolver, types).await?,
+                                    final_inputs));
 }
 
 pub async fn get_line(effect: ParsingFuture<Effects>, expression_type: ExpressionType)

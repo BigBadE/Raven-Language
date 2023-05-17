@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Mutex};
 use crate::function::{display, display_parenless};
-use crate::{ParsingError, Struct};
+use crate::{is_modifier, Modifier, ParsingError, Struct};
 use crate::syntax::Syntax;
 
 #[derive(Clone, Debug)]
@@ -18,6 +18,21 @@ pub enum Types {
 }
 
 impl Types {
+    pub fn id(&self) -> u64 {
+        return match self {
+            Types::Struct(structure) => structure.id,
+            Types::Reference(inner) => inner.id(),
+            _ => panic!("Tried to ID generic!")
+        }
+    }
+
+    pub fn is_primitive(&self) -> bool {
+        return match self {
+            Types::Struct(structure) => is_modifier(structure.modifiers, Modifier::Internal),
+            Types::Reference(inner) => inner.is_primitive(),
+            _ => panic!("Tried to primitive check a generic!")
+        }
+    }
     pub fn of_type(&self, other: &Types) -> bool {
         return match self {
             Types::Struct(found) => match other {

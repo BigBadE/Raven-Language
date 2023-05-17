@@ -20,9 +20,12 @@ pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), I
         Modifier::Internal as u8, "str".to_string()));
 }
 
+pub static ID: Mutex<u64> = Mutex::new(0);
+
 #[derive(Clone)]
 pub struct Struct {
     pub modifiers: u8,
+    pub id: u64,
     pub name: String,
     pub generics: IndexMap<String, Types>,
     pub attributes: Vec<Attribute>,
@@ -35,8 +38,11 @@ pub struct Struct {
 impl Struct {
     pub fn new(attributes: Vec<Attribute>, fields: Vec<MemberField>, generics: IndexMap<String, Types>,
                functions: Vec<Arc<Function>>, modifiers: u8, name: String) -> Self {
+        let mut id = ID.lock().unwrap();
+        *id += 1;
         return Self {
             attributes,
+            id: *id,
             modifiers,
             fields,
             functions,
@@ -50,6 +56,7 @@ impl Struct {
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
         return Self {
             attributes: Vec::new(),
+            id: 0,
             modifiers: 0,
             name,
             generics: IndexMap::new(),
