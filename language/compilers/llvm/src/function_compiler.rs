@@ -12,10 +12,12 @@ use syntax::r#struct::Struct;
 
 use crate::internal::instructions::compile_internal;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::create_function_value;
+use crate::util::{create_function_value, print_formatted};
 
 pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
+    println!("Value: {:?} -> {}", value.get_params(), value.get_type().get_return_type().map_or("None".to_string(),
+                                                                                                |found| found.to_string()));
     if is_modifier(function.modifiers, Modifier::Internal) {
         compile_internal(&type_getter.compiler, &function.name, &function.fields, value);
     } else if is_modifier(function.modifiers, Modifier::Extern) {
@@ -49,6 +51,8 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                     _ => {
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
+                        print_formatted(function.to_string());
+                        println!("{:?}, {}", returned, returned.is_int_value());
                         if returned.is_struct_value() {
                             type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
                                                                      returned);
@@ -82,7 +86,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
         Effects::CreateVariable(name, inner) => {
-            let compiled = compile_effect(type_getter, function, effect, id).unwrap();
+            let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             let output = type_getter.compiler.builder.build_alloca(compiled.get_type(), &id.to_string());
             *id += 1;
             type_getter.variables.insert(name.clone(),
@@ -115,6 +119,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
+            println!("{}: {} vs {}", calling_function.name, calling_function.return_type.is_some(), calling.get_type().get_return_type().is_some());
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
                 let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
                 let pointer = type_getter.compiler.builder.build_alloca(

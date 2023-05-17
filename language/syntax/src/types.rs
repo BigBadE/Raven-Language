@@ -40,6 +40,7 @@ impl Types {
                     }
 
                     //TODO check generics, I have no clue how to with respect to subtypes.
+                    //Is this even required? Or are generics resolved by now? Idk
                     todo!()
                 }
                 Types::Generic(_, bounds) => {
@@ -119,10 +120,18 @@ impl Types {
         };
     }
 
-    pub fn flatten(&self, generics: &Vec<Types>, syntax: &Arc<Mutex<Syntax>>) -> Types {
+    pub fn flatten(&mut self, generics: &mut Vec<Types>, syntax: &Arc<Mutex<Syntax>>) -> Types {
+        for generic in &mut *generics {
+            if let Types::GenericType(base, bounds) = generic {
+                *generic = base.flatten(bounds, syntax);
+            }
+        }
         return match self {
             Types::Struct(found) => {
-                let name = format!("{}_{}", found.name, display_parenless(generics, "_"));
+                if generics.is_empty() {
+                    return self.clone();
+                }
+                let name = format!("{}<{}>", found.name, display_parenless(generics, "_"));
                 let mut locked = syntax.lock().unwrap();
                 return if let Some(found) = locked.structures.types.get(&name) {
                     Types::Struct(found.clone())

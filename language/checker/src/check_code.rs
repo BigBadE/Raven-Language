@@ -20,7 +20,6 @@ pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody,
 
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
-    println!("Matching {:?}", effect);
     match effect {
         Effects::CodeBody(body) => verify_code(process_manager, body, syntax, &mut variables.clone()).await?,
         Effects::Set(first, second) => {

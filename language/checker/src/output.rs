@@ -7,6 +7,7 @@ use async_trait::async_trait;
 
 use syntax::function::Function;
 use syntax::ProcessManager;
+use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::check_function::verify_function;
