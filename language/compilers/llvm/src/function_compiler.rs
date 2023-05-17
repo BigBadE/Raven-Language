@@ -16,8 +16,7 @@ use crate::util::{create_function_value, print_formatted};
 
 pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
-    println!("Value: {:?} -> {}", value.get_params(), value.get_type().get_return_type().map_or("None".to_string(),
-                                                                                                |found| found.to_string()));
+
     if is_modifier(function.modifiers, Modifier::Internal) {
         compile_internal(&type_getter.compiler, &function.name, &function.fields, value);
     } else if is_modifier(function.modifiers, Modifier::Extern) {
@@ -52,7 +51,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
                         print_formatted(function.to_string());
-                        println!("{:?}, {}", returned, returned.is_int_value());
                         if returned.is_struct_value() {
                             type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
                                                                      returned);
@@ -87,12 +85,10 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
         Effects::CreateVariable(name, inner) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
-            let output = type_getter.compiler.builder.build_alloca(compiled.get_type(), &id.to_string());
-            *id += 1;
             type_getter.variables.insert(name.clone(),
                                          (inner.get_return(type_getter).unwrap(),
-                                          output.as_basic_value_enum()));
-            Some(output.as_basic_value_enum())
+                                          compiled.as_basic_value_enum()));
+            Some(compiled.as_basic_value_enum())
         },
         //Label of jumping to body
         Effects::Jump(label) => {
@@ -119,7 +115,6 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
-            println!("{}: {} vs {}", calling_function.name, calling_function.return_type.is_some(), calling.get_type().get_return_type().is_some());
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
                 let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
                 let pointer = type_getter.compiler.builder.build_alloca(
@@ -158,7 +153,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         //Loads variable/field pointer from structure, or self if structure is None
         Effects::Load(loading_from, field) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
-            let mut offset = 1;
+            let mut offset = from.is_struct_value() as u32;
             for struct_field in &loading_from
                 .get_return(type_getter)
                 .unwrap().clone_struct().fields {

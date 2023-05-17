@@ -30,8 +30,11 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::ParenOpen => {
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
                 match last.token_type {
-                    TokenTypes::Variable => {
+                    TokenTypes::Variable | TokenTypes::CallingType => {
                         let mut effects = Vec::new();
+                        if let Some(last) = effect {
+                            effects.push(last);
+                        }
                         while let Some((_, effect)) = parse_line(parser_utils, false, false) {
                             effects.push(effect);
                             if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
@@ -39,6 +42,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                                 break
                             }
                         }
+
                         let name = last.to_string(parser_utils.buffer);
                         effect = Some(Box::pin(method_call(parser_utils.syntax.clone(), name.clone(),
                                                            token.make_error(parser_utils.file.clone(), format!("Unknown method {}!", name)),
@@ -59,9 +63,11 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             }
             TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::BlockEnd => break,
             TokenTypes::CodeEnd => return None,
-            TokenTypes::Variable => {
-                effect = Some(constant_effect(Effects::LoadVariable(token.to_string(parser_utils.buffer))))
-            }
+            TokenTypes::Variable =>
+                if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {} else {
+                    effect = Some(constant_effect(
+                        Effects::LoadVariable(token.to_string(parser_utils.buffer))))
+                },
             TokenTypes::Return => expression_type = ExpressionType::Return,
             TokenTypes::New => effect = Some(parse_new(parser_utils)),
             TokenTypes::BlockStart => if break_at_body {
@@ -87,7 +93,11 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::ArgumentEnd => if !deep {
                 break;
             },
-            TokenTypes::CallingType => {},
+            TokenTypes::CallingType =>
+                if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {} else {
+                    effect = Some(Box::pin(load_effect(effect.unwrap(), token.to_string(parser_utils.buffer))))
+                },
+            TokenTypes::Period => {},
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
@@ -101,6 +111,10 @@ async fn method_call(syntax: Arc<Mutex<Syntax>>, variable: String, error: Parsin
         output.push(possible.await?);
     }
     return Ok(Effects::MethodCall(Syntax::get_function(syntax, error, variable, false, resolver).await?, output));
+}
+
+async fn load_effect(loading: ParsingFuture<Effects>, name: String) -> Result<Effects, ParsingError> {
+    return Ok(Effects::Load(Box::new(loading.await?), name));
 }
 
 async fn body_effect(body: impl Future<Output=Result<CodeBody, ParsingError>>) -> Result<Effects, ParsingError> {

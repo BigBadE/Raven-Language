@@ -1,6 +1,6 @@
 pub fn main() -> i64 {
     let iter = new iter::Iter<i64> {
-        field: 2
+        field: 17
     };
     return main::test(iter.field);
 }

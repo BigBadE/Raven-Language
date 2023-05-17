@@ -19,13 +19,13 @@ pub enum ExpressionType {
     Line,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Field {
     pub name: String,
     pub field_type: Types,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MemberField {
     pub modifiers: u8,
     pub attributes: Vec<Attribute>,
@@ -150,7 +150,15 @@ impl Effects {
                 }
                 panic!("Unresolved variable {}", name);
             },
-            Effects::Load(from, _) => from.get_return(variables),
+            Effects::Load(from, name) =>
+                match from.get_return(variables).unwrap() {
+                    Types::Struct(structure) => {
+                        structure.fields.iter()
+                            .find(|field| &field.field.name == name)
+                            .map(|field| field.field.field_type.clone())
+                    },
+                    _ => None
+                }
             Effects::CreateStruct(types, _) => Some(types.clone()),
             Effects::Float(_) => Some(Types::Struct(F64.clone())),
             Effects::Int(_) => Some(Types::Struct(I64.clone())),

@@ -3,7 +3,9 @@ use crate::tokens::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_acceptable, parse_numbers};
 
 pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
-    if tokenizer.matches(";") {
+    if let TokenTypes::Period = tokenizer.last.token_type {
+        parse_acceptable(tokenizer, TokenTypes::CallingType)
+    } else if tokenizer.matches(";") {
         tokenizer.for_loop = false;
         if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 12 {
             tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
@@ -34,14 +36,11 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
     } else if tokenizer.matches(")") {
         tokenizer.make_token(TokenTypes::ParenClose)
     } else if tokenizer.matches(".") {
-        if tokenizer.len == tokenizer.index {
-            return tokenizer.make_token(TokenTypes::EOF);
-        }
         if (tokenizer.buffer[tokenizer.index] as char).is_numeric() {
             tokenizer.index -= 1;
             parse_numbers(tokenizer)
         } else {
-            parse_acceptable(tokenizer, TokenTypes::CallingType)
+            tokenizer.make_token(TokenTypes::Period)
         }
     } else if tokenizer.matches("return") {
         tokenizer.make_token(TokenTypes::Return)

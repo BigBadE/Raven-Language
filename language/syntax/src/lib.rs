@@ -79,7 +79,7 @@ pub trait DisplayIndented {
     fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Attribute {
     Basic(String),
     Integer(String, i64),
