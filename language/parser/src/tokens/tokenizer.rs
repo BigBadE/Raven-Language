@@ -47,6 +47,14 @@ impl<'a> Tokenizer<'a> {
     }
 
     pub fn next(&mut self) -> Token {
+        if self.matches("//") {
+            return self.parse_to_line_end(TokenTypes::Comment);
+        } else if self.matches("/*") {
+            while !self.matches("*/") {
+
+            }
+            return self.make_token(TokenTypes::Comment);
+        }
         self.last = match self.state {
             TokenizerState::GENERIC_TO_FUNC | TokenizerState::GENERIC_TO_FUNC_TOP |
             TokenizerState::GENERIC_TO_STRUCT | TokenizerState::GENERIC_TO_IMPL => next_generic(self),
@@ -121,7 +129,7 @@ impl<'a> Tokenizer<'a> {
                           (self.line, self.index as u32 - self.line_index), self.index);
     }
 
-    pub fn handle_invalid(&mut self) -> Token {
+    pub fn parse_to_line_end(&mut self, types: TokenTypes) -> Token {
         if self.index == self.len {
             return Token::new(TokenTypes::EOF, self.last.end, self.last.end_offset,
                               (self.line, self.index as u32 - self.line_index), self.index);
@@ -135,8 +143,13 @@ impl<'a> Tokenizer<'a> {
                 break;
             }
         }
-        return Token::new(TokenTypes::InvalidCharacters, self.last.end, self.last.end_offset,
+
+        return Token::new(types, self.last.end, self.last.end_offset,
                           (self.line, self.index as u32 - self.line_index), self.index - 1);
+    }
+
+    pub fn handle_invalid(&mut self) -> Token {
+        return self.parse_to_line_end(TokenTypes::InvalidCharacters);
     }
 
     pub fn make_token(&self, token_type: TokenTypes) -> Token {

@@ -1,8 +1,6 @@
 pub fn main() -> i64 {
-    let iter = new iter::Iter<i64> {
-        field: 17
-    };
-    return main::test(iter.field);
+    let temp = 1 == 2;
+    return main::test(1 == 2);
 }
 
 pub fn test<T>(input: T) -> T {

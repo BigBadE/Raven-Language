@@ -130,5 +130,6 @@ pub enum TokenTypes {
     Equals = 59,
     AttributeEnd = 60,
     FieldSeparator = 61,
-    Period = 62
+    Period = 62,
+    Comment = 63
 }

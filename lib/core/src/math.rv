@@ -1,14 +1,33 @@
+//Primitive numbers, prefixed by signed/unsigned, suffixed by the amount of bits.
+//Signed types
 pub internal struct i64 {}
 pub internal struct i32 {}
 pub internal struct i16 {}
 pub internal struct i8 {}
+
+//Unsigned types
+pub internal struct u64 {}
+pub internal struct u32 {}
+pub internal struct u16 {}
+pub internal struct u8 {}
+
+//Booleans, either true or false (1 or 0)
 pub internal struct bool {}
 
+//Basic math operations, implemented internally by the compiler.
+//Equality
+#[priority(-1)]
+pub internal operation fn {}=={}(first: i64, second: i64) -> i64 {
+    return first + second;
+}
+
+//Addition
 #[priority(0)]
 pub internal operation fn {}+{}(first: i64, second: i64) -> i64 {
     return first + second;
 }
 
+//Division
 #[priority(1)]
 pub internal operation fn {}/{}(first: i64, second: i64) -> i64 {
     return first / second;

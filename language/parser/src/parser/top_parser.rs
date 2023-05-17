@@ -64,7 +64,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 parser_utils.syntax.lock().unwrap().process_manager.add_implementation(base, implementor);
                 attributes = Vec::new();
                 modifiers = Vec::new();
-            }
+            },
+            TokenTypes::Comment => {},
             TokenTypes::EOF => return,
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }

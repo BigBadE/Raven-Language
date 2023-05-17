@@ -12,7 +12,8 @@ use crate::tokens::tokens::{Token, TokenTypes};
 
 pub fn parse_code(parser_utils: &mut ParserUtils) -> ParsingFuture<CodeBody> {
     let mut lines = Vec::new();
-    while let Some((expression, effect)) = parse_line(parser_utils, false, false) {
+    while let Some((expression, effect)) =
+        parse_line(parser_utils, false, false) {
         lines.push(get_line(effect, expression));
     }
     parser_utils.imports.last_id += 1;
@@ -77,17 +78,19 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             },
             TokenTypes::Let => return Some((expression_type, parse_let(parser_utils))),
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
-            TokenTypes::Equals => if effect.is_some() &&
-                parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type != TokenTypes::Operator {
-                let error = token.make_error(parser_utils.file.clone(), "Tried to assign a void value!".to_string());
-                let value = parse_line(parser_utils, false, false);
-                if let Some(value) = value {
-                    effect = Some(Box::pin(create_assign(effect.unwrap(), value.1)));
+            TokenTypes::Equals => {
+                let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
+                if effect.is_some() && other != TokenTypes::Operator && other != TokenTypes::Equals {
+                    let error = token.make_error(parser_utils.file.clone(), "Tried to assign a void value!".to_string());
+                    let value = parse_line(parser_utils, false, false);
+                    if let Some(value) = value {
+                        effect = Some(Box::pin(create_assign(effect.unwrap(), value.1)));
+                    } else {
+                        effect = Some(constant_error(error));
+                    }
                 } else {
-                    effect = Some(constant_error(error));
+                    return Some((expression_type, parse_operator(effect, parser_utils)));
                 }
-            } else {
-                return Some((expression_type, parse_operator(effect, parser_utils)));
             },
             TokenTypes::Operator => return Some((expression_type, parse_operator(effect, parser_utils))),
             TokenTypes::ArgumentEnd => if !deep {
@@ -97,7 +100,11 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {} else {
                     effect = Some(Box::pin(load_effect(effect.unwrap(), token.to_string(parser_utils.buffer))))
                 },
-            TokenTypes::Period => {},
+            TokenTypes::EOF => {
+                parser_utils.index -= 1;
+                break
+            }
+            TokenTypes::Period | TokenTypes::Comment => {},
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
