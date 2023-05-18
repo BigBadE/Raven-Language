@@ -67,18 +67,9 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
-    return get_function(parser_utils.syntax.clone(), attributes,
-                        get_modifier(modifiers.as_slice()), fields, generics,
-                        code, return_type, parser_utils.file.clone() + "::" + name.as_str());
-}
-
-pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8,
-                          fields: Vec<FutureField>,
-                          generics: HashMap<String, Vec<ParsingFuture<Types>>>,
-                          code: Option<ParsingFuture<CodeBody>>,
-                          return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
+    let modifiers = get_modifier(modifiers.as_slice());
     {
-        let mut locked = syntax.lock().unwrap();
+        let mut locked = parser_utils.syntax.lock().unwrap();
         locked.functions.parsing.push(name.clone());
         if is_modifier(modifiers, Modifier::Operation) {
             for i in 0.. {
@@ -90,6 +81,15 @@ pub async fn get_function(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>
             }
         }
     }
+    return get_function(attributes, modifiers, fields, generics,
+                        code, return_type, parser_utils.file.clone() + "::" + name.as_str());
+}
+
+pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,
+                          fields: Vec<FutureField>,
+                          generics: HashMap<String, Vec<ParsingFuture<Types>>>,
+                          code: Option<ParsingFuture<CodeBody>>,
+                          return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
     let generics = get_generics(generics).await?;
     let return_type = match return_type {
         Some(found) => Some(found.await?),

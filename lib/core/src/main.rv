@@ -1,6 +1,9 @@
 pub fn main() -> i64 {
-    let temp = 1 == 2;
-    return main::test(1 == 1);
+    if 1 == 2 {
+        return 1;
+    } else {
+        return 2;
+    }
 }
 
 pub fn test<T>(input: T) -> T {

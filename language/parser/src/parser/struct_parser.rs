@@ -59,14 +59,15 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
     if !is_modifier(modifiers, Modifier::Internal) {
         name = parser_utils.file.clone() + "::" + name.as_str();
     }
-    return get_struct(parser_utils.syntax.clone(), attributes,
+    parser_utils.syntax.lock().unwrap().structures.parsing.push(name.clone());
+
+    return get_struct(attributes,
                       modifiers, fields, generics, functions, name);
 }
 
-pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
+pub async fn get_struct(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
                         generics: HashMap<String, Vec<ParsingFuture<Types>>>,
                         functions: Vec<impl Future<Output=Result<Function, ParsingError>>>, name: String) -> Result<Struct, ParsingError> {
-    syntax.lock().unwrap().structures.parsing.push(name.clone());
     let generics = get_generics(generics).await?;
     let mut done_fields = Vec::new();
     for field in fields {
