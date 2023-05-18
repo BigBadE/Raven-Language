@@ -3,13 +3,14 @@ use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::Sender;
 use anyhow::Error;
 use checker::output::TypesChecker;
+use compilers::compiling::Output;
 use parser::parse;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use crate::{get_compiler, RunnerSettings};
 
 pub async fn run(settings: &RunnerSettings)
-    -> Result<Option<i64>, Vec<ParsingError>> {
+    -> Result<Option<Output>, Vec<ParsingError>> {
     let syntax = Syntax::new(
         Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())));
     let syntax = Arc::new(Mutex::new(syntax));
@@ -58,7 +59,7 @@ pub async fn run(settings: &RunnerSettings)
     return receiver.recv().unwrap();
 }
 
-pub async fn start(sender: Sender<Result<Option<i64>, Vec<ParsingError>>>, compiler: String, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start(sender: Sender<Result<Option<Output>, Vec<ParsingError>>>, compiler: String, syntax: Arc<Mutex<Syntax>>) {
     let compiler = get_compiler(compiler);
     sender.send(compiler.compile(&syntax)).unwrap();
 }

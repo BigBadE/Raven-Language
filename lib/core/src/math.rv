@@ -17,7 +17,7 @@ pub internal struct bool {}
 //Basic math operations, implemented internally by the compiler.
 //Equality
 #[priority(-1)]
-pub internal operation fn {}=={}(first: i64, second: i64) -> i64 {
+pub internal operation fn {}=={}(first: i64, second: i64) -> bool {
     return first + second;
 }
 

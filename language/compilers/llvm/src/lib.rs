@@ -2,7 +2,7 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use compilers::compiling::Compiler;
+use compilers::compiling::{Compiler, Output};
 
 use inkwell::context::Context;
 use syntax::ParsingError;
@@ -33,7 +33,7 @@ impl LLVMCompiler {
 
 impl Compiler for LLVMCompiler {
     fn compile(&self, syntax: &Arc<Mutex<Syntax>>)
-        -> Result<Option<i64>, Vec<ParsingError>> {
+        -> Result<Option<Output>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
         let result = binding.compile();

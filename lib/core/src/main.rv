@@ -1,6 +1,6 @@
 pub fn main() -> i64 {
     let temp = 1 == 2;
-    return main::test(1 == 2);
+    return main::test(1 == 1);
 }
 
 pub fn test<T>(input: T) -> T {

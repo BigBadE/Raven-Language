@@ -6,6 +6,7 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
+use compilers::compiling::Output;
 use syntax::function::Function;
 use syntax::{ParsingError, VariableManager};
 use syntax::syntax::Syntax;
@@ -16,7 +17,7 @@ use crate::internal::structs::get_internal_struct;
 use crate::type_waiter::TypeWaiter;
 use crate::util::print_formatted;
 
-pub type Main = unsafe extern "C" fn() -> i64;
+pub type Main = unsafe extern "C" fn() -> Output;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
