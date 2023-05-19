@@ -47,7 +47,6 @@ pub async fn run(settings: &RunnerSettings)
     }
 
     syntax.lock().unwrap().finish();
-    println!("Finished!");
 
     if !errors.is_empty() {
         println!("Error detected, this likely poisoned the mutexes. Please report any non-poison errors");

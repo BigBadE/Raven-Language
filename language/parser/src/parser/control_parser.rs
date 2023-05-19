@@ -18,10 +18,17 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string())));
     }
 
+    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
+        return Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string())));
+    }
+    parser_utils.index += 1;
+
     let body = parse_code(parser_utils);
     let mut else_ifs = Vec::new();
     let mut else_body = None;
 
+    println!("Next: {:?}", parser_utils.tokens.get(parser_utils.index).unwrap());
     while parser_utils.tokens.get(parser_utils.index).unwrap().token_type == TokenTypes::Else {
         if parser_utils.tokens.get(parser_utils.index+1).unwrap().token_type == TokenTypes::If {
             parser_utils.index += 2;
@@ -36,7 +43,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             else_body = Some(parse_code(parser_utils));
         }
     }
-    let adding = 1;
+    let adding = 2;
     parser_utils.imports.last_id += adding;
     return Box::pin(create_if(effect.unwrap().1, body, else_ifs, else_body, parser_utils.imports.last_id-adding));
 }

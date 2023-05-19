@@ -20,7 +20,7 @@ pub fn parse_operator(last: Option<ParsingFuture<Effects>>, parser_utils: &mut P
         parser_utils.index += 1;
     }
 
-    let right = parse_line(parser_utils, false, false);
+    let right = parse_line(parser_utils, true, false);
     if right.is_some() {
         operation += "{}";
     }

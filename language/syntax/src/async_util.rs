@@ -70,7 +70,7 @@ impl Future for AsyncTypesGetter<Function> {
         }
 
         if locked.async_manager.finished && !locked.functions.parsing.contains(&name) {
-            println!("Failed to find!");
+            println!("Failed to find {}!", name);
             locked.functions.wakers.values().for_each(|wakers| for waker in wakers {
                 waker.wake_by_ref();
             });

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::{env, fs};
 use std::env::Args;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
@@ -47,8 +48,25 @@ impl Arguments {
                 };
             }
         }
+
+        let runner_args = all_args.get_mut(&ArgumentTypes::Runner).unwrap();
+        if let Some(test) = runner_args.get("test") {
+            match test.get(0).unwrap().as_str() {
+                "ten_mil_lines" => {
+                    println!("Writing test file:");
+                    let test_folder = env::temp_dir().join("raven_test");
+                    fs::create_dir_all(test_folder.clone()).unwrap();
+                    let test_file = test_folder.clone().join("raven_test.rv");
+                    fs::write(test_file.clone(), format!("pub internal struct i64 {{}} pub fn main() -> i64 {{{}return 123;}}",
+                    "let a = 1;".repeat(2))).unwrap();
+                    runner_args.insert("root".to_string(), vec!(test_folder.to_str().unwrap().to_string()));
+                    println!("Test file written to {:?}", test_file);
+                }
+                test => panic!("Unknown test {}", test)
+            }
+        }
         return Self {
-            runner_settings: Self::parse_runner_settings(all_args.get(&ArgumentTypes::Runner).unwrap())
+            runner_settings: Self::parse_runner_settings(runner_args)
         };
     }
 
