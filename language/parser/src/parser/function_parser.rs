@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
 use indexmap::IndexMap;
 use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
-use syntax::syntax::Syntax;
 use syntax::types::Types;
 
 use crate::parser::code_parser::parse_code;

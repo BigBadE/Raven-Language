@@ -69,8 +69,8 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
 #[async_recursion]
 async fn create_if(effect: ParsingFuture<Effects>, body: ParsingFuture<CodeBody>,
                    mut else_ifs: Vec<(ParsingFuture<Effects>, ParsingFuture<CodeBody>)>,
-                   mut else_body: Option<ParsingFuture<CodeBody>>, mut id: u32) -> Result<Effects, ParsingError> {
-    let mut body = body.await?;
+                   else_body: Option<ParsingFuture<CodeBody>>, mut id: u32) -> Result<Effects, ParsingError> {
+    let body = body.await?;
     let end = CodeBody::new(Vec::new(), id.to_string());
 
     let mut else_body = if let Some(body) = else_body {

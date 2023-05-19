@@ -5,7 +5,7 @@ use syntax::function::CodeBody;
 use syntax::{ParsingError, ParsingFuture};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
-use crate::parser::control_parser::parse_for;
+use crate::parser::control_parser::{parse_for, parse_if};
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
@@ -77,6 +77,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 effect = Some(Box::pin(body_effect(parse_code(parser_utils))))
             },
             TokenTypes::Let => return Some((expression_type, parse_let(parser_utils))),
+            TokenTypes::If => effect = Some(parse_if(parser_utils)),
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
