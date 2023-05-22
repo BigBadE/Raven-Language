@@ -43,7 +43,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
         type_getter.compiler.builder.position_at_end(block.clone());
         block.clone()
     } else {
-        println!("Creating {}", code.label);
         let temp = type_getter.compiler.context.append_basic_block(function, &code.label);
         type_getter.blocks.insert(code.label.clone(), temp);
         temp
@@ -51,6 +50,7 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
 
     type_getter.current_block = Some(block);
     type_getter.compiler.builder.position_at_end(block);
+    let mut broke = false;
     for line in &code.expressions {
         match line.expression_type {
             ExpressionType::Return => {
@@ -74,17 +74,34 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                         } else {
                             type_getter.compiler.builder.build_return(Some(&returned));
                         }
+                        broke = true;
                         break
                     }
                 }
             }
             ExpressionType::Line => {
-                compile_effect(type_getter, function, &line.effect, id);
+                if broke {
+                    println!("Yep broke");
+                    if let Effects::CodeBody(_) = &line.effect {
+                        compile_effect(type_getter, function, &line.effect, id);
+                    }
+                } else {
+                    compile_effect(type_getter, function, &line.effect, id);
+                    match &line.effect {
+                        Effects::Jump(name) | Effects::CompareJump(_, name, _) => {
+                            broke = true;
+                        },
+                        _ => {}
+                    }
+                }
             }
             ExpressionType::Break => return compile_effect(type_getter, function, &line.effect, id)
         }
     }
 
+    if !broke {
+        type_getter.compiler.builder.build_return(None);
+    }
     return None;
 }
 
