@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{Attribute, DisplayIndented, Function, to_modifiers, VariableManager};
 use crate::function::{CodeBody, display_indented, display_joined};
-use crate::r#struct::{F64, I64, STR, U64};
+use crate::r#struct::{BOOL, F64, I64, STR, U64};
 use crate::types::Types;
 
 #[derive(Clone, Debug)]
@@ -121,6 +121,7 @@ pub enum Effects {
     Float(f64),
     Int(i64),
     UInt(u64),
+    Bool(bool),
     String(String),
 }
 
@@ -163,6 +164,7 @@ impl Effects {
             Effects::Float(_) => Some(Types::Struct(F64.clone())),
             Effects::Int(_) => Some(Types::Struct(I64.clone())),
             Effects::UInt(_) => Some(Types::Struct(U64.clone())),
+            Effects::Bool(_) => Some(Types::Struct(BOOL.clone())),
             Effects::String(_) => Some(Types::Reference(Box::new(Types::Struct(STR.clone()))))
         };
     }
@@ -223,6 +225,7 @@ impl DisplayIndented for Effects {
             Effects::Float(float) => write!(f, "{}", float),
             Effects::Int(int) => write!(f, "{}", int),
             Effects::UInt(uint) => write!(f, "{}", uint),
+            Effects::Bool(bool) => write!(f, "{}", bool),
             Effects::String(string) => write!(f, "{}", string)
         };
     }

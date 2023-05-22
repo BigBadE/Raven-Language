@@ -65,6 +65,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
+    let name = parser_utils.file.clone() + "::" + name.as_str();
     let modifiers = get_modifier(modifiers.as_slice());
     {
         let mut locked = parser_utils.syntax.lock().unwrap();
@@ -80,7 +81,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
         }
     }
     return get_function(attributes, modifiers, fields, generics,
-                        code, return_type, parser_utils.file.clone() + "::" + name.as_str());
+                        code, return_type, name);
 }
 
 pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,

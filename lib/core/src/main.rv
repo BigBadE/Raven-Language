@@ -3,5 +3,5 @@ pub fn main() -> bool {
         return false;
     } else {
         return true;
-    }
+    };
 }

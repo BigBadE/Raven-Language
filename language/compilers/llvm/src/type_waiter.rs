@@ -41,6 +41,12 @@ impl TypeWaiter {
 
     pub fn wait(&self) {
         while !self.syntax.lock().unwrap().functions.types.contains_key(&self.function) {
+            {
+                let locked = self.syntax.lock().unwrap();
+                if !locked.functions.parsing.contains(&self.function) && locked.async_manager.finished {
+                    break
+                }
+            }
             thread::yield_now();
         }
     }

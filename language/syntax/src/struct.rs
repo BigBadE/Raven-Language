@@ -18,6 +18,8 @@ pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), I
         Modifier::Internal as u8, "u64".to_string()));
 pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
         Modifier::Internal as u8, "str".to_string()));
+pub static ref BOOL: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
+        Modifier::Internal as u8, "bool".to_string()));
 }
 
 pub static ID: Mutex<u64> = Mutex::new(0);

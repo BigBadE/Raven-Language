@@ -48,6 +48,10 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
         tokenizer.make_token(TokenTypes::Break)
     } else if tokenizer.matches("switch") {
         tokenizer.make_token(TokenTypes::Switch)
+    } else if tokenizer.matches("true") {
+        tokenizer.make_token(TokenTypes::True)
+    } else if tokenizer.matches("false") {
+        tokenizer.make_token(TokenTypes::False)
     } else if tokenizer.matches("for") &&
         (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
         tokenizer.for_loop = true;

@@ -38,9 +38,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                         }
                         while let Some((_, effect)) = parse_line(parser_utils, false, false) {
                             effects.push(effect);
-                            if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
-                            } else {
-                                break
+                            if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {} else {
+                                break;
                             }
                         }
 
@@ -48,12 +47,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                         effect = Some(Box::pin(method_call(parser_utils.syntax.clone(), name.clone(),
                                                            token.make_error(parser_utils.file.clone(), format!("Unknown method {}!", name)),
                                                            parser_utils.imports.boxed_clone(), effects)))
-                    },
+                    }
                     _ => if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
-                            effect = Some(in_effect);
-                        } else {
-                            effect = None;
-                        }
+                        effect = Some(in_effect);
+                    } else {
+                        effect = None;
+                    }
                 }
             }
             TokenTypes::Float => {
@@ -61,9 +60,15 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             }
             TokenTypes::Integer => {
                 effect = Some(constant_effect(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap())))
-            }
-            TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::BlockEnd => break,
-            TokenTypes::CodeEnd => return None,
+            },
+            TokenTypes::True => {
+                effect = Some(constant_effect(Effects::Bool(true)))
+            },
+            TokenTypes::False => {
+                effect = Some(constant_effect(Effects::Bool(false)))
+            },
+            TokenTypes::LineEnd | TokenTypes::ParenClose => break,
+            TokenTypes::CodeEnd | TokenTypes::BlockEnd => return None,
             TokenTypes::Variable =>
                 if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {} else {
                     effect = Some(constant_effect(
@@ -92,7 +97,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 } else {
                     return Some((expression_type, parse_operator(effect, parser_utils)));
                 }
-            },
+            }
             TokenTypes::Operator => return Some((expression_type, parse_operator(effect, parser_utils))),
             TokenTypes::ArgumentEnd => if !deep {
                 break;
@@ -103,9 +108,11 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 },
             TokenTypes::EOF => {
                 parser_utils.index -= 1;
-                break
+                break;
             }
-            TokenTypes::Period | TokenTypes::Comment => {},
+            TokenTypes::Else => return Some((expression_type, constant_error(token.make_error(parser_utils.file.clone(),
+                                                                                              "Unexpected Else!".to_string())))),
+            TokenTypes::Period | TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
@@ -155,7 +162,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             return constant_error(next.make_error(parser_utils.file.clone(), "Unexpected token, expected variable name!".to_string()));
         }
 
-        if let TokenTypes::Equals = parser_utils.tokens.get(parser_utils.index+1).unwrap().token_type {} else {
+        if let TokenTypes::Equals = parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {} else {
             return constant_error(next.make_error(parser_utils.file.clone(), format!("Unexpected {:?}, expected equals!", next)));
         }
         parser_utils.index += 2;
@@ -224,8 +231,8 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<E
                 };
                 name = String::new();
                 values.push((0, effect));
-                if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::BlockEnd {
-                    break
+                if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::BlockEnd {
+                    break;
                 }
             }
             TokenTypes::BlockEnd => break,

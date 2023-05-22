@@ -36,7 +36,9 @@ impl Compiler for LLVMCompiler {
         -> Result<Option<Output>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
+
         let result = binding.compile();
+
         let locked = syntax.lock().unwrap();
 
         return if locked.errors.is_empty() {
