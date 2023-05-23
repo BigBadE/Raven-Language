@@ -59,7 +59,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                     _ => {
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
-                        print_formatted(function.to_string());
                         if returned.is_struct_value() {
                             type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
                                                                      returned);
@@ -81,27 +80,30 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
             }
             ExpressionType::Line => {
                 if broke {
-                    println!("Yep broke");
                     if let Effects::CodeBody(_) = &line.effect {
                         compile_effect(type_getter, function, &line.effect, id);
                     }
                 } else {
-                    compile_effect(type_getter, function, &line.effect, id);
                     match &line.effect {
+                        Effects::CodeBody(body) => {
+                            let destination =
+                                unwrap_or_create(&body.label, function, type_getter);
+                            type_getter.compiler.builder.build_unconditional_branch(
+                                destination);
+                            broke = true;
+                        }
                         Effects::Jump(name) | Effects::CompareJump(_, name, _) => {
                             broke = true;
                         },
                         _ => {}
                     }
+                    compile_effect(type_getter, function, &line.effect, id);
                 }
             }
             ExpressionType::Break => return compile_effect(type_getter, function, &line.effect, id)
         }
     }
 
-    if !broke {
-        type_getter.compiler.builder.build_return(None);
-    }
     return None;
 }
 
@@ -132,8 +134,6 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             None
         }
         Effects::CodeBody(body) => {
-            let destination = unwrap_or_create(&body.label, function, type_getter);
-            type_getter.compiler.builder.build_unconditional_branch(destination);
             compile_block(body, function, type_getter, id)
         }
         //Calling function, function arguments

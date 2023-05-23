@@ -1,6 +1,6 @@
 use std::mem;
 use std::sync::{Arc, Mutex};
-use syntax::code::Effects;
+use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::{CodeBody, display_parenless, Function};
 use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
@@ -11,17 +11,24 @@ use crate::check_function::CheckerVariableManager;
 use crate::output::TypesChecker;
 
 pub async fn verify_code(process_manager: &TypesChecker, code: &mut CodeBody,
-                         syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
+                         syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
+    let mut returning = false;
     for line in &mut code.expressions {
+        if let ExpressionType::Return = line.expression_type {
+            returning = true;
+        }
         verify_effect(process_manager, &mut line.effect, syntax, variables).await?;
     }
-    return Ok(());
+
+    return Ok(returning);
 }
 
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, effect: &mut Effects, syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(), ParsingError> {
     match effect {
-        Effects::CodeBody(body) => verify_code(process_manager, body, syntax, &mut variables.clone()).await?,
+        Effects::CodeBody(body) => {
+            verify_code(process_manager, body, syntax, &mut variables.clone()).await?;
+        },
         Effects::Set(first, second) => {
             verify_effect(process_manager, first, syntax, variables).await?;
             verify_effect(process_manager, second, syntax, variables).await?;

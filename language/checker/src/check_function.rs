@@ -3,9 +3,10 @@ use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::function::{CodeStatus, Function};
 use syntax::{is_modifier, Modifier, ParsingError, VariableManager};
+use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
-use crate::check_code::verify_code;
+use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
 pub async fn verify_function(process_manager: &TypesChecker, function: &mut Function, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
@@ -27,7 +28,14 @@ pub async fn verify_function(process_manager: &TypesChecker, function: &mut Func
         _ => {}
     }
 
-    verify_code(process_manager, function.code.assume_finished_mut(), syntax, &mut variable_manager).await?;
+    if !verify_code(process_manager, function.code.assume_finished_mut(), syntax, &mut variable_manager).await? {
+        if function.return_type.is_none() {
+            function.code.assume_finished_mut().expressions.push(Expression::new(ExpressionType::Return, Effects::NOP()));
+        } else {
+            return Err(placeholder_error(format!("Function doesn't return a {}!",
+                                                 function.return_type.as_ref().unwrap())))
+        }
+    }
     return Ok(());
 }
 

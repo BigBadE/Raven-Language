@@ -10,14 +10,18 @@ use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 
-pub fn parse_code(parser_utils: &mut ParserUtils) -> ParsingFuture<CodeBody> {
+pub fn parse_code(parser_utils: &mut ParserUtils) -> (ExpressionType, ParsingFuture<CodeBody>) {
     let mut lines = Vec::new();
+    let mut types = ExpressionType::Line;
     while let Some((expression, effect)) =
         parse_line(parser_utils, false, false) {
+        if expression != ExpressionType::Line {
+            types = expression;
+        }
         lines.push(get_line(effect, expression));
     }
     parser_utils.imports.last_id += 1;
-    return Box::pin(create_body(parser_utils.imports.last_id - 1, lines));
+    return (types, Box::pin(create_body(parser_utils.imports.last_id - 1, lines)));
 }
 
 pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: bool)
@@ -79,10 +83,20 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::BlockStart => if break_at_body {
                 break;
             } else {
-                effect = Some(Box::pin(body_effect(parse_code(parser_utils))))
+                let (returning, body) = parse_code(parser_utils);
+                if expression_type != ExpressionType::Line {
+                    expression_type = returning;
+                }
+                effect = Some(Box::pin(body_effect(body)))
             },
             TokenTypes::Let => return Some((expression_type, parse_let(parser_utils))),
-            TokenTypes::If => effect = Some(parse_if(parser_utils)),
+            TokenTypes::If => {
+                let (returning, body) = parse_if(parser_utils);
+                if expression_type != ExpressionType::Line {
+                    expression_type = returning;
+                }
+                effect = Some(body)
+            },
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();

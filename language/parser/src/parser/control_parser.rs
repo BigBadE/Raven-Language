@@ -11,19 +11,19 @@ use crate::parser::code_parser::{parse_code, parse_line};
 
 use crate::{ParserUtils, TokenTypes};
 
-pub fn parse_if(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
+pub fn parse_if(parser_utils: &mut ParserUtils) -> (ExpressionType, ParsingFuture<Effects>) {
     let effect = parse_line(parser_utils, true, false);
     if effect.is_none() {
-        return Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
-            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string())));
+        return (ExpressionType::Line, Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()))));
     }
 
     if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type != TokenTypes::BlockStart {
-        return Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
-            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string())));
+        return (ExpressionType::Line, Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()))));
     }
 
-    let body = parse_code(parser_utils);
+    let (mut returning, body) = parse_code(parser_utils);
     let mut else_ifs = Vec::new();
     let mut else_body = None;
 
@@ -32,22 +32,36 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             parser_utils.index += 2;
             let effect = parse_line(parser_utils, true, false);
             if effect.is_none() {
-                return Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
-                    .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string())));
+                return (ExpressionType::Line, Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
+                    .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()))));
             }
-            else_ifs.push((effect.unwrap().1, parse_code(parser_utils)));
+            let (other_returning, body) = parse_code(parser_utils);
+            if other_returning != returning {
+                returning = ExpressionType::Line;
+            }
+            else_ifs.push((effect.unwrap().1, body));
         } else if parser_utils.tokens.get(parser_utils.index+1).unwrap().token_type == TokenTypes::BlockStart {
             parser_utils.index += 2;
-            else_body = Some(parse_code(parser_utils));
+            let (other_returning, body) = parse_code(parser_utils);
+            if other_returning != returning {
+                returning = ExpressionType::Line;
+            }
+            else_body = Some(body);
             break
         } else {
-            return Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
-                .make_error(parser_utils.file.clone(), "Expected block!".to_string())))
+            return (ExpressionType::Line, Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap()
+                .make_error(parser_utils.file.clone(), "Expected block!".to_string()))))
         }
     }
+
+    if else_body.is_none() {
+        returning = ExpressionType::Line;
+    }
+
     let adding = 2;
     parser_utils.imports.last_id += adding;
-    return Box::pin(create_if(effect.unwrap().1, body, else_ifs, else_body, parser_utils.imports.last_id-adding));
+    return (returning, Box::pin(create_if(effect.unwrap().1, body, else_ifs, else_body,
+                                          parser_utils.imports.last_id-adding)));
 }
 
 pub fn parse_for(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
@@ -68,7 +82,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
         return Box::pin(create_error(parser_utils.tokens.get(parser_utils.index).unwrap().make_error(
             parser_utils.file.clone(), "Expected iterator, found void".to_string())));
     }
-    let body = parse_code(parser_utils);
+    let body = parse_code(parser_utils).1;
     parser_utils.imports.last_id += 2;
     return Box::pin(create_for(name, parser_utils.file.clone(), effect.unwrap().1,
                                body, parser_utils.imports.last_id - 1,

@@ -12,7 +12,7 @@ pub struct Expression {
     pub effect: Effects,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq)]
 pub enum ExpressionType {
     Break,
     Return,
@@ -60,6 +60,17 @@ impl Expression {
             expression_type,
             effect,
         };
+    }
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.expression_type {
+            ExpressionType::Return => write!(f, "return ")?,
+            ExpressionType::Break => write!(f, "break ")?,
+            _ => {}
+        }
+        return self.effect.format("", f);
     }
 }
 

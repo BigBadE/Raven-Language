@@ -7,7 +7,7 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use compilers::compiling::Output;
-use syntax::function::Function;
+use syntax::function::{display_parenless, Function};
 use syntax::{ParsingError, VariableManager};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
