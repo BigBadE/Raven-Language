@@ -57,24 +57,35 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                 match &line.effect {
                     Effects::NOP() => {}
                     _ => {
+                        if let Effects::CodeBody(body) = &line.effect {
+                            if !broke {
+                                let destination = unwrap_or_create(&body.label, function, type_getter);
+                                type_getter.compiler.builder.build_unconditional_branch(destination);
+                            }
+                            compile_effect(type_getter, function, &line.effect, id);
+                            broke = true;
+                            break
+                        }
+
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
-                        if returned.is_struct_value() {
-                            type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
-                                                                     returned);
-                            type_getter.compiler.builder.build_return(None);
-                        } else if returned.is_pointer_value() &&
-                            returned.into_pointer_value().get_type().get_element_type().is_struct_type() {
-                            type_getter.compiler.builder.build_store(
-                                function.get_first_param().unwrap().into_pointer_value(),
-                                type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
-                            *id += 1;
-                            type_getter.compiler.builder.build_return(None);
-                        } else {
-                            type_getter.compiler.builder.build_return(Some(&returned));
+                        if !broke {
+                            if returned.is_struct_value() {
+                                type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
+                                                                         returned);
+                                type_getter.compiler.builder.build_return(None);
+                            } else if returned.is_pointer_value() &&
+                                returned.into_pointer_value().get_type().get_element_type().is_struct_type() {
+                                type_getter.compiler.builder.build_store(
+                                    function.get_first_param().unwrap().into_pointer_value(),
+                                    type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
+                                *id += 1;
+                                type_getter.compiler.builder.build_return(None);
+                            } else {
+                                type_getter.compiler.builder.build_return(Some(&returned));
+                            }
                         }
                         broke = true;
-                        break
                     }
                 }
             }
@@ -86,15 +97,14 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                 } else {
                     match &line.effect {
                         Effects::CodeBody(body) => {
+                            println!("Making unconditional to {}", body.label);
                             let destination =
                                 unwrap_or_create(&body.label, function, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(
                                 destination);
                             broke = true;
-                        }
-                        Effects::Jump(name) | Effects::CompareJump(_, name, _) => {
-                            broke = true;
                         },
+                        Effects::Jump(_) | Effects::CompareJump(_, _, _) => broke = true,
                         _ => {}
                     }
                     compile_effect(type_getter, function, &line.effect, id);

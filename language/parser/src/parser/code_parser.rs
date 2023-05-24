@@ -84,7 +84,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 break;
             } else {
                 let (returning, body) = parse_code(parser_utils);
-                if expression_type != ExpressionType::Line {
+                if expression_type == ExpressionType::Line {
                     expression_type = returning;
                 }
                 effect = Some(Box::pin(body_effect(body)))
@@ -92,7 +92,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Let => return Some((expression_type, parse_let(parser_utils))),
             TokenTypes::If => {
                 let (returning, body) = parse_if(parser_utils);
-                if expression_type != ExpressionType::Line {
+                if expression_type == ExpressionType::Line {
                     expression_type = returning;
                 }
                 effect = Some(body)
