@@ -69,6 +69,7 @@ pub async fn get_struct(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<F
                         functions: Vec<impl Future<Output=Result<Function, ParsingError>>>, name: String) -> Result<Struct, ParsingError> {
     let generics = get_generics(generics).await?;
     let mut done_fields = Vec::new();
+    //TODO investigate fields deadlocking with circular references
     for field in fields {
         done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)))
     }

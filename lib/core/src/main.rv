@@ -1,7 +1,7 @@
 pub fn main() -> bool {
     let iter = new iter::NumberIter {
         current: 1,
-        end: 5
+        end: 5,
     };
 
     iter.next();
