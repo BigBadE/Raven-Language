@@ -1,6 +1,6 @@
 use std::mem;
 use std::sync::{Arc, Mutex};
-use syntax::code::{Effects, Expression, ExpressionType};
+use syntax::code::{Effects, ExpressionType};
 use syntax::function::{CodeBody, display_parenless, Function};
 use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;

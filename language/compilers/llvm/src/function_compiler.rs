@@ -13,7 +13,7 @@ use syntax::r#struct::Struct;
 
 use crate::internal::instructions::compile_internal;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::{create_function_value, print_formatted};
+use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
@@ -64,7 +64,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                             }
                             compile_effect(type_getter, function, &line.effect, id);
                             broke = true;
-                            break
                         }
 
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();

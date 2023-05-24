@@ -1,3 +1,21 @@
-pub struct Iter<T> {
-    pub field: T;
+pub trait Iter<T> {
+    pub fn next(self) -> T;
+
+    pub fn has_next(self) -> bool;
+}
+
+pub struct NumberIter {
+    current: u64,
+    end: u64
+}
+
+impl Iter<u64> for NumberIter {
+    pub fn next(self) -> u64 {
+        self.current = self.current + 1;
+        return self.current;
+    }
+
+    pub fn has_next(self) -> bool {
+        return self.current == self.end;
+    }
 }

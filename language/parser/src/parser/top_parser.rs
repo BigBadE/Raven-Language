@@ -9,7 +9,7 @@ use crate::tokens::tokens::{Token, TokenTypes};
 pub fn parse_top(parser_utils: &mut ParserUtils) {
     let mut modifiers = Vec::new();
     let mut attributes = Vec::new();
-    while !parser_utils.tokens.is_empty() {
+    while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {

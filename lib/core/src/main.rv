@@ -1,7 +1,9 @@
 pub fn main() -> bool {
-    if 1 == 2 {
-        return false;
-    } else {
-        return true;
+    let iter = new iter::NumberIter {
+        current: 1,
+        end: 5
     };
+
+    iter.next();
+    return iter.has_next();
 }
