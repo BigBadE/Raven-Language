@@ -110,7 +110,7 @@ pub trait ProcessManager: Send + Sync {
 
     async fn verify_struct(&self, structure: &mut Struct, syntax: &Arc<Mutex<Syntax>>);
 
-    fn add_implementation(&self, base: Types, implementing: Types);
+    fn add_implementation(&self, implementor: TraitImplementor);
 
     fn get_generic(&self, name: &str) -> Option<Types>;
 
@@ -183,4 +183,11 @@ pub trait TopElement where Self: Sized {
     async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager);
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
+}
+
+pub struct TraitImplementor {
+    pub base: Types,
+    pub implementor: Types,
+    pub attributes: Vec<Attribute>,
+    pub functions: Vec<Function>
 }

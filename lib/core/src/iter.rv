@@ -4,11 +4,6 @@ pub trait Iter<T> {
     pub fn has_next(self) -> bool;
 }
 
-pub struct NumberIter {
-    current: u64,
-    end: u64
-}
-
 impl Iter<u64> for NumberIter {
     pub fn next(self) -> u64 {
         self.current = self.current + 1;

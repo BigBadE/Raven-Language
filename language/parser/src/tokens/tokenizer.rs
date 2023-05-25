@@ -56,8 +56,6 @@ impl<'a> Tokenizer<'a> {
             return self.make_token(TokenTypes::Comment);
         }
         self.last = match self.state {
-            TokenizerState::GENERIC_TO_FUNC | TokenizerState::GENERIC_TO_FUNC_TOP |
-            TokenizerState::GENERIC_TO_STRUCT | TokenizerState::GENERIC_TO_IMPL => next_generic(self),
             TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => next_top_token(self),
             TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => next_func_token(self),
             TokenizerState::STRUCTURE => next_struct_token(self),
@@ -65,8 +63,10 @@ impl<'a> Tokenizer<'a> {
             state =>
                 if state & 0xFF <= 1 {
                     next_string(self)
+                } else if state & 0xF00 == 0 {
+                    next_code_token(self, state & 0xFFFFF000)
                 } else {
-                    next_code_token(self, state & 0xFFFFFF00)
+                    next_generic(self, state & 0xFFFFF000)
                 },
         };
         return self.last.clone();
@@ -177,10 +177,10 @@ impl TokenizerState {
     pub const IMPLEMENTATION: u64 = 4;
     pub const FUNCTION: u64 = 5;
     pub const FUNCTION_TO_STRUCT_TOP: u64 = 6;
-    pub const GENERIC_TO_FUNC: u64 = 7;
-    pub const GENERIC_TO_FUNC_TOP: u64 = 8;
-    pub const GENERIC_TO_STRUCT: u64 = 9;
-    pub const GENERIC_TO_IMPL: u64 = 10;
+    pub const GENERIC_TO_FUNC: u64 = 0xF01;
+    pub const GENERIC_TO_FUNC_TOP: u64 = 0xF02;
+    pub const GENERIC_TO_STRUCT: u64 = 0xF03;
+    pub const GENERIC_TO_IMPL: u64 = 0xF04;
     pub const TOP_ELEMENT_TO_STRUCT: u64 = 11;
     pub const CODE: u64 = 12;
     pub const CODE_TO_STRUCT_TOP: u64 = 13;

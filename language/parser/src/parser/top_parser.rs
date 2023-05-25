@@ -60,8 +60,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 modifiers = Vec::new();
             }
             TokenTypes::ImplStart => {
-                let (base, implementor) = parse_implementor(parser_utils, attributes, modifiers);
-                parser_utils.syntax.lock().unwrap().process_manager.add_implementation(base, implementor);
+                parser_utils.syntax.lock().unwrap().process_manager.add_implementation(
+                        parse_implementor(parser_utils, attributes, modifiers));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             },

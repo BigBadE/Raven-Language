@@ -14,7 +14,7 @@ use crate::tokens::tokens::TokenTypes;
 pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
                       -> impl Future<Output=Result<Function, ParsingError>> {
     let mut name = String::new();
-    let mut generics = HashMap::new();
+    let mut generics = IndexMap::new();
     let mut fields = Vec::new();
     let mut code = None;
     let mut return_type = None;
@@ -34,7 +34,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             TokenTypes::ArgumentEnd => {
                 if last_arg_type.is_empty() {
                     if !parser_utils.imports.parent.is_some() {
-                        panic!("No parent!");
+                        panic!("No parent for {}!", name);
                     }
                     fields.push(FutureField(
                         parser_utils.get_struct(token,
@@ -86,7 +86,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
 
 pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,
                           fields: Vec<FutureField>,
-                          generics: HashMap<String, Vec<ParsingFuture<Types>>>,
+                          generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
                           code: Option<ParsingFuture<CodeBody>>,
                           return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
     let generics = get_generics(generics).await?;
@@ -104,7 +104,7 @@ pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,
 
 async fn const_empty() -> Result<CodeBody, ParsingError> { Ok(CodeBody::new(Vec::new(), "empty_trait".to_string())) }
 
-pub async fn get_generics(generics: HashMap<String, Vec<ParsingFuture<Types>>>)
+pub async fn get_generics(generics: IndexMap<String, Vec<ParsingFuture<Types>>>)
     -> Result<IndexMap<String, Types>, ParsingError> {
     let mut done_generics = IndexMap::new();
     for (name, generic) in generics {

@@ -113,7 +113,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
         TokenTypes::ArgumentsStart | TokenTypes::ArgumentEnd => if tokenizer.matches(")") {
             tokenizer.make_token(TokenTypes::ArgumentsEnd)
         } else {
-            parse_ident(tokenizer, TokenTypes::ArgumentName, &[b':', b','])
+            parse_ident(tokenizer, TokenTypes::ArgumentName, &[b':', b',', b')'])
         },
         TokenTypes::ArgumentName => if tokenizer.matches(":") {
             tokenizer.make_token(TokenTypes::ArgumentTypeSeparator)
@@ -160,7 +160,8 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
 
 pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
-        TokenTypes::StructStart | TokenTypes::TraitStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
+        TokenTypes::StructStart | TokenTypes::TraitStart =>
+            parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
         TokenTypes::Identifier | TokenTypes::GenericEnd => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GENERIC_TO_STRUCT;
             tokenizer.make_token(TokenTypes::GenericsStart)

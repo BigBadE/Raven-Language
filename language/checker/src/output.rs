@@ -6,7 +6,7 @@ use tokio::runtime::Handle;
 use async_trait::async_trait;
 
 use syntax::function::Function;
-use syntax::ProcessManager;
+use syntax::{ProcessManager, TraitImplementor};
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -52,7 +52,7 @@ impl ProcessManager for TypesChecker {
         }
     }
 
-    fn add_implementation(&self, _base: Types, _implementing: Types) {
+    fn add_implementation(&self, implementor: TraitImplementor) {
         todo!()
     }
 
