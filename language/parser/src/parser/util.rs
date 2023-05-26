@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
 use syntax::function::Function;
-use syntax::{ParsingError, ParsingFuture, TopElement};
+use syntax::{ParsingError, ParsingFuture, TopElement, TraitImplementor};
 use syntax::async_util::UnparsedType;
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
@@ -45,6 +45,11 @@ impl<'a> ParserUtils<'a> {
         Syntax::add(&syntax, token.make_error(file,
                                               format!("Duplicate structure {}", structure.name)),
                     structure).await;
+    }
+
+    pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: ParsingFuture<TraitImplementor>) {
+        let implementor = implementor.await.unwrap();
+        syntax.lock().unwrap().process_manager.add_implementation(implementor);
     }
 
     pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,

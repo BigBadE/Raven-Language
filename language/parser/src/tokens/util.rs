@@ -75,14 +75,16 @@ pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
 
 pub fn next_generic(tokenizer: &mut Tokenizer, state: u64) -> Token {
     return match &tokenizer.last.token_type {
-        TokenTypes::GenericsStart =>
-            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<']),
+        TokenTypes::GenericsStart => {
+            tokenizer.state += 0x1000;
+            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
+        },
         TokenTypes::Generic | TokenTypes::GenericBound => if tokenizer.matches(":") || tokenizer.matches("+") {
             parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
         } else if tokenizer.matches(",") {
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
         } else if tokenizer.matches(">") {
-            if state == 0 {
+            if state == 1 {
                 tokenizer.state = match (tokenizer.state & 0xF00) {
                     TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
                     TokenizerState::GENERIC_TO_FUNC_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,

@@ -88,40 +88,40 @@ pub async fn get_struct(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<F
 }
 
 pub fn parse_implementor(parser_util: &mut ParserUtils, attributes: Vec<Attribute>,
-                         _modifiers: Vec<Modifier>) -> TraitImplementor {
+                         _modifiers: Vec<Modifier>) -> ParsingFuture<TraitImplementor> {
     let mut base = None;
     let mut implementor = None;
     let mut functions = Vec::new();
     let mut generics = IndexMap::new();
 
     let mut state = 0;
-    while parser_utils.tokens.len() != parser_utils.index {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
-        parser_utils.index += 1;
+    while parser_util.tokens.len() != parser_util.index {
+        let token = parser_util.tokens.get(parser_util.index).unwrap();
+        parser_util.index += 1;
         match token.token_type {
-            TokenTypes::Identifier => if state == 0 {
-                state = 1;
+            TokenTypes::Identifier => {
                 let name = token.to_string(parser_util.buffer);
-                base = Some(Types::Struct(
-                    Syntax::get_struct(
-                        parser_util.syntax.clone(),
-                        token.create_error(format!("Failed to find {}", name)),
-                        name, parser_util.imports.boxed_clone())));
-            } else {
-                let name = token.to_string(parser_util.buffer);
-                implementor = Some(Types::Struct(
-                    Syntax::get_struct(
-                        parser_util.syntax.clone(),
-                        token.create_error(format!("Failed to find {}", name)),
-                        name, parser_util.imports.boxed_clone())));
+                let temp = Some(UnparsedType::Basic(name));
+                if state == 0 {
+                    base = temp;
+                    state = 1;
+                } else {
+                    implementor = temp;
+                }
             },
             TokenTypes::GenericsStart => {
                 if state == 0 {
                     parse_generics(parser_util, &mut generics);
                 } else {
-                    let mut temp = IndexMap::new();
-                    parse_generics(parser_util, &mut temp);
-
+                    let found =
+                        parse_type_generics(parser_util);
+                    if state == 1 {
+                        base = Some(UnparsedType::Generic(Box::new(base.unwrap()),
+                                                     found));
+                    } else {
+                        implementor = Some(UnparsedType::Generic(Box::new(implementor.unwrap()),
+                                                            found));
+                    }
                 }
             },
             TokenTypes::Generic => {
@@ -132,19 +132,68 @@ pub fn parse_implementor(parser_util: &mut ParserUtils, attributes: Vec<Attribut
         }
     }
 
-    return TraitImplementor {
-        base: base.unwrap(),
-        implementor: implementor.unwrap(),
-        functions,
-        attributes
+    let token = parser_util.tokens.get(parser_util.index-1).unwrap();
+
+    let base = Box::pin(
+        Syntax::parse_type(
+            parser_util.syntax.clone(),
+            token.make_error(parser_util.file.clone(), format!("Failed to find")),
+            parser_util.imports.boxed_clone(), base.unwrap()));
+
+    let implementor = Box::pin(
+        Syntax::parse_type(
+            parser_util.syntax.clone(),
+            token.make_error(parser_util.file.clone(), format!("Failed to find")),
+            parser_util.imports.boxed_clone(), implementor.unwrap()));
+
+    return Box::pin(get_implementation(base, implementor, functions, attributes));
+}
+
+async fn get_implementation(base: ParsingFuture<Types>, implementor: ParsingFuture<Types>,
+                            functions: Vec<ParsingFuture<Function>>, attributes: Vec<Attribute>)
+    -> Result<TraitImplementor, ParsingError> {
+    let mut final_funcs = Vec::new();
+    for func in functions {
+        final_funcs.push(func.await?);
     }
+    return Ok(TraitImplementor {
+        base: base.await?,
+        implementor: implementor.await?,
+        functions: final_funcs,
+        attributes
+    })
+}
+
+pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Vec<UnparsedType> {
+    let mut current = Vec::new();
+    while parser_utils.tokens.len() != parser_utils.index {
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
+        match token.token_type {
+            TokenTypes::GenericsStart => {
+                let mut temp = current.pop().unwrap();
+                temp = UnparsedType::Generic(Box::new(temp), parse_type_generics(parser_utils));
+            }
+            TokenTypes::Generic => {
+                let name = token.to_string(parser_utils.buffer);
+                current.push(UnparsedType::Basic(name));
+            }
+            TokenTypes::GenericEnd => {
+                break
+            }
+            _ => {
+                panic!("Unexpected type!");
+            }
+        }
+    }
+    return current;
 }
 
 pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<String, Vec<ParsingFuture<Types>>>) {
     let mut name = String::new();
     let mut unfinished_bounds = Vec::new();
     let mut bounds = Vec::new();
-    while !parser_utils.tokens.is_empty() {
+    while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
