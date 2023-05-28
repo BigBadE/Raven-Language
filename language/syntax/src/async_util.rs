@@ -2,9 +2,10 @@ use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 use crate::{ParsingError, TopElement};
+use crate::async_getters::AsyncGetter;
 use crate::function::{display_parenless, Function};
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
@@ -16,6 +17,31 @@ pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub operation: bool,
     pub name_resolver: Box<dyn NameResolver>,
     pub finished: Option<Arc<T>>,
+}
+
+impl<T: TopElement> AsyncTypesGetter<T> {
+    fn get_types(&mut self, getting: &mut AsyncGetter<T>, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
+        let name = if name.is_empty() {
+            self.getting.clone()
+        } else {
+            name + "::" + &*self.getting.clone()
+        };
+
+        //Look for a structure of that name
+        if let Some(found) = getting.types.get(&name).cloned() {
+            self.finished = Some(found.clone());
+
+            return Some(Ok(found));
+        }
+
+        //Add a waker for that type
+        if let Some(vectors) = getting.wakers.get_mut(&name) {
+            vectors.push(waker);
+        } else {
+            getting.wakers.insert(self.getting.clone(), vec!(waker));
+        }
+        return None;
+    }
 }
 
 impl AsyncTypesGetter<Function> {
@@ -55,34 +81,32 @@ impl Future for AsyncTypesGetter<Function> {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        let name = self.name_resolver.imports();
-
         //Look for a structure of that name
         if self.operation {
             if let Some(found) = locked.operations.get(&self.getting) {
                 return Poll::Ready(Ok(found.get(0).unwrap().clone()));
             }
-        } else {
-            if let Some(found) = locked.functions.types.get(name).cloned() {
-                self.finished = Some(found.clone());
+        }
 
-                return Poll::Ready(Ok(found));
+        if let Some(output) = self.get_types(&mut locked.functions,
+                                             String::new(), cx.waker().clone()) {
+            return Poll::Ready(output);
+        }
+
+        for import in self.name_resolver.imports().clone() {
+            if let Some(output) = self.get_types(&mut locked.functions,
+                                                 import, cx.waker().clone()) {
+                return Poll::Ready(output);
             }
         }
 
-        if locked.async_manager.finished && !locked.functions.parsing.contains(&name) {
+        if locked.async_manager.finished {
             locked.functions.wakers.values().for_each(|wakers| for waker in wakers {
                 waker.wake_by_ref();
             });
             return Poll::Ready(Err(self.error.clone()));
         }
 
-        //Add a waker for that type
-        if let Some(vectors) = locked.functions.wakers.get_mut(name) {
-            vectors.push(cx.waker().clone());
-        } else {
-            locked.functions.wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
-        }
         return Poll::Pending;
     }
 }
@@ -98,28 +122,26 @@ impl Future for AsyncTypesGetter<Struct> {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        let name = self.name_resolver.resolve(&self.getting);
-
-        //Look for a structure of that name
-        if let Some(found) = locked.structures.types.get(name).cloned() {
-            self.finished = Some(found.clone());
-
-            return Poll::Ready(Ok(found));
+        if let Some(output) = self.get_types(&mut locked.structures,
+                                             String::new(), cx.waker().clone()) {
+            return Poll::Ready(output);
         }
 
-        if locked.async_manager.finished && !locked.structures.parsing.contains(&name) {
+        for import in self.name_resolver.imports().clone() {
+            if let Some(output) = self.get_types(&mut locked.structures,
+                                                 import, cx.waker().clone()) {
+                return Poll::Ready(output);
+            }
+        }
+
+        if locked.async_manager.finished {
             locked.structures.wakers.values().for_each(|wakers| for waker in wakers {
                 waker.wake_by_ref();
             });
+
             return Poll::Ready(Err(self.error.clone()));
         }
 
-        //Add a waker for that type
-        if let Some(vectors) = locked.structures.wakers.get_mut(name) {
-            vectors.push(cx.waker().clone());
-        } else {
-            locked.structures.wakers.insert(self.getting.clone(), vec!(cx.waker().clone()));
-        }
         return Poll::Pending;
     }
 }
@@ -127,7 +149,7 @@ impl Future for AsyncTypesGetter<Struct> {
 #[derive(Clone, Debug)]
 pub enum UnparsedType {
     Basic(String),
-    Generic(Box<UnparsedType>, Vec<UnparsedType>)
+    Generic(Box<UnparsedType>, Vec<UnparsedType>),
 }
 
 impl Display for UnparsedType {
@@ -135,8 +157,8 @@ impl Display for UnparsedType {
         return match self {
             UnparsedType::Basic(name) => write!(f, "{}", name),
             UnparsedType::Generic(base, bounds) =>
-            write!(f, "{}<{}>", base, display_parenless(bounds, " + "))
-        }
+                write!(f, "{}<{}>", base, display_parenless(bounds, " + "))
+        };
     }
 }
 

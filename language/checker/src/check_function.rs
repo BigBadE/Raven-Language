@@ -14,10 +14,6 @@ pub async fn verify_function(process_manager: &TypesChecker, function: &mut Func
         return Ok(());
     }
 
-    if function.name == "main::main" {
-        println!("Here! 1");
-    }
-
     let mut variable_manager = CheckerVariableManager { variables: HashMap::new() };
 
     for argument in &function.fields {
@@ -32,9 +28,6 @@ pub async fn verify_function(process_manager: &TypesChecker, function: &mut Func
         _ => {}
     }
 
-    if function.name == "main::main" {
-        println!("Here! 2");
-    }
     if !verify_code(process_manager, function.code.assume_finished_mut(), syntax, &mut variable_manager).await? {
         if function.return_type.is_none() {
             function.code.assume_finished_mut().expressions.push(Expression::new(ExpressionType::Return, Effects::NOP()));
