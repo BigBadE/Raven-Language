@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::future::Future;
 use indexmap::IndexMap;
-use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
+use syntax::{Attribute, get_all_names, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
 use syntax::types::Types;
@@ -36,6 +35,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                     if !parser_utils.imports.parent.is_some() {
                         panic!("No parent for {}!", name);
                     }
+
                     fields.push(FutureField(
                         parser_utils.get_struct(token,
                                                 parser_utils.imports.parent.as_ref().unwrap().clone()),
@@ -69,7 +69,6 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
     let modifiers = get_modifier(modifiers.as_slice());
     {
         let mut locked = parser_utils.syntax.lock().unwrap();
-        locked.functions.parsing.push(name.clone());
         if is_modifier(modifiers, Modifier::Operation) {
             for i in 0.. {
                 let name = format!("{}${}", name.split("::").last().unwrap().to_string(), i);
@@ -77,6 +76,10 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                     locked.functions.parsing.push(name);
                     break
                 }
+            }
+        } else {
+            for name in get_all_names(&name) {
+                locked.functions.parsing.push(name);
             }
         }
     }
@@ -90,13 +93,18 @@ pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,
                           code: Option<ParsingFuture<CodeBody>>,
                           return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
     let generics = get_generics(generics).await?;
+
     let return_type = match return_type {
         Some(found) => Some(found.await?),
         None => None
     };
+
     let mut done_fields = Vec::new();
+    let mut index = 0;
     for field in fields {
-        done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)))
+        done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)));
+
+        index += 1;
     }
     return Ok(Function::new(attributes, modifiers, done_fields, generics, code.unwrap_or(Box::pin(const_empty())),
                             return_type, name));

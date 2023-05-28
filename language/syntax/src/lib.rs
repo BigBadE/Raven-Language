@@ -154,6 +154,23 @@ impl ParsingError {
     }
 }
 
+pub fn get_all_names(input: &String) -> Vec<String> {
+    let mut output = Vec::new();
+
+    let mut temp = String::new();
+    let mut split = input.split("::").collect::<Vec<_>>();
+    while let Some(found) = split.pop() {
+        if temp.is_empty() {
+            temp = found.to_string()
+        } else {
+            temp = found.to_string() + "::" + &*temp;
+        }
+        output.push(temp.clone());
+    }
+
+    return output;
+}
+
 pub trait ErrorProvider {
     fn get_error(&self, error: String) -> ParsingError;
 }

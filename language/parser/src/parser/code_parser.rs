@@ -220,13 +220,13 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
     }
 
     return Box::pin(create_effect(parser_utils.syntax.clone(),
-                                  parser_utils.tokens.get(parser_utils.index).unwrap()
-                                      .make_error(parser_utils.file.clone(), "Unknown type!".to_string()),
+                                  parser_utils.tokens.get(parser_utils.index).unwrap().clone(),
+                                  parser_utils.file.clone(),
                                   parser_utils.imports.boxed_clone(),
                                   types.unwrap(), values));
 }
 
-fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<Effects>)> {
+fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(String, ParsingFuture<Effects>)> {
     let mut values = Vec::new();
     let mut name = String::new();
     loop {
@@ -241,10 +241,10 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Vec<(usize, ParsingFuture<E
                         .unwrap_or((ExpressionType::Line,
                                     Box::pin(expect_effect(parser_utils.file.clone(), token)))).1
                 } else {
-                    constant_effect(Effects::LoadVariable(name))
+                    constant_effect(Effects::LoadVariable(name.clone()))
                 };
+                values.push((name, effect));
                 name = String::new();
-                values.push((0, effect));
                 if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::BlockEnd {
                     break;
                 }
@@ -262,15 +262,26 @@ async fn expect_effect(file: String, token: Token) -> Result<Effects, ParsingErr
     return Err(token.make_error(file, "Expected something, found void".to_string()));
 }
 
-async fn create_effect(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
-                       types: UnparsedType, inputs: Vec<(usize, ParsingFuture<Effects>)>)
+async fn create_effect(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, resolver: Box<dyn NameResolver>,
+                       types: UnparsedType, inputs: Vec<(String, ParsingFuture<Effects>)>)
                        -> Result<Effects, ParsingError> {
+    let types = Syntax::parse_type(syntax, token.make_error(file.clone(), format!("Unknown type {}", types)), resolver, types).await?;
+    let fields = types.get_fields();
     let mut final_inputs = Vec::new();
     for input in inputs {
-        final_inputs.push((input.0, input.1.await?));
+        let mut i = 0;
+        for field in fields {
+            if field.field.name == input.0 {
+                final_inputs.push((i, input.1.await?));
+                break
+            }
+            i += 1;
+        }
+        if i == fields.len() {
+            return Err(token.make_error(file, format!("No field named {}!", input.0)));
+        }
     }
-    return Ok(Effects::CreateStruct(Syntax::parse_type(syntax, error, resolver, types).await?,
-                                    final_inputs));
+    return Ok(Effects::CreateStruct(types, final_inputs));
 }
 
 pub async fn get_line(effect: ParsingFuture<Effects>, expression_type: ExpressionType)

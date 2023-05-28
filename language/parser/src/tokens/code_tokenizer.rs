@@ -14,7 +14,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
             tokenizer.make_token(TokenTypes::LineEnd)
         }
     } else if tokenizer.matches("{") {
-        tokenizer.state += 0x100;
+        tokenizer.state += 0x1000;
         tokenizer.make_token(TokenTypes::BlockStart)
     } else if tokenizer.matches("}") {
         tokenizer.for_loop = false;

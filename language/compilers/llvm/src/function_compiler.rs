@@ -96,7 +96,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                 } else {
                     match &line.effect {
                         Effects::CodeBody(body) => {
-                            println!("Making unconditional to {}", body.label);
                             let destination =
                                 unwrap_or_create(&body.label, function, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(
@@ -254,7 +253,6 @@ fn unwrap_or_create<'ctx>(name: &String, function: FunctionValue<'ctx>, type_get
     return if let Some(output) = type_getter.blocks.get(name) {
         output.clone()
     } else {
-        println!("2 Creating {}", name);
         let temp = type_getter.compiler.context.append_basic_block(function, name);
         type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
         type_getter.blocks.insert(name.clone(), temp);

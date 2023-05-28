@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use async_recursion::async_recursion;
 
-use crate::{ParsingError, ProcessManager, TopElement, Types};
+use crate::{get_all_names, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::Function;
@@ -54,11 +54,8 @@ impl Syntax {
         } else {
             T::get_manager(locked.deref_mut()).types.insert(adding.name().clone(), adding.clone());
         }
-        if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(adding.name()) {
-            for waker in wakers {
-                waker.wake();
-            }
-        }
+
+        let mut split = get_all_names(adding.name());
 
         if adding.is_operator() {
             //Only functions can be operators. This will break if something else is.
@@ -73,7 +70,9 @@ impl Syntax {
                     locked.operations.insert(name.clone(), vec!(adding));
                 }
             }
+        }
 
+        for name in split {
             if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
                 for waker in wakers {
                     waker.wake();
@@ -91,9 +90,12 @@ impl Syntax {
         if getter.types.get_mut(element.name()).is_none() {
             getter.types.insert(element.name().clone(), element.clone());
         }
-        if let Some(wakers) = getter.wakers.remove(element.name()) {
-            for waker in wakers {
-                waker.wake();
+
+        for name in get_all_names(element.name()) {
+            if let Some(wakers) = getter.wakers.remove(&name) {
+                for waker in wakers {
+                    waker.wake();
+                }
             }
         }
     }
@@ -104,13 +106,13 @@ impl Syntax {
     }
 
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
+                            getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
         if let Some(found) = name_resolver.generic(&getting) {
             let mut bounds = Vec::new();
             for bound in found {
                 //Async recursion isn't sync, but futures are implicitly sync.
                 bounds.push(Self::parse_type(syntax.clone(), error.clone(),
-                            name_resolver.boxed_clone(), bound).await?);
+                                             name_resolver.boxed_clone(), bound).await?);
             }
             return Ok(Types::Generic(getting, bounds));
         }
@@ -119,7 +121,7 @@ impl Syntax {
 
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
-                        types: UnparsedType) -> Result<Types, ParsingError> {
+                            types: UnparsedType) -> Result<Types, ParsingError> {
         return match types {
             UnparsedType::Basic(name) =>
                 Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,
@@ -133,7 +135,7 @@ impl Syntax {
                     Self::parse_type(syntax, error, resolver, *name).await?),
                                       generics))
             }
-        }
+        };
     }
 
     fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {

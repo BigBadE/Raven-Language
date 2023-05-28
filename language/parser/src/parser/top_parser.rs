@@ -82,7 +82,7 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
 
     match next.token_type {
         TokenTypes::Identifier => {
-            parser_utils.imports.imports.insert(name.split("::").last().unwrap().to_string(), name.parse().unwrap());
+            parser_utils.imports.imports.push(name);
         }
         _ => {
             parser_utils.index -= 1;

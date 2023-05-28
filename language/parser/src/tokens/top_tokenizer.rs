@@ -39,6 +39,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::TraitStart)
             }
         } else if tokenizer.matches("impl") {
+            tokenizer.index += 1;
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
@@ -160,7 +161,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
 
 pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
-        TokenTypes::StructStart | TokenTypes::TraitStart =>
+        TokenTypes::StructStart | TokenTypes::TraitStart | TokenTypes::For =>
             parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
         TokenTypes::Identifier | TokenTypes::GenericEnd => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GENERIC_TO_STRUCT;
@@ -171,7 +172,7 @@ pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
         } else {
             tokenizer.handle_invalid()
         },
-        _ => panic!("How'd you get here?")
+        _ => panic!("How'd you get here? {:?}", tokenizer.last.token_type)
     }
 }
 
@@ -185,7 +186,7 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
         },
         TokenTypes::GenericEnd => if tokenizer.matches("for") {
             tokenizer.state = TokenizerState::STRUCTURE;
-            tokenizer.make_token(TokenTypes::TraitStart)
+            tokenizer.make_token(TokenTypes::For)
         } else {
             tokenizer.next_included()?;
             tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')

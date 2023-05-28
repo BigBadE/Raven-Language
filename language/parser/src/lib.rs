@@ -35,7 +35,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
 
 #[derive(Clone)]
 pub struct ImportNameResolver {
-    pub imports: HashMap<String, String>,
+    pub imports: Vec<String>,
     pub generics: HashMap<String, Vec<UnparsedType>>,
     pub parent: Option<String>,
     pub last_id: u32
@@ -44,7 +44,7 @@ pub struct ImportNameResolver {
 impl ImportNameResolver {
     pub fn new() -> Self {
         return Self {
-            imports: HashMap::new(),
+            imports: Vec::new(),
             generics: HashMap::new(),
             parent: None,
             last_id: 0
@@ -53,8 +53,8 @@ impl ImportNameResolver {
 }
 
 impl NameResolver for ImportNameResolver {
-    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
-        return self.imports.get(name).unwrap_or(name);
+    fn imports(&self) -> &Vec<String> {
+        return &self.imports;
     }
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>> {

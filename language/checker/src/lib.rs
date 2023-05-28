@@ -7,13 +7,15 @@ pub mod check_function;
 pub mod check_struct;
 pub mod output;
 
+static EMPTY: Vec<String> = Vec::new();
+
 pub struct EmptyNameResolver {
     
 }
 
 impl NameResolver for EmptyNameResolver {
-    fn resolve<'a>(&'a self, name: &'a String) -> &'a String {
-        return name;
+    fn imports(&self) -> &Vec<String> {
+        return &EMPTY;
     }
 
     fn generic(&self, _name: &String) -> Option<Vec<UnparsedType>> {

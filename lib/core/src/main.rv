@@ -1,9 +1,12 @@
+import iter;
+
 pub fn main() -> bool {
-    let iter = new iter::NumberIter {
+    let iter = new NumberIter {
         current: 1,
         end: 5,
     };
 
-    iter.next();
-    return iter.has_next();
+    //iter.next();
+    //return iter.has_next();
+    return false;
 }

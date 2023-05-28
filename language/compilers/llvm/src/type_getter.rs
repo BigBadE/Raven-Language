@@ -108,6 +108,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             }
             compile_block(function.code.assume_finished(), function_type,
                           &mut self.for_function(&function, function_type), &mut 0);
+            print_formatted(function_type.to_string());
         }
 
         print_formatted(self.compiler.module.to_string());

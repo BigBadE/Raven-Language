@@ -25,6 +25,10 @@ pub struct ParserUtils<'a> {
 
 impl<'a> ParserUtils<'a> {
     pub fn get_struct(&self, token: &Token, name: String) -> ParsingFuture<Types> {
+        if name.is_empty() {
+            panic!("Empty name!");
+        }
+
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(), token.make_error(self.file.clone(),
                                                   format!("Failed to find type named {}", &name)),
@@ -48,7 +52,8 @@ impl<'a> ParserUtils<'a> {
     }
 
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: ParsingFuture<TraitImplementor>) {
-        let implementor = implementor.await.unwrap();
+        let temp = implementor.await;
+        let implementor = temp.unwrap();
         syntax.lock().unwrap().process_manager.add_implementation(implementor);
     }
 

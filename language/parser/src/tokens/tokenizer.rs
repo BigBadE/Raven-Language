@@ -51,19 +51,20 @@ impl<'a> Tokenizer<'a> {
             return self.parse_to_line_end(TokenTypes::Comment);
         } else if self.matches("/*") {
             while !self.matches("*/") {
-
+                self.index += 1;
             }
             return self.make_token(TokenTypes::Comment);
         }
+
         self.last = match self.state {
             TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => next_top_token(self),
             TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => next_func_token(self),
             TokenizerState::STRUCTURE => next_struct_token(self),
             TokenizerState::IMPLEMENTATION => next_implementation_token(self),
             state =>
-                if state & 0xFF <= 1 {
+                if state & 0xFF <= TokenizerState::STRING_TO_CODE_STRUCT_TOP {
                     next_string(self)
-                } else if state & 0xF00 == 0 {
+                } else if state & 0xFF == TokenizerState::CODE || state & 0xFF == TokenizerState::CODE_TO_STRUCT_TOP {
                     next_code_token(self, state & 0xFFFFF000)
                 } else {
                     next_generic(self, state & 0xFFFFF000)
@@ -98,7 +99,8 @@ impl<'a> Tokenizer<'a> {
         let offset = self.line_index;
         let line = self.line;
         for character in input.bytes() {
-            if self.next_included().unwrap_or(b' ') != character {
+            let found = self.next_included().unwrap_or(b' ');
+            if found != character {
                 self.index = start;
                 self.line_index = offset;
                 self.line = line;
@@ -181,7 +183,7 @@ impl TokenizerState {
     pub const GENERIC_TO_FUNC_TOP: u64 = 0xF02;
     pub const GENERIC_TO_STRUCT: u64 = 0xF03;
     pub const GENERIC_TO_IMPL: u64 = 0xF04;
-    pub const TOP_ELEMENT_TO_STRUCT: u64 = 11;
-    pub const CODE: u64 = 12;
-    pub const CODE_TO_STRUCT_TOP: u64 = 13;
+    pub const TOP_ELEMENT_TO_STRUCT: u64 = 0xB;
+    pub const CODE: u64 = 0xC;
+    pub const CODE_TO_STRUCT_TOP: u64 = 0xD;
 }

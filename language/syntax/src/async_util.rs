@@ -1,10 +1,11 @@
+use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use crate::{ParsingError, TopElement};
-use crate::function::Function;
+use crate::function::{display_parenless, Function};
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
 
@@ -54,11 +55,11 @@ impl Future for AsyncTypesGetter<Function> {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        let name = self.name_resolver.resolve(&self.getting);
+        let name = self.name_resolver.imports();
 
         //Look for a structure of that name
         if self.operation {
-            if let Some(found) = locked.operations.get(name) {
+            if let Some(found) = locked.operations.get(&self.getting) {
                 return Poll::Ready(Ok(found.get(0).unwrap().clone()));
             }
         } else {
@@ -129,8 +130,18 @@ pub enum UnparsedType {
     Generic(Box<UnparsedType>, Vec<UnparsedType>)
 }
 
+impl Display for UnparsedType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return match self {
+            UnparsedType::Basic(name) => write!(f, "{}", name),
+            UnparsedType::Generic(base, bounds) =>
+            write!(f, "{}<{}>", base, display_parenless(bounds, " + "))
+        }
+    }
+}
+
 pub trait NameResolver: Send + Sync {
-    fn resolve<'a>(&'a self, name: &'a String) -> &'a String;
+    fn imports(&self) -> &Vec<String>;
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
 

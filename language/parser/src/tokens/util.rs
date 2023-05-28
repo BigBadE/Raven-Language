@@ -15,7 +15,7 @@ pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> To
         }
         let character = tokenizer.buffer[tokenizer.index] as char;
         if !character.is_alphanumeric() && character != ':' && character != '_' {
-            if tokenizer.buffer[tokenizer.index-1] == b':' {
+            if tokenizer.buffer[tokenizer.index - 1] == b':' {
                 tokenizer.index -= 1;
             }
             return tokenizer.make_token(token_type);
@@ -44,7 +44,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
                     tokenizer.make_token(TokenTypes::Float)
                 } else {
                     tokenizer.make_token(TokenTypes::Integer)
-                }
+                };
             }
         }
         tokenizer.index += 1;
@@ -78,30 +78,31 @@ pub fn next_generic(tokenizer: &mut Tokenizer, state: u64) -> Token {
         TokenTypes::GenericsStart => {
             tokenizer.state += 0x1000;
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
-        },
-        TokenTypes::Generic | TokenTypes::GenericBound => if tokenizer.matches(":") || tokenizer.matches("+") {
-            parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
-        } else if tokenizer.matches(",") {
-            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
-        } else if tokenizer.matches(">") {
-            if state == 1 {
-                tokenizer.state = match (tokenizer.state & 0xF00) {
-                    TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
-                    TokenizerState::GENERIC_TO_FUNC_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
-                    TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
-                    TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
-                    _ => panic!("Unexpected generic state!")
-                };
-            } else {
-                tokenizer.state -= 0x1000;
-            }
+        }
+        TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericEnd =>
+            if tokenizer.matches(":") || tokenizer.matches("+") {
+                parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
+            } else if tokenizer.matches(",") {
+                parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
+            } else if tokenizer.matches(">") {
+                if state == 0x1000 {
+                    tokenizer.state = match tokenizer.state & 0xFFF {
+                        TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
+                        TokenizerState::GENERIC_TO_FUNC_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
+                        TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
+                        TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
+                        _ => panic!("Unexpected generic state!")
+                    };
+                } else {
+                    tokenizer.state -= 0x1000;
+                }
 
-            tokenizer.make_token(TokenTypes::GenericEnd)
-        } else {
-            tokenizer.handle_invalid()
-        },
+                tokenizer.make_token(TokenTypes::GenericEnd)
+            } else {
+                tokenizer.handle_invalid()
+            },
         token_type => panic!("How'd you get here? {:?}", token_type)
-    }
+    };
 }
 
 #[cfg(test)]

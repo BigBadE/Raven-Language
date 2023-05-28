@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Mutex};
 use crate::function::{display, display_parenless};
 use crate::{is_modifier, Modifier, ParsingError, Struct};
+use crate::code::MemberField;
 use crate::syntax::Syntax;
 
 #[derive(Clone, Debug)]
@@ -33,6 +34,16 @@ impl Types {
             _ => panic!("Tried to primitive check a generic!")
         }
     }
+    
+    pub fn get_fields(&self) -> &Vec<MemberField> {
+        return match self { 
+            Types::Struct(structure) => &structure.fields,
+            Types::Reference(inner) => inner.get_fields(),
+            Types::GenericType(base, _) => base.get_fields(),
+            Types::Generic(_, _) => panic!("Tried to get fields of generic!")
+        }
+    }
+    
     pub fn of_type(&self, other: &Types) -> bool {
         return match self {
             Types::Struct(found) => match other {
