@@ -117,8 +117,9 @@ pub enum Effects {
     //Comparison effect, and label to jump to the first if true, second if false
     CompareJump(Box<Effects>, String, String),
     CodeBody(CodeBody),
-    //Calling function, function arguments
-    MethodCall(Arc<Function>, Vec<Effects>),
+    //Calling, calling function, function arguments
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>),
+    VerifiedMethodCall(Arc<Function>, Vec<Effects>),
     //Sets pointer to value
     Set(Box<Effects>, Box<Effects>),
     //Loads variable
@@ -145,7 +146,8 @@ impl Effects {
             Effects::CodeBody(_) => None,
             Effects::CreateVariable(_, effect) => effect.get_return(variables),
             Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
-            Effects::MethodCall(function, _) => function.return_type.clone(),
+            Effects::MethodCall(_, _, _) => panic!("Failed to resolve method call!"),
+            Effects::VerifiedMethodCall(function, _) => function.return_type.clone(),
             Effects::Set(_, to) => to.get_return(variables),
             Effects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
@@ -213,8 +215,18 @@ impl DisplayIndented for Effects {
             },
             Effects::LoadVariable(variable) => write!(f, "{}", variable),
             Effects::CodeBody(body) => body.format(&deeper, f),
-            Effects::MethodCall(function, args) => {
-                write!(f, "{}.", function.name, )?;
+            Effects::MethodCall(calling, function, args) => {
+                if let Some(calling) = calling {
+                    calling.format(parsing, f)?;
+                    write!(f, ".{}", function)?;
+                    display_indented(f, args, &deeper, ", ")
+                } else {
+                    write!(f, "{}", function)?;
+                    display_indented(f, args, &deeper, ", ")
+                }
+            }
+            Effects::VerifiedMethodCall(function, args) => {
+                write!(f, "{}.", function.name)?;
                 display_indented(f, args, &deeper, ", ")
             }
             Effects::Set(setting, value) => {
@@ -237,7 +249,7 @@ impl DisplayIndented for Effects {
             Effects::Int(int) => write!(f, "{}", int),
             Effects::UInt(uint) => write!(f, "{}", uint),
             Effects::Bool(bool) => write!(f, "{}", bool),
-            Effects::String(string) => write!(f, "{}", string)
+            Effects::String(string) => write!(f, "{}", string),
         };
     }
 }

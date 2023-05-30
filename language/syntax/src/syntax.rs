@@ -35,10 +35,10 @@ impl Syntax {
         self.async_manager.finished = true;
     }
 
-    pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, mut adding: Arc<T>) {
+    pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, dupe_error: ParsingError, mut adding: Arc<T>) {
         let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
 
-        unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, process_manager.deref_mut()).await;
+        unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, resolver, process_manager.deref_mut()).await;
 
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
@@ -55,7 +55,7 @@ impl Syntax {
             T::get_manager(locked.deref_mut()).types.insert(adding.name().clone(), adding.clone());
         }
 
-        let mut split = get_all_names(adding.name());
+        let split = get_all_names(adding.name());
 
         if adding.is_operator() {
             //Only functions can be operators. This will break if something else is.

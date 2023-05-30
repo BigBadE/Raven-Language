@@ -6,7 +6,7 @@ use crate::{is_modifier, Modifier, ParsingError, Struct};
 use crate::code::MemberField;
 use crate::syntax::Syntax;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Types {
     //A basic struct
     Struct(Arc<Struct>),
@@ -66,7 +66,6 @@ impl Types {
                     }
 
                     //TODO check generics, I have no clue how to with respect to subtypes.
-                    //Is this even required? Or are generics resolved by now? Idk
                     todo!()
                 }
                 Types::Generic(_, bounds) => {

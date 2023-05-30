@@ -3,13 +3,14 @@ use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::function::{CodeStatus, Function};
 use syntax::{is_modifier, Modifier, ParsingError, VariableManager};
+use syntax::async_util::NameResolver;
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
-pub async fn verify_function(process_manager: &TypesChecker, function: &mut Function, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, function: &mut Function, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
     if is_modifier(function.modifiers, Modifier::Internal) {
         return Ok(());
     }
@@ -28,7 +29,7 @@ pub async fn verify_function(process_manager: &TypesChecker, function: &mut Func
         _ => {}
     }
 
-    if !verify_code(process_manager, function.code.assume_finished_mut(), syntax, &mut variable_manager).await? {
+    if !verify_code(process_manager, &resolver, function.code.assume_finished_mut(), syntax, &mut variable_manager).await? {
         if function.return_type.is_none() {
             function.code.assume_finished_mut().expressions.push(Expression::new(ExpressionType::Return, Effects::NOP()));
         } else {

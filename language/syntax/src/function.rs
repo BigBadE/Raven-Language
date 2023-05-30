@@ -5,12 +5,11 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 
 use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture};
+use crate::async_util::NameResolver;
 use crate::code::{Expression, MemberField};
-use crate::r#struct::Struct;
 
 #[derive(Clone)]
 pub struct Function {
-    pub parent: Option<Arc<Struct>>,
     pub attributes: Vec<Attribute>,
     pub generics: IndexMap<String, Types>,
     pub modifiers: u8,
@@ -57,7 +56,6 @@ impl Function {
                fields: Vec<MemberField>, generics: IndexMap<String, Types>,
                code: ParsingFuture<CodeBody>, return_type: Option<Types>, name: String) -> Self {
         return Self {
-            parent: None,
             attributes,
             generics,
             modifiers,
@@ -71,7 +69,6 @@ impl Function {
     
     pub fn poisoned(name: String, error: ParsingError) -> Self {
         return Self {
-            parent: None,
             attributes: Vec::new(),
             generics: IndexMap::new(),
             modifiers: 0,
@@ -106,8 +103,8 @@ impl TopElement for Function {
         return Function::poisoned(name, error);
     }
 
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
-        process_manager.verify_func(self, syntax).await;
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: &mut dyn ProcessManager) {
+        process_manager.verify_func(self, resolver, syntax).await;
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {

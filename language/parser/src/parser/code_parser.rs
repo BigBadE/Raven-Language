@@ -37,9 +37,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 match last.token_type {
                     TokenTypes::Variable | TokenTypes::CallingType => {
                         let mut effects = Vec::new();
-                        if let Some(last) = effect {
-                            effects.push(last);
-                        }
                         while let Some((_, effect)) = parse_line(parser_utils, false, false) {
                             effects.push(effect);
                             if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {} else {
@@ -48,9 +45,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                         }
 
                         let name = last.to_string(parser_utils.buffer);
-                        effect = Some(Box::pin(method_call(parser_utils.syntax.clone(), name.clone(),
-                                                           token.make_error(parser_utils.file.clone(), format!("Unknown method {}!", name)),
-                                                           parser_utils.imports.boxed_clone(), effects)))
+                        effect = Some(Box::pin(method_call(effect, name.clone(), effects)))
                     }
                     _ => if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
                         effect = Some(in_effect);
@@ -133,13 +128,18 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
     return Some((expression_type, effect.unwrap_or(constant_effect(Effects::NOP()))));
 }
 
-async fn method_call(syntax: Arc<Mutex<Syntax>>, variable: String, error: ParsingError,
-                     resolver: Box<dyn NameResolver>, inner: Vec<ParsingFuture<Effects>>) -> Result<Effects, ParsingError> {
+async fn method_call(calling: Option<ParsingFuture<Effects>>, name: String,
+                     inner: Vec<ParsingFuture<Effects>>) -> Result<Effects, ParsingError> {
     let mut output = Vec::new();
+    let calling = match calling {
+        Some(found) => Some(Box::new(found.await?)),
+        None => None
+    };
+
     for possible in inner {
         output.push(possible.await?);
     }
-    return Ok(Effects::MethodCall(Syntax::get_function(syntax, error, variable, false, resolver).await?, output));
+    return Ok(Effects::MethodCall(calling, name, output));
 }
 
 async fn load_effect(loading: ParsingFuture<Effects>, name: String) -> Result<Effects, ParsingError> {

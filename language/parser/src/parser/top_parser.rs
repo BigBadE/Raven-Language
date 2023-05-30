@@ -25,8 +25,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let token = token.clone();
                 let function = parse_function(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
-                    ParserUtils::add_function(parser_utils.syntax.clone(), parser_utils.file.clone(),
-                                              token, Box::pin(function)));
+                    ParserUtils::add_function(parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone()),
+                                              parser_utils.file.clone(), token, Box::pin(function)));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
@@ -34,7 +34,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
-                    ParserUtils::add_struct(parser_utils.syntax.clone(), token,
+                    ParserUtils::add_struct(parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone()), token,
                                             parser_utils.file.clone(), Box::pin(structure)));
                 attributes = Vec::new();
                 modifiers = Vec::new();
@@ -54,7 +54,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.handle.spawn(
-                    ParserUtils::add_struct(parser_utils.syntax.clone(), token,
+                    ParserUtils::add_struct(parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone()), token,
                                             parser_utils.file.clone(), Box::pin(structure)));
                 attributes = Vec::new();
                 modifiers = Vec::new();
@@ -63,8 +63,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let implementor = parse_implementor(parser_utils,
                                                     attributes, modifiers);
                 parser_utils.handle.spawn(
-                        ParserUtils::add_implementor(parser_utils.syntax.clone(),
-                                                     implementor));
+                        ParserUtils::add_implementor(parser_utils.syntax.clone(), implementor));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             },

@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
+use crate::async_util::NameResolver;
 use crate::function::Function;
 use crate::r#struct::Struct;
 use crate::syntax::Syntax;
@@ -106,11 +107,13 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: &mut Function, syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>,  syntax: &Arc<Mutex<Syntax>>);
 
-    async fn verify_struct(&self, structure: &mut Struct, syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_struct(&self, structure: &mut Struct, resolver: Box<dyn NameResolver>,  syntax: &Arc<Mutex<Syntax>>);
 
-    fn add_implementation(&self, implementor: TraitImplementor);
+    fn add_implementation(&mut self, implementor: TraitImplementor);
+
+    fn of_types(&self, base: &Types, target: &Types) -> Option<&Vec<Arc<Function>>>;
 
     fn get_generic(&self, name: &str) -> Option<Types>;
 
@@ -197,7 +200,7 @@ pub trait TopElement where Self: Sized {
 
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager);
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: &mut dyn ProcessManager);
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
 }
@@ -206,5 +209,5 @@ pub struct TraitImplementor {
     pub base: Types,
     pub implementor: Types,
     pub attributes: Vec<Attribute>,
-    pub functions: Vec<Function>
+    pub functions: Vec<Arc<Function>>
 }

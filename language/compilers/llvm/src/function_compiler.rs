@@ -120,6 +120,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
         Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
+        Effects::MethodCall(_, _, _) => panic!("Checker failed to resolve method call!"),
         Effects::CreateVariable(name, inner) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             type_getter.variables.insert(name.clone(),
@@ -145,7 +146,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             compile_block(body, function, type_getter, id)
         }
         //Calling function, function arguments
-        Effects::MethodCall(calling_function, arguments) => {
+        Effects::VerifiedMethodCall(calling_function, arguments) => {
             let mut final_arguments = Vec::new();
 
             let calling = type_getter.get_function(calling_function);

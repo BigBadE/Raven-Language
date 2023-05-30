@@ -1,24 +1,25 @@
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
 use crate::{AsyncGetter, Modifier, ProcessManager, Syntax, TopElement};
 use crate::code::MemberField;
-use crate::function::Function;
 use crate::{Attribute, ParsingError};
+use crate::async_util::NameResolver;
 use crate::types::Types;
 
 lazy_static! {
-pub static ref I64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
+pub static ref I64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
         Modifier::Internal as u8, "i64".to_string()));
-pub static ref F64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
+pub static ref F64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
         Modifier::Internal as u8, "f64".to_string()));
-pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
+pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
         Modifier::Internal as u8, "u64".to_string()));
-pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
+pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
         Modifier::Internal as u8, "str".to_string()));
-pub static ref BOOL: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(), Vec::new(),
+pub static ref BOOL: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
         Modifier::Internal as u8, "bool".to_string()));
 }
 
@@ -32,14 +33,25 @@ pub struct Struct {
     pub generics: IndexMap<String, Types>,
     pub attributes: Vec<Attribute>,
     pub fields: Vec<MemberField>,
-    pub functions: Vec<Arc<Function>>,
     pub traits: Vec<Arc<Struct>>,
     pub poisoned: Vec<ParsingError>,
 }
 
+impl Hash for Struct {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(&self.id.to_be_bytes())
+    }
+}
+
+impl PartialEq for Struct {
+    fn eq(&self, other: &Self) -> bool {
+        return self.id == other.id;
+    }
+}
+
 impl Struct {
     pub fn new(attributes: Vec<Attribute>, fields: Vec<MemberField>, generics: IndexMap<String, Types>,
-               functions: Vec<Arc<Function>>, modifiers: u8, name: String) -> Self {
+               modifiers: u8, name: String) -> Self {
         let mut id = ID.lock().unwrap();
         *id += 1;
         return Self {
@@ -47,7 +59,6 @@ impl Struct {
             id: *id,
             modifiers,
             fields,
-            functions,
             name,
             generics,
             traits: Vec::new(),
@@ -63,7 +74,6 @@ impl Struct {
             name,
             generics: IndexMap::new(),
             fields: Vec::new(),
-            functions: Vec::new(),
             traits: Vec::new(),
             poisoned: vec!(error),
         };
@@ -118,8 +128,8 @@ impl TopElement for Struct {
         return Struct::new_poisoned(name, error);
     }
 
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, process_manager: &mut dyn ProcessManager) {
-        process_manager.verify_struct(self, syntax).await;
+    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: &mut dyn ProcessManager) {
+        process_manager.verify_struct(self, resolver, syntax).await;
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
@@ -133,8 +143,4 @@ impl Debug for Struct {
     }
 }
 
-impl PartialEq for Struct {
-    fn eq(&self, other: &Self) -> bool {
-        return self.name == other.name;
-    }
-}
+impl Eq for Struct {}

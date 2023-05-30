@@ -1,12 +1,9 @@
 use std::future::Future;
-use std::sync::{Arc, Mutex};
-use syntax::async_util::NameResolver;
 
 use async_recursion::async_recursion;
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::{ParsingError, ParsingFuture};
-use syntax::syntax::Syntax;
 use crate::parser::code_parser::{parse_code, parse_line};
 
 use crate::{ParserUtils, TokenTypes};
@@ -84,9 +81,8 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
     }
     let body = parse_code(parser_utils).1;
     parser_utils.imports.last_id += 2;
-    return Box::pin(create_for(name, parser_utils.file.clone(), effect.unwrap().1,
-                               body, parser_utils.imports.last_id - 1,
-    parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone())));
+    return Box::pin(create_for(name, effect.unwrap().1,
+                               body, parser_utils.imports.last_id - 1));
 }
 
 #[async_recursion]
@@ -145,28 +141,17 @@ async fn create_if(effect: ParsingFuture<Effects>, body: ParsingFuture<CodeBody>
     return Ok(Effects::CodeBody(top));
 }
 
-async fn create_for(name: String, file: String, effect: ParsingFuture<Effects>,
-                    body: impl Future<Output=Result<CodeBody, ParsingError>>, id: u32,
-                    syntax: Arc<Mutex<Syntax>>, name_resolver: Box<dyn NameResolver>) -> Result<Effects, ParsingError> {
+async fn create_for(name: String, effect: ParsingFuture<Effects>,
+                    body: impl Future<Output=Result<CodeBody, ParsingError>>, id: u32) -> Result<Effects, ParsingError> {
     let mut top = Vec::new();
     let mut body = body.await?;
     let effect = effect.await?;
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
     Effects::Set(Box::new(Effects::LoadVariable(name)), Box::new(Effects::MethodCall(
-        Syntax::get_function(syntax.clone(),
-                            ParsingError::new(file.clone(), (0, 0), 0, (0, 0), 0,
-                                              "No core found! Report this!".to_string()),
-                            "iter::Iter::next".to_string(),
-                            false, name_resolver.boxed_clone()).await?,
-        vec!(effect.clone()))))));
+        None, "iter::Iter::next".to_string(), vec!(effect.clone()))))));
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::MethodCall(
-        Syntax::get_function(syntax.clone(),
-                            ParsingError::new(file, (0, 0), 0, (0, 0), 0,
-                                              "No core found! Report this!".to_string()),
-                            "iter::Iter::has_next".to_string(),
-                            false, name_resolver.boxed_clone()).await?,
-        vec!(effect))),
+        None, "iter::Iter::has_next".to_string(),vec!(effect))),
                                   body.label.clone(), (id + 1).to_string())));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
 

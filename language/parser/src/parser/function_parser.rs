@@ -25,7 +25,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Identifier => name = token.to_string(parser_utils.buffer),
+            TokenTypes::Identifier => name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer),
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::ArgumentsStart | TokenTypes::ArgumentSeparator | TokenTypes::ArgumentTypeSeparator => {}
             TokenTypes::ArgumentName => last_arg = token.to_string(parser_utils.buffer),
@@ -65,7 +65,6 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
-    let name = parser_utils.file.clone() + "::" + name.as_str();
     let modifiers = get_modifier(modifiers.as_slice());
     {
         let mut locked = parser_utils.syntax.lock().unwrap();
@@ -93,19 +92,16 @@ pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,
                           code: Option<ParsingFuture<CodeBody>>,
                           return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
     let generics = get_generics(generics).await?;
-
     let return_type = match return_type {
         Some(found) => Some(found.await?),
         None => None
     };
 
     let mut done_fields = Vec::new();
-    let mut index = 0;
     for field in fields {
         done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)));
-
-        index += 1;
     }
+
     return Ok(Function::new(attributes, modifiers, done_fields, generics, code.unwrap_or(Box::pin(const_empty())),
                             return_type, name));
 }

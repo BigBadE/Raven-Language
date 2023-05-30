@@ -5,7 +5,7 @@ use tokio::runtime::Handle;
 
 use syntax::function::Function;
 use syntax::{ParsingError, ParsingFuture, TopElement, TraitImplementor};
-use syntax::async_util::UnparsedType;
+use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::r#struct::Struct;
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -35,32 +35,31 @@ impl<'a> ParserUtils<'a> {
             name, Box::new(self.imports.clone())));
     }
 
-    pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, token: Token, file: String,
+    pub async fn add_struct(syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, token: Token, file: String,
                             structure: ParsingFuture<Struct>) {
         let structure = Self::get_elem(&file, structure).await;
 
-        for function in &structure.functions {
-            unsafe { Arc::get_mut_unchecked(&mut function.clone()) }.parent = Some(structure.clone());
-            Syntax::add(&syntax,
-                        token.make_error(file.clone(), format!("Duplicate function {}", function.name)),
-                       function.clone()).await;
-        }
-
-        Syntax::add(&syntax, token.make_error(file,
-                                              format!("Duplicate structure {}", structure.name)),
-                    structure).await;
+        Syntax::add(&syntax, resolver.boxed_clone(), token.make_error(file.clone(),
+                                                        format!("Duplicate structure {}", structure.name)),
+                    structure.clone()).await;
     }
 
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: ParsingFuture<TraitImplementor>) {
         let temp = implementor.await;
-        let implementor = temp.unwrap();
-        syntax.lock().unwrap().process_manager.add_implementation(implementor);
+        match temp {
+            Ok(implementor) => syntax.lock().unwrap().process_manager.add_implementation(implementor),
+            Err(error) => {
+                syntax.lock().unwrap().structures.types
+                    .insert("$main".to_string(), Arc::new(Struct::new_poisoned(
+                        "$main".to_string(), error)));
+            }
+        }
     }
 
-    pub async fn add_function(syntax: Arc<Mutex<Syntax>>, file: String, token: Token,
+    pub async fn add_function(syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, file: String, token: Token,
                               function: impl Future<Output=Result<Function, ParsingError>>) {
         let adding = Self::get_elem(&file, function).await;
-        Syntax::add(&syntax,
+        Syntax::add(&syntax, resolver,
                     token.make_error(file, format!("Duplicate {}", adding.name())),
                                    adding).await;
     }
