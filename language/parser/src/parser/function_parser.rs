@@ -1,6 +1,6 @@
 use std::future::Future;
 use indexmap::IndexMap;
-use syntax::{Attribute, get_all_names, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
+use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::code::{Field, MemberField};
 use syntax::function::{CodeBody, Function};
 use syntax::types::Types;
@@ -53,6 +53,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                 return_type = Some(parser_utils.get_struct(token, name))
             },
             TokenTypes::CodeStart => {
+                println!("Parsing for {}", name);
                 code = Some(parse_code(parser_utils).1);
                 break
             },
@@ -75,10 +76,6 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                     locked.functions.parsing.push(name);
                     break
                 }
-            }
-        } else {
-            for name in get_all_names(&name) {
-                locked.functions.parsing.push(name);
             }
         }
     }

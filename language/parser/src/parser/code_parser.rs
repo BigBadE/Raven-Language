@@ -37,11 +37,15 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 match last.token_type {
                     TokenTypes::Variable | TokenTypes::CallingType => {
                         let mut effects = Vec::new();
-                        while let Some((_, effect)) = parse_line(parser_utils, false, false) {
-                            effects.push(effect);
-                            if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {} else {
-                                break;
+                        parser_utils.index += 1;
+                        if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type != TokenTypes::ParenClose {
+                            while let Some((_, effect)) = parse_line(parser_utils, false, false) {
+                                effects.push(effect);
+                                if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {} else {
+                                    break;
+                                }
                             }
+                            parser_utils.index -= 1;
                         }
 
                         let name = last.to_string(parser_utils.buffer);
@@ -107,12 +111,16 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     return Some((expression_type, parse_operator(effect, parser_utils)));
                 }
             }
-            TokenTypes::Operator => return Some((expression_type, parse_operator(effect, parser_utils))),
+            TokenTypes::Operator => {
+                return Some((expression_type, parse_operator(effect, parser_utils)))
+            },
             TokenTypes::ArgumentEnd => if !deep {
                 break;
             },
             TokenTypes::CallingType =>
-                if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {} else {
+                if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {
+                    //Ignored, ParenOpen handles this
+                } else {
                     effect = Some(Box::pin(load_effect(effect.unwrap(), token.to_string(parser_utils.buffer))))
                 },
             TokenTypes::EOF => {
@@ -139,6 +147,8 @@ async fn method_call(calling: Option<ParsingFuture<Effects>>, name: String,
     for possible in inner {
         output.push(possible.await?);
     }
+
+    println!("Calling: {:?}", output);
     return Ok(Effects::MethodCall(calling, name, output));
 }
 
@@ -271,7 +281,7 @@ async fn create_effect(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, r
     for input in inputs {
         let mut i = 0;
         for field in fields {
-            if field.field.name == input.0 {
+            if field.assume_finished().field.name == input.0 {
                 final_inputs.push((i, input.1.await?));
                 break
             }

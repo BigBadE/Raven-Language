@@ -2,10 +2,11 @@ use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::code::{Effects, ExpressionType};
 use syntax::function::{CodeBody, display_parenless, Function};
-use syntax::{Attribute, ParsingError, ProcessManager};
+use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
 use crate::EmptyNameResolver;
 use async_recursion::async_recursion;
+use syntax::async_getters::ImplementationGetter;
 use syntax::async_util::NameResolver;
 use syntax::types::Types;
 use crate::check_function::CheckerVariableManager;
@@ -13,15 +14,14 @@ use crate::output::TypesChecker;
 
 pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: &mut CodeBody,
                          syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
-    let mut returning = false;
     for line in &mut code.expressions {
-        if let ExpressionType::Return = line.expression_type {
-            returning = true;
-        }
         verify_effect(process_manager, resolver.boxed_clone(), &mut line.effect, syntax, variables).await?;
+        if let ExpressionType::Return = line.expression_type {
+            return Ok(true);
+        }
     }
 
-    return Ok(returning);
+    return Ok(false);
 }
 
 #[async_recursion]
@@ -30,7 +30,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     match effect {
         Effects::CodeBody(body) => {
             verify_code(process_manager, &resolver, body, syntax, &mut variables.clone()).await?;
-        },
+        }
         Effects::Set(first, second) => {
             verify_effect(process_manager, resolver.boxed_clone(), first, syntax, variables).await?;
             verify_effect(process_manager, resolver, second, syntax, variables).await?;
@@ -46,15 +46,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let mut ops = 0;
             'outer: loop {
                 let operation = format!("{}${}", operation, ops);
-                {
-                    let locked = syntax.lock().unwrap();
-                    if let Some(operations) = locked.operations.get(&operation) {
-                        ops = operations.len();
-                        for potential_operation in operations {
-                            if let Some(new_effect) = check_operation(potential_operation, values, variables) {
-                                *effect = assign_with_priority(new_effect);
-                                break 'outer;
-                            }
+                let operations = syntax.lock().unwrap().operations.get(&operation).cloned();
+                if let Some(operations) = operations {
+                    ops = operations.len();
+                    for potential_operation in operations {
+                        if let Some(new_effect) = check_operation(potential_operation, values,
+                                                                  syntax, variables).await {
+                            *effect = assign_with_priority(new_effect);
+                            break 'outer;
                         }
                     }
                 }
@@ -75,8 +74,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let mut output = None;
                     for import in resolver.imports() {
                         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                                                import.clone(), resolver.boxed_clone()).await {
-                            if let Some(value) = process_manager.of_types(&return_type, &value) {
+                                                              import.clone(), resolver.boxed_clone()).await {
+                            while let Ok(value) = ImplementationGetter::new(syntax.clone(),
+                                                                            return_type.clone(), value.clone()).await {
                                 for temp in value {
                                     if &temp.name == method {
                                         if output.is_some() {
@@ -100,19 +100,19 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             if let Some(found) = check_method(process_manager, resolver, &mut method,
-                         effects, syntax, variables).await? {
+                                              effects, syntax, variables).await? {
                 *effect = found;
             }
         }
         Effects::CompareJump(effect, _, _) => verify_effect(process_manager, resolver, effect, syntax, variables).await?,
         Effects::CreateStruct(target, effects) => {
             if let Types::GenericType(base, bounds) = target {
-                *target = base.flatten(bounds, syntax);
+                *target = base.flatten(bounds, syntax).await;
             }
             for (_, effect) in effects {
                 verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?;
             }
-        },
+        }
         Effects::Load(effect, _) => verify_effect(process_manager, resolver, effect, syntax, variables).await?,
         Effects::CreateVariable(name, effect) => {
             verify_effect(process_manager, resolver, effect, syntax, variables).await?;
@@ -121,8 +121,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 Ok(())
             } else {
                 Err(placeholder_error("No return type!".to_string()))
-            }
-        },
+            };
+        }
         _ => {}
     }
     return Ok(());
@@ -141,7 +141,7 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
             if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
-                &effect, placeholder_error("Invalid bounds!".to_string()))? {
+                &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                 if let Types::Generic(name, _) = old {
                     manager.generics.insert(name, effect);
                 } else {
@@ -155,25 +155,24 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
         let mut temp = Vec::new();
         mem::swap(&mut temp, effects);
         {
-            let mut locked = syntax.lock().unwrap();
-            if let Some(found) = locked.functions.types.get(&name) {
-                *method = found.clone()
+            if syntax.lock().unwrap().functions.types.contains_key(&name) {
+                *method = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone()
             } else {
                 let mut new_method = Function::clone(method);
                 new_method.generics.clear();
                 new_method.name = name.clone();
                 for field in &mut new_method.fields {
-                    field.field.field_type.degeneric(&manager.generics,
+                    field.field.field_type.degeneric(&manager.generics, syntax,
                                                      placeholder_error("No generic!".to_string()),
-                                                     placeholder_error("Invalid bounds!".to_string()))?;
+                                                     placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 if let Some(returning) = &mut new_method.return_type {
-                    returning.degeneric(&manager.generics,
+                    returning.degeneric(&manager.generics, syntax,
                                         placeholder_error("No generic!".to_string()),
-                                        placeholder_error("Invalid bounds!".to_string()))?;
+                                        placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 *method = Arc::new(new_method);
-                locked.functions.types.insert(name, method.clone());
+                syntax.lock().unwrap().functions.types.insert(name, method.clone());
             };
         }
 
@@ -187,8 +186,10 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
         verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?;
     }
 
-    if !check_args(&method, effects, variables) {
-        return Err(placeholder_error(format!("Incorrect args to method {}", method.name)));
+    if !check_args(&method, effects, syntax, variables).await {
+        return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.name,
+                                             method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
+                                             effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
     return Ok(None);
@@ -198,24 +199,25 @@ pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
-fn check_operation(operation: &Arc<Function>, values: &Vec<Effects>,
-                   variables: &mut CheckerVariableManager) -> Option<Effects> {
-    if check_args(operation, values, variables) {
-        return Some(Effects::VerifiedMethodCall(operation.clone(), values.clone()));
+async fn check_operation(operation: Arc<Function>, values: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
+                         variables: &mut CheckerVariableManager) -> Option<Effects> {
+    if check_args(&operation, values, syntax, variables).await {
+        return Some(Effects::VerifiedMethodCall(operation, values.clone()));
     }
     return None;
 }
 
-fn check_args(function: &Arc<Function>, args: &Vec<Effects>, variables: &mut CheckerVariableManager) -> bool {
+async fn check_args(function: &Arc<Function>, args: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
+                    variables: &mut CheckerVariableManager) -> bool {
     if function.fields.len() != args.len() {
         return false;
     }
 
     for i in 0..function.fields.len() {
         let returning = args.get(i).unwrap().get_return(variables);
-        if returning.is_some() && !function.fields.get(i).unwrap().field.field_type.of_type(
-            returning.as_ref().unwrap()) {
-            println!("{} != {}", function.fields.get(i).unwrap().field.field_type, returning.as_ref().unwrap());
+        if returning.is_some() && !returning.as_ref().unwrap().of_type(
+            &function.fields.get(i).unwrap().field.field_type, syntax).await {
+            println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().field.field_type);
             return false;
         }
     }

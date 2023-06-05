@@ -8,4 +8,4 @@ syntax = { path = "../../syntax" }
 
 # Util
 anyhow = "1.0.70"
-async-trait = "0.1.68"
+async-trait = { version = "0.1.69", path = "../../../crates/async-trait" }

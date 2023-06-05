@@ -4,18 +4,25 @@ use std::sync::{Arc, Mutex};
 
 use async_recursion::async_recursion;
 
-use crate::{get_all_names, ParsingError, ProcessManager, TopElement, Types};
+use crate::{ParsingError, ParsingFuture, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::Function;
 use crate::r#struct::Struct;
 
+/// The entire program's syntax, including libraries.
 pub struct Syntax {
+    // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
+    // All structures in the program
     pub structures: AsyncGetter<Struct>,
+    // All functions in the program
     pub functions: AsyncGetter<Function>,
+    // Stores the async parsing state
     pub async_manager: GetterManager,
+    // All operations without namespaces, for example {}+{} or {}/{}
     pub operations: HashMap<String, Vec<Arc<Function>>>,
+    // Manages the next steps of compilation after parsing
     pub process_manager: Box<dyn ProcessManager>,
 }
 
@@ -31,10 +38,15 @@ impl Syntax {
         };
     }
 
+    // Sets the syntax to be finished
     pub fn finish(&mut self) {
+        if self.async_manager.finished {
+            panic!("Tried to finish already-finished syntax!")
+        }
         self.async_manager.finished = true;
     }
 
+    // Adds the top element to the syntax
     pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, dupe_error: ParsingError, mut adding: Arc<T>) {
         let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
 
@@ -55,8 +67,7 @@ impl Syntax {
             T::get_manager(locked.deref_mut()).types.insert(adding.name().clone(), adding.clone());
         }
 
-        let split = get_all_names(adding.name());
-
+        let name = adding.name().clone();
         if adding.is_operator() {
             //Only functions can be operators. This will break if something else is.
             //These is no better way to do this because Rust.
@@ -72,11 +83,9 @@ impl Syntax {
             }
         }
 
-        for name in split {
-            if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
-                for waker in wakers {
-                    waker.wake();
-                }
+        if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
+            for waker in wakers {
+                waker.wake();
             }
         }
     }
@@ -91,11 +100,9 @@ impl Syntax {
             getter.types.insert(element.name().clone(), element.clone());
         }
 
-        for name in get_all_names(element.name()) {
-            if let Some(wakers) = getter.wakers.remove(&name) {
-                for waker in wakers {
-                    waker.wake();
-                }
+        if let Some(wakers) = getter.wakers.remove(element.name()) {
+            for waker in wakers {
+                waker.wake();
             }
         }
     }
@@ -142,5 +149,48 @@ impl Syntax {
         let mut error = error.clone();
         error.message = format!("Unknown type {}!", new_type);
         return error;
+    }
+}
+
+pub enum ParsingType<T> where T: Clone {
+    Parsing(ParsingFuture<T>),
+    Done(T),
+    Swapping(),
+}
+
+impl<T: Clone> Clone for ParsingType<T> {
+    fn clone(&self) -> Self {
+        match self {
+            ParsingType::Done(body) => ParsingType::Done(body.clone()),
+            _ => panic!("Tried to clone unfinished parsing type!")
+        }
+    }
+}
+
+impl<T: Clone> ParsingType<T> {
+    pub async fn await_finish(&mut self) -> Result<&mut T, ParsingError> {
+        return match self {
+            ParsingType::Done(value) => Ok(value),
+            ParsingType::Parsing(future) => {
+                let temp = future.await?;
+                *self = ParsingType::Done(temp);
+                return Ok(self.assume_finished_mut());
+            },
+            _ => panic!("Swapping fail!")
+        }
+    }
+
+    pub fn assume_finished_mut(&mut self) -> &mut T {
+        return match self {
+            ParsingType::Done(found) => found,
+            _ => panic!("Assumed finished on unfinished code parsing!")
+        };
+    }
+
+    pub fn assume_finished(&self) -> &T {
+        return match self {
+            ParsingType::Done(found) => found,
+            _ => panic!("Assumed finished on unfinished code parsing!")
+        };
     }
 }

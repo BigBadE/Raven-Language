@@ -7,60 +7,30 @@ use indexmap::IndexMap;
 use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture};
 use crate::async_util::NameResolver;
 use crate::code::{Expression, MemberField};
+use crate::syntax::ParsingType;
 
 #[derive(Clone)]
 pub struct Function {
     pub attributes: Vec<Attribute>,
     pub generics: IndexMap<String, Types>,
     pub modifiers: u8,
-    pub fields: Vec<MemberField>,
-    pub code: CodeStatus,
-    pub return_type: Option<Types>,
+    pub fields: Vec<ParsingType<MemberField>>,
+    pub code: ParsingType<CodeBody>,
+    pub return_type: Option<ParsingType<Types>>,
     pub name: String,
     pub poisoned: Vec<ParsingError>
 }
 
-pub enum CodeStatus {
-    Parsing(ParsingFuture<CodeBody>),
-    Finished(CodeBody),
-    Swapping()
-}
-
-impl Clone for CodeStatus {
-    fn clone(&self) -> Self {
-        match self {
-            CodeStatus::Finished(body) => CodeStatus::Finished(body.clone()),
-            _ => panic!("Tried to clone unfinished code body!")
-        }
-    }
-}
-
-impl CodeStatus {
-    pub fn assume_finished_mut(&mut self) -> &mut CodeBody {
-        return match self {
-            CodeStatus::Finished(found) => found,
-            _ => panic!("Assumed finished on unfinished code parsing!")
-        }
-    }
-
-    pub fn assume_finished(&self) -> &CodeBody {
-        return match self {
-            CodeStatus::Finished(found) => found,
-            _ => panic!("Assumed finished on unfinished code parsing!")
-        }
-    }
-}
-
 impl Function {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8,
-               fields: Vec<MemberField>, generics: IndexMap<String, Types>,
-               code: ParsingFuture<CodeBody>, return_type: Option<Types>, name: String) -> Self {
+               fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, Types>,
+               code: ParsingFuture<CodeBody>, return_type: Option<ParsingType<Types>>, name: String) -> Self {
         return Self {
             attributes,
             generics,
             modifiers,
             fields,
-            code: CodeStatus::Parsing(code),
+            code: ParsingType::Parsing(code),
             return_type,
             name,
             poisoned: Vec::new()
@@ -73,7 +43,7 @@ impl Function {
             generics: IndexMap::new(),
             modifiers: 0,
             fields: Vec::new(),
-            code: CodeStatus::Finished(CodeBody::new(Vec::new(), "poison".to_string())),
+            code: ParsingType::Done(CodeBody::new(Vec::new(), "poison".to_string())),
             return_type: None,
             name,
             poisoned: vec!(error)
@@ -152,10 +122,10 @@ impl DisplayIndented for Function {
             write!(f, ">")?;
         }
 
-        write!(f, "{} ", display(&self.fields, ", "))?;
+        write!(f, "{} ", display(&self.fields.iter().map(|field| field.assume_finished()).collect::<Vec<_>>(), ", "))?;
 
         if self.return_type.is_some() {
-            write!(f, "-> {} ", self.return_type.as_ref().unwrap())?;
+            write!(f, "-> {} ", self.return_type.as_ref().unwrap().assume_finished())?;
         }
         // self.code.format(indent, f)
         return write!(f, " TODO");

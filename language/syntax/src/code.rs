@@ -147,7 +147,8 @@ impl Effects {
             Effects::CreateVariable(_, effect) => effect.get_return(variables),
             Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
             Effects::MethodCall(_, _, _) => panic!("Failed to resolve method call!"),
-            Effects::VerifiedMethodCall(function, _) => function.return_type.clone(),
+            Effects::VerifiedMethodCall(function, _) =>
+                function.return_type.as_ref().map(|inner| inner.assume_finished().clone()),
             Effects::Set(_, to) => to.get_return(variables),
             Effects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
@@ -168,8 +169,8 @@ impl Effects {
                 match from.get_return(variables).unwrap() {
                     Types::Struct(structure) => {
                         structure.fields.iter()
-                            .find(|field| &field.field.name == name)
-                            .map(|field| field.field.field_type.clone())
+                            .find(|field| &field.assume_finished().field.name == name)
+                            .map(|field| field.assume_finished().field.field_type.clone())
                     },
                     _ => None
                 }

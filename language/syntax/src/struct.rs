@@ -8,6 +8,7 @@ use crate::{AsyncGetter, Modifier, ProcessManager, Syntax, TopElement};
 use crate::code::MemberField;
 use crate::{Attribute, ParsingError};
 use crate::async_util::NameResolver;
+use crate::syntax::ParsingType;
 use crate::types::Types;
 
 lazy_static! {
@@ -30,9 +31,9 @@ pub struct Struct {
     pub modifiers: u8,
     pub id: u64,
     pub name: String,
-    pub generics: IndexMap<String, Types>,
+    pub generics: IndexMap<String, ParsingType<Types>>,
     pub attributes: Vec<Attribute>,
-    pub fields: Vec<MemberField>,
+    pub fields: Vec<ParsingType<MemberField>>,
     pub traits: Vec<Arc<Struct>>,
     pub poisoned: Vec<ParsingError>,
 }
@@ -50,7 +51,7 @@ impl PartialEq for Struct {
 }
 
 impl Struct {
-    pub fn new(attributes: Vec<Attribute>, fields: Vec<MemberField>, generics: IndexMap<String, Types>,
+    pub fn new(attributes: Vec<Attribute>, fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, ParsingType<Types>>,
                modifiers: u8, name: String) -> Self {
         let mut id = ID.lock().unwrap();
         *id += 1;
@@ -79,18 +80,18 @@ impl Struct {
         };
     }
 
-    pub fn degeneric(&mut self, generics: &Vec<Types>) {
+    pub async fn degeneric(&mut self, generics: &Vec<Types>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         let mut i = 0;
         for value in self.generics.values_mut() {
-            if let Types::Generic(name, bounds) = value {
+            if let Types::Generic(name, bounds) = value.await_finish().await? {
                 let name = name.clone();
                 let temp = generics.get(i).unwrap().clone();
                 for bound in bounds {
-                    if !temp.of_type(bound) {
+                    if !temp.of_type(&bound, syntax).await {
                         panic!("Generic {} set to a {} which isn't a {}", name, temp, bound);
                     }
                 }
-                *value = temp;
+                *value = ParsingType::Done(temp);
                 i += 1;
             } else {
                 panic!("Guhh?????");
@@ -98,11 +99,13 @@ impl Struct {
         }
 
         for field in &mut self.fields {
-            let types = &mut field.field.field_type;
+            let types = &mut field.assume_finished_mut().field.field_type;
             if let Types::Generic(name, _) = types {
-                *types = self.generics.get(name).unwrap().clone();
+                *types = self.generics.get(name).unwrap().assume_finished().clone();
             }
         }
+
+        return Ok(());
     }
 }
 

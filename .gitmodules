@@ -4,3 +4,6 @@
 [submodule "crates/async-recursion"]
 	path = crates/async-recursion
 	url = git@github.com:BigBadE/async-recursion.git
+[submodule "crates/async-trait"]
+	path = crates/async-trait
+	url = git@github.com:BigBadE/async-trait.git

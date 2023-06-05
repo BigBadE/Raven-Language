@@ -2,6 +2,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Handle;
+use async_recursion::async_recursion;
 
 use syntax::function::Function;
 use syntax::{ParsingError, ParsingFuture, TopElement, TraitImplementor};
@@ -47,7 +48,11 @@ impl<'a> ParserUtils<'a> {
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: ParsingFuture<TraitImplementor>) {
         let temp = implementor.await;
         match temp {
-            Ok(implementor) => syntax.lock().unwrap().process_manager.add_implementation(implementor),
+            Ok(implementor) => {
+                //Have to clone this twice to get around mutability restrictions and not keep syntax locked across awaits.
+                let process_manager = syntax.lock().unwrap().process_manager.cloned();
+                process_manager.cloned().add_implementation(implementor, &syntax).await
+            },
             Err(error) => {
                 syntax.lock().unwrap().structures.types
                     .insert("$main".to_string(), Arc::new(Struct::new_poisoned(
@@ -73,8 +78,7 @@ impl<'a> ParserUtils<'a> {
     }
 }
 
-pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils)
-                    -> UnparsedType {
+pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils) -> UnparsedType {
     let mut generics = Vec::new();
     let mut last = None;
     loop {
@@ -83,7 +87,7 @@ pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils)
         match token.token_type {
             TokenTypes::Variable => last = Some(UnparsedType::Basic(token.to_string(parser_utils.buffer))),
             TokenTypes::Operator => if let Some(types) = last {
-                generics.push(add_generics(types, parser_utils));
+                generics.push(inner_generic(types, parser_utils));
                 last = None;
             },
             TokenTypes::ArgumentEnd => if let Some(types) = last {
@@ -97,4 +101,35 @@ pub fn add_generics(input: UnparsedType, parser_utils: &mut ParserUtils)
         }
     }
     return UnparsedType::Generic(Box::new(input), generics);
+}
+
+fn inner_generic(outer: UnparsedType, parser_utils: &mut ParserUtils) -> UnparsedType {
+    let mut values = Vec::new();
+    let mut last = None;
+    loop {
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
+        match token.token_type {
+            TokenTypes::Variable => {
+                if let Some(found) = last {
+                    values.push(found);
+                }
+                last = Some(UnparsedType::Basic(token.to_string(parser_utils.buffer)));
+            },
+            TokenTypes::Operator => if let Some(types) = last {
+                values.push(inner_generic(types, parser_utils));
+                last = None;
+            },
+            TokenTypes::ArgumentEnd => if let Some(types) = last {
+                generics.push(types);
+                last = None;
+            },
+            _ => {
+                parser_utils.index -= 1;
+                break;
+            }
+        }
+    }
+
+    return UnparsedType::Generic(Box::new(outer), values);
 }

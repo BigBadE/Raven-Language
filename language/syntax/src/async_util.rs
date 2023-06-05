@@ -101,14 +101,6 @@ impl Future for AsyncTypesGetter<Function> {
         }
 
         if locked.async_manager.finished {
-            if locked.structures.parsing.contains(&self.getting) {
-                return Poll::Pending;
-            }
-            for imports in self.name_resolver.imports() {
-                if locked.structures.parsing.contains(&format!("{}::{}", imports, self.getting)) {
-                    return Poll::Pending;
-                }
-            }
             locked.functions.wakers.values().for_each(|wakers| for waker in wakers {
                 waker.wake_by_ref();
             });
@@ -143,15 +135,6 @@ impl Future for AsyncTypesGetter<Struct> {
         }
 
         if locked.async_manager.finished {
-            if locked.structures.parsing.contains(&self.getting) {
-                return Poll::Pending;
-            }
-            for imports in self.name_resolver.imports() {
-                if locked.structures.parsing.contains(&format!("{}::{}", imports, self.getting)) {
-                    return Poll::Pending;
-                }
-            }
-
             locked.structures.wakers.values().for_each(|wakers| for waker in wakers {
                 waker.wake_by_ref();
             });
@@ -163,7 +146,7 @@ impl Future for AsyncTypesGetter<Struct> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum UnparsedType {
     Basic(String),
     Generic(Box<UnparsedType>, Vec<UnparsedType>),

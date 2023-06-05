@@ -1,12 +1,12 @@
 use std::future::Future;
 use std::sync::Arc;
 use indexmap::IndexMap;
-use syntax::{Attribute, get_all_names, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture, TraitImplementor};
+use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::code::{Field, MemberField};
 use syntax::function::Function;
 use syntax::r#struct::Struct;
-use syntax::syntax::Syntax;
+use syntax::syntax::{ParsingType, Syntax};
 use syntax::types::Types;
 use crate::parser::function_parser::{get_generics, parse_function};
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
@@ -16,7 +16,7 @@ use crate::tokens::tokens::{Token, TokenTypes};
 pub struct FutureField(pub ParsingFuture<Types>, pub Vec<Attribute>, pub u8, pub String);
 
 pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
-                       -> impl Future<Output=Result<Struct, ParsingError>> {
+                       -> Result<Struct, ParsingError> {
     let modifiers = get_modifier(modifiers.as_slice());
 
     let mut member_modifiers = Vec::new();
@@ -36,7 +36,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                 }
 
                 parser_utils.imports.parent = Some(name.clone());
-            },
+            }
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
@@ -69,25 +69,11 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         }
     }
 
-    for name in get_all_names(&name) {
-        parser_utils.syntax.lock().unwrap().structures.parsing.push(name);
-    }
-    return get_struct(attributes, modifiers, fields, generics, name);
-}
-
-pub async fn get_struct(attributes: Vec<Attribute>, modifiers: u8, fields: Vec<FutureField>,
-                        generics: IndexMap<String, Vec<ParsingFuture<Types>>>, name: String) -> Result<Struct, ParsingError> {
-    let generics = get_generics(generics).await?;
-    let mut done_fields = Vec::new();
-    //TODO investigate fields deadlocking with circular references
-    for field in fields {
-        done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)))
-    }
-    return Ok(Struct::new(attributes, done_fields, generics, modifiers, name));
+    return Ok(Struct::new(attributes, fields, generics, modifiers, name));
 }
 
 pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>,
-                         _modifiers: Vec<Modifier>) -> ParsingFuture<TraitImplementor> {
+                         _modifiers: Vec<Modifier>) -> Result<TraitImplementor, ParsingError> {
     let mut base = None;
     let mut implementor = None;
     let mut member_attributes = Vec::new();
@@ -110,7 +96,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                     parser_utils.imports.parent = Some(format!("{}::{}", parser_utils.file.clone(), name));
                     implementor = temp;
                 }
-            },
+            }
             TokenTypes::GenericsStart => {
                 if state == 0 {
                     parse_generics(parser_utils, &mut generics);
@@ -119,13 +105,13 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                         parse_type_generics(parser_utils);
                     if state == 1 {
                         base = Some(UnparsedType::Generic(Box::new(base.unwrap()),
-                                                     found));
+                                                          found));
                     } else {
                         implementor = Some(UnparsedType::Generic(Box::new(implementor.unwrap()),
-                                                            found));
+                                                                 found));
                     }
                 }
-            },
+            }
             TokenTypes::For => state = 2,
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
@@ -134,13 +120,16 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
             }
-            TokenTypes::StructTopElement => {},
+            TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
 
-    let token = parser_utils.tokens.get(parser_utils.index-1).unwrap();
+    let token = parser_utils.tokens.get(parser_utils.index - 1).unwrap();
+
+    parser_utils.syntax.lock().unwrap().process_manager.add_impl_parsing(base.clone().unwrap(),
+                                                                         implementor.clone().unwrap());
 
     let base = Box::pin(
         Syntax::parse_type(
@@ -154,25 +143,15 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
             parser_utils.imports.boxed_clone(), implementor.unwrap()));
 
-    return Box::pin(get_implementation(base, implementor, functions, attributes));
-}
-
-async fn get_implementation(base: ParsingFuture<Types>, implementor: ParsingFuture<Types>,
-                            functions: Vec<impl Future<Output=Result<Function, ParsingError>>>, attributes: Vec<Attribute>)
-    -> Result<TraitImplementor, ParsingError> {
-    let mut final_funcs = Vec::new();
-    for func in functions {
-        final_funcs.push(Arc::new(func.await?));
-    }
     return Ok(TraitImplementor {
-        base: base.await?,
-        implementor: implementor.await?,
-        functions: final_funcs,
-        attributes
-    })
+        base: ParsingType::Parsing(base),
+        implementor: ParsingType::Parsing(implementor),
+        functions,
+        attributes,
+    });
 }
 
-pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Vec<UnparsedType> {
+pub async fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Types>, ParsingError> {
     let mut current = Vec::new();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -180,28 +159,28 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Vec<UnparsedType> 
         match token.token_type {
             TokenTypes::GenericsStart => {
                 let mut temp = current.pop().unwrap();
-                temp = UnparsedType::Generic(Box::new(temp), parse_type_generics(parser_utils));
-                current.push(temp);
+                current.push(Types::GenericType(Box::new(temp), parse_type_generics(parser_utils)));
             }
             TokenTypes::Generic => {
                 let name = token.to_string(parser_utils.buffer);
-                current.push(UnparsedType::Basic(name));
+                current.push(parser_utils.get_struct(token, name).await?);
             }
             TokenTypes::GenericEnd => {
-                break
+                break;
             }
             _ => {
                 panic!("Unexpected type!");
             }
         }
     }
-    return current;
+
+    return Ok(current);
 }
 
-pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<String, Vec<ParsingFuture<Types>>>) {
+pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<String, ParsingType<Types>>) {
     let mut name = String::new();
     let mut unfinished_bounds = Vec::new();
-    let mut bounds = Vec::new();
+    let mut bounds: Option<UnparsedType> = None;
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -210,15 +189,22 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 name = token.to_string(parser_utils.buffer);
             }
             TokenTypes::GenericEnd => {
-                parser_utils.imports.generics.insert(name.clone(), unfinished_bounds);
-                generics.insert(name.clone(), bounds);
-                bounds = Vec::new();
+                parser_utils.imports.generics.insert(name.clone(), Syntax::parse_type(parser_utils.syntax.clone(),
+                                                                                      token.make_error(parser_utils.file.clone(),
+                                                                                                       format!("")),
+                                                                                      Box::new(parser_utils.imports.clone()), bounds.unwrap()));
+                generics.insert(name.clone(), Syntax::parse_type(parser_utils.syntax.clone(),
+                                                   token.make_error(parser_utils.file.clone(),
+                                                                    format!("")),
+                                                   Box::new(parser_utils.imports.clone()), bounds.unwrap()));
+                bounds = None;
                 unfinished_bounds = Vec::new();
             }
             TokenTypes::GenericBound => {
+                let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+                parser_utils.index += 1;
                 let name = token.to_string(parser_utils.buffer);
-                bounds.push(parser_utils.get_struct(token, name.clone()));
-                unfinished_bounds.push(add_generics(UnparsedType::Basic(name), parser_utils))
+                bounds = Some(add_generics(name, parser_utils));
             }
             _ => {
                 parser_utils.index -= 1;
@@ -229,7 +215,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
 }
 
 pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
-                   attributes: Vec<Attribute>, modifiers: Vec<Modifier>) -> FutureField {
+                   attributes: Vec<Attribute>, modifiers: Vec<Modifier>) -> ParsingType<MemberField> {
     let mut types = None;
     while !parser_utils.tokens.is_empty() {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -238,12 +224,16 @@ pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
             TokenTypes::FieldType => {
                 let name = token.to_string(parser_utils.buffer).clone();
                 types = Some(parser_utils.get_struct(token, name))
-            },
-            TokenTypes::FieldSeparator => {},
+            }
+            TokenTypes::FieldSeparator => {}
             TokenTypes::FieldEnd => break,
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
 
-    return FutureField(types.unwrap(), attributes, get_modifier(modifiers.as_slice()), name);
+    return ParsingType::Parsing(Box::pin(to_field(types.unwrap(), attributes, get_modifier(modifiers.as_slice()), name)));
+}
+
+async fn to_field(types: ParsingFuture<Types>, attributes: Vec<Attribute>, modifier: u8, name: String) -> Result<MemberField, ParsingError> {
+    return Ok(MemberField::new(modifier, attributes, Field::new(name, types.await?)));
 }

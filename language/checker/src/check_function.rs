@@ -7,7 +7,7 @@ use syntax::async_util::NameResolver;
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
-use crate::check_code::{placeholder_error, verify_code};
+use crate::check_code::verify_code;
 use crate::output::TypesChecker;
 
 pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, function: &mut Function, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
@@ -29,12 +29,13 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         _ => {}
     }
 
+    println!("{}: {:?}", function.name, function.code.assume_finished().expressions);
     if !verify_code(process_manager, &resolver, function.code.assume_finished_mut(), syntax, &mut variable_manager).await? {
         if function.return_type.is_none() {
             function.code.assume_finished_mut().expressions.push(Expression::new(ExpressionType::Return, Effects::NOP()));
         } else {
-            return Err(placeholder_error(format!("Function doesn't return a {}!",
-                                                 function.return_type.as_ref().unwrap())))
+            //return Err(placeholder_error(format!("Function {} doesn't return a {}!", function.name,
+            //                                     function.return_type.as_ref().unwrap())))
         }
     }
     return Ok(());
