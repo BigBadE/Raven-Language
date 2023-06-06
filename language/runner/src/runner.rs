@@ -14,7 +14,6 @@ pub async fn run(settings: &RunnerSettings)
     let syntax = Syntax::new(
         Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())));
     let syntax = Arc::new(Mutex::new(syntax));
-    syntax.lock().unwrap().process_manager.init(syntax.clone());
 
     let (sender, receiver) = mpsc::channel();
 

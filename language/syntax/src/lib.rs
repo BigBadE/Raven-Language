@@ -9,7 +9,7 @@ use std::task::Waker;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
-use crate::async_util::{NameResolver, UnparsedType};
+use crate::async_util::NameResolver;
 use crate::function::Function;
 use crate::r#struct::Struct;
 use crate::syntax::{ParsingType, Syntax};
@@ -39,7 +39,7 @@ pub enum Modifier {
     Internal = 0b1000,
     Operation = 0b1_0000,
     // Hidden from the user, only used internally
-    Trait = 0b1100
+    Trait = 0b1100,
 }
 
 impl Display for Modifier {
@@ -51,7 +51,7 @@ impl Display for Modifier {
             Modifier::Internal => write!(f, "internal"),
             Modifier::Operation => write!(f, "operation"),
             Modifier::Trait => panic!("Shouldn't display trait modifier!")
-        }
+        };
     }
 }
 
@@ -93,7 +93,7 @@ pub enum Attribute {
     Basic(String),
     Integer(String, i64),
     Bool(String, bool),
-    String(String, String)
+    String(String, String),
 }
 
 impl Attribute {
@@ -117,15 +117,11 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>,  syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
 
-    async fn verify_struct(&self, structure: &mut Struct, resolver: Box<dyn NameResolver>,  syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_struct(&self, structure: &mut Struct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
 
     async fn add_implementation(&mut self, implementor: TraitImplementor, syntax: &Arc<Mutex<Syntax>>);
-
-    fn add_impl_parsing(&mut self, base: UnparsedType, target: UnparsedType);
-
-    async fn check_parsing(&mut self, input: &Types, target: &Types, syntax: &Arc<Mutex<Syntax>>) -> bool;
 
     fn add_impl_waiter(&mut self, waiter: Waker, base: Types);
 
@@ -134,8 +130,6 @@ pub trait ProcessManager: Send + Sync {
     fn get_generic(&self, name: &str) -> Option<Types>;
 
     fn cloned(&self) -> Box<dyn ProcessManager>;
-
-    fn init(&mut self, syntax: Arc<Mutex<Syntax>>);
 }
 
 // An error somewhere in a source file, with exact location.
@@ -146,7 +140,7 @@ pub struct ParsingError {
     pub start_offset: usize,
     pub end: (u32, u32),
     pub end_offset: usize,
-    pub message: String
+    pub message: String,
 }
 
 impl ParsingError {
@@ -158,19 +152,19 @@ impl ParsingError {
             start_offset: 0,
             end: (0, 0),
             end_offset: 0,
-            message: "You shouldn't see this! Report this please!".to_string()
-        }
+            message: "You shouldn't see this! Report this please!".to_string(),
+        };
     }
 
     pub fn new(file: String, start: (u32, u32), start_offset: usize, end: (u32, u32),
-        end_offset: usize, message: String) -> Self {
+               end_offset: usize, message: String) -> Self {
         return Self {
             file,
             start,
             start_offset,
             end,
             end_offset,
-            message
+            message,
         };
     }
 }
@@ -205,7 +199,7 @@ pub trait TopElement where Self: Sized {
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
     // Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: &mut dyn ProcessManager);
+    async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
 
     // Gets the getter for that type on the syntax
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
@@ -216,5 +210,5 @@ pub struct TraitImplementor {
     pub base: ParsingType<Types>,
     pub implementor: ParsingType<Types>,
     pub attributes: Vec<Attribute>,
-    pub functions: Vec<Arc<Function>>
+    pub functions: Vec<Arc<Function>>,
 }

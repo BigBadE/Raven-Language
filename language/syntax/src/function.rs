@@ -12,7 +12,7 @@ use crate::syntax::ParsingType;
 #[derive(Clone)]
 pub struct Function {
     pub attributes: Vec<Attribute>,
-    pub generics: IndexMap<String, Types>,
+    pub generics: IndexMap<String, ParsingType<Types>>,
     pub modifiers: u8,
     pub fields: Vec<ParsingType<MemberField>>,
     pub code: ParsingType<CodeBody>,
@@ -23,7 +23,7 @@ pub struct Function {
 
 impl Function {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8,
-               fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, Types>,
+               fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, ParsingType<Types>>,
                code: ParsingFuture<CodeBody>, return_type: Option<ParsingType<Types>>, name: String) -> Self {
         return Self {
             attributes,
@@ -73,8 +73,8 @@ impl TopElement for Function {
         return Function::poisoned(name, error);
     }
 
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: &mut dyn ProcessManager) {
-        process_manager.verify_func(self, resolver, syntax).await;
+    async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+        process_manager.verify_func(unsafe { Arc::get_mut_unchecked(&mut current) }, resolver, syntax).await;
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
@@ -117,7 +117,7 @@ impl DisplayIndented for Function {
         if !self.generics.is_empty() {
             write!(f, "<")?;
             for (_name, generic) in &self.generics {
-                write!(f, "{}", generic)?;
+                write!(f, "{}", generic.assume_finished())?;
             }
             write!(f, ">")?;
         }

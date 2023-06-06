@@ -20,14 +20,14 @@ pub struct GetterManager {
 /// Generic async type manager, holds the types and the wakers requiring those types.
 pub struct AsyncGetter<T> where T: TopElement {
     pub types: HashMap<String, Arc<T>>,
-    pub wakers: HashMap<String, Vec<Waker>>
+    pub wakers: HashMap<String, Vec<Waker>>,
 }
 
 impl<T> AsyncGetter<T> where T: TopElement {
     pub fn new() -> Self {
         return Self {
             types: HashMap::new(),
-            wakers: HashMap::new()
+            wakers: HashMap::new(),
         };
     }
 }
@@ -37,7 +37,7 @@ impl<T> AsyncGetter<T> where T: TopElement {
 pub struct ImplementationGetter {
     syntax: Arc<Mutex<Syntax>>,
     testing: Types,
-    target: Types
+    target: Types,
 }
 
 impl ImplementationGetter {
@@ -45,8 +45,8 @@ impl ImplementationGetter {
         return ImplementationGetter {
             syntax,
             testing,
-            target
-        }
+            target,
+        };
     }
 }
 
@@ -65,15 +65,10 @@ impl Future for ImplementationGetter {
         }
 
         if locked.async_manager.finished {
-            if let Poll::Ready(found) = Future::poll(Pin::new(
-                &mut locked.process_manager.check_parsing(&self.testing, &self.target, &self.syntax)), cx) {
-                if found {
-                    return Poll::Ready(Err(()));
-                }
-            }
+            return Poll::Ready(Err(()));
         }
 
         locked.process_manager.add_impl_waiter(cx.waker().clone(), self.testing.clone());
-        return Poll::Pending
+        return Poll::Pending;
     }
 }

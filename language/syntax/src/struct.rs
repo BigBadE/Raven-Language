@@ -131,8 +131,8 @@ impl TopElement for Struct {
         return Struct::new_poisoned(name, error);
     }
 
-    async fn verify(&mut self, syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: &mut dyn ProcessManager) {
-        process_manager.verify_struct(self, resolver, syntax).await;
+    async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+        process_manager.verify_struct(unsafe { Arc::get_mut_unchecked(&mut current) }, resolver, syntax).await;
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {

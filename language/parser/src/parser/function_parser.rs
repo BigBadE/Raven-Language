@@ -1,17 +1,16 @@
-use std::future::Future;
 use indexmap::IndexMap;
-use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
-use syntax::code::{Field, MemberField};
+use syntax::{Attribute, get_modifier, Modifier, ParsingError, ParsingFuture};
 use syntax::function::{CodeBody, Function};
+use syntax::syntax::ParsingType;
 use syntax::types::Types;
 
 use crate::parser::code_parser::parse_code;
-use crate::parser::struct_parser::{FutureField, parse_generics};
+use crate::parser::struct_parser::{parse_generics, to_field};
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
 
 pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
-                      -> impl Future<Output=Result<Function, ParsingError>> {
+                      -> Result<Function, ParsingError> {
     let mut name = String::new();
     let mut generics = IndexMap::new();
     let mut fields = Vec::new();
@@ -36,13 +35,12 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                         panic!("No parent for {}!", name);
                     }
 
-                    fields.push(FutureField(
-                        parser_utils.get_struct(token,
+                    fields.push(ParsingType::Parsing(Box::pin(to_field(parser_utils.get_struct(token,
                                                 parser_utils.imports.parent.as_ref().unwrap().clone()),
-                        Vec::new(), 0, last_arg));
+                        Vec::new(), 0, last_arg))));
                 } else {
-                    fields.push(FutureField(parser_utils.get_struct(token, last_arg_type),
-                                            Vec::new(), 0, last_arg));
+                    fields.push(ParsingType::Parsing(Box::pin(to_field(parser_utils.get_struct(token, last_arg_type),
+                                            Vec::new(), 0, last_arg))));
                     last_arg_type = String::new();
                 }
                 last_arg = String::new();
@@ -50,7 +48,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             TokenTypes::ArgumentsEnd | TokenTypes::ReturnTypeArrow => {},
             TokenTypes::ReturnType => {
                 let name = token.to_string(parser_utils.buffer).clone();
-                return_type = Some(parser_utils.get_struct(token, name))
+                return_type = Some(ParsingType::Parsing(parser_utils.get_struct(token, name)))
             },
             TokenTypes::CodeStart => {
                 println!("Parsing for {}", name);
@@ -67,40 +65,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
         }
     }
     let modifiers = get_modifier(modifiers.as_slice());
-    {
-        let mut locked = parser_utils.syntax.lock().unwrap();
-        if is_modifier(modifiers, Modifier::Operation) {
-            for i in 0.. {
-                let name = format!("{}${}", name.split("::").last().unwrap().to_string(), i);
-                if !locked.functions.parsing.contains(&name) {
-                    locked.functions.parsing.push(name);
-                    break
-                }
-            }
-        }
-    }
-    return get_function(attributes, modifiers, fields, generics,
-                        code, return_type, name);
-}
-
-pub async fn get_function(attributes: Vec<Attribute>, modifiers: u8,
-                          fields: Vec<FutureField>,
-                          generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
-                          code: Option<ParsingFuture<CodeBody>>,
-                          return_type: Option<ParsingFuture<Types>>, name: String) -> Result<Function, ParsingError> {
-    let generics = get_generics(generics).await?;
-    let return_type = match return_type {
-        Some(found) => Some(found.await?),
-        None => None
-    };
-
-    let mut done_fields = Vec::new();
-    for field in fields {
-        done_fields.push(MemberField::new(field.2, field.1, Field::new(field.3, field.0.await?)));
-    }
-
-    return Ok(Function::new(attributes, modifiers, done_fields, generics, code.unwrap_or(Box::pin(const_empty())),
-                            return_type, name));
+    return Ok(Function::new(attributes, modifiers, fields, generics,
+                        code.unwrap(), return_type, name));
 }
 
 async fn const_empty() -> Result<CodeBody, ParsingError> { Ok(CodeBody::new(Vec::new(), "empty_trait".to_string())) }

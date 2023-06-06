@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
+use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
 
@@ -47,11 +48,8 @@ impl Syntax {
     }
 
     // Adds the top element to the syntax
-    pub async fn add<T: TopElement>(syntax: &Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, dupe_error: ParsingError, mut adding: Arc<T>) {
-        let mut process_manager = syntax.lock().unwrap().process_manager.cloned();
-
-        unsafe { Arc::get_mut_unchecked(&mut adding) }.verify(syntax, resolver, process_manager.deref_mut()).await;
-
+    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
+                                              resolver: Box<dyn NameResolver>, dupe_error: ParsingError, adding: Arc<T>) {
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
@@ -71,7 +69,7 @@ impl Syntax {
         if adding.is_operator() {
             //Only functions can be operators. This will break if something else is.
             //These is no better way to do this because Rust.
-            let adding: Arc<Function> = unsafe { std::mem::transmute(adding) };
+            let adding: Arc<Function> = unsafe { std::mem::transmute(adding.clone()) };
 
             let name = adding.name().split("::").last().unwrap().to_string();
             let name = format!("{}${}", name, locked.operations.get(&name).map(|found| found.len()).unwrap_or(0));
@@ -88,6 +86,9 @@ impl Syntax {
                 waker.wake();
             }
         }
+
+        let process_manager = syntax.lock().unwrap().process_manager.cloned();
+        handle.spawn(T::verify(adding, syntax.clone(), resolver, process_manager));
     }
 
     pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {
@@ -153,9 +154,36 @@ impl Syntax {
 }
 
 pub enum ParsingType<T> where T: Clone {
-    Parsing(ParsingFuture<T>),
+    Parsing(u32, ParsingFuture<T>),
     Done(T),
     Swapping(),
+}
+
+pub static mut LAST_ID: u32 = 0;
+
+impl<T: Clone> ParsingType<T> {
+    pub fn new(parsing: ParsingFuture<T>) -> Self {
+        unsafe {
+            LAST_ID += 1;
+            return ParsingType::Parsing(LAST_ID - 1, parsing);
+        }
+    }
+}
+
+impl<T: Clone + PartialEq> PartialEq for ParsingType<T> {
+    fn eq(&self, other: &Self) -> bool {
+        return match self {
+            ParsingType::Done(inner) => match other {
+                ParsingType::Done(other) => inner == other,
+                _ => false
+            },
+            ParsingType::Parsing(id, _) => match other {
+                ParsingType::Parsing(other, _) => id == other,
+                _ => false
+            },
+            _ => false
+        }
+    }
 }
 
 impl<T: Clone> Clone for ParsingType<T> {
@@ -171,7 +199,7 @@ impl<T: Clone> ParsingType<T> {
     pub async fn await_finish(&mut self) -> Result<&mut T, ParsingError> {
         return match self {
             ParsingType::Done(value) => Ok(value),
-            ParsingType::Parsing(future) => {
+            ParsingType::Parsing(_, future) => {
                 let temp = future.await?;
                 *self = ParsingType::Done(temp);
                 return Ok(self.assume_finished_mut());
