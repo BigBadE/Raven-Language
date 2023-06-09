@@ -31,7 +31,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut Co
 pub fn instance_struct<'ctx>(structure: Arc<Struct>, type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
     let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
     for field in &structure.fields {
-        fields.push(type_getter.get_type(&field.field.field_type));
+        fields.push(type_getter.get_type(&field.assume_finished().field.field_type));
     }
 
     return type_getter.compiler.context.struct_type(fields.as_slice(), true);
@@ -153,7 +153,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
-                let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
+                let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap().assume_finished());
                 let pointer = type_getter.compiler.builder.build_alloca(
                     types, &id.to_string());
                 *id += 1;
@@ -193,7 +193,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             for struct_field in &loading_from
                 .get_return(type_getter)
                 .unwrap().clone_struct().fields {
-                if &struct_field.field.name != field {
+                if &struct_field.assume_finished().field.name != field {
                     offset += 1;
                 } else {
                     break;

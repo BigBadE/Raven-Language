@@ -5,7 +5,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::Waker;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
@@ -121,9 +120,7 @@ pub trait ProcessManager: Send + Sync {
 
     async fn verify_struct(&self, structure: &mut Struct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
 
-    async fn add_implementation(&mut self, implementor: TraitImplementor, syntax: &Arc<Mutex<Syntax>>);
-
-    fn add_impl_waiter(&mut self, waiter: Waker, base: Types);
+    fn add_implementation(&mut self, implementor: TraitImplementor);
 
     async fn of_types(&self, base: &Types, target: &Types, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<Function>>>;
 

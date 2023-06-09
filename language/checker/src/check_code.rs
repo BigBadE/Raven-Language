@@ -107,7 +107,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::CompareJump(effect, _, _) => verify_effect(process_manager, resolver, effect, syntax, variables).await?,
         Effects::CreateStruct(target, effects) => {
             if let Types::GenericType(base, bounds) = target {
-                *target = base.flatten(bounds, syntax).await;
+                *target = base.flatten(bounds, syntax).await?;
             }
             for (_, effect) in effects {
                 verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?;
@@ -140,7 +140,8 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
 
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
+            if let Some(old) = unsafe { Arc::get_mut_unchecked(method) }.fields.get_mut(i)
+                .unwrap().await_finish().await?.field.field_type.resolve_generic(
                 &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                 if let Types::Generic(name, _) = old {
                     manager.generics.insert(name, effect);
@@ -162,14 +163,14 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
                 new_method.generics.clear();
                 new_method.name = name.clone();
                 for field in &mut new_method.fields {
-                    field.field.field_type.degeneric(&manager.generics, syntax,
-                                                     placeholder_error("No generic!".to_string()),
-                                                     placeholder_error("Invalid bounds!".to_string())).await?;
+                    field.assume_finished_mut().field.field_type.degeneric(&manager.generics, syntax,
+                                                                           placeholder_error("No generic!".to_string()),
+                                                                           placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 if let Some(returning) = &mut new_method.return_type {
-                    returning.degeneric(&manager.generics, syntax,
-                                        placeholder_error("No generic!".to_string()),
-                                        placeholder_error("Invalid bounds!".to_string())).await?;
+                    returning.assume_finished_mut().degeneric(&manager.generics, syntax,
+                                                              placeholder_error("No generic!".to_string()),
+                                                              placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 *method = Arc::new(new_method);
                 syntax.lock().unwrap().functions.types.insert(name, method.clone());
@@ -188,7 +189,7 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
 
     if !check_args(&method, effects, syntax, variables).await {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.name,
-                                             method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
+                                             method.fields.iter().map(|field| &field.assume_finished().field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
@@ -216,8 +217,8 @@ async fn check_args(function: &Arc<Function>, args: &Vec<Effects>, syntax: &Arc<
     for i in 0..function.fields.len() {
         let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() && !returning.as_ref().unwrap().of_type(
-            &function.fields.get(i).unwrap().field.field_type, syntax).await {
-            println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().field.field_type);
+            &function.fields.get(i).unwrap().assume_finished().field.field_type, syntax).await {
+            println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().assume_finished().field.field_type);
             return false;
         }
     }

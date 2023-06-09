@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
@@ -155,7 +156,7 @@ impl Syntax {
 
 pub enum ParsingType<T> where T: Clone {
     Parsing(u32, ParsingFuture<T>),
-    Done(T),
+    Done(u32, T),
     Swapping(),
 }
 
@@ -168,13 +169,20 @@ impl<T: Clone> ParsingType<T> {
             return ParsingType::Parsing(LAST_ID - 1, parsing);
         }
     }
+
+    pub fn new_done(done: T) -> Self {
+        unsafe {
+            LAST_ID += 1;
+            return ParsingType::Done(LAST_ID - 1, done);
+        }
+    }
 }
 
 impl<T: Clone + PartialEq> PartialEq for ParsingType<T> {
     fn eq(&self, other: &Self) -> bool {
         return match self {
-            ParsingType::Done(inner) => match other {
-                ParsingType::Done(other) => inner == other,
+            ParsingType::Done(_, inner) => match other {
+                ParsingType::Done(_, other) => inner == other,
                 _ => false
             },
             ParsingType::Parsing(id, _) => match other {
@@ -186,10 +194,24 @@ impl<T: Clone + PartialEq> PartialEq for ParsingType<T> {
     }
 }
 
+impl<T: Clone + Hash> Hash for ParsingType<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            ParsingType::Done(id, _) => Hash::hash(id, state),
+            ParsingType::Parsing(id, _) => Hash::hash(id, state),
+            _ => {}
+        }
+    }
+}
+
+impl<T: Clone + PartialEq> Eq for ParsingType<T> {
+
+}
+
 impl<T: Clone> Clone for ParsingType<T> {
     fn clone(&self) -> Self {
         match self {
-            ParsingType::Done(body) => ParsingType::Done(body.clone()),
+            ParsingType::Done(id, body) => ParsingType::Done(*id, body.clone()),
             _ => panic!("Tried to clone unfinished parsing type!")
         }
     }
@@ -198,10 +220,10 @@ impl<T: Clone> Clone for ParsingType<T> {
 impl<T: Clone> ParsingType<T> {
     pub async fn await_finish(&mut self) -> Result<&mut T, ParsingError> {
         return match self {
-            ParsingType::Done(value) => Ok(value),
-            ParsingType::Parsing(_, future) => {
+            ParsingType::Done(_, value) => Ok(value),
+            ParsingType::Parsing(id, future) => {
                 let temp = future.await?;
-                *self = ParsingType::Done(temp);
+                *self = ParsingType::Done(*id, temp);
                 return Ok(self.assume_finished_mut());
             },
             _ => panic!("Swapping fail!")
@@ -210,14 +232,14 @@ impl<T: Clone> ParsingType<T> {
 
     pub fn assume_finished_mut(&mut self) -> &mut T {
         return match self {
-            ParsingType::Done(found) => found,
+            ParsingType::Done(_, found) => found,
             _ => panic!("Assumed finished on unfinished code parsing!")
         };
     }
 
     pub fn assume_finished(&self) -> &T {
         return match self {
-            ParsingType::Done(found) => found,
+            ParsingType::Done(_, found) => found,
             _ => panic!("Assumed finished on unfinished code parsing!")
         };
     }

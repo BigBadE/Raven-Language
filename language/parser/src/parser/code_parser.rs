@@ -218,7 +218,7 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
             }
             //Handle making new structs with generics.
             TokenTypes::Operator => {
-                types = Some(add_generics(types.unwrap(), parser_utils));
+                types = Some(add_generics(types.unwrap().to_string(), parser_utils).0);
             }
             TokenTypes::BlockStart => {
                 values = parse_new_args(parser_utils);

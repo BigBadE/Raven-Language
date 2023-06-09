@@ -44,7 +44,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
         for i in 0..llvm_function.count_params() as usize {
-            let field = &function.fields.get(i + offset as usize).unwrap().field;
+            let field = &function.fields.get(i + offset as usize).unwrap().assume_finished().field;
             variables.insert(field.name.clone(),
                              (field.field_type.clone(), llvm_function.get_nth_param(i as u32).unwrap()));
         }

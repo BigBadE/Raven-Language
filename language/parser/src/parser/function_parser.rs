@@ -35,11 +35,11 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                         panic!("No parent for {}!", name);
                     }
 
-                    fields.push(ParsingType::Parsing(Box::pin(to_field(parser_utils.get_struct(token,
+                    fields.push(ParsingType::new(Box::pin(to_field(parser_utils.get_struct(token,
                                                 parser_utils.imports.parent.as_ref().unwrap().clone()),
                         Vec::new(), 0, last_arg))));
                 } else {
-                    fields.push(ParsingType::Parsing(Box::pin(to_field(parser_utils.get_struct(token, last_arg_type),
+                    fields.push(ParsingType::new(Box::pin(to_field(parser_utils.get_struct(token, last_arg_type),
                                             Vec::new(), 0, last_arg))));
                     last_arg_type = String::new();
                 }
@@ -48,7 +48,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             TokenTypes::ArgumentsEnd | TokenTypes::ReturnTypeArrow => {},
             TokenTypes::ReturnType => {
                 let name = token.to_string(parser_utils.buffer).clone();
-                return_type = Some(ParsingType::Parsing(parser_utils.get_struct(token, name)))
+                return_type = Some(ParsingType::new(parser_utils.get_struct(token, name)))
             },
             TokenTypes::CodeStart => {
                 println!("Parsing for {}", name);
@@ -66,10 +66,12 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
     }
     let modifiers = get_modifier(modifiers.as_slice());
     return Ok(Function::new(attributes, modifiers, fields, generics,
-                        code.unwrap(), return_type, name));
+                        code.unwrap_or(Box::pin(const_finished())), return_type, name));
 }
 
-async fn const_empty() -> Result<CodeBody, ParsingError> { Ok(CodeBody::new(Vec::new(), "empty_trait".to_string())) }
+async fn const_finished() -> Result<CodeBody, ParsingError> {
+    return Ok(CodeBody::new(Vec::new(), String::new()));
+}
 
 pub async fn get_generics(generics: IndexMap<String, Vec<ParsingFuture<Types>>>)
     -> Result<IndexMap<String, Types>, ParsingError> {

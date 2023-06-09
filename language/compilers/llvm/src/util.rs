@@ -33,12 +33,12 @@ pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut C
     let mut params = Vec::new();
 
     for param in &function.fields {
-        params.push(From::from(type_getter.get_type(&param.field.field_type)));
+        params.push(From::from(type_getter.get_type(&param.assume_finished().field.field_type)));
     }
 
     let llvm_function = match &function.return_type {
         Some(returning) => {
-            let types = type_getter.get_type(&returning);
+            let types = type_getter.get_type(&returning.assume_finished());
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             if types.is_struct_type() {
                 params.insert(0, From::from(types.ptr_type(AddressSpace::default())));

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::task::Waker;
 
 use tokio::runtime::Handle;
 
@@ -8,11 +7,10 @@ use async_trait::async_trait;
 
 use syntax::function::Function;
 use syntax::{Attribute, ProcessManager, TraitImplementor};
-use syntax::async_util::{NameResolver, UnparsedType};
+use syntax::async_util::NameResolver;
 use syntax::r#struct::Struct;
 use syntax::syntax::{ParsingType, Syntax};
 use syntax::types::Types;
-use crate::check_code::placeholder_error;
 use crate::check_function::verify_function;
 use crate::check_struct::verify_struct;
 
@@ -21,11 +19,6 @@ pub struct TypesChecker {
     runtime: Handle,
     pub generics: HashMap<String, Types>,
     implementations: HashMap<ParsingType<Types>, (ParsingType<Types>, Vec<Attribute>, Vec<Arc<Function>>)>,
-    waiting_implementations: HashMap<Types, Waker>,
-    //Parsing implementations that don't have their type resolved
-    parsing_implementations: HashMap<UnparsedType, UnparsedType>,
-    //Parsing implementations that do have their type resolved, but not their impl
-    finished_parsing_impl: HashMap<Types, Types>,
 }
 
 impl TypesChecker {
@@ -34,9 +27,6 @@ impl TypesChecker {
             runtime,
             generics: HashMap::new(),
             implementations: HashMap::new(),
-            waiting_implementations: HashMap::new(),
-            parsing_implementations: HashMap::new(),
-            finished_parsing_impl: HashMap::new(),
         };
     }
 }
@@ -63,18 +53,9 @@ impl ProcessManager for TypesChecker {
         }
     }
 
-    async fn add_implementation(&mut self, implementor: TraitImplementor, syntax: &Arc<Mutex<Syntax>>) {
-        for waker in &self.waiting_implementations {
-            if implementor.base.assume_finished().of_type(&waker.0, syntax).await {
-                waker.1.wake_by_ref();
-            }
-        }
+    fn add_implementation(&mut self, implementor: TraitImplementor) {
         self.implementations.insert(implementor.implementor,
                                     (implementor.base, implementor.attributes, implementor.functions));
-    }
-
-    fn add_impl_waiter(&mut self, waiter: Waker, base: Types) {
-        self.waiting_implementations.insert(base, waiter);
     }
 
     async fn of_types(&self, base: &Types, target: &Types, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<Function>>> {

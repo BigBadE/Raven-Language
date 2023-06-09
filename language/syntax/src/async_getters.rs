@@ -54,7 +54,7 @@ impl Future for ImplementationGetter {
     type Output = Result<Vec<Arc<Function>>, ()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.syntax.lock().unwrap();
+        let locked = self.syntax.lock().unwrap();
         if let Poll::Ready(result) = Future::poll(Pin::new(
             &mut locked.process_manager.of_types(&self.target, &self.testing, &self.syntax)), cx) {
             if let Some(found) = result {
@@ -68,7 +68,6 @@ impl Future for ImplementationGetter {
             return Poll::Ready(Err(()));
         }
 
-        locked.process_manager.add_impl_waiter(cx.waker().clone(), self.testing.clone());
         return Poll::Pending;
     }
 }

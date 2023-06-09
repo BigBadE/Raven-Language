@@ -12,7 +12,7 @@ use crate::syntax::ParsingType;
 #[derive(Clone)]
 pub struct Function {
     pub attributes: Vec<Attribute>,
-    pub generics: IndexMap<String, ParsingType<Types>>,
+    pub generics: IndexMap<String, Vec<ParsingType<Types>>>,
     pub modifiers: u8,
     pub fields: Vec<ParsingType<MemberField>>,
     pub code: ParsingType<CodeBody>,
@@ -23,14 +23,14 @@ pub struct Function {
 
 impl Function {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8,
-               fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, ParsingType<Types>>,
+               fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, Vec<ParsingType<Types>>>,
                code: ParsingFuture<CodeBody>, return_type: Option<ParsingType<Types>>, name: String) -> Self {
         return Self {
             attributes,
             generics,
             modifiers,
             fields,
-            code: ParsingType::Parsing(code),
+            code: ParsingType::new(code),
             return_type,
             name,
             poisoned: Vec::new()
@@ -43,7 +43,7 @@ impl Function {
             generics: IndexMap::new(),
             modifiers: 0,
             fields: Vec::new(),
-            code: ParsingType::Done(CodeBody::new(Vec::new(), "poison".to_string())),
+            code: ParsingType::new_done(CodeBody::new(Vec::new(), "poison".to_string())),
             return_type: None,
             name,
             poisoned: vec!(error)
@@ -116,8 +116,8 @@ impl DisplayIndented for Function {
 
         if !self.generics.is_empty() {
             write!(f, "<")?;
-            for (_name, generic) in &self.generics {
-                write!(f, "{}", generic.assume_finished())?;
+            for (_name, _generic) in &self.generics {
+                write!(f, "TODO")?;
             }
             write!(f, ">")?;
         }

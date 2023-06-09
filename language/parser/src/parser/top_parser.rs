@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use syntax::{Attribute, Modifier, MODIFIERS};
 use syntax::r#struct::Struct;
-use crate::parser;
 use crate::parser::function_parser::parse_function;
 use crate::parser::struct_parser::{parse_implementor, parse_structure};
 use crate::parser::util::ParserUtils;
@@ -25,18 +24,18 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::FunctionStart => {
                 let token = token.clone();
                 let function = parse_function(parser_utils, attributes, modifiers);
-                parser_utils.handle.spawn(
-                    ParserUtils::add_function(parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone()),
-                                              parser_utils.file.clone(), token, Box::pin(function)));
+                ParserUtils::add_function(&parser_utils.syntax, &parser_utils.handle,
+                                          Box::new(parser_utils.imports.clone()),
+                                              parser_utils.file.clone(), token, function);
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::StructStart => {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                parser_utils.handle.spawn(
-                    ParserUtils::add_struct(parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone()), token,
-                                            parser_utils.file.clone(), Box::pin(structure)));
+                ParserUtils::add_struct(&parser_utils.syntax, &parser_utils.handle,
+                                        Box::new(parser_utils.imports.clone()), token,
+                                            parser_utils.file.clone(), structure);
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
