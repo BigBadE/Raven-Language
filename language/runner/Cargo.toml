@@ -9,7 +9,6 @@ parser = { path = "../parser" }
 checker = { path = "../checker" }
 
 # Compilers
-compilers = { path = "../compilers/compilers" }
 compiler-llvm = { path = "../compilers/llvm" }
 
 # Tokio is used for scheduling I/O and CPU operations

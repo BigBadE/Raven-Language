@@ -1,9 +1,8 @@
 use std::sync::Arc;
 use inkwell::AddressSpace;
-use inkwell::types::{BasicType, StructType};
+use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
 use syntax::function::Function;
-use syntax::r#struct::Struct;
 use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
@@ -51,8 +50,4 @@ pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut C
     };
 
     return type_getter.compiler.module.add_function(&function.name, llvm_function, None);
-}
-
-pub async fn create_struct_value<'ctx>(_structure: &Struct, _type_getter: &CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
-    todo!()
 }

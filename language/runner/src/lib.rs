@@ -1,9 +1,13 @@
 use std::{fs, path};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use anyhow::Error;
 use tokio::runtime::Runtime;
 use compiler_llvm::LLVMCompiler;
-use compilers::compiling::Compiler;
+use syntax::function::Function;
+use syntax::r#struct::Struct;
+use syntax::syntax::Compiler;
 
 pub mod runner;
 
@@ -15,11 +19,12 @@ pub struct RunnerSettings {
     pub compiler: String,
 }
 
-pub fn get_compiler(name: String) -> Box<dyn Compiler> {
-    match name.to_lowercase().as_str() {
-        "llvm" => Box::new(LLVMCompiler::new()),
+pub fn get_compiler(compiling: Arc<HashMap<String, Arc<Function>>>, struct_compiling: Arc<HashMap<String, Arc<Struct>>>,
+                    name: String) -> Box<dyn Compiler> {
+    return Box::new(match name.to_lowercase().as_str() {
+        "llvm" => LLVMCompiler::new(compiling, struct_compiling),
         _ => panic!("Unknown compilers {}", name)
-    }
+    });
 }
 
 pub struct SourceSet {

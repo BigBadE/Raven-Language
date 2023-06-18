@@ -116,7 +116,7 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
+    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>);
 
     async fn verify_struct(&self, structure: &mut Struct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
 

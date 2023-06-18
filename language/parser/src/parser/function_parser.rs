@@ -51,7 +51,6 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
                 return_type = Some(ParsingType::new(parser_utils.get_struct(token, name)))
             },
             TokenTypes::CodeStart => {
-                println!("Parsing for {}", name);
                 code = Some(parse_code(parser_utils).1);
                 break
             },
@@ -59,7 +58,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
             TokenTypes::EOF => {
                 parser_utils.index -= 1;
                 break
-            }
+            },
             TokenTypes::Comment => {},
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }

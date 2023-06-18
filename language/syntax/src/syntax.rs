@@ -14,6 +14,10 @@ use crate::r#struct::Struct;
 
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
+    // The compiling functions
+    pub compiling: Arc<HashMap<String, Arc<Function>>>,
+    // The compiling structs
+    pub strut_compiling: Arc<HashMap<String, Arc<Struct>>>,
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
     // All structures in the program
@@ -31,6 +35,8 @@ pub struct Syntax {
 impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
+            compiling: Arc::new(HashMap::new()),
+            strut_compiling: Arc::new(HashMap::new()),
             errors: Vec::new(),
             structures: AsyncGetter::new(),
             functions: AsyncGetter::new(),
@@ -88,7 +94,7 @@ impl Syntax {
             }
         }
 
-        let process_manager = syntax.lock().unwrap().process_manager.cloned();
+        let process_manager = locked.process_manager.cloned();
         handle.spawn(T::verify(adding, syntax.clone(), resolver, process_manager));
     }
 
@@ -156,8 +162,7 @@ impl Syntax {
 
 pub enum ParsingType<T> where T: Clone {
     Parsing(u32, ParsingFuture<T>),
-    Done(u32, T),
-    Swapping(),
+    Done(u32, T)
 }
 
 pub static mut LAST_ID: u32 = 0;
@@ -188,8 +193,7 @@ impl<T: Clone + PartialEq> PartialEq for ParsingType<T> {
             ParsingType::Parsing(id, _) => match other {
                 ParsingType::Parsing(other, _) => id == other,
                 _ => false
-            },
-            _ => false
+            }
         }
     }
 }
@@ -198,8 +202,7 @@ impl<T: Clone + Hash> Hash for ParsingType<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             ParsingType::Done(id, _) => Hash::hash(id, state),
-            ParsingType::Parsing(id, _) => Hash::hash(id, state),
-            _ => {}
+            ParsingType::Parsing(id, _) => Hash::hash(id, state)
         }
     }
 }
@@ -226,7 +229,6 @@ impl<T: Clone> ParsingType<T> {
                 *self = ParsingType::Done(*id, temp);
                 return Ok(self.assume_finished_mut());
             },
-            _ => panic!("Swapping fail!")
         }
     }
 
@@ -243,4 +245,11 @@ impl<T: Clone> ParsingType<T> {
             _ => panic!("Assumed finished on unfinished code parsing!")
         };
     }
+}
+
+pub type Output = bool;
+
+pub trait Compiler {
+    /// Compiles the main function and returns the main runner.
+    fn compile(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<Output>, Vec<ParsingError>>;
 }

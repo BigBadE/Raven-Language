@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 syntax = { path = "../syntax" }
-compilers = { path = "../compilers/compilers" }
 
 # CPU-bound async tasks
 tokio = { version = "1.27.0", features = ["rt"] }

@@ -1,20 +1,20 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use compilers::compiling::Output;
 use syntax::function::Function;
 use syntax::{ParsingError, VariableManager};
-use syntax::syntax::Syntax;
+use syntax::r#struct::Struct;
+use syntax::syntax::{Output, Syntax};
 use syntax::types::Types;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_struct};
 use crate::internal::structs::get_internal_struct;
-use crate::type_waiter::TypeWaiter;
 use crate::util::print_formatted;
 
 pub type Main = unsafe extern "C" fn() -> Output;
@@ -81,14 +81,14 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile(&mut self) -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
-        let found = self.syntax.lock().unwrap().functions.types.contains_key("main::main");
-
-        if !found {
-            TypeWaiter::new(&self.syntax, "main::main").wait();
+    pub fn compile(&mut self, functions: &HashMap<String, Arc<Function>>, structures: &HashMap<String, Arc<Struct>>)
+        -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
+        while !functions.contains_key("main::main") {
+            //Waiting
+            thread::yield_now();
         }
 
-        let function = match self.syntax.lock().unwrap().functions.types.get("main::main") {
+        let function = match functions.get("main::main") {
             Some(found) => found,
             None => return Ok(None)
         }.clone();

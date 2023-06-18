@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-compilers = { path = "../compilers" }
 syntax = { path = "../../syntax" }
 
 async-trait = { version = "0.1.69", path = "../../../crates/async-trait" }

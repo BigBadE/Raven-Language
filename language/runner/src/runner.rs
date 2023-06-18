@@ -3,21 +3,19 @@ use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::Sender;
 use anyhow::Error;
 use checker::output::TypesChecker;
-use compilers::compiling::Output;
 use parser::parse;
 use syntax::ParsingError;
-use syntax::syntax::Syntax;
+use syntax::syntax::{Output, Syntax};
 use crate::{get_compiler, RunnerSettings};
 
 pub async fn run(settings: &RunnerSettings)
     -> Result<Option<Output>, Vec<ParsingError>> {
-    let syntax = Syntax::new(
-        Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())));
+    let syntax = Syntax::new(Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())));
     let syntax = Arc::new(Mutex::new(syntax));
 
     let (sender, receiver) = mpsc::channel();
 
-    settings.cpu_runtime.spawn(start(sender, settings.compiler.clone(), syntax.clone()));
+    settings.cpu_runtime.spawn(start(settings.compiler.clone(), sender, syntax.clone()));
 
     //Parse source, getting handles and building into the unresolved syntax.
     let mut handles = Vec::new();
@@ -58,7 +56,12 @@ pub async fn run(settings: &RunnerSettings)
     return receiver.recv().unwrap();
 }
 
-pub async fn start(sender: Sender<Result<Option<Output>, Vec<ParsingError>>>, compiler: String, syntax: Arc<Mutex<Syntax>>) {
-    let compiler = get_compiler(compiler);
-    sender.send(compiler.compile(&syntax)).unwrap();
+pub async fn start(compiler: String, sender: Sender<Result<Option<Output>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
+    let code_compiler;
+    {
+        let locked = syntax.lock().unwrap();
+        code_compiler = get_compiler(locked.compiling.clone(),
+                                locked.strut_compiling.clone(), compiler);
+    }
+    sender.send(code_compiler.compile(&syntax)).unwrap();
 }

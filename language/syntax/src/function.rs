@@ -74,7 +74,10 @@ impl TopElement for Function {
     }
 
     async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
-        process_manager.verify_func(unsafe { Arc::get_mut_unchecked(&mut current) }, resolver, syntax).await;
+        unsafe {
+            process_manager.verify_func(Arc::get_mut_unchecked(&mut current), resolver, &syntax).await;
+            Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling).insert(current.name.clone(), current);
+        }
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {

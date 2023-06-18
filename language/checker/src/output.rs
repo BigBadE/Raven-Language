@@ -37,9 +37,8 @@ impl ProcessManager for TypesChecker {
         return &self.runtime;
     }
 
-    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>) {
-        if let Err(error) = verify_function(self, resolver, function,
-                                            &syntax).await {
+    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) {
+        if let Err(error) = verify_function(self, resolver, function, syntax).await {
             syntax.lock().unwrap().errors.push(error.clone());
             function.poisoned.push(error);
         }

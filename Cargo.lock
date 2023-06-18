@@ -94,7 +94,6 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "async-trait",
- "compilers",
  "syntax",
  "tokio",
 ]
@@ -122,20 +121,10 @@ name = "compiler-llvm"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "compilers",
  "inkwell",
  "llvm-sys",
  "syntax",
  "tokio",
-]
-
-[[package]]
-name = "compilers"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "syntax",
 ]
 
 [[package]]
@@ -520,7 +509,6 @@ dependencies = [
  "anyhow",
  "checker",
  "compiler-llvm",
- "compilers",
  "parser",
  "syntax",
  "tokio",

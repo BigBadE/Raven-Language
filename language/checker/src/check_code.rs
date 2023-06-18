@@ -51,7 +51,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     ops = operations.len();
                     for potential_operation in operations {
                         if let Some(new_effect) = check_operation(potential_operation, values,
-                                                                  syntax, variables).await {
+                                                                  syntax, variables).await? {
                             *effect = assign_with_priority(new_effect);
                             break 'outer;
                         }
@@ -187,7 +187,7 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
         verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?;
     }
 
-    if !check_args(&method, effects, syntax, variables).await {
+    if !check_args(&method, effects, syntax, variables).await? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.name,
                                              method.fields.iter().map(|field| &field.assume_finished().field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -201,29 +201,30 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 async fn check_operation(operation: Arc<Function>, values: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
-                         variables: &mut CheckerVariableManager) -> Option<Effects> {
-    if check_args(&operation, values, syntax, variables).await {
-        return Some(Effects::VerifiedMethodCall(operation, values.clone()));
+                         variables: &mut CheckerVariableManager) -> Result<Option<Effects>, ParsingError> {
+    if check_args(&operation, values, syntax, variables).await? {
+        return Ok(Some(Effects::VerifiedMethodCall(operation, values.clone())));
     }
-    return None;
+    return Ok(None);
 }
 
 async fn check_args(function: &Arc<Function>, args: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
-                    variables: &mut CheckerVariableManager) -> bool {
+                    variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
-        return false;
+        return Ok(false);
     }
 
+    let mut function = function.clone();
     for i in 0..function.fields.len() {
         let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() && !returning.as_ref().unwrap().of_type(
-            &function.fields.get(i).unwrap().assume_finished().field.field_type, syntax).await {
+            &unsafe { Arc::get_mut_unchecked(&mut function) }.fields.get_mut(i).unwrap().await_finish().await?.field.field_type, syntax).await {
             println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().assume_finished().field.field_type);
-            return false;
+            return Ok(false);
         }
     }
 
-    return true;
+    return Ok(true);
 }
 
 pub fn assign_with_priority(operator: Effects) -> Effects {
