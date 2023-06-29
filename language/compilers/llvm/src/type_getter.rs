@@ -81,7 +81,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile(&mut self, functions: &HashMap<String, Arc<Function>>, structures: &HashMap<String, Arc<Struct>>)
+    pub fn compile(&mut self, functions: &HashMap<String, Arc<Function>>, _structures: &HashMap<String, Arc<Struct>>)
         -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
         while !functions.contains_key("main::main") {
             //Waiting

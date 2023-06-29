@@ -113,7 +113,18 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?;
             }
         }
-        Effects::Load(effect, _) => verify_effect(process_manager, resolver, effect, syntax, variables).await?,
+        Effects::Load(effect, _) => {
+            verify_effect(process_manager, resolver, effect, syntax, variables).await?;
+            let temp = effect.get_return(variables).unwrap();
+            match temp {
+                Types::Struct(mut structure) => {
+                    for field in &mut unsafe { Arc::get_mut_unchecked(&mut structure) }.fields {
+                        field.await_finish().await?;
+                    }
+                },
+                _ => {}
+            }
+        },
         Effects::CreateVariable(name, effect) => {
             verify_effect(process_manager, resolver, effect, syntax, variables).await?;
             return if let Some(found) = effect.get_return(variables) {
