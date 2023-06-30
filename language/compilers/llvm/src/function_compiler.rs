@@ -69,7 +69,6 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
                         if !broke {
-                            println!("Return unbroken");
                             if returned.is_struct_value() {
                                 type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
                                                                          returned);
@@ -120,7 +119,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                             effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
         Effects::NOP() => panic!("Tried to compile a NOP"),
-        Effects::Operation(_, _) => panic!("Checker failed to resolve operation!"),
+        Effects::Operation(_, _) => panic!("Checker failed to resolve operation! {:?}", effect),
         Effects::MethodCall(_, _, _) => panic!("Checker failed to resolve method call!"),
         Effects::CreateVariable(name, inner) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();

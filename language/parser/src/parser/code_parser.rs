@@ -30,6 +30,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
     let mut expression_type = ExpressionType::Line;
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap().clone();
+
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::ParenOpen => {
@@ -63,13 +64,13 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             }
             TokenTypes::Integer => {
                 effect = Some(constant_effect(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap())))
-            },
+            }
             TokenTypes::True => {
                 effect = Some(constant_effect(Effects::Bool(true)))
-            },
+            }
             TokenTypes::False => {
                 effect = Some(constant_effect(Effects::Bool(false)))
-            },
+            }
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => return None,
             TokenTypes::Variable =>
@@ -95,7 +96,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     expression_type = returning;
                 }
                 effect = Some(body)
-            },
+            }
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
@@ -107,13 +108,14 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     } else {
                         effect = Some(constant_error(error));
                     }
+                    break
                 } else {
                     return Some((expression_type, parse_operator(effect, parser_utils)));
                 }
             }
             TokenTypes::Operator => {
-                return Some((expression_type, parse_operator(effect, parser_utils)))
-            },
+                return Some((expression_type, parse_operator(effect, parser_utils)));
+            }
             TokenTypes::ArgumentEnd => if !deep {
                 break;
             },
@@ -281,7 +283,7 @@ async fn create_effect(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, r
         for field in fields {
             if unsafe { very_bad_function(field) }.await_finish().await?.field.name == input.0 {
                 final_inputs.push((i, input.1.await?));
-                break
+                break;
             }
             i += 1;
         }

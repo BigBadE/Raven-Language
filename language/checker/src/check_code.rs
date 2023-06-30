@@ -37,6 +37,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             verify_effect(process_manager, resolver, second, syntax, variables).await?;
         }
         Effects::Operation(operation, values) => {
+            println!("Operation! {}", operation);
             for arg in &mut *values {
                 verify_effect(process_manager, resolver.boxed_clone(), arg, syntax, variables).await?;
             }
@@ -46,22 +47,27 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             //Keeps track of the last operation notified of.
             let mut ops = 0;
             'outer: loop {
+                println!("Here! {}", operation);
                 let operation = format!("{}${}", operation, ops);
                 let operations = syntax.lock().unwrap().operations.get(&operation).cloned();
                 if let Some(operations) = operations {
+                    println!("Found op for {}", operation);
                     ops = operations.len();
                     for potential_operation in operations {
+                        println!("Checking op for {}", operation);
                         match check_operation(potential_operation, values,
                                               syntax, variables).await {
                             Ok(new_effect) => {
                                 if let Some(new_effect) = new_effect {
-                                    println!("2");
+                                    println!("Assigning with {:?}", new_effect);
                                     *effect = assign_with_priority(new_effect);
                                     break 'outer;
+                                } else {
+                                    println!("Missed op for {}", operation);
                                 }
                             },
                             Err(error) => {
-                                println!("2-error");
+                                println!("Error for {}", operation);
                                 *effect = NOP();
                                 return Err(error);
                             }
@@ -69,9 +75,17 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
                 }
 
-                Syntax::get_function(syntax.clone(), error.clone(),
-                                     operation, true, Box::new(EmptyNameResolver {})).await?;
+                println!("Failed to check op for {}", operation);
+                match Syntax::get_function(syntax.clone(), error.clone(),
+                                     operation, true, Box::new(EmptyNameResolver {})).await {
+                    Ok(_) => {},
+                    Err(error) => {
+                        println!("Got error!");
+                        return Err(error);
+                    }
+                }
             }
+            println!("Set operation to {:?}", effect);
             return verify_effect(process_manager, resolver, effect, syntax, variables).await;
         }
         Effects::MethodCall(calling, method, effects) => {

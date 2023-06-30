@@ -43,6 +43,7 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
                                                  function.return_type.as_ref().unwrap().assume_finished())))
         }
     }
+
     return Ok(());
 }
 
