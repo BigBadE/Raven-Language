@@ -8,5 +8,5 @@ pub fn main() -> bool {
     };
 
     iter.next();
-    return iter.has_next();
+    return iter.current;
 }

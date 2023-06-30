@@ -209,7 +209,7 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
     let values;
 
     loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => {
@@ -228,10 +228,9 @@ fn parse_new(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
         }
     }
 
-    return Box::pin(create_effect(parser_utils.syntax.clone(),
-                                  parser_utils.tokens.get(parser_utils.index).unwrap().clone(),
-                                  parser_utils.file.clone(),
-                                  parser_utils.imports.boxed_clone(),
+    let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
+    return Box::pin(create_effect(parser_utils.syntax.clone(), token.clone(),
+                                  parser_utils.file.clone(), parser_utils.imports.boxed_clone(),
                                   types.unwrap(), values));
 }
 

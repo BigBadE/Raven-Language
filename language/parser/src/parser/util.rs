@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
 use syntax::function::Function;
-use syntax::{ParsingError, ParsingFuture, TopElement, TraitImplementor};
+use syntax::{is_modifier, Modifier, ParsingError, ParsingFuture, TopElement, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::r#struct::Struct;
 use syntax::syntax::{ParsingType, Syntax};
@@ -36,7 +36,10 @@ impl<'a> ParserUtils<'a> {
 
     pub fn add_struct(syntax: &Arc<Mutex<Syntax>>, handle: &Handle, resolver: Box<dyn NameResolver>, token: Token, file: String,
                             structure: Result<Struct, ParsingError>) -> Arc<Struct> {
-        let structure = Self::get_elem(&file, structure);
+        let structure = Arc::new(match structure {
+            Ok(adding) => adding,
+            Err(error) => Struct::new_poisoned(format!("${}", file), error)
+        });
 
         Syntax::add(&syntax, handle, resolver.boxed_clone(), token.make_error(file.clone(),
                                                         format!("Duplicate structure {}", structure.name)),
@@ -59,20 +62,28 @@ impl<'a> ParserUtils<'a> {
         }
     }
 
-    pub fn add_function(syntax: &Arc<Mutex<Syntax>>, handle: &Handle, resolver: Box<dyn NameResolver>, file: String, token: Token,
+    pub fn add_function(syntax: &Arc<Mutex<Syntax>>, trait_function: bool, handle: &Handle, resolver: Box<dyn NameResolver>, file: String, token: Token,
                               function: Result<Function, ParsingError>) -> Arc<Function> {
-        let adding = Self::get_elem(&file, function);
+        let adding = Arc::new(match function {
+            Ok(mut adding) => {
+                if trait_function {
+                    if is_modifier(adding.modifiers, Modifier::Internal) || is_modifier(adding.modifiers, Modifier::Extern) {
+                        Function::new_poisoned(format!("${}", file), token.make_error(
+                            file.clone(), "Traits can't be internal/external!".to_string()))
+                    } else {
+                        adding.modifiers += Modifier::Trait as u8;
+                        adding
+                    }
+                } else {
+                    adding
+                }
+            },
+            Err(error) => Function::new_poisoned(format!("${}", file), error)
+        });
         Syntax::add(syntax, handle, resolver,
                     token.make_error(file, format!("Duplicate {}", adding.name())),
                                    adding.clone());
         return adding;
-    }
-
-    fn get_elem<T: TopElement>(file: &String, adding: Result<T, ParsingError>) -> Arc<T> {
-        return Arc::new(match adding {
-            Ok(adding) => adding,
-            Err(error) => T::new_poisoned(format!("${}", file), error)
-        });
     }
 }
 

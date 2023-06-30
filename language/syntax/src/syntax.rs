@@ -181,6 +181,13 @@ impl<T: Clone> ParsingType<T> {
             return ParsingType::Done(LAST_ID - 1, done);
         }
     }
+
+    pub fn get_id(&self) -> u32 {
+        return match *self {
+            ParsingType::Done(id, _) => id,
+            ParsingType::Parsing(id, _) => id
+        };
+    }
 }
 
 impl<T: Clone + PartialEq> PartialEq for ParsingType<T> {
@@ -247,7 +254,7 @@ impl<T: Clone> ParsingType<T> {
     }
 }
 
-pub type Output = bool;
+pub type Output = i64;
 
 pub trait Compiler {
     /// Compiles the main function and returns the main runner.

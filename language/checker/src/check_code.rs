@@ -8,6 +8,7 @@ use crate::EmptyNameResolver;
 use async_recursion::async_recursion;
 use syntax::async_getters::ImplementationGetter;
 use syntax::async_util::NameResolver;
+use syntax::code::Effects::NOP;
 use syntax::types::Types;
 use crate::check_function::CheckerVariableManager;
 use crate::output::TypesChecker;
@@ -50,10 +51,20 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 if let Some(operations) = operations {
                     ops = operations.len();
                     for potential_operation in operations {
-                        if let Some(new_effect) = check_operation(potential_operation, values,
-                                                                  syntax, variables).await? {
-                            *effect = assign_with_priority(new_effect);
-                            break 'outer;
+                        match check_operation(potential_operation, values,
+                                              syntax, variables).await {
+                            Ok(new_effect) => {
+                                if let Some(new_effect) = new_effect {
+                                    println!("2");
+                                    *effect = assign_with_priority(new_effect);
+                                    break 'outer;
+                                }
+                            },
+                            Err(error) => {
+                                println!("2-error");
+                                *effect = NOP();
+                                return Err(error);
+                            }
                         }
                     }
                 }
@@ -64,9 +75,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             return verify_effect(process_manager, resolver, effect, syntax, variables).await;
         }
         Effects::MethodCall(calling, method, effects) => {
-            let mut method = if let Some(found) = calling {
-                effects.push(*found.clone());
+            let method = if let Some(found) = calling {
                 let return_type = found.get_return(variables).unwrap();
+                effects.push(*found.clone());
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), false, resolver.boxed_clone()).await {
                     value
@@ -99,7 +110,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                      method.clone(), false, resolver.boxed_clone()).await?
             };
 
-            if let Some(found) = check_method(process_manager, resolver, &mut method,
+            if let Some(found) = check_method(process_manager, resolver, method,
                                               effects, syntax, variables).await? {
                 *effect = found;
             }
@@ -139,7 +150,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     return Ok(());
 }
 
-async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, method: &mut Arc<Function>,
+async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, mut method: Arc<Function>,
                       effects: &mut Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager) -> Result<Option<Effects>, ParsingError> {
     if !method.generics.is_empty() {
@@ -151,7 +162,7 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
 
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            if let Some(old) = unsafe { Arc::get_mut_unchecked(method) }.fields.get_mut(i)
+            if let Some(old) = unsafe { Arc::get_mut_unchecked(&mut method) }.fields.get_mut(i)
                 .unwrap().await_finish().await?.field.field_type.resolve_generic(
                 &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                 if let Types::Generic(name, _) = old {
@@ -168,9 +179,9 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
         mem::swap(&mut temp, effects);
         {
             if syntax.lock().unwrap().functions.types.contains_key(&name) {
-                *method = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone()
+                method = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone()
             } else {
-                let mut new_method = Function::clone(method);
+                let mut new_method = Function::clone(&method);
                 new_method.generics.clear();
                 new_method.name = name.clone();
                 for field in &mut new_method.fields {
@@ -183,7 +194,7 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
                                                               placeholder_error("No generic!".to_string()),
                                                               placeholder_error("Invalid bounds!".to_string())).await?;
                 }
-                *method = Arc::new(new_method);
+                method = Arc::new(new_method);
                 syntax.lock().unwrap().functions.types.insert(name, method.clone());
             };
         }
@@ -204,7 +215,9 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
-    return Ok(None);
+    let mut temp = Vec::new();
+    mem::swap(&mut temp, effects);
+    return Ok(Some(Effects::VerifiedMethodCall(method, temp)));
 }
 
 pub fn placeholder_error(message: String) -> ParsingError {

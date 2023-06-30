@@ -31,8 +31,9 @@ impl Types {
 
     pub fn is_primitive(&self) -> bool {
         return match self {
-            Types::Struct(structure) => is_modifier(structure.modifiers, Modifier::Internal),
-            Types::Reference(inner) => inner.is_primitive(),
+            Types::Struct(structure) => is_modifier(structure.modifiers, Modifier::Internal) &&
+                !is_modifier(structure.modifiers, Modifier::Extern),
+            Types::Reference(_) => false,
             _ => panic!("Tried to primitive check a generic!")
         };
     }

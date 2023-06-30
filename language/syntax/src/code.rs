@@ -139,7 +139,7 @@ pub enum Effects {
 
 impl Effects {
     pub fn get_return(&self, variables: &dyn VariableManager) -> Option<Types> {
-        return match self {
+        let temp = match self {
             Effects::NOP() => None,
             Effects::Jump(_) => None,
             Effects::CompareJump(_, _, _) => None,
@@ -148,7 +148,13 @@ impl Effects {
             Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
             Effects::MethodCall(_, _, _) => panic!("Failed to resolve method call!"),
             Effects::VerifiedMethodCall(function, _) =>
-                function.return_type.as_ref().map(|inner| inner.assume_finished().clone()),
+                function.return_type.as_ref().map(|inner| {
+                    let mut returning = inner.assume_finished().clone();
+                    if !returning.is_primitive() {
+                        returning = Types::Reference(Box::new(returning));
+                    }
+                    returning
+                }),
             Effects::Set(_, to) => to.get_return(variables),
             Effects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
@@ -174,13 +180,14 @@ impl Effects {
                     },
                     _ => None
                 }
-            Effects::CreateStruct(types, _) => Some(types.clone()),
+            Effects::CreateStruct(types, _) => Some(Types::Reference(Box::new(types.clone()))),
             Effects::Float(_) => Some(Types::Struct(F64.clone())),
             Effects::Int(_) => Some(Types::Struct(I64.clone())),
             Effects::UInt(_) => Some(Types::Struct(U64.clone())),
             Effects::Bool(_) => Some(Types::Struct(BOOL.clone())),
             Effects::String(_) => Some(Types::Reference(Box::new(Types::Struct(STR.clone()))))
         };
+        return temp;
     }
 }
 

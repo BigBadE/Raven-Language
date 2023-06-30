@@ -1,24 +1,56 @@
-# Memory Management
+# References (or the lack thereof)
 
-Raven doesn't require the user to use references. Instead,
-the compiler infers how memory should be managed based of the code.
+In Raven, there are no references. This is why the language resembles (and runs in) garbage-collected languages so well.
 
-This is done through static analysis using references:
+So how does this work behind the scenes, and how does this effect the user?
 
-# References
+# Dual memory management
 
-Say function A calls function B and passes variable C, and B returns D.
+Raven has two memory management systems: The lifetime memory manager and the "other" memory manager.
 
-This results in the following ownership:
+The lifetime memory manager uses the lifetime memory management system popularized by Rust, dropping variables when they
+go out of scope.
 
-- A owns C
-- D references C
+Sometimes, the lifetime memory manager can't free memory, because it has a reference to it outside the scope of the function.
 
-That means, if A is dropped, C is dropped, and D's reference is invalid.
+Here's an example in Rust:
+```rust
+struct Example {
+    inner: &Inner,
+}
 
-So, the compiler will detect D's reference to C, and swap ownership 
-of C to D instead of A, and give A the reference.
+struct Inner {
+    id: u32
+}
 
-To do this, A would always only have a pointer to C, it will just be the only
-object to drop C unless something else controls C.
+fn main() {
+    let inner = Inner { id: 1 };
+    let mut example = Example { inner: &inner };
+    other_function(&mut example);
+    //LIFETIME ISSUE: other_inner is dropped in other_function(), so this fails.
+    println!("{}", example.inner.id);
+}
 
+fn other_function(example: &mut Example) {
+    let other_inner = Inner { id: 2};
+    example.inner = other_inner;
+}
+```
+
+This has a few solutions:
+- Disallow references with longer lifespans
+- Disallow non-owning references
+- Force the user to manually manager those references
+- Garbage collect those references
+- Reference count the object, dropping it only when there are no references
+
+Each of these solutions have their own languages implementing them, each with their own set of trade-offs.
+
+So how does Raven deal with these, and what does this mean for references?
+
+The first big difference is removing references from being a user's concern, because every function parameter is a reference by default
+(Except when the verifier deems that a reference is safe to be directly passed).
+The compiler statically analyzes the code to determine lifetimes, changing nothing if a function parameter fits the owner's lifetime,
+if not, the compiler falls back on the secondary memory manager, the "other" memory manager.
+
+This allows for the use of slower or more difficult methods on a small subset of the variables used by the program.

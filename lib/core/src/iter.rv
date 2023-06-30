@@ -5,12 +5,12 @@ pub trait Iter<T> {
 }
 
 pub struct NumberIter {
-    pub current: u64;
-    pub end: u64;
+    pub current: i64;
+    pub end: i64;
 }
 
 impl Iter<u64> for NumberIter {
-    pub fn next(self) -> u64 {
+    pub fn next(self) -> i64 {
         self.current = self.current + 1;
         return self.current;
     }

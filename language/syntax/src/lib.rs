@@ -173,7 +173,7 @@ impl Display for ParsingError {
 }
 
 // A variable manager used for getting return types from effects
-pub trait VariableManager {
+pub trait VariableManager: Debug {
     fn get_variable(&self, name: &String) -> Option<Types>;
 }
 

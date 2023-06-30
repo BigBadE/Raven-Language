@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use inkwell::basic_block::BasicBlock;
 
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::types::{BasicType, StructType};
 
 use syntax::{is_modifier, Modifier};
@@ -69,6 +69,7 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
                         let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
                         if !broke {
+                            println!("Return unbroken");
                             if returned.is_struct_value() {
                                 type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
                                                                          returned);
@@ -159,17 +160,13 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 *id += 1;
                 final_arguments.push(From::from(pointer.as_basic_value_enum()));
 
-                for argument in arguments {
-                    final_arguments.push(From::from(compile_effect(type_getter, function, argument, id).unwrap()));
-                }
+                add_args(&mut final_arguments, type_getter, function, arguments, id);
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(), &(*id - 1).to_string());
                 Some(pointer.as_basic_value_enum())
             } else {
-                for argument in arguments {
-                    final_arguments.push(From::from(compile_effect(type_getter, function, argument, id).unwrap()));
-                }
+                add_args(&mut final_arguments, type_getter, function, arguments, id);
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
@@ -248,6 +245,14 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         Effects::Bool(bool) => Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum()),
         Effects::String(string) => Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum())
     };
+}
+
+fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
+            function: FunctionValue<'ctx>, arguments: &'a Vec<Effects>, id: &mut u64) {
+    for argument in arguments {
+        let value = compile_effect(type_getter, function, argument, id).unwrap();
+        final_arguments.push(From::from(value));
+    }
 }
 
 fn unwrap_or_create<'ctx>(name: &String, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>) -> BasicBlock<'ctx> {

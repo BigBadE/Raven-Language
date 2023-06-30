@@ -14,6 +14,7 @@ use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
 
 pub mod internal;
+pub mod lifetimes;
 
 pub mod compiler;
 pub mod function_compiler;

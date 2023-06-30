@@ -86,13 +86,13 @@ impl Struct {
             for generic in value {
                 if let Types::Generic(name, bounds) = generic.await_finish().await? {
                     let name = name.clone();
-                    let temp = generics.get(i).unwrap().clone();
+                    let temp: &Types = generics.get(i).unwrap();
                     for bound in bounds {
                         if !temp.of_type(&bound, syntax).await {
                             panic!("Generic {} set to a {} which isn't a {}", name, temp, bound);
                         }
                     }
-                    *generic = ParsingType::new_done(temp);
+                    *generic = ParsingType::new_done(temp.clone());
                     i += 1;
                 } else {
                     panic!("Guhh?????");

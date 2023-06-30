@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -122,6 +123,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 Err(_) => None
             }
         };
+    }
+}
+
+impl Debug for CompilerTypeGetter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return self.variables.fmt(f);
     }
 }
 
