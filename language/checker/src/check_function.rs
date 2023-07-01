@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::mem;
 use std::sync::{Arc, Mutex};
-use syntax::function::Function;
+use syntax::function::{FunctionData, UnfinalizedFunction};
 use syntax::{is_modifier, Modifier, ParsingError, VariableManager};
 use syntax::async_util::NameResolver;
 use syntax::code::{Effects, Expression, ExpressionType};
@@ -11,7 +11,7 @@ use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
 pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
-                             function: &mut Function, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+                             function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
     let mut variable_manager = CheckerVariableManager { variables: HashMap::new() };
 
     for argument in &mut function.fields {
@@ -45,15 +45,4 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
     }
 
     return Ok(());
-}
-
-#[derive(Clone, Debug)]
-pub struct CheckerVariableManager {
-    pub variables: HashMap<String, Types>
-}
-
-impl VariableManager for CheckerVariableManager {
-    fn get_variable(&self, name: &String) -> Option<Types> {
-        return self.variables.get(name).map(|found| found.clone());
-    }
 }

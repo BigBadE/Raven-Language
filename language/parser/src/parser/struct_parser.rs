@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::code::{Field, MemberField};
-use syntax::r#struct::Struct;
+use syntax::r#struct::StructData;
 use syntax::syntax::{ParsingType, Syntax};
 use syntax::types::Types;
 use crate::parser::function_parser::parse_function;
@@ -12,7 +12,7 @@ use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 
 pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
-                       -> Result<Struct, ParsingError> {
+                       -> Result<StructData, ParsingError> {
     let modifiers = get_modifier(modifiers.as_slice());
 
     let mut member_modifiers = Vec::new();
@@ -36,8 +36,8 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
-                .add_poison(Arc::new(Struct::new_poisoned(format!("{}", parser_utils.file),
-                                                          token.make_error(parser_utils.file.clone(),
+                .add_poison(Arc::new(StructData::new_poisoned(format!("{}", parser_utils.file),
+                                                              token.make_error(parser_utils.file.clone(),
                                                                            "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
@@ -65,7 +65,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         }
     }
 
-    return Ok(Struct::new(attributes, fields, generics, modifiers, name));
+    return Ok(StructData::new(attributes, fields, generics, modifiers, name));
 }
 
 pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>,

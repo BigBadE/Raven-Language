@@ -2,10 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Handle;
 
-use syntax::function::Function;
+use syntax::function::FunctionData;
 use syntax::{is_modifier, Modifier, ParsingError, ParsingFuture, TopElement, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
-use syntax::r#struct::Struct;
+use syntax::r#struct::StructData;
 use syntax::syntax::{ParsingType, Syntax};
 use syntax::types::Types;
 
@@ -35,10 +35,10 @@ impl<'a> ParserUtils<'a> {
     }
 
     pub fn add_struct(syntax: &Arc<Mutex<Syntax>>, handle: &Handle, resolver: Box<dyn NameResolver>, token: Token, file: String,
-                            structure: Result<Struct, ParsingError>) -> Arc<Struct> {
+                      structure: Result<StructData, ParsingError>) -> Arc<StructData> {
         let structure = Arc::new(match structure {
             Ok(adding) => adding,
-            Err(error) => Struct::new_poisoned(format!("${}", file), error)
+            Err(error) => StructData::new_poisoned(format!("${}", file), error)
         });
 
         Syntax::add(&syntax, handle, resolver.boxed_clone(), token.make_error(file.clone(),
@@ -52,23 +52,26 @@ impl<'a> ParserUtils<'a> {
             Ok(implementor) => {
                 //Have to clone this twice to get around mutability restrictions and not keep syntax locked across awaits.
                 let process_manager = syntax.lock().unwrap().process_manager.cloned();
-                process_manager.cloned().add_implementation(implementor);
+                match process_manager.cloned().add_implementation(implementor).await {
+                    Ok(_) => {},
+                    Err(error) => {
+                        syntax.lock().unwrap().errors.push(error);
+                    }
+                };
             },
             Err(error) => {
-                syntax.lock().unwrap().structures.types
-                    .insert("$main".to_string(), Arc::new(Struct::new_poisoned(
-                        "$main".to_string(), error)));
+                syntax.lock().unwrap().errors.push(error);
             }
         }
     }
 
     pub fn add_function(syntax: &Arc<Mutex<Syntax>>, trait_function: bool, handle: &Handle, resolver: Box<dyn NameResolver>, file: String, token: Token,
-                              function: Result<Function, ParsingError>) -> Arc<Function> {
+                        function: Result<FunctionData, ParsingError>) -> Arc<FunctionData> {
         let adding = Arc::new(match function {
             Ok(mut adding) => {
                 if trait_function {
                     if is_modifier(adding.modifiers, Modifier::Internal) || is_modifier(adding.modifiers, Modifier::Extern) {
-                        Function::new_poisoned(format!("${}", file), token.make_error(
+                        FunctionData::new_poisoned(format!("${}", file), token.make_error(
                             file.clone(), "Traits can't be internal/external!".to_string()))
                     } else {
                         adding.modifiers += Modifier::Trait as u8;
@@ -78,7 +81,7 @@ impl<'a> ParserUtils<'a> {
                     adding
                 }
             },
-            Err(error) => Function::new_poisoned(format!("${}", file), error)
+            Err(error) => FunctionData::new_poisoned(format!("${}", file), error)
         });
         Syntax::add(syntax, handle, resolver,
                     token.make_error(file, format!("Duplicate {}", adding.name())),

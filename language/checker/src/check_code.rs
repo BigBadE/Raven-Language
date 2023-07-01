@@ -1,7 +1,7 @@
 use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::code::{Effects, ExpressionType};
-use syntax::function::{CodeBody, display_parenless, Function};
+use syntax::function::{CodeBody, display_parenless, FunctionData};
 use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
 use crate::EmptyNameResolver;
@@ -65,7 +65,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 } else {
                                     println!("Missed op for {}", operation);
                                 }
-                            },
+                            }
                             Err(error) => {
                                 println!("Error for {}", operation);
                                 *effect = NOP();
@@ -77,8 +77,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                 println!("Failed to check op for {}", operation);
                 match Syntax::get_function(syntax.clone(), error.clone(),
-                                     operation, true, Box::new(EmptyNameResolver {})).await {
-                    Ok(_) => {},
+                                           operation, true, Box::new(EmptyNameResolver {})).await {
+                    Ok(_) => {}
                     Err(error) => {
                         println!("Got error!");
                         return Err(error);
@@ -146,10 +146,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for field in &mut unsafe { Arc::get_mut_unchecked(&mut structure) }.fields {
                         field.await_finish().await?;
                     }
-                },
+                }
                 _ => {}
             }
-        },
+        }
         Effects::CreateVariable(name, effect) => {
             verify_effect(process_manager, resolver, effect, syntax, variables).await?;
             return if let Some(found) = effect.get_return(variables) {
@@ -164,7 +164,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     return Ok(());
 }
 
-async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, mut method: Arc<Function>,
+async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, mut method: Arc<FunctionData>,
                       effects: &mut Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager) -> Result<Option<Effects>, ParsingError> {
     if !method.generics.is_empty() {
@@ -195,18 +195,18 @@ async fn check_method(process_manager: &TypesChecker, resolver: Box<dyn NameReso
             if syntax.lock().unwrap().functions.types.contains_key(&name) {
                 method = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone()
             } else {
-                let mut new_method = Function::clone(&method);
+                let mut new_method = FunctionData::clone(&method);
                 new_method.generics.clear();
                 new_method.name = name.clone();
                 for field in &mut new_method.fields {
-                    field.assume_finished_mut().field.field_type.degeneric(&manager.generics, syntax,
-                                                                           placeholder_error("No generic!".to_string()),
-                                                                           placeholder_error("Invalid bounds!".to_string())).await?;
+                    field.field.field_type.degeneric(&manager.generics, syntax,
+                                                     placeholder_error("No generic!".to_string()),
+                                                     placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 if let Some(returning) = &mut new_method.return_type {
-                    returning.assume_finished_mut().degeneric(&manager.generics, syntax,
-                                                              placeholder_error("No generic!".to_string()),
-                                                              placeholder_error("Invalid bounds!".to_string())).await?;
+                    returning.degeneric(&manager.generics, syntax,
+                                        placeholder_error("No generic!".to_string()),
+                                        placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 method = Arc::new(new_method);
                 syntax.lock().unwrap().functions.types.insert(name, method.clone());
@@ -238,7 +238,7 @@ pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
-async fn check_operation(operation: Arc<Function>, values: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
+async fn check_operation(operation: Arc<FunctionData>, values: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
                          variables: &mut CheckerVariableManager) -> Result<Option<Effects>, ParsingError> {
     if check_args(&operation, values, syntax, variables).await? {
         return Ok(Some(Effects::VerifiedMethodCall(operation, values.clone())));
@@ -246,7 +246,7 @@ async fn check_operation(operation: Arc<Function>, values: &Vec<Effects>, syntax
     return Ok(None);
 }
 
-async fn check_args(function: &Arc<Function>, args: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
+async fn check_args(function: &Arc<FunctionData>, args: &Vec<Effects>, syntax: &Arc<Mutex<Syntax>>,
                     variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);

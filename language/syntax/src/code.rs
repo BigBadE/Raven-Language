@@ -1,15 +1,21 @@
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::{Attribute, DisplayIndented, Function, to_modifiers, VariableManager};
-use crate::function::{CodeBody, display_indented, display_joined};
-use crate::r#struct::{BOOL, F64, I64, STR, U64};
-use crate::types::Types;
+use crate::{Attribute, DisplayIndented, to_modifiers, VariableManager};
+use crate::function::{CodeBody, display_joined, FinalizedCodeBody, FinalizedFunction};
+use crate::r#struct::{BOOL, F64, FinalizedStruct, I64, STR, U64};
+use crate::types::{FinalizedTypes, Types};
 
 #[derive(Clone, Debug)]
 pub struct Expression {
     pub expression_type: ExpressionType,
     pub effect: Effects,
+}
+
+#[derive(Clone, Debug)]
+pub struct FinalizedExpression {
+    pub expression_type: ExpressionType,
+    pub effect: FinalizedEffects,
 }
 
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq)]
@@ -26,10 +32,23 @@ pub struct Field {
 }
 
 #[derive(Clone, Debug)]
+pub struct FinalizedField {
+    pub name: String,
+    pub field_type: FinalizedTypes,
+}
+
+#[derive(Clone, Debug)]
 pub struct MemberField {
     pub modifiers: u8,
     pub attributes: Vec<Attribute>,
     pub field: Field,
+}
+
+#[derive(Clone, Debug)]
+pub struct FinalizedMemberField {
+    pub modifiers: u8,
+    pub attributes: Vec<Attribute>,
+    pub field: FinalizedField,
 }
 
 impl MemberField {
@@ -63,41 +82,12 @@ impl Expression {
     }
 }
 
-impl Display for Expression {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.expression_type {
-            ExpressionType::Return => write!(f, "return ")?,
-            ExpressionType::Break => write!(f, "break ")?,
-            _ => {}
-        }
-        return self.effect.format("", f);
-    }
-}
-
 impl Field {
     pub fn new(name: String, field_type: Types) -> Self {
         return Self {
             name,
             field_type,
         };
-    }
-}
-
-impl DisplayIndented for Expression {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", indent)?;
-        match self.expression_type {
-            ExpressionType::Return => write!(f, "return")?,
-            ExpressionType::Break => write!(f, "break")?,
-            _ => {}
-        }
-        if let ExpressionType::Line = self.expression_type {
-            //Only add a space for returns
-        } else {
-            write!(f, " ")?;
-        }
-        self.effect.format(indent, f)?;
-        return write!(f, "\n");
     }
 }
 
@@ -119,7 +109,6 @@ pub enum Effects {
     CodeBody(CodeBody),
     //Calling, calling function, function arguments
     MethodCall(Option<Box<Effects>>, String, Vec<Effects>),
-    VerifiedMethodCall(Arc<Function>, Vec<Effects>),
     //Sets pointer to value
     Set(Box<Effects>, Box<Effects>),
     //Loads variable
@@ -137,127 +126,74 @@ pub enum Effects {
     String(String),
 }
 
-impl Effects {
-    pub fn get_return(&self, variables: &dyn VariableManager) -> Option<Types> {
+#[derive(Clone, Debug)]
+pub enum FinalizedEffects {
+    //Creates a variable
+    CreateVariable(String, Box<FinalizedEffects>, FinalizedTypes),
+    //Label of jumping to body
+    Jump(String),
+    //Comparison effect, and label to jump to the first if true, second if false
+    CompareJump(Box<FinalizedEffects>, String, String),
+    CodeBody(FinalizedCodeBody),
+    //Calling and function arguments
+    MethodCall(Arc<FinalizedFunction>, Vec<FinalizedEffects>),
+    //Sets pointer to value
+    Set(Box<FinalizedEffects>, Box<FinalizedEffects>),
+    //Loads variable
+    LoadVariable(String),
+    //Loads field pointer from structure, with the given struct
+    Load(Box<FinalizedEffects>, String, FinalizedStruct),
+    //Struct to create and a tuple of the index of the argument and the argument
+    CreateStruct(FinalizedTypes, Vec<(usize, FinalizedEffects)>),
+    Float(f64),
+    Int(i64),
+    UInt(u64),
+    Bool(bool),
+    String(String),
+}
+
+impl FinalizedEffects {
+    pub fn get_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
         let temp = match self {
-            Effects::NOP() => None,
-            Effects::Jump(_) => None,
-            Effects::CompareJump(_, _, _) => None,
-            Effects::CodeBody(_) => None,
-            Effects::CreateVariable(_, effect) => effect.get_return(variables),
-            Effects::Operation(_, _) => panic!("Failed to resolve operation?"),
-            Effects::MethodCall(_, _, _) => panic!("Failed to resolve method call!"),
-            Effects::VerifiedMethodCall(function, _) =>
+            FinalizedEffects::Jump(_) => None,
+            FinalizedEffects::CompareJump(_, _, _) => None,
+            FinalizedEffects::CodeBody(_) => None,
+            FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
+            FinalizedEffects::MethodCall(function, _) =>
                 function.return_type.as_ref().map(|inner| {
-                    let mut returning = inner.assume_finished().clone();
+                    let mut returning = inner.clone();
                     if !returning.is_primitive() {
-                        returning = Types::Reference(Box::new(returning));
+                        returning = FinalizedTypes::Reference(Box::new(returning));
                     }
                     returning
                 }),
-            Effects::Set(_, to) => to.get_return(variables),
-            Effects::LoadVariable(name) => {
+            FinalizedEffects::Set(_, to) => to.get_return(variables),
+            FinalizedEffects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
                 if let Some(found) = variable {
                     match found {
-                        Types::Generic(name, _) => {
+                        FinalizedTypes::Generic(name, _) => {
                             panic!("Unresolved generic {}", name)
                         }
-                        Types::GenericType(name, _) => {
+                        FinalizedTypes::GenericType(name, _) => {
                             panic!("Unresolved generic {:?}", name)
                         }
                         _ => return Some(found)
                     }
                 }
                 panic!("Unresolved variable {}", name);
-            },
-            Effects::Load(from, name) =>
-                match from.get_return(variables).unwrap() {
-                    Types::Struct(structure) => {
-                        structure.fields.iter()
-                            .find(|field| &field.assume_finished().field.name == name)
-                            .map(|field| field.assume_finished().field.field_type.clone())
-                    },
-                    _ => None
-                }
-            Effects::CreateStruct(types, _) => Some(Types::Reference(Box::new(types.clone()))),
-            Effects::Float(_) => Some(Types::Struct(F64.clone())),
-            Effects::Int(_) => Some(Types::Struct(I64.clone())),
-            Effects::UInt(_) => Some(Types::Struct(U64.clone())),
-            Effects::Bool(_) => Some(Types::Struct(BOOL.clone())),
-            Effects::String(_) => Some(Types::Reference(Box::new(Types::Struct(STR.clone()))))
+            }
+            FinalizedEffects::Load(_, name, loading) =>
+                loading.fields.iter()
+                    .find(|field| &field.field.name == name)
+                    .map(|field| field.field.field_type.clone()),
+            FinalizedEffects::CreateStruct(types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
+            FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
+            FinalizedEffects::Int(_) => Some(FinalizedTypes::Struct(I64.clone())),
+            FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
+            FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
+            FinalizedEffects::String(_) => Some(FinalizedTypes::Reference(Box::new(FinalizedTypes::Struct(STR.clone()))))
         };
         return temp;
-    }
-}
-
-impl DisplayIndented for Effects {
-    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let deeper = parsing.to_string() + "    ";
-        return match self {
-            Effects::NOP() => Ok(()),
-            Effects::CreateVariable(name, effect) => {
-                write!(f, "{} = ", name)?;
-                return effect.format(&deeper, f);
-            },
-            Effects::Operation(operation, effects) => {
-                let mut index = 0;
-                let mut effect = 0;
-                while index < operation.len() {
-                    if operation.as_bytes()[index] == b'{' {
-                        index += 1;
-                        effects.get(effect).unwrap().format(&deeper, f)?;
-                        effect += 1;
-                    } else {
-                        write!(f, "{}", operation.as_bytes()[index])?;
-                    }
-                    index += 1;
-                }
-                return Ok(());
-            }
-            Effects::Jump(label) => write!(f, "jump {}", label),
-            Effects::CompareJump(comparing, label, other) => {
-                write!(f, "if ")?;
-                comparing.format(&deeper, f)?;
-                write!(f, " jump {} else {}", label, other)
-            },
-            Effects::LoadVariable(variable) => write!(f, "{}", variable),
-            Effects::CodeBody(body) => body.format(&deeper, f),
-            Effects::MethodCall(calling, function, args) => {
-                if let Some(calling) = calling {
-                    calling.format(parsing, f)?;
-                    write!(f, ".{}", function)?;
-                    display_indented(f, args, &deeper, ", ")
-                } else {
-                    write!(f, "{}", function)?;
-                    display_indented(f, args, &deeper, ", ")
-                }
-            }
-            Effects::VerifiedMethodCall(function, args) => {
-                write!(f, "{}.", function.name)?;
-                display_indented(f, args, &deeper, ", ")
-            }
-            Effects::Set(setting, value) => {
-                setting.format(&deeper, f)?;
-                write!(f, " = ")?;
-                value.format(&deeper, f)
-            }
-            Effects::Load(from, loading) => {
-                from.format(&deeper, f)?;
-                write!(f, ".{}", loading)
-            }
-            Effects::CreateStruct(structure, arguments) => {
-                write!(f, "{} {{", structure)?;
-                for (_, arg) in arguments {
-                    arg.format(&deeper, f)?;
-                }
-                write!(f, "}}")
-            }
-            Effects::Float(float) => write!(f, "{}", float),
-            Effects::Int(int) => write!(f, "{}", int),
-            Effects::UInt(uint) => write!(f, "{}", uint),
-            Effects::Bool(bool) => write!(f, "{}", bool),
-            Effects::String(string) => write!(f, "{}", string),
-        };
     }
 }

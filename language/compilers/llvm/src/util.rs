@@ -2,7 +2,7 @@ use std::sync::Arc;
 use inkwell::AddressSpace;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
-use syntax::function::Function;
+use syntax::function::FinalizedFunction;
 use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
@@ -28,7 +28,7 @@ pub fn print_formatted(input: String) {
     println!("{}", output);
 }
 
-pub fn create_function_value<'ctx>(function: &Arc<Function>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
+pub fn create_function_value<'ctx>(function: &Arc<FinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let mut params = Vec::new();
 
     for param in &function.fields {

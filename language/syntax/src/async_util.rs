@@ -1,26 +1,46 @@
 use std::fmt::{Display, Formatter};
 use std::future::Future;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
 use crate::{ParsingError, TopElement};
 use crate::async_getters::AsyncGetter;
-use crate::function::{display_parenless, Function};
-use crate::r#struct::Struct;
+use crate::function::{display_parenless, FinalizedFunction, FunctionData};
+use crate::r#struct::{FinalizedStruct, StructData};
 use crate::syntax::Syntax;
 
-pub(crate) struct AsyncTypesGetter<T: TopElement> {
+pub(crate) struct AsyncTypesGetter<T: TopElement<K>, K> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub error: ParsingError,
     pub getting: String,
     pub operation: bool,
     pub name_resolver: Box<dyn NameResolver>,
     pub finished: Option<Arc<T>>,
+    phantom: PhantomData<K>
 }
 
-impl<T: TopElement> AsyncTypesGetter<T> {
-    fn get_types(&mut self, getting: &mut AsyncGetter<T>, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
+pub struct AsyncDataGetter<T: TopElement<K>, K> {
+    pub syntax: Arc<Mutex<Syntax>>,
+    pub getting: Arc<T>,
+    phantom: PhantomData<K>
+}
+
+impl<T: TopElement<K>, K> AsyncDataGetter<T, K> {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
+        return AsyncDataGetter {
+            syntax,
+            getting,
+            phantom: PhantomData::default()
+        }
+    }
+}
+
+impl<T: TopElement<K>, K> AsyncTypesGetter<T, K> {
+    fn get_types(&mut self, getting: &mut AsyncGetter<T, K>, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
         let name = if name.is_empty() {
             self.getting.clone()
         } else {
@@ -44,7 +64,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
     }
 }
 
-impl AsyncTypesGetter<Function> {
+impl AsyncTypesGetter<FunctionData, FinalizedFunction> {
     pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
@@ -53,11 +73,12 @@ impl AsyncTypesGetter<Function> {
             operation,
             name_resolver,
             finished: None,
+            phantom: PhantomData::default()
         };
     }
 }
 
-impl AsyncTypesGetter<Struct> {
+impl AsyncTypesGetter<StructData, FinalizedStruct> {
     pub fn new_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
@@ -66,12 +87,13 @@ impl AsyncTypesGetter<Struct> {
             operation: false,
             name_resolver,
             finished: None,
+            phantom: PhantomData::default()
         };
     }
 }
 
-impl Future for AsyncTypesGetter<Function> {
-    type Output = Result<Arc<Function>, ParsingError>;
+impl Future for AsyncTypesGetter<FunctionData, FinalizedFunction> {
+    type Output = Result<Arc<FunctionData>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if let Some(finished) = &self.finished {
@@ -84,7 +106,8 @@ impl Future for AsyncTypesGetter<Function> {
         //Look for a structure of that name
         if self.operation {
             if let Some(found) = locked.operations.get(&self.getting) {
-                return Poll::Ready(Ok(found.get(0).unwrap().clone()));
+                let data: &Arc<FunctionData> = found.get(0).unwrap();
+                return Poll::Ready(Ok(data.clone()));
             }
         }
 
@@ -111,8 +134,8 @@ impl Future for AsyncTypesGetter<Function> {
     }
 }
 
-impl Future for AsyncTypesGetter<Struct> {
-    type Output = Result<Arc<Struct>, ParsingError>;
+impl Future for AsyncTypesGetter<StructData, FinalizedStruct> {
+    type Output = Result<Arc<StructData>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if let Some(finished) = &self.finished {
@@ -140,6 +163,21 @@ impl Future for AsyncTypesGetter<Struct> {
             });
 
             return Poll::Ready(Err(self.error.clone()));
+        }
+
+        return Poll::Pending;
+    }
+}
+
+impl<T, K> Future for AsyncDataGetter<T, K> where T: TopElement<K> + Hash + Eq {
+    type Output = Arc<K>;
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let locked = self.syntax.clone();
+        let mut locked = locked.lock().unwrap();
+
+        if let Some(output) = T::get_manager(locked.deref_mut()).data.get(&self.getting) {
+            return Poll::Ready(output.clone());
         }
 
         return Poll::Pending;

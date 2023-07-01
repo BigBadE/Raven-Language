@@ -5,9 +5,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use inkwell::context::Context;
-use syntax::function::Function;
+use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
-use syntax::r#struct::Struct;
+use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Compiler, Output, Syntax};
 
 use crate::compiler::CompilerImpl;
@@ -22,13 +22,14 @@ pub mod type_getter;
 pub mod util;
 
 pub struct LLVMCompiler {
-    compiling: Arc<HashMap<String, Arc<Function>>>,
-    struct_compiling: Arc<HashMap<String, Arc<Struct>>>,
+    compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>,
+    struct_compiling: Arc<HashMap<String, Arc<FinalizedStruct>>>,
     context: Context
 }
 
 impl LLVMCompiler {
-    pub fn new(compiling: Arc<HashMap<String, Arc<Function>>>, struct_compiling: Arc<HashMap<String, Arc<Struct>>>) -> Self {
+    pub fn new(compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>,
+               struct_compiling: Arc<HashMap<String, Arc<FinalizedStruct>>>) -> Self {
         return Self {
             compiling,
             struct_compiling,

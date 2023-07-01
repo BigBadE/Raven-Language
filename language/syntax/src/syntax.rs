@@ -1,33 +1,32 @@
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
 
-use crate::{ParsingError, ParsingFuture, ProcessManager, TopElement, Types};
+use crate::{ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
-use crate::function::Function;
-use crate::r#struct::Struct;
+use crate::function::{FinalizedFunction, FunctionData};
+use crate::r#struct::{FinalizedStruct, StructData};
 
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
     // The compiling functions
-    pub compiling: Arc<HashMap<String, Arc<Function>>>,
+    pub compiling: Arc<HashMap<String, Arc<FunctionData>>>,
     // The compiling structs
-    pub strut_compiling: Arc<HashMap<String, Arc<Struct>>>,
+    pub strut_compiling: Arc<HashMap<String, Arc<StructData>>>,
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
     // All structures in the program
-    pub structures: AsyncGetter<Struct>,
+    pub structures: AsyncGetter<StructData, FinalizedStruct>,
     // All functions in the program
-    pub functions: AsyncGetter<Function>,
+    pub functions: AsyncGetter<FunctionData, FinalizedFunction>,
     // Stores the async parsing state
     pub async_manager: GetterManager,
     // All operations without namespaces, for example {}+{} or {}/{}
-    pub operations: HashMap<String, Vec<Arc<Function>>>,
+    pub operations: HashMap<String, Vec<Arc<FunctionData>>>,
     // Manages the next steps of compilation after parsing
     pub process_manager: Box<dyn ProcessManager>,
 }
@@ -55,7 +54,7 @@ impl Syntax {
     }
 
     // Adds the top element to the syntax
-    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
+    pub fn add<K, T: TopElement<K> + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
                                               resolver: Box<dyn NameResolver>, dupe_error: ParsingError, adding: Arc<T>) {
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
@@ -76,7 +75,7 @@ impl Syntax {
         if adding.is_operator() {
             //Only functions can be operators. This will break if something else is.
             //These is no better way to do this because Rust.
-            let adding: Arc<Function> = unsafe { std::mem::transmute(adding.clone()) };
+            let adding: Arc<FunctionData> = unsafe { std::mem::transmute(adding.clone()) };
 
             let name = adding.name().split("::").last().unwrap().to_string();
             let name = format!("{}${}", name, locked.operations.get(&name).map(|found| found.len()).unwrap_or(0));
@@ -98,7 +97,7 @@ impl Syntax {
         handle.spawn(T::verify(adding, syntax.clone(), resolver, process_manager));
     }
 
-    pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {
+    pub fn add_poison<K, T: TopElement<K>>(&mut self, element: Arc<T>) {
         for poison in element.errors() {
             self.errors.push(poison.clone());
         }
@@ -116,7 +115,7 @@ impl Syntax {
     }
 
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Result<Arc<Function>, ParsingError> {
+                              getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Result<Arc<FunctionData>, ParsingError> {
         return AsyncTypesGetter::new_func(syntax, error, getting, operation, name_resolver).await;
     }
 
@@ -157,100 +156,6 @@ impl Syntax {
         let mut error = error.clone();
         error.message = format!("Unknown type {}!", new_type);
         return error;
-    }
-}
-
-pub enum ParsingType<T> where T: Clone {
-    Parsing(u32, ParsingFuture<T>),
-    Done(u32, T)
-}
-
-pub static mut LAST_ID: u32 = 0;
-
-impl<T: Clone> ParsingType<T> {
-    pub fn new(parsing: ParsingFuture<T>) -> Self {
-        unsafe {
-            LAST_ID += 1;
-            return ParsingType::Parsing(LAST_ID - 1, parsing);
-        }
-    }
-
-    pub fn new_done(done: T) -> Self {
-        unsafe {
-            LAST_ID += 1;
-            return ParsingType::Done(LAST_ID - 1, done);
-        }
-    }
-
-    pub fn get_id(&self) -> u32 {
-        return match *self {
-            ParsingType::Done(id, _) => id,
-            ParsingType::Parsing(id, _) => id
-        };
-    }
-}
-
-impl<T: Clone + PartialEq> PartialEq for ParsingType<T> {
-    fn eq(&self, other: &Self) -> bool {
-        return match self {
-            ParsingType::Done(_, inner) => match other {
-                ParsingType::Done(_, other) => inner == other,
-                _ => false
-            },
-            ParsingType::Parsing(id, _) => match other {
-                ParsingType::Parsing(other, _) => id == other,
-                _ => false
-            }
-        }
-    }
-}
-
-impl<T: Clone + Hash> Hash for ParsingType<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            ParsingType::Done(id, _) => Hash::hash(id, state),
-            ParsingType::Parsing(id, _) => Hash::hash(id, state)
-        }
-    }
-}
-
-impl<T: Clone + PartialEq> Eq for ParsingType<T> {
-
-}
-
-impl<T: Clone> Clone for ParsingType<T> {
-    fn clone(&self) -> Self {
-        match self {
-            ParsingType::Done(id, body) => ParsingType::Done(*id, body.clone()),
-            _ => panic!("Tried to clone unfinished parsing type!")
-        }
-    }
-}
-
-impl<T: Clone> ParsingType<T> {
-    pub async fn await_finish(&mut self) -> Result<&mut T, ParsingError> {
-        return match self {
-            ParsingType::Done(_, value) => Ok(value),
-            ParsingType::Parsing(id, future) => {
-                let temp = future.await?;
-                *self = ParsingType::Done(*id, temp);
-                return Ok(self.assume_finished_mut());
-            },
-        }
-    }
-
-    pub fn assume_finished_mut(&mut self) -> &mut T {
-        return match self {
-            ParsingType::Done(_, found) => found,
-            _ => panic!("Assumed finished on unfinished code parsing!")
-        };
-    }
-
-    pub fn assume_finished(&self) -> &T {
-        return match self {
-            ParsingType::Done(_, found) => found,
-            _ => panic!("Assumed finished on unfinished code parsing!")
-        };
     }
 }
 

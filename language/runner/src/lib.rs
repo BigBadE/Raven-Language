@@ -5,8 +5,8 @@ use std::sync::Arc;
 use anyhow::Error;
 use tokio::runtime::Runtime;
 use compiler_llvm::LLVMCompiler;
-use syntax::function::Function;
-use syntax::r#struct::Struct;
+use syntax::function::FunctionData;
+use syntax::r#struct::StructData;
 use syntax::syntax::Compiler;
 
 pub mod runner;
@@ -19,7 +19,7 @@ pub struct RunnerSettings {
     pub compiler: String,
 }
 
-pub fn get_compiler(compiling: Arc<HashMap<String, Arc<Function>>>, struct_compiling: Arc<HashMap<String, Arc<Struct>>>,
+pub fn get_compiler(compiling: Arc<HashMap<String, Arc<FunctionData>>>, struct_compiling: Arc<HashMap<String, Arc<StructData>>>,
                     name: String) -> Box<dyn Compiler> {
     return Box::new(match name.to_lowercase().as_str() {
         "llvm" => LLVMCompiler::new(compiling, struct_compiling),

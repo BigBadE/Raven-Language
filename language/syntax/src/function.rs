@@ -4,34 +4,42 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::{Attribute, DisplayIndented, ParsingError, TopElement, to_modifiers, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture};
+use crate::{Attribute, DisplayIndented, ParsingError, TopElement, Types, ProcessManager, Syntax,
+            AsyncGetter, is_modifier, Modifier, ParsingFuture};
 use crate::async_util::NameResolver;
-use crate::code::{Expression, MemberField};
-use crate::syntax::ParsingType;
+use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
+use crate::types::FinalizedTypes;
 
-#[derive(Clone)]
-pub struct Function {
+#[derive(Clone, Debug)]
+pub struct FunctionData {
     pub attributes: Vec<Attribute>,
-    pub generics: IndexMap<String, Vec<ParsingType<Types>>>,
     pub modifiers: u8,
-    pub fields: Vec<ParsingType<MemberField>>,
-    pub code: ParsingType<CodeBody>,
-    pub return_type: Option<ParsingType<Types>>,
     pub name: String,
     pub poisoned: Vec<ParsingError>
 }
 
-impl Function {
-    pub fn new(attributes: Vec<Attribute>, modifiers: u8,
-               fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, Vec<ParsingType<Types>>>,
-               code: ParsingFuture<CodeBody>, return_type: Option<ParsingType<Types>>, name: String) -> Self {
+pub struct UnfinalizedFunction {
+    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    pub fields: Vec<ParsingFuture<MemberField>>,
+    pub code: ParsingFuture<CodeBody>,
+    pub return_type: Option<ParsingFuture<Types>>,
+    pub data: Arc<FunctionData>
+}
+
+#[derive(Clone, Debug)]
+pub struct FinalizedFunction {
+    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub fields: Vec<FinalizedMemberField>,
+    pub code: FinalizedCodeBody,
+    pub return_type: Option<FinalizedTypes>,
+    pub data: Arc<FunctionData>
+}
+
+impl FunctionData {
+    pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
         return Self {
             attributes,
-            generics,
             modifiers,
-            fields,
-            code: ParsingType::new(code),
-            return_type,
             name,
             poisoned: Vec::new()
         };
@@ -40,11 +48,7 @@ impl Function {
     pub fn poisoned(name: String, error: ParsingError) -> Self {
         return Self {
             attributes: Vec::new(),
-            generics: IndexMap::new(),
             modifiers: 0,
-            fields: Vec::new(),
-            code: ParsingType::new_done(CodeBody::new(Vec::new(), "poison".to_string())),
-            return_type: None,
             name,
             poisoned: vec!(error)
         }
@@ -52,7 +56,7 @@ impl Function {
 }
 
 #[async_trait]
-impl TopElement for Function {
+impl TopElement<FinalizedFunction> for FunctionData {
     fn poison(&mut self, error: ParsingError) {
         self.poisoned.push(error);
     }
@@ -70,7 +74,7 @@ impl TopElement for Function {
     }
 
     fn new_poisoned(name: String, error: ParsingError) -> Self {
-        return Function::poisoned(name, error);
+        return FunctionData::poisoned(name, error);
     }
 
     async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
@@ -80,7 +84,7 @@ impl TopElement for Function {
         }
     }
 
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self, FinalizedFunction> {
         return &mut syntax.functions;
     }
 }
@@ -91,59 +95,18 @@ pub struct CodeBody {
     pub expressions: Vec<Expression>,
 }
 
+#[derive(Clone, Default, Debug)]
+pub struct FinalizedCodeBody {
+    pub label: String,
+    pub expressions: Vec<FinalizedExpression>,
+}
+
 impl CodeBody {
     pub fn new(expressions: Vec<Expression>, label: String) -> Self {
         return Self {
             label,
             expressions
         };
-    }
-}
-
-impl Debug for Function {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return self.format("", f);
-    }
-}
-
-impl Display for Function {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return self.format("", f);
-    }
-}
-
-impl DisplayIndented for Function {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} fn {}", indent, display_joined(&to_modifiers(self.modifiers)),
-               self.name)?;
-
-        if !self.generics.is_empty() {
-            write!(f, "<")?;
-            for (_name, _generic) in &self.generics {
-                write!(f, "TODO")?;
-            }
-            write!(f, ">")?;
-        }
-
-        write!(f, "{} ", display(&self.fields.iter().map(|field| field.assume_finished()).collect::<Vec<_>>(), ", "))?;
-
-        if self.return_type.is_some() {
-            write!(f, "-> {} ", self.return_type.as_ref().unwrap().assume_finished())?;
-        }
-        // self.code.format(indent, f)
-        return write!(f, " TODO");
-    }
-}
-
-impl DisplayIndented for CodeBody {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {{\n", self.label)?;
-        let deeper_indent = indent.to_string() + "    ";
-        for expression in &self.expressions {
-            expression.format(deeper_indent.as_str(), f)?;
-        }
-        write!(f, "{}}}", indent)?;
-        return Ok(());
     }
 }
 

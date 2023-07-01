@@ -7,20 +7,20 @@ use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, Functi
 use inkwell::types::{BasicType, StructType};
 
 use syntax::{is_modifier, Modifier};
-use syntax::code::{Effects, ExpressionType};
-use syntax::function::{CodeBody, Function};
-use syntax::r#struct::Struct;
+use syntax::code::{ExpressionType, FinalizedEffects};
+use syntax::function::{FinalizedCodeBody, FinalizedFunction};
+use syntax::r#struct::FinalizedStruct;
 
 use crate::internal::instructions::compile_internal;
 use crate::type_getter::CompilerTypeGetter;
 use crate::util::create_function_value;
 
-pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
+pub fn instance_function<'a, 'ctx>(function: Arc<FinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
 
-    if is_modifier(function.modifiers, Modifier::Internal) {
-        compile_internal(&type_getter.compiler, &function.name, &function.fields, value);
-    } else if is_modifier(function.modifiers, Modifier::Extern) {
+    if is_modifier(function.data.modifiers, Modifier::Internal) {
+        compile_internal(&type_getter.compiler, &function.data.name, value);
+    } else if is_modifier(function.data.modifiers, Modifier::Extern) {
         todo!()
     } else {
         unsafe { Rc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
@@ -28,16 +28,16 @@ pub fn instance_function<'a, 'ctx>(function: Arc<Function>, type_getter: &mut Co
     return value;
 }
 
-pub fn instance_struct<'ctx>(structure: Arc<Struct>, type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
+pub fn instance_struct<'ctx>(structure: &Arc<FinalizedStruct>, type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
     let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
     for field in &structure.fields {
-        fields.push(type_getter.get_type(&field.assume_finished().field.field_type));
+        fields.push(type_getter.get_type(&field.field.field_type));
     }
 
     return type_getter.compiler.context.struct_type(fields.as_slice(), true);
 }
 
-pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>,
+pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>,
                            id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     let block = if let Some(block) = type_getter.blocks.get(&code.label) {
         type_getter.compiler.builder.position_at_end(block.clone());
@@ -55,9 +55,8 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
         match line.expression_type {
             ExpressionType::Return => {
                 match &line.effect {
-                    Effects::NOP() => {}
                     _ => {
-                        if let Effects::CodeBody(body) = &line.effect {
+                        if let FinalizedEffects::CodeBody(body) = &line.effect {
                             if !broke {
                                 let destination = unwrap_or_create(&body.label, function, type_getter);
                                 type_getter.compiler.builder.build_unconditional_branch(destination);
@@ -90,19 +89,19 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
             }
             ExpressionType::Line => {
                 if broke {
-                    if let Effects::CodeBody(_) = &line.effect {
+                    if let FinalizedEffects::CodeBody(_) = &line.effect {
                         compile_effect(type_getter, function, &line.effect, id);
                     }
                 } else {
                     match &line.effect {
-                        Effects::CodeBody(body) => {
+                        FinalizedEffects::CodeBody(body) => {
                             let destination =
                                 unwrap_or_create(&body.label, function, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(
                                 destination);
                             broke = true;
                         },
-                        Effects::Jump(_) | Effects::CompareJump(_, _, _) => broke = true,
+                        FinalizedEffects::Jump(_) | FinalizedEffects::CompareJump(_, _, _) => broke = true,
                         _ => {}
                     }
                     compile_effect(type_getter, function, &line.effect, id);
@@ -116,44 +115,39 @@ pub fn compile_block<'ctx>(code: &CodeBody, function: FunctionValue<'ctx>, type_
 }
 
 pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function: FunctionValue<'ctx>,
-                            effect: &Effects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
+                            effect: &FinalizedEffects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
-        Effects::NOP() => panic!("Tried to compile a NOP"),
-        Effects::Operation(_, _) => panic!("Checker failed to resolve operation! {:?}", effect),
-        Effects::MethodCall(_, _, _) => panic!("Checker failed to resolve method call!"),
-        Effects::CreateVariable(name, inner) => {
+        FinalizedEffects::CreateVariable(name, inner, types) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
-            type_getter.variables.insert(name.clone(),
-                                         (inner.get_return(type_getter).unwrap(),
-                                          compiled.as_basic_value_enum()));
+            type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));
             Some(compiled.as_basic_value_enum())
         },
         //Label of jumping to body
-        Effects::Jump(label) => {
+        FinalizedEffects::Jump(label) => {
             let destination = unwrap_or_create(label, function, type_getter);
             type_getter.compiler.builder.build_unconditional_branch(destination);
             None
         }
         //Comparison effect, and label to jump to the first if true, second if false
-        Effects::CompareJump(effect, then_body, else_body) => {
+        FinalizedEffects::CompareJump(effect, then_body, else_body) => {
             let effect = compile_effect(type_getter, function, effect, id).unwrap().into_int_value();
             let then = unwrap_or_create(then_body, function, type_getter);
             let else_block = unwrap_or_create(else_body, function, type_getter);
             type_getter.compiler.builder.build_conditional_branch(effect, then, else_block);
             None
         }
-        Effects::CodeBody(body) => {
+        FinalizedEffects::CodeBody(body) => {
             compile_block(body, function, type_getter, id)
         }
         //Calling function, function arguments
-        Effects::VerifiedMethodCall(calling_function, arguments) => {
+        FinalizedEffects::MethodCall(calling_function, arguments) => {
             let mut final_arguments = Vec::new();
 
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
-                let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap().assume_finished());
+                let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
                 let pointer = type_getter.compiler.builder.build_alloca(
                     types, &id.to_string());
                 *id += 1;
@@ -174,22 +168,22 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             }
         }
         //Sets pointer to value
-        Effects::Set(setting, value) => {
+        FinalizedEffects::Set(setting, value) => {
             let output = compile_effect(type_getter, function, setting, id).unwrap();
             let storing = compile_effect(type_getter, function, value, id).unwrap();
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }
-        Effects::LoadVariable(name) => return Some(type_getter.variables.get(name).unwrap().1),
+        FinalizedEffects::LoadVariable(name) => return Some(type_getter.variables.get(name).unwrap().1),
         //Loads variable/field pointer from structure, or self if structure is None
-        Effects::Load(loading_from, field) => {
+        FinalizedEffects::Load(loading_from, field, _) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             //Compensate for type id
             let mut offset = 1;
             for struct_field in &loading_from
                 .get_return(type_getter)
-                .unwrap().clone_struct().fields {
-                if &struct_field.assume_finished().field.name != field {
+                .unwrap().inner_struct().fields {
+                if &struct_field.field.name != field {
                     offset += 1;
                 } else {
                     break;
@@ -210,7 +204,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 &(*id - 1).to_string()).as_basic_value_enum())
         }
         //Struct to create and a tuple of the index of the argument and the argument
-        Effects::CreateStruct(structure, arguments) => {
+        FinalizedEffects::CreateStruct(structure, arguments) => {
             let mut out_arguments = vec![MaybeUninit::uninit(); arguments.len()];
 
             for (index, effect) in arguments {
@@ -237,17 +231,17 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             }
 
             Some(pointer.as_basic_value_enum())
-        }
-        Effects::Float(float) => Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum()),
-        Effects::Int(int) => Some(type_getter.compiler.context.i64_type().const_int(*int as u64, false).as_basic_value_enum()),
-        Effects::UInt(uint) => Some(type_getter.compiler.context.i64_type().const_int(*uint, true).as_basic_value_enum()),
-        Effects::Bool(bool) => Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum()),
-        Effects::String(string) => Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum())
+        },
+        FinalizedEffects::Float(float) => Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum()),
+        FinalizedEffects::Int(int) => Some(type_getter.compiler.context.i64_type().const_int(*int as u64, false).as_basic_value_enum()),
+        FinalizedEffects::UInt(uint) => Some(type_getter.compiler.context.i64_type().const_int(*uint, true).as_basic_value_enum()),
+        FinalizedEffects::Bool(bool) => Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum()),
+        FinalizedEffects::String(string) => Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum())
     };
 }
 
 fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
-            function: FunctionValue<'ctx>, arguments: &'a Vec<Effects>, id: &mut u64) {
+            function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, id: &mut u64) {
     for argument in arguments {
         let value = compile_effect(type_getter, function, argument, id).unwrap();
         final_arguments.push(From::from(value));

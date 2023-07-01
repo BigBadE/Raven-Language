@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
-use crate::function::Function;
+use crate::function::FunctionData;
 use crate::syntax::Syntax;
 use crate::TopElement;
 use crate::types::Types;
@@ -18,16 +18,18 @@ pub struct GetterManager {
 }
 
 /// Generic async type manager, holds the types and the wakers requiring those types.
-pub struct AsyncGetter<T> where T: TopElement {
+pub struct AsyncGetter<T, K> where T: TopElement<K> {
     pub types: HashMap<String, Arc<T>>,
+    pub data: HashMap<Arc<T>, Arc<K>>,
     pub wakers: HashMap<String, Vec<Waker>>,
 }
 
-impl<T> AsyncGetter<T> where T: TopElement {
+impl<T, K> AsyncGetter<T, K> where T: TopElement<K> {
     pub fn new() -> Self {
         return Self {
             types: HashMap::new(),
-            wakers: HashMap::new(),
+            data: HashMap::new(),
+            wakers: HashMap::new()
         };
     }
 }
@@ -51,7 +53,7 @@ impl ImplementationGetter {
 }
 
 impl Future for ImplementationGetter {
-    type Output = Result<Vec<Arc<Function>>, ()>;
+    type Output = Result<Vec<Arc<FunctionData>>, ()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let locked = self.syntax.lock().unwrap();

@@ -276,20 +276,9 @@ async fn create_effect(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, r
                        types: UnparsedType, inputs: Vec<(String, ParsingFuture<Effects>)>)
                        -> Result<Effects, ParsingError> {
     let types = Syntax::parse_type(syntax, token.make_error(file.clone(), format!("Unknown type {}", types)), resolver, types).await?;
-    let fields = types.get_fields();
     let mut final_inputs = Vec::new();
     for input in inputs {
-        let mut i = 0;
-        for field in fields {
-            if unsafe { very_bad_function(field) }.await_finish().await?.field.name == input.0 {
-                final_inputs.push((i, input.1.await?));
-                break;
-            }
-            i += 1;
-        }
-        if i == fields.len() {
-            return Err(token.make_error(file, format!("No field named {}!", input.0)));
-        }
+        final_inputs.push((input.0, input.1.await?));
     }
     return Ok(Effects::CreateStruct(types, final_inputs));
 }

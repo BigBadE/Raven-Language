@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
 use syntax::{Attribute, get_modifier, Modifier, ParsingError, ParsingFuture};
-use syntax::function::{CodeBody, Function};
-use syntax::syntax::ParsingType;
+use syntax::function::{CodeBody, FunctionData};
 use syntax::types::Types;
 
 use crate::parser::code_parser::parse_code;
@@ -10,7 +9,7 @@ use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
 
 pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
-                      -> Result<Function, ParsingError> {
+                      -> Result<FunctionData, ParsingError> {
     let mut name = String::new();
     let mut generics = IndexMap::new();
     let mut fields = Vec::new();
@@ -64,8 +63,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>
         }
     }
     let modifiers = get_modifier(modifiers.as_slice());
-    return Ok(Function::new(attributes, modifiers, fields, generics,
-                        code.unwrap_or(Box::pin(const_finished())), return_type, name));
+    return Ok(FunctionData::new(attributes, modifiers, fields,
+                                code.unwrap_or(Box::pin(const_finished())), name));
 }
 
 async fn const_finished() -> Result<CodeBody, ParsingError> {

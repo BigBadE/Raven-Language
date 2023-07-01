@@ -9,10 +9,10 @@ use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
-use crate::function::Function;
-use crate::r#struct::Struct;
-use crate::syntax::{ParsingType, Syntax};
-use crate::types::Types;
+use crate::function::FunctionData;
+use crate::r#struct::StructData;
+use crate::syntax::Syntax;
+use crate::types::{FinalizedTypes, Types};
 
 pub mod async_getters;
 pub mod async_util;
@@ -116,13 +116,13 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: &mut Function, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_func(&self, function: &mut FunctionData, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>);
 
-    async fn verify_struct(&self, structure: &mut Struct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
+    async fn verify_struct(&self, structure: &mut StructData, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
 
-    fn add_implementation(&mut self, implementor: TraitImplementor);
+    async fn add_implementation(&mut self, implementor: TraitImplementor) -> Result<(), ParsingError>;
 
-    async fn of_types(&self, base: &Types, target: &Types, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<Function>>>;
+    async fn of_types(&self, base: &Types, target: &Types, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<FunctionData>>>;
 
     fn get_generic(&self, name: &str) -> Option<Types>;
 
@@ -174,12 +174,12 @@ impl Display for ParsingError {
 
 // A variable manager used for getting return types from effects
 pub trait VariableManager: Debug {
-    fn get_variable(&self, name: &String) -> Option<Types>;
+    fn get_variable(&self, name: &String) -> Option<FinalizedTypes>;
 }
 
 // Top elements are structures or functions
 #[async_trait]
-pub trait TopElement where Self: Sized {
+pub trait TopElement<K> where Self: Sized {
     // Poisons the element, adding an error to it and forcing users to ignore issues with it
     fn poison(&mut self, error: ParsingError);
 
@@ -199,13 +199,13 @@ pub trait TopElement where Self: Sized {
     async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
 
     // Gets the getter for that type on the syntax
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self, K>;
 }
 
 // An impl block for a type
 pub struct TraitImplementor {
-    pub base: ParsingType<Types>,
-    pub implementor: ParsingType<Types>,
+    pub base: ParsingFuture<Types>,
+    pub implementor: ParsingFuture<Types>,
     pub attributes: Vec<Attribute>,
-    pub functions: Vec<Arc<Function>>,
+    pub functions: Vec<Arc<FunctionData>>,
 }

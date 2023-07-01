@@ -4,64 +4,72 @@ use std::sync::{Arc, Mutex};
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
-use crate::{AsyncGetter, Modifier, ProcessManager, Syntax, TopElement};
-use crate::code::MemberField;
+use crate::{AsyncGetter, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
+use crate::code::{FinalizedMemberField, MemberField};
 use crate::{Attribute, ParsingError};
 use crate::async_util::NameResolver;
-use crate::syntax::ParsingType;
-use crate::types::Types;
+use crate::types::{FinalizedTypes, Types};
 
 lazy_static! {
-pub static ref I64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
-        Modifier::Internal as u8, "i64".to_string()));
-pub static ref F64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
-        Modifier::Internal as u8, "f64".to_string()));
-pub static ref U64: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
-        Modifier::Internal as u8, "u64".to_string()));
-pub static ref STR: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
-        Modifier::Internal as u8, "str".to_string()));
-pub static ref BOOL: Arc<Struct> = Arc::new(Struct::new(Vec::new(), Vec::new(), IndexMap::new(),
-        Modifier::Internal as u8, "bool".to_string()));
+pub static ref I64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i64".to_string())));
+pub static ref F64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "f64".to_string())));
+pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u64".to_string())));
+pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "str".to_string())));
+pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "bool".to_string())));
 }
 
 pub static ID: Mutex<u64> = Mutex::new(0);
 
 #[derive(Clone)]
-pub struct Struct {
+pub struct StructData {
     pub modifiers: u8,
     pub id: u64,
     pub name: String,
-    pub generics: IndexMap<String, Vec<ParsingType<Types>>>,
     pub attributes: Vec<Attribute>,
-    pub fields: Vec<ParsingType<MemberField>>,
-    pub traits: Vec<Arc<Struct>>,
+    pub traits: Vec<Arc<StructData>>,
     pub poisoned: Vec<ParsingError>,
 }
 
-impl Hash for Struct {
+pub struct UnfinalizedStruct {
+    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    pub fields: Vec<ParsingFuture<MemberField>>,
+    pub data: Arc<StructData>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FinalizedStruct {
+    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub fields: Vec<FinalizedMemberField>,
+    pub data: Arc<StructData>,
+}
+
+impl Hash for StructData {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.id.to_be_bytes())
     }
 }
 
-impl PartialEq for Struct {
+impl PartialEq for StructData {
     fn eq(&self, other: &Self) -> bool {
         return self.id == other.id;
     }
 }
 
-impl Struct {
-    pub fn new(attributes: Vec<Attribute>, fields: Vec<ParsingType<MemberField>>, generics: IndexMap<String, Vec<ParsingType<Types>>>,
-               modifiers: u8, name: String) -> Self {
+impl PartialEq for FinalizedStruct {
+    fn eq(&self, other: &Self) -> bool {
+        return self.data.id == other.data.id;
+    }
+}
+
+impl StructData {
+    pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
         let mut id = ID.lock().unwrap();
         *id += 1;
         return Self {
             attributes,
             id: *id,
             modifiers,
-            fields,
             name,
-            generics,
             traits: Vec::new(),
             poisoned: Vec::new(),
         };
@@ -73,26 +81,34 @@ impl Struct {
             id: 0,
             modifiers: 0,
             name,
-            generics: IndexMap::new(),
-            fields: Vec::new(),
             traits: Vec::new(),
             poisoned: vec!(error),
         };
     }
+}
 
-    pub async fn degeneric(&mut self, generics: &Vec<Types>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+impl FinalizedStruct {
+    pub fn empty_of(data: StructData) -> Self {
+        return Self {
+            generics: IndexMap::new(),
+            fields: Vec::new(),
+            data: Arc::new(data),
+        };
+    }
+
+    pub async fn degeneric(&mut self, generics: &Vec<FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         let mut i = 0;
         for value in self.generics.values_mut() {
             for generic in value {
-                if let Types::Generic(name, bounds) = generic.await_finish().await? {
+                if let FinalizedTypes::Generic(name, bounds) = generic {
                     let name = name.clone();
-                    let temp: &Types = generics.get(i).unwrap();
+                    let temp: &FinalizedTypes = generics.get(i).unwrap();
                     for bound in bounds {
                         if !temp.of_type(&bound, syntax).await {
-                            panic!("Generic {} set to a {} which isn't a {}", name, temp, bound);
+                            panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
                         }
                     }
-                    *generic = ParsingType::new_done(temp.clone());
+                    *generic = temp.clone();
                     i += 1;
                 } else {
                     panic!("Guhh?????");
@@ -101,10 +117,11 @@ impl Struct {
         }
 
         for field in &mut self.fields {
-            let types = &mut field.assume_finished_mut().field.field_type;
-            if let Types::Generic(name, _) = types {
+            let types = &mut field.field.field_type;
+            if let FinalizedTypes::Generic(name, _) = types {
                 let index = self.generics.iter().position(|(other_name, _)| name == other_name).unwrap();
-                *types = generics.get(index).unwrap().clone();
+                let generic: &FinalizedTypes = generics.get(index).unwrap();
+                *types = generic.clone();
             }
         }
 
@@ -113,7 +130,7 @@ impl Struct {
 }
 
 #[async_trait]
-impl TopElement for Struct {
+impl TopElement<FinalizedStruct> for StructData {
     fn poison(&mut self, error: ParsingError) {
         self.poisoned.push(error);
     }
@@ -131,22 +148,24 @@ impl TopElement for Struct {
     }
 
     fn new_poisoned(name: String, error: ParsingError) -> Self {
-        return Struct::new_poisoned(name, error);
+        return StructData::new_poisoned(name, error);
     }
 
     async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         process_manager.verify_struct(unsafe { Arc::get_mut_unchecked(&mut current) }, resolver, syntax).await;
     }
 
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self, FinalizedStruct> {
         return &mut syntax.structures;
     }
 }
 
-impl Debug for Struct {
+impl Debug for StructData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl Eq for Struct {}
+impl Eq for StructData {}
+
+impl Eq for FinalizedStruct {}
