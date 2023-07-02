@@ -115,8 +115,9 @@ impl FinalizedTypes {
     pub async fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
         return match self {
             FinalizedTypes::Struct(found) => match other {
-                FinalizedTypes::Struct(other_struct) => found == other_struct ||
-                    ImplementationGetter::new(syntax.clone(), self.clone(), other.clone()).await.is_ok(),
+                FinalizedTypes::Struct(other_struct) =>
+                    found == other_struct ||
+                        ImplementationGetter::new(syntax.clone(), self.clone(), other.clone()).await.is_ok(),
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
                         if !self.of_type(bound, syntax).await {
@@ -228,13 +229,21 @@ impl FinalizedTypes {
                     Ok(FinalizedTypes::Struct(AsyncDataGetter::new(syntax.clone(), data).await))
                 } else {
                     let mut other = StructData::clone(&found.data);
+                    other.fix_id();
                     other.name = name.clone();
                     let other = Arc::new(other);
                     syntax.lock().unwrap().structures.types.insert(name, other.clone());
                     let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), other.clone()).await.deref());
                     data.degeneric(generics, syntax).await?;
                     let data = Arc::new(data);
-                    syntax.lock().unwrap().structures.data.insert(other.clone(), data.clone());
+                    let mut locked = syntax.lock().unwrap();
+                    if let Some(wakers) = locked.structures.wakers.remove(&data.data.name) {
+                        for waker in wakers {
+                            waker.wake();
+                        }
+                    }
+
+                    locked.structures.data.insert(other.clone(), data.clone());
                     Ok(FinalizedTypes::Struct(data))
                 }
             }

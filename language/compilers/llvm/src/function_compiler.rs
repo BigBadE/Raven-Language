@@ -13,7 +13,7 @@ use syntax::r#struct::FinalizedStruct;
 
 use crate::internal::instructions::compile_internal;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::create_function_value;
+use crate::util::{create_function_value, print_formatted};
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
@@ -170,8 +170,13 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Sets pointer to value
         FinalizedEffects::Set(setting, value) => {
+            println!("{:?}\nto\n{:?}", setting, value);
             let output = compile_effect(type_getter, function, setting, id).unwrap();
             let storing = compile_effect(type_getter, function, value, id).unwrap();
+            print_formatted(output.to_string());
+            println!("vs");
+            print_formatted(storing.to_string());
+            println!("{} vs {}", output.is_int_value(), storing.is_int_value());
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }

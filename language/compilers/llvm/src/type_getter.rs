@@ -44,7 +44,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn for_function(&self, function: &Arc<FinalizedFunction>, llvm_function: FunctionValue<'ctx>) -> Self {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
-        for i in 0..llvm_function.count_params() as usize {
+        for i in offset as usize..llvm_function.count_params() as usize {
             let field = &function.fields.get(i + offset as usize).unwrap().field;
             variables.insert(field.name.clone(),
                              (field.field_type.clone(), llvm_function.get_nth_param(i as u32).unwrap()));

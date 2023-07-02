@@ -31,7 +31,7 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<FinalizedEffects, ParsingError> {
-    return Ok(match effect {
+    let output = match effect.clone() {
         Effects::CodeBody(body) =>
             FinalizedEffects::CodeBody(verify_code(process_manager, &resolver, body, syntax, &mut variables.clone()).await?.1),
         Effects::Set(first, second) => {
@@ -58,7 +58,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for potential_operation in operations {
                         if let Some(new_effect) = check_operation(
                             AsyncDataGetter::new(syntax.clone(), potential_operation).await, &args,
-                            syntax, variables).await? {
+                        syntax, variables).await? {
                             break 'outer assign_with_priority(new_effect);
                         }
                     }
@@ -166,7 +166,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::UInt(uint) => FinalizedEffects::UInt(uint),
         Effects::Bool(bool) => FinalizedEffects::Bool(bool),
         Effects::String(string) => FinalizedEffects::String(string)
-    });
+    };
+    return Ok(output);
 }
 
 async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
@@ -211,8 +212,15 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                         placeholder_error("Invalid bounds!".to_string())).await?;
                 }
                 method = Arc::new(new_method);
-                syntax.lock().unwrap().functions.types.insert(name, method.data.clone());
-                syntax.lock().unwrap().functions.data.insert(method.data.clone(), method.clone());
+                let mut locked = syntax.lock().unwrap();
+                if let Some(wakers) = locked.functions.wakers.remove(&name) {
+                    for waker in wakers {
+                        waker.wake();
+                    }
+                }
+
+                locked.functions.types.insert(name, method.data.clone());
+                locked.functions.data.insert(method.data.clone(), method.clone());
             };
         }
 
@@ -247,11 +255,10 @@ async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<Finali
         return Ok(false);
     }
 
-    let mut function = function.clone();
     for i in 0..function.fields.len() {
         let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() && !returning.as_ref().unwrap().of_type(
-            &unsafe { Arc::get_mut_unchecked(&mut function) }.fields.get_mut(i).unwrap().field.field_type, syntax).await {
+            &function.fields.get(i).unwrap().field.field_type, syntax).await {
             println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().field.field_type);
             return Ok(false);
         }

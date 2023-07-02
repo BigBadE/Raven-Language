@@ -20,7 +20,6 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         let field = argument.await?;
         let mut field = FinalizedMemberField { modifiers: field.modifiers, attributes: field.attributes,
             field: FinalizedField { field_type: field.field.field_type.finalize(syntax.clone()).await, name: field.field.name } };
-
         variable_manager.variables.insert(field.field.name.clone(),
                                           field.field.field_type.clone());
         if !field.field.field_type.is_primitive() {
@@ -44,10 +43,18 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         data: function.data.clone(),
     };
 
-    syntax.lock().unwrap().functions.data.insert(function.data.clone(), Arc::new(codeless.clone()));
+    {
+        let mut locked = syntax.lock().unwrap();
+        if let Some(wakers) = locked.functions.wakers.remove(&function.data.name) {
+            for waker in wakers {
+                waker.wake();
+            }
+        }
+        locked.functions.data.insert(function.data.clone(), Arc::new(codeless.clone()));
+    }
 
-    //Internal functions verify everything but the code.
-    if is_modifier(function.data.modifiers, Modifier::Internal) {
+    //Internal/external/trait functions verify everything but the code.
+    if is_modifier(function.data.modifiers, Modifier::Internal) || is_modifier(function.data.modifiers, Modifier::Extern) {
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new())));
     }
 

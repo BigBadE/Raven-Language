@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::code::{Field, MemberField};
-use syntax::r#struct::{StructData, UnfinalizedStruct};
+use syntax::r#struct::{get_internal, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::parser::function_parser::parse_function;
@@ -67,10 +67,16 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         }
     }
 
+    let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
+        get_internal(name)
+    } else {
+        Arc::new(StructData::new(attributes, modifiers, name))
+    };
+
     return Ok(UnfinalizedStruct {
         generics,
         fields,
-        data: Arc::new(StructData::new(attributes, modifiers, name)),
+        data
     });
 }
 

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use syntax::function::{FinalizedFunction, FunctionData, UnfinalizedFunction};
 use syntax::{Attribute, ParsingError, ProcessManager, TraitImplementor};
 use syntax::async_util::NameResolver;
-use syntax::r#struct::{FinalizedStruct, UnfinalizedStruct};
+use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use crate::check_function::verify_function;
@@ -38,11 +38,18 @@ impl ProcessManager for TypesChecker {
     }
 
     async fn verify_func(&self, function: UnfinalizedFunction, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction {
-        match verify_function(self, resolver, function, syntax).await {
-            Ok(output) => return output,
+        return match verify_function(self, resolver, function, syntax).await {
+            Ok(output) => output,
             Err(error) => {
+                println!("Error: {}", error);
                 syntax.lock().unwrap().errors.push(error.clone());
-                panic!("TODO better error");
+                FinalizedFunction {
+                    generics: Default::default(),
+                    fields: vec![],
+                    code: Default::default(),
+                    return_type: None,
+                    data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
+                }
             }
         }
     }
@@ -52,7 +59,11 @@ impl ProcessManager for TypesChecker {
             Ok(output) => return output,
             Err(error) => {
                 syntax.lock().unwrap().errors.push(error.clone());
-                panic!("TODO better error");
+                FinalizedStruct {
+                    generics: Default::default(),
+                    fields: vec![],
+                    data: Arc::new(StructData::new(Vec::new(), 0, String::new())),
+                }
             }
         }
     }

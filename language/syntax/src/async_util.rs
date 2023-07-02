@@ -166,12 +166,19 @@ impl Future for AsyncTypesGetter<StructData> {
 impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq {
     type Output = Arc<T::Finalized>;
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        if let Some(output) = T::get_manager(locked.deref_mut()).data.get(&self.getting) {
+        let manager = T::get_manager(locked.deref_mut());
+        if let Some(output) = manager.data.get(&self.getting) {
             return Poll::Ready(output.clone());
+        }
+
+        if let Some(wakers) = manager.wakers.get_mut(self.getting.name()) {
+            wakers.push(cx.waker().clone());
+        } else {
+            manager.wakers.insert(self.getting.name().clone(), vec!(cx.waker().clone()));
         }
 
         return Poll::Pending;

@@ -12,10 +12,35 @@ use crate::types::{FinalizedTypes, Types};
 
 lazy_static! {
 pub static ref I64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i64".to_string())));
+pub static ref I32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i32".to_string())));
+pub static ref I16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i16".to_string())));
+pub static ref I8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i8".to_string())));
 pub static ref F64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "f64".to_string())));
+pub static ref F32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "f32".to_string())));
 pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u64".to_string())));
+pub static ref U32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u32".to_string())));
+pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u16".to_string())));
+pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u8".to_string())));
 pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "str".to_string())));
 pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "bool".to_string())));
+}
+
+pub fn get_internal(name: String) -> Arc<StructData> {
+    return match name.as_str() {
+        "i64" => I64.data.clone(),
+        "i32" => I32.data.clone(),
+        "i16" => I16.data.clone(),
+        "i8" => I8.data.clone(),
+        "f64" => F64.data.clone(),
+        "f32" => F32.data.clone(),
+        "u64" => U64.data.clone(),
+        "u32" => U32.data.clone(),
+        "u16" => U16.data.clone(),
+        "u8" => U8.data.clone(),
+        "str" => STR.data.clone(),
+        "bool" => BOOL.data.clone(),
+        _ => panic!("Unknown internal type {}", name)
+    }
 }
 
 pub static ID: Mutex<u64> = Mutex::new(0);
@@ -81,6 +106,11 @@ impl StructData {
         };
     }
 
+    pub fn fix_id(&mut self) {
+        let mut id = ID.lock().unwrap();
+        *id += 1;
+        self.id = *id;
+    }
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
         return Self {
             attributes: Vec::new(),
@@ -161,7 +191,16 @@ impl TopElement for StructData {
     }
 
     async fn verify(current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
-        process_manager.verify_struct(current, resolver, syntax).await;
+        let data = current.data.clone();
+        let structure = process_manager.verify_struct(current, resolver, syntax.clone()).await;
+        let mut locked = syntax.lock().unwrap();
+        if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
+            for waker in wakers {
+                waker.wake();
+            }
+        }
+
+        locked.structures.data.insert(data, Arc::new(structure));
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
