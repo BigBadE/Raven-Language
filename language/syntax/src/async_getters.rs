@@ -6,7 +6,7 @@ use std::task::{Context, Poll, Waker};
 use crate::function::FunctionData;
 use crate::syntax::Syntax;
 use crate::TopElement;
-use crate::types::Types;
+use crate::types::FinalizedTypes;
 
 /// The async manager, just stores the basic post-parsing tasks.
 #[derive(Default)]
@@ -18,13 +18,13 @@ pub struct GetterManager {
 }
 
 /// Generic async type manager, holds the types and the wakers requiring those types.
-pub struct AsyncGetter<T, K> where T: TopElement<K> {
+pub struct AsyncGetter<T> where T: TopElement {
     pub types: HashMap<String, Arc<T>>,
-    pub data: HashMap<Arc<T>, Arc<K>>,
+    pub data: HashMap<Arc<T>, Arc<T::Finalized>>,
     pub wakers: HashMap<String, Vec<Waker>>,
 }
 
-impl<T, K> AsyncGetter<T, K> where T: TopElement<K> {
+impl<T> AsyncGetter<T> where T: TopElement {
     pub fn new() -> Self {
         return Self {
             types: HashMap::new(),
@@ -38,12 +38,12 @@ impl<T, K> AsyncGetter<T, K> where T: TopElement<K> {
 /// If one doesn't exist, an Err will be returned with nothing in it.
 pub struct ImplementationGetter {
     syntax: Arc<Mutex<Syntax>>,
-    testing: Types,
-    target: Types,
+    testing: FinalizedTypes,
+    target: FinalizedTypes,
 }
 
 impl ImplementationGetter {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, testing: Types, target: Types) -> Self {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, testing: FinalizedTypes, target: FinalizedTypes) -> Self {
         return ImplementationGetter {
             syntax,
             testing,

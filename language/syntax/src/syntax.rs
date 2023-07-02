@@ -14,15 +14,15 @@ use crate::r#struct::{FinalizedStruct, StructData};
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
     // The compiling functions
-    pub compiling: Arc<HashMap<String, Arc<FunctionData>>>,
+    pub compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>,
     // The compiling structs
-    pub strut_compiling: Arc<HashMap<String, Arc<StructData>>>,
+    pub strut_compiling: Arc<HashMap<String, Arc<FinalizedStruct>>>,
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
     // All structures in the program
-    pub structures: AsyncGetter<StructData, FinalizedStruct>,
+    pub structures: AsyncGetter<StructData>,
     // All functions in the program
-    pub functions: AsyncGetter<FunctionData, FinalizedFunction>,
+    pub functions: AsyncGetter<FunctionData>,
     // Stores the async parsing state
     pub async_manager: GetterManager,
     // All operations without namespaces, for example {}+{} or {}/{}
@@ -54,8 +54,9 @@ impl Syntax {
     }
 
     // Adds the top element to the syntax
-    pub fn add<K, T: TopElement<K> + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
-                                              resolver: Box<dyn NameResolver>, dupe_error: ParsingError, adding: Arc<T>) {
+    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
+                                              resolver: Box<dyn NameResolver>, dupe_error: ParsingError,
+                                              adding: Arc<T>, verifying: T::Unfinalized) {
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
@@ -94,10 +95,10 @@ impl Syntax {
         }
 
         let process_manager = locked.process_manager.cloned();
-        handle.spawn(T::verify(adding, syntax.clone(), resolver, process_manager));
+        handle.spawn(T::verify(verifying, syntax.clone(), resolver, process_manager));
     }
 
-    pub fn add_poison<K, T: TopElement<K>>(&mut self, element: Arc<T>) {
+    pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {
         for poison in element.errors() {
             self.errors.push(poison.clone());
         }
@@ -124,7 +125,6 @@ impl Syntax {
         if let Some(found) = name_resolver.generic(&getting) {
             let mut bounds = Vec::new();
             for bound in found {
-                //Async recursion isn't sync, but futures are implicitly sync.
                 bounds.push(Self::parse_type(syntax.clone(), error.clone(),
                                              name_resolver.boxed_clone(), bound).await?);
             }

@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -9,38 +8,35 @@ use std::task::{Context, Poll, Waker};
 
 use crate::{ParsingError, TopElement};
 use crate::async_getters::AsyncGetter;
-use crate::function::{display_parenless, FinalizedFunction, FunctionData};
-use crate::r#struct::{FinalizedStruct, StructData};
+use crate::function::{display_parenless, FunctionData};
+use crate::r#struct::StructData;
 use crate::syntax::Syntax;
 
-pub(crate) struct AsyncTypesGetter<T: TopElement<K>, K> {
+pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub error: ParsingError,
     pub getting: String,
     pub operation: bool,
     pub name_resolver: Box<dyn NameResolver>,
-    pub finished: Option<Arc<T>>,
-    phantom: PhantomData<K>
+    pub finished: Option<Arc<T>>
 }
 
-pub struct AsyncDataGetter<T: TopElement<K>, K> {
+pub struct AsyncDataGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
-    pub getting: Arc<T>,
-    phantom: PhantomData<K>
+    pub getting: Arc<T>
 }
 
-impl<T: TopElement<K>, K> AsyncDataGetter<T, K> {
+impl<T: TopElement> AsyncDataGetter<T> {
     pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
         return AsyncDataGetter {
             syntax,
-            getting,
-            phantom: PhantomData::default()
+            getting
         }
     }
 }
 
-impl<T: TopElement<K>, K> AsyncTypesGetter<T, K> {
-    fn get_types(&mut self, getting: &mut AsyncGetter<T, K>, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
+impl<T: TopElement> AsyncTypesGetter<T> {
+    fn get_types(&mut self, getting: &mut AsyncGetter<T>, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
         let name = if name.is_empty() {
             self.getting.clone()
         } else {
@@ -64,7 +60,7 @@ impl<T: TopElement<K>, K> AsyncTypesGetter<T, K> {
     }
 }
 
-impl AsyncTypesGetter<FunctionData, FinalizedFunction> {
+impl AsyncTypesGetter<FunctionData> {
     pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
@@ -72,13 +68,12 @@ impl AsyncTypesGetter<FunctionData, FinalizedFunction> {
             getting,
             operation,
             name_resolver,
-            finished: None,
-            phantom: PhantomData::default()
+            finished: None
         };
     }
 }
 
-impl AsyncTypesGetter<StructData, FinalizedStruct> {
+impl AsyncTypesGetter<StructData> {
     pub fn new_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, name_resolver: Box<dyn NameResolver>) -> Self {
         return Self {
             syntax,
@@ -86,13 +81,12 @@ impl AsyncTypesGetter<StructData, FinalizedStruct> {
             getting,
             operation: false,
             name_resolver,
-            finished: None,
-            phantom: PhantomData::default()
+            finished: None
         };
     }
 }
 
-impl Future for AsyncTypesGetter<FunctionData, FinalizedFunction> {
+impl Future for AsyncTypesGetter<FunctionData> {
     type Output = Result<Arc<FunctionData>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -134,7 +128,7 @@ impl Future for AsyncTypesGetter<FunctionData, FinalizedFunction> {
     }
 }
 
-impl Future for AsyncTypesGetter<StructData, FinalizedStruct> {
+impl Future for AsyncTypesGetter<StructData> {
     type Output = Result<Arc<StructData>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -169,8 +163,8 @@ impl Future for AsyncTypesGetter<StructData, FinalizedStruct> {
     }
 }
 
-impl<T, K> Future for AsyncDataGetter<T, K> where T: TopElement<K> + Hash + Eq {
-    type Output = Arc<K>;
+impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq {
+    type Output = Arc<T::Finalized>;
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         let locked = self.syntax.clone();

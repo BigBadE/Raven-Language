@@ -23,8 +23,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let token = token.clone();
-                let function = parse_function(parser_utils, attributes, modifiers);
-                ParserUtils::add_function(&parser_utils.syntax, false, &parser_utils.handle,
+                let function = parse_function(parser_utils, false, attributes, modifiers);
+                ParserUtils::add_function(&parser_utils.syntax, &parser_utils.handle,
                                           Box::new(parser_utils.imports.clone()),
                                               parser_utils.file.clone(), token, function);
                 attributes = Vec::new();

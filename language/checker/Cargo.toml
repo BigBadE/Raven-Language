@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 syntax = { path = "../syntax" }
 
+indexmap = "1.9.3"
+
 # CPU-bound async tasks
 tokio = { version = "1.27.0", features = ["rt"] }
 

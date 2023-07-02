@@ -2,7 +2,7 @@ use std::sync::Arc;
 use inkwell::AddressSpace;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
-use syntax::function::FinalizedFunction;
+use syntax::function::CodelessFinalizedFunction;
 use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
@@ -28,16 +28,16 @@ pub fn print_formatted(input: String) {
     println!("{}", output);
 }
 
-pub fn create_function_value<'ctx>(function: &Arc<FinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
+pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let mut params = Vec::new();
 
     for param in &function.fields {
-        params.push(From::from(type_getter.get_type(&param.assume_finished().field.field_type)));
+        params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }
 
     let llvm_function = match &function.return_type {
         Some(returning) => {
-            let types = type_getter.get_type(&returning.assume_finished());
+            let types = type_getter.get_type(&returning);
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             if types.is_struct_type() {
                 params.insert(0, From::from(types.ptr_type(AddressSpace::default())));
@@ -49,5 +49,5 @@ pub fn create_function_value<'ctx>(function: &Arc<FinalizedFunction>, type_gette
         None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
     };
 
-    return type_getter.compiler.module.add_function(&function.name, llvm_function, None);
+    return type_getter.compiler.module.add_function(&function.data.name, llvm_function, None);
 }

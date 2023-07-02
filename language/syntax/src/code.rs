@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 use crate::{Attribute, DisplayIndented, to_modifiers, VariableManager};
-use crate::function::{CodeBody, display_joined, FinalizedCodeBody, FinalizedFunction};
+use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
 use crate::r#struct::{BOOL, F64, FinalizedStruct, I64, STR, U64};
 use crate::types::{FinalizedTypes, Types};
 
@@ -82,6 +82,15 @@ impl Expression {
     }
 }
 
+impl FinalizedExpression {
+    pub fn new(expression_type: ExpressionType, effect: FinalizedEffects) -> Self {
+        return Self {
+            expression_type,
+            effect,
+        };
+    }
+}
+
 impl Field {
     pub fn new(name: String, field_type: Types) -> Self {
         return Self {
@@ -118,7 +127,7 @@ pub enum Effects {
     //An unresolved operation, sent to the checker.
     Operation(String, Vec<Effects>),
     //Struct to create and a tuple of the index of the argument and the argument
-    CreateStruct(Types, Vec<(usize, Effects)>),
+    CreateStruct(Types, Vec<(String, Effects)>),
     Float(f64),
     Int(i64),
     UInt(u64),
@@ -128,6 +137,8 @@ pub enum Effects {
 
 #[derive(Clone, Debug)]
 pub enum FinalizedEffects {
+    //Exclusively used for void returns.
+    NOP(),
     //Creates a variable
     CreateVariable(String, Box<FinalizedEffects>, FinalizedTypes),
     //Label of jumping to body
@@ -136,13 +147,13 @@ pub enum FinalizedEffects {
     CompareJump(Box<FinalizedEffects>, String, String),
     CodeBody(FinalizedCodeBody),
     //Calling and function arguments
-    MethodCall(Arc<FinalizedFunction>, Vec<FinalizedEffects>),
+    MethodCall(Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     //Sets pointer to value
     Set(Box<FinalizedEffects>, Box<FinalizedEffects>),
     //Loads variable
     LoadVariable(String),
     //Loads field pointer from structure, with the given struct
-    Load(Box<FinalizedEffects>, String, FinalizedStruct),
+    Load(Box<FinalizedEffects>, String, Arc<FinalizedStruct>),
     //Struct to create and a tuple of the index of the argument and the argument
     CreateStruct(FinalizedTypes, Vec<(usize, FinalizedEffects)>),
     Float(f64),
@@ -155,6 +166,7 @@ pub enum FinalizedEffects {
 impl FinalizedEffects {
     pub fn get_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
         let temp = match self {
+            FinalizedEffects::NOP() => None,
             FinalizedEffects::Jump(_) => None,
             FinalizedEffects::CompareJump(_, _, _) => None,
             FinalizedEffects::CodeBody(_) => None,

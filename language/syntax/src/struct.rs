@@ -43,6 +43,12 @@ pub struct FinalizedStruct {
     pub data: Arc<StructData>,
 }
 
+impl Hash for FinalizedStruct {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.data.id.hash(state);
+    }
+}
+
 impl Hash for StructData {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.id.to_be_bytes())
@@ -130,7 +136,10 @@ impl FinalizedStruct {
 }
 
 #[async_trait]
-impl TopElement<FinalizedStruct> for StructData {
+impl TopElement for StructData {
+    type Unfinalized = UnfinalizedStruct;
+    type Finalized = FinalizedStruct;
+
     fn poison(&mut self, error: ParsingError) {
         self.poisoned.push(error);
     }
@@ -151,11 +160,11 @@ impl TopElement<FinalizedStruct> for StructData {
         return StructData::new_poisoned(name, error);
     }
 
-    async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
-        process_manager.verify_struct(unsafe { Arc::get_mut_unchecked(&mut current) }, resolver, syntax).await;
+    async fn verify(current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+        process_manager.verify_struct(current, resolver, syntax).await;
     }
 
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self, FinalizedStruct> {
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
         return &mut syntax.structures;
     }
 }

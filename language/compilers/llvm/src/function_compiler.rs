@@ -8,14 +8,14 @@ use inkwell::types::{BasicType, StructType};
 
 use syntax::{is_modifier, Modifier};
 use syntax::code::{ExpressionType, FinalizedEffects};
-use syntax::function::{FinalizedCodeBody, FinalizedFunction};
+use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::r#struct::FinalizedStruct;
 
 use crate::internal::instructions::compile_internal;
 use crate::type_getter::CompilerTypeGetter;
 use crate::util::create_function_value;
 
-pub fn instance_function<'a, 'ctx>(function: Arc<FinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
+pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
 
     if is_modifier(function.data.modifiers, Modifier::Internal) {
@@ -117,6 +117,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
 pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function: FunctionValue<'ctx>,
                             effect: &FinalizedEffects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
+        FinalizedEffects::NOP() => panic!("Tried to compile a NOP!"),
         FinalizedEffects::CreateVariable(name, inner, types) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));

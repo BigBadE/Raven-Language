@@ -9,8 +9,8 @@ use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
-use crate::function::FunctionData;
-use crate::r#struct::StructData;
+use crate::function::{FinalizedFunction, FunctionData, UnfinalizedFunction};
+use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
 
@@ -87,7 +87,7 @@ pub trait DisplayIndented {
 }
 
 // A simple attribute over structures or functions, potentially used later in the process
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Attribute {
     Basic(String),
     Integer(String, i64),
@@ -116,15 +116,13 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: &mut FunctionData, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>);
+    async fn verify_func(&self, function: UnfinalizedFunction, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction;
 
-    async fn verify_struct(&self, structure: &mut StructData, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>);
+    async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>) -> FinalizedStruct;
 
-    async fn add_implementation(&mut self, implementor: TraitImplementor) -> Result<(), ParsingError>;
+    async fn add_implementation(&mut self, syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor) -> Result<(), ParsingError>;
 
-    async fn of_types(&self, base: &Types, target: &Types, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<FunctionData>>>;
-
-    fn get_generic(&self, name: &str) -> Option<Types>;
+    async fn of_types(&self, base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<FunctionData>>>;
 
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }
@@ -179,7 +177,10 @@ pub trait VariableManager: Debug {
 
 // Top elements are structures or functions
 #[async_trait]
-pub trait TopElement<K> where Self: Sized {
+pub trait TopElement where Self: Sized {
+    type Unfinalized;
+    type Finalized;
+
     // Poisons the element, adding an error to it and forcing users to ignore issues with it
     fn poison(&mut self, error: ParsingError);
 
@@ -196,10 +197,10 @@ pub trait TopElement<K> where Self: Sized {
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
     // Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
-    async fn verify(mut current: Arc<Self>, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
+    async fn verify(mut current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
 
     // Gets the getter for that type on the syntax
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self, K>;
+    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
 }
 
 // An impl block for a type

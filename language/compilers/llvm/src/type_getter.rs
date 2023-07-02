@@ -8,7 +8,7 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use syntax::function::FinalizedFunction;
+use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
 use syntax::{ParsingError, VariableManager};
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Output, Syntax};
@@ -23,7 +23,7 @@ pub type Main = unsafe extern "C" fn() -> Output;
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub compiler: Rc<CompilerImpl<'ctx>>,
-    pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<FinalizedFunction>)>>,
+    pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
     pub current_block: Option<BasicBlock<'ctx>>,
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
@@ -59,7 +59,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn get_function(&mut self, function: &Arc<FinalizedFunction>) -> FunctionValue<'ctx> {
+    pub fn get_function(&mut self, function: &Arc<CodelessFinalizedFunction>) -> FunctionValue<'ctx> {
         match self.compiler.module.get_function(&function.data.name) {
             Some(found) => found,
             None => {
@@ -94,13 +94,21 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             None => return Ok(None)
         }.clone();
 
-        instance_function(function, self);
+        instance_function(Arc::new(function.to_codeless()), self);
 
         let mut errors = Vec::new();
         while !self.compiling.is_empty() {
             let (function_type, function) = unsafe {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
+            let function = if let Some(found) = functions.get(&function.data.name) {
+                found
+            } else {
+                unsafe {
+                    Rc::get_mut_unchecked(&mut self.compiling)
+                }.push((function_type, function));
+                continue
+            };
             if !function.data.poisoned.is_empty() {
                 for error in &function.data.poisoned {
                     errors.push(error.clone());

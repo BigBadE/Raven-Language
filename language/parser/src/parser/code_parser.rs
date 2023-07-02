@@ -283,14 +283,6 @@ async fn create_effect(syntax: Arc<Mutex<Syntax>>, token: Token, file: String, r
     return Ok(Effects::CreateStruct(types, final_inputs));
 }
 
-//This turns an immutable reference mutable.
-//Why? Because it's a pain to trace the reference for testing back to the Arc.
-unsafe fn very_bad_function<T>(reference: &T) -> &mut T {
-    let const_ptr = reference as *const T;
-    let mut_ptr = const_ptr as *mut T;
-    &mut *mut_ptr
-}
-
 pub async fn get_line(effect: ParsingFuture<Effects>, expression_type: ExpressionType)
                       -> Result<Expression, ParsingError> {
     return Ok(Expression::new(expression_type, effect.await?));

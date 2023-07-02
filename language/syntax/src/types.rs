@@ -7,6 +7,7 @@ use crate::function::{display, display_parenless};
 use crate::{is_modifier, Modifier, ParsingError, StructData};
 use crate::async_getters::ImplementationGetter;
 use crate::async_util::AsyncDataGetter;
+use crate::code::FinalizedMemberField;
 use crate::r#struct::FinalizedStruct;
 use crate::syntax::Syntax;
 
@@ -22,7 +23,7 @@ pub enum Types {
     Generic(String, Vec<Types>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash)]
 pub enum FinalizedTypes {
     //A basic struct
     Struct(Arc<FinalizedStruct>),
@@ -34,16 +35,6 @@ pub enum FinalizedTypes {
     Generic(String, Vec<FinalizedTypes>),
 }
 
-impl FinalizedTypes {
-    pub fn inner_struct(&self) -> &Arc<FinalizedStruct> {
-        return match self {
-            FinalizedTypes::Struct(structure) => structure,
-            FinalizedTypes::Reference(inner) => inner.inner_struct(),
-            _ => panic!("Tried to get inner struct of invalid type!")
-        };
-    }
-}
-
 impl Types {
     pub fn name(&self) -> String {
         return match self {
@@ -53,6 +44,26 @@ impl Types {
             Types::GenericType(_, _) => panic!("Generics should never be named")
         };
     }
+
+    #[async_recursion]
+    pub async fn finalize(&self, syntax: Arc<Mutex<Syntax>>) -> FinalizedTypes {
+        return match self {
+            Types::Struct(structs) => FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
+            Types::Reference(structs) => FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
+            Types::Generic(name, bounds) => FinalizedTypes::Generic(name.clone(),
+                                                                    Self::finalize_all(syntax, bounds).await),
+            Types::GenericType(base, bounds) => FinalizedTypes::GenericType(Box::new(base.finalize(syntax.clone()).await),
+                                                                        Self::finalize_all(syntax, bounds).await)
+        };
+    }
+
+    async fn finalize_all(syntax: Arc<Mutex<Syntax>>, types: &Vec<Types>) -> Vec<FinalizedTypes> {
+        let mut output = Vec::new();
+        for found in types {
+            output.push(found.finalize(syntax.clone()).await);
+        }
+        return output;
+    }
 }
 
 impl FinalizedTypes {
@@ -61,6 +72,22 @@ impl FinalizedTypes {
             FinalizedTypes::Struct(structure) => structure.data.id,
             FinalizedTypes::Reference(inner) => inner.id(),
             _ => panic!("Tried to ID generic!")
+        };
+    }
+
+    pub fn get_fields(&self) -> &Vec<FinalizedMemberField> {
+        return match self {
+            FinalizedTypes::Struct(inner) => &inner.fields,
+            FinalizedTypes::Reference(inner) => inner.get_fields(),
+            _ => panic!("Tried to get fields of generic!")
+        }
+    }
+
+    pub fn inner_struct(&self) -> &Arc<FinalizedStruct> {
+        return match self {
+            FinalizedTypes::Struct(structure) => structure,
+            FinalizedTypes::Reference(inner) => inner.inner_struct(),
+            _ => panic!("Tried to get inner struct of invalid type!")
         };
     }
 
@@ -89,7 +116,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => found == other_struct ||
-                    ImplementationGetter::new(syntax.clone(), self.downcast(), other.downcast()).await.is_ok(),
+                    ImplementationGetter::new(syntax.clone(), self.clone(), other.clone()).await.is_ok(),
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
                         if !self.of_type(bound, syntax).await {
@@ -251,5 +278,11 @@ impl Display for FinalizedTypes {
             FinalizedTypes::GenericType(types, generics) =>
                 write!(f, "{}<{}>", types, display_parenless(generics, "_"))
         }
+    }
+}
+
+impl PartialEq for FinalizedTypes {
+    fn eq(&self, other: &Self) -> bool {
+        return self.name() == other.name();
     }
 }
