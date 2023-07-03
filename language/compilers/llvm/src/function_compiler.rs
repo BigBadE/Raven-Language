@@ -7,7 +7,7 @@ use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, Functi
 use inkwell::types::{BasicType, StructType};
 
 use syntax::{is_modifier, Modifier};
-use syntax::code::{ExpressionType, FinalizedEffects};
+use syntax::code::{ExpressionType, FinalizedEffects, FinalizedMemberField};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::r#struct::FinalizedStruct;
 
@@ -79,6 +79,10 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
                                     type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
                                 *id += 1;
                                 type_getter.compiler.builder.build_return(None);
+                            } else if returned.is_pointer_value() {
+                                let load = type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string());
+                                *id += 1;
+                                type_getter.compiler.builder.build_return(Some(&load));
                             } else {
                                 type_getter.compiler.builder.build_return(Some(&returned));
                             }
@@ -154,13 +158,13 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 *id += 1;
                 final_arguments.push(From::from(pointer.as_basic_value_enum()));
 
-                add_args(&mut final_arguments, type_getter, function, arguments, id);
+                add_args(&mut final_arguments, type_getter, function, arguments, true, &calling_function.fields, id);
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(), &(*id - 1).to_string());
                 Some(pointer.as_basic_value_enum())
             } else {
-                add_args(&mut final_arguments, type_getter, function, arguments, id);
+                add_args(&mut final_arguments, type_getter, function, arguments, false, &calling_function.fields, id);
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
@@ -204,10 +208,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             } else {
                 pointer = from.into_pointer_value();
             }
-            *id += 2;
-            Some(type_getter.compiler.builder.build_load(
-                type_getter.compiler.builder.build_struct_gep(pointer, offset, &(*id - 2).to_string()).unwrap(),
-                &(*id - 1).to_string()).as_basic_value_enum())
+            *id += 1;
+            Some(type_getter.compiler.builder.build_struct_gep(pointer, offset, &(*id - 1).to_string()).unwrap().as_basic_value_enum())
         }
         //Struct to create and a tuple of the index of the argument and the argument
         FinalizedEffects::CreateStruct(structure, arguments) => {
@@ -247,9 +249,16 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 }
 
 fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
-            function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, id: &mut u64) {
-    for argument in arguments {
-        let value = compile_effect(type_getter, function, argument, id).unwrap();
+            function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, fields: &Vec<FinalizedMemberField>, id: &mut u64) {
+    for i in offset as usize..arguments.len() {
+        let argument = arguments.get(i).unwrap();
+        let field: &FinalizedMemberField = fields.get(i).unwrap();
+        let mut value = compile_effect(type_getter, function, argument, id).unwrap();
+        //Primitives must be loaded
+        if value.is_pointer_value() && field.field.field_type.is_primitive() {
+            value = type_getter.compiler.builder.build_load(value.into_pointer_value(), &id.to_string()).as_basic_value_enum();
+            *id += 1;
+        }
         final_arguments.push(From::from(value));
     }
 }

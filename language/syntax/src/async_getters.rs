@@ -13,6 +13,10 @@ use crate::types::FinalizedTypes;
 pub struct GetterManager {
     //If parsing is finished
     pub finished: bool,
+    //Parsing impls
+    pub parsing_impls: u32,
+    //Impl waiters
+    pub impl_waiters: Vec<Waker>,
     //Tasks to call when finished
     pub finish: Vec<Waker>,
 }
@@ -29,7 +33,7 @@ impl<T> AsyncGetter<T> where T: TopElement {
         return Self {
             types: HashMap::new(),
             data: HashMap::new(),
-            wakers: HashMap::new()
+            wakers: HashMap::new(),
         };
     }
 }
@@ -56,20 +60,18 @@ impl Future for ImplementationGetter {
     type Output = Result<Vec<Arc<FunctionData>>, ()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let locked = self.syntax.lock().unwrap();
-        if let Poll::Ready(result) = Future::poll(Pin::new(
-            &mut locked.process_manager.of_types(&self.target, &self.testing, &self.syntax)), cx) {
+        let mut locked = self.syntax.lock().unwrap();
+        // TODO see if there is a safe alternative or see why this is safe
+        if let Poll::Ready(result) = Future::poll(unsafe { Pin::new_unchecked(
+            &mut Syntax::of_types(&self.target, &self.testing, &self.syntax)) }, cx) {
             if let Some(found) = result {
                 return Poll::Ready(Ok(found.clone()));
+            } else if locked.async_manager.finished && locked.async_manager.parsing_impls == 0 {
+                return Poll::Ready(Err(()));
             }
-        } else {
-            return Poll::Pending;
         }
 
-        if locked.async_manager.finished {
-            return Poll::Ready(Err(()));
-        }
-
+        locked.async_manager.impl_waiters.push(cx.waker().clone());
         return Poll::Pending;
     }
 }

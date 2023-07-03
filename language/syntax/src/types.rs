@@ -113,7 +113,7 @@ impl FinalizedTypes {
     }
     #[async_recursion]
     pub async fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
-        return match self {
+        let output = match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) =>
                     found == other_struct ||
@@ -167,6 +167,7 @@ impl FinalizedTypes {
                 _ => other.of_type(self, syntax).await
             }
         };
+        return output;
     }
 
     pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,

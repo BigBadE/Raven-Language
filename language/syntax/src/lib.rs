@@ -120,10 +120,6 @@ pub trait ProcessManager: Send + Sync {
 
     async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>) -> FinalizedStruct;
 
-    async fn add_implementation(&mut self, syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor) -> Result<(), ParsingError>;
-
-    async fn of_types(&self, base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<&Vec<Arc<FunctionData>>>;
-
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }
 

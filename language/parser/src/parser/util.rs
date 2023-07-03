@@ -53,9 +53,9 @@ impl<'a> ParserUtils<'a> {
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>) {
         match implementor {
             Ok(implementor) => {
-                //Have to clone this twice to get around mutability restrictions and not keep syntax locked across awaits.
-                let process_manager = syntax.lock().unwrap().process_manager.cloned();
-                match process_manager.cloned().add_implementation(&syntax, implementor).await {
+                syntax.lock().unwrap().async_manager.parsing_impls += 1;
+
+                match Self::add_implementation(&syntax, implementor).await {
                     Ok(_) => {},
                     Err(error) => {
                         syntax.lock().unwrap().errors.push(error);
@@ -66,6 +66,20 @@ impl<'a> ParserUtils<'a> {
                 syntax.lock().unwrap().errors.push(error);
             }
         }
+    }
+
+    async fn add_implementation(syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor) -> Result<(), ParsingError> {
+        let output = (implementor.implementor.await?.finalize(syntax.clone()).await,
+                      (implementor.base.await?.finalize(syntax.clone()).await,
+                       implementor.attributes, implementor.functions));
+        let mut locked = syntax.lock().unwrap();
+        locked.implementations.insert(output.0, output.1);
+        locked.async_manager.parsing_impls -= 1;
+        for waker in &locked.async_manager.impl_waiters {
+            waker.wake_by_ref();
+        }
+        locked.async_manager.impl_waiters.clear();
+        return Ok(());
     }
 
     pub fn add_function(syntax: &Arc<Mutex<Syntax>>, handle: &Handle, resolver: Box<dyn NameResolver>, file: String, token: Token,

@@ -26,8 +26,8 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
         index: 0,
         tokens,
         syntax,
-        file: name,
-        imports: ImportNameResolver::new(),
+        file: name.clone(),
+        imports: ImportNameResolver::new(name),
         handle,
     };
     parse_top(&mut parser_utils);
@@ -42,9 +42,9 @@ pub struct ImportNameResolver {
 }
 
 impl ImportNameResolver {
-    pub fn new() -> Self {
+    pub fn new(base: String) -> Self {
         return Self {
-            imports: Vec::new(),
+            imports: vec!(base),
             generics: HashMap::new(),
             parent: None,
             last_id: 0

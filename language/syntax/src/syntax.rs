@@ -5,11 +5,12 @@ use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
 
-use crate::{ParsingError, ProcessManager, TopElement, Types};
+use crate::{Attribute, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{FinalizedStruct, StructData};
+use crate::types::FinalizedTypes;
 
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
@@ -23,6 +24,8 @@ pub struct Syntax {
     pub structures: AsyncGetter<StructData>,
     // All functions in the program
     pub functions: AsyncGetter<FunctionData>,
+    // All implementations in the program
+    pub implementations: HashMap<FinalizedTypes, (FinalizedTypes, Vec<Attribute>, Vec<Arc<FunctionData>>)>,
     // Stores the async parsing state
     pub async_manager: GetterManager,
     // All operations without namespaces, for example {}+{} or {}/{}
@@ -39,6 +42,7 @@ impl Syntax {
             errors: Vec::new(),
             structures: AsyncGetter::new(),
             functions: AsyncGetter::new(),
+            implementations: HashMap::new(),
             async_manager: GetterManager::default(),
             operations: HashMap::new(),
             process_manager,
@@ -51,6 +55,20 @@ impl Syntax {
             panic!("Tried to finish already-finished syntax!")
         }
         self.async_manager.finished = true;
+    }
+
+    /// Checks if the given target type matches the base type.
+    /// Can false negative unless parsing is finished.
+    pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<Vec<Arc<FunctionData>>> {
+        let implementations = syntax.lock().unwrap().implementations.clone();
+        for (implementor, (other, _, functions)) in implementations {
+            if base.of_type(&implementor, syntax).await &&
+                other.of_type(&target, syntax).await {
+                return Some(functions);
+            }
+        }
+
+        return None;
     }
 
     // Adds the top element to the syntax
@@ -136,7 +154,7 @@ impl Syntax {
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {
-        return match types {
+        let temp = match types {
             UnparsedType::Basic(name) =>
                 Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,
             UnparsedType::Generic(name, args) => {
@@ -150,6 +168,7 @@ impl Syntax {
                                       generics))
             }
         };
+        return temp;
     }
 
     fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {
