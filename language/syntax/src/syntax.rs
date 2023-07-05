@@ -60,6 +60,7 @@ impl Syntax {
     /// Checks if the given target type matches the base type.
     /// Can false negative unless parsing is finished.
     pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<Vec<Arc<FunctionData>>> {
+
         let implementations = syntax.lock().unwrap().implementations.clone();
         for (implementor, (other, _, functions)) in implementations {
             if base.of_type(&implementor, syntax).await &&

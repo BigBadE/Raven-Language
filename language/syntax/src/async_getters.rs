@@ -60,10 +60,10 @@ impl Future for ImplementationGetter {
     type Output = Result<Vec<Arc<FunctionData>>, ()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.syntax.lock().unwrap();
         // TODO see if there is a safe alternative or see why this is safe
         if let Poll::Ready(result) = Future::poll(unsafe { Pin::new_unchecked(
             &mut Syntax::of_types(&self.target, &self.testing, &self.syntax)) }, cx) {
+            let locked = self.syntax.lock().unwrap();
             if let Some(found) = result {
                 return Poll::Ready(Ok(found.clone()));
             } else if locked.async_manager.finished && locked.async_manager.parsing_impls == 0 {
@@ -71,7 +71,7 @@ impl Future for ImplementationGetter {
             }
         }
 
-        locked.async_manager.impl_waiters.push(cx.waker().clone());
+        self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
         return Poll::Pending;
     }
 }

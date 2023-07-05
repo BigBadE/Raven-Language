@@ -7,7 +7,6 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
 use crate::{ParsingError, TopElement};
-use crate::async_getters::AsyncGetter;
 use crate::function::{display_parenless, FunctionData};
 use crate::r#struct::StructData;
 use crate::syntax::Syntax;
@@ -36,13 +35,14 @@ impl<T: TopElement> AsyncDataGetter<T> {
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
-    fn get_types(&mut self, getting: &mut AsyncGetter<T>, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
+    fn get_types(&mut self, locked: &mut Syntax, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
         let name = if name.is_empty() {
             self.getting.clone()
         } else {
             name + "::" + &*self.getting.clone()
         };
 
+        let getting = T::get_manager(locked);
         //Look for a structure of that name
         if let Some(found) = getting.types.get(&name).cloned() {
             self.finished = Some(found.clone());
@@ -54,8 +54,9 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         if let Some(vectors) = getting.wakers.get_mut(&name) {
             vectors.push(waker);
         } else {
-            getting.wakers.insert(self.getting.clone(), vec!(waker));
+            getting.wakers.insert(name, vec!(waker));
         }
+
         return None;
     }
 }
@@ -105,13 +106,13 @@ impl Future for AsyncTypesGetter<FunctionData> {
             }
         }
 
-        if let Some(output) = self.get_types(&mut locked.functions,
+        if let Some(output) = self.get_types(&mut locked,
                                              String::new(), cx.waker().clone()) {
             return Poll::Ready(output);
         }
 
         for import in self.name_resolver.imports().clone() {
-            if let Some(output) = self.get_types(&mut locked.functions,
+            if let Some(output) = self.get_types(&mut locked,
                                                  import, cx.waker().clone()) {
                 return Poll::Ready(output);
             }
@@ -139,13 +140,13 @@ impl Future for AsyncTypesGetter<StructData> {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        if let Some(output) = self.get_types(&mut locked.structures,
+        if let Some(output) = self.get_types(&mut locked,
                                              String::new(), cx.waker().clone()) {
             return Poll::Ready(output);
         }
 
         for import in self.name_resolver.imports().clone() {
-            if let Some(output) = self.get_types(&mut locked.structures,
+            if let Some(output) = self.get_types(&mut locked,
                                                  import, cx.waker().clone()) {
                 return Poll::Ready(output);
             }

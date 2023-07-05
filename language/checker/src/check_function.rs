@@ -15,9 +15,6 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
                              mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedFunction, ParsingError> {
     let mut variable_manager = CheckerVariableManager { variables: HashMap::new() };
 
-    if function.data.name.contains("main") {
-        println!("1 - {}", function.data.name);
-    }
     let mut fields = Vec::new();
     for argument in &mut function.fields {
         let field = argument.await?;
@@ -33,24 +30,20 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         fields.push(field);
     }
 
-    if function.data.name.contains("main") {
-        println!("2 - {}", function.data.name);
-    }
     let return_type = if let Some(return_type) = function.return_type.as_mut() {
-        let first = return_type.await?;
+        let first = match return_type.await {
+            Ok(result) => result,
+            Err(error) => {
+                println!("Found dumb error: {}", error);
+                return Err(error);
+            }
+        };
 
-        if function.data.name.contains("main") {
-            println!("2.5 - {}", function.data.name);
-        }
         Some(first.finalize(syntax.clone()).await)
     } else {
         None
     };
 
-
-    if function.data.name.contains("main") {
-        println!("3 - {}", function.data.name);
-    }
     let codeless = CodelessFinalizedFunction {
         generics: finalize_generics(syntax, function.generics).await?,
         fields,
@@ -58,9 +51,6 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         data: function.data.clone(),
     };
 
-    if function.data.name.contains("main") {
-        println!("4 - {}", function.data.name);
-    }
     {
         let mut locked = syntax.lock().unwrap();
         if let Some(wakers) = locked.functions.wakers.remove(&function.data.name) {
@@ -76,9 +66,6 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new())));
     }
 
-    if function.data.name.contains("main") {
-        println!("5 - {}", function.data.name);
-    }
     let mut code_output = verify_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?;
     if !code_output.0 {
         if function.return_type.is_none() {
@@ -89,8 +76,5 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         }
     }
 
-    if function.data.name.contains("main") {
-        println!("6 - {}", function.data.name);
-    }
     return Ok(codeless.clone().add_code(code_output.1));
 }

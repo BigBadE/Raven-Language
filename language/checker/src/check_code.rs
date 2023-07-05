@@ -178,8 +178,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
 
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            if let Some(old) = unsafe { Arc::get_mut_unchecked(&mut method) }.fields.get_mut(i)
-                .unwrap().field.field_type.resolve_generic(
+            if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
                 &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                 if let FinalizedTypes::Generic(name, _) = old {
                     manager.generics.insert(name, effect);
@@ -206,6 +205,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                                      placeholder_error("No generic!".to_string()),
                                                      placeholder_error("Invalid bounds!".to_string())).await?;
                 }
+
                 if let Some(returning) = &mut new_method.return_type {
                     returning.degeneric(&manager.generics, syntax,
                                         placeholder_error("No generic!".to_string()),

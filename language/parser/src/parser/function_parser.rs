@@ -48,8 +48,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
             }
             TokenTypes::ArgumentsEnd | TokenTypes::ReturnTypeArrow => {}
             TokenTypes::ReturnType => {
-                let name = token.to_string(parser_utils.buffer).clone();
-                return_type = Some(parser_utils.get_struct(token, name))
+                let ret_name = token.to_string(parser_utils.buffer).clone();
+                return_type = Some(parser_utils.get_struct(token, ret_name))
             }
             TokenTypes::CodeStart => {
                 code = Some(parse_code(parser_utils).1);
