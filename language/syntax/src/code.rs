@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{Attribute, DisplayIndented, to_modifiers, VariableManager};
 use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
-use crate::r#struct::{BOOL, F64, FinalizedStruct, I64, STR, U64};
+use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::types::{FinalizedTypes, Types};
 
 #[derive(Clone, Debug)]
@@ -116,6 +116,8 @@ pub enum Effects {
     //Comparison effect, and label to jump to the first if true, second if false
     CompareJump(Box<Effects>, String, String),
     CodeBody(CodeBody),
+    //Calling, trait to call, function name, args
+    ImplementationCall(Box<Effects>, String, String, Vec<Effects>),
     //Calling, calling function, function arguments
     MethodCall(Option<Box<Effects>>, String, Vec<Effects>),
     //Sets pointer to value
@@ -157,7 +159,6 @@ pub enum FinalizedEffects {
     //Struct to create and a tuple of the index of the argument and the argument
     CreateStruct(FinalizedTypes, Vec<(usize, FinalizedEffects)>),
     Float(f64),
-    Int(i64),
     UInt(u64),
     Bool(bool),
     String(String),
@@ -173,11 +174,7 @@ impl FinalizedEffects {
             FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
             FinalizedEffects::MethodCall(function, _) =>
                 function.return_type.as_ref().map(|inner| {
-                    let mut returning = inner.clone();
-                    if !returning.is_primitive() {
-                        returning = FinalizedTypes::Reference(Box::new(returning));
-                    }
-                    returning
+                    FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),
             FinalizedEffects::Set(_, to) => to.get_return(variables),
             FinalizedEffects::LoadVariable(name) => {
@@ -193,7 +190,7 @@ impl FinalizedEffects {
                         _ => return Some(found)
                     }
                 }
-                panic!("Unresolved variable {}", name);
+                panic!("Unresolved variable {} from {:?}", name, variables);
             }
             FinalizedEffects::Load(_, name, loading) =>
                 loading.fields.iter()
@@ -201,7 +198,6 @@ impl FinalizedEffects {
                     .map(|field| field.field.field_type.clone()),
             FinalizedEffects::CreateStruct(types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
-            FinalizedEffects::Int(_) => Some(FinalizedTypes::Struct(I64.clone())),
             FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
             FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
             FinalizedEffects::String(_) => Some(FinalizedTypes::Reference(Box::new(FinalizedTypes::Struct(STR.clone()))))

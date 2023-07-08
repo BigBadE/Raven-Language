@@ -22,11 +22,11 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
             field: FinalizedField { field_type: field.field.field_type.finalize(syntax.clone()).await, name: field.field.name } };
         variable_manager.variables.insert(field.field.name.clone(),
                                           field.field.field_type.clone());
-        if !field.field.field_type.is_primitive() {
+        //if !field.field.field_type.is_primitive() {
             let mut temp = FinalizedTypes::Generic(String::new(), vec!());
             mem::swap(&mut temp, &mut field.field.field_type);
             field.field.field_type = FinalizedTypes::Reference(Box::new(temp));
-        }
+        //}
         fields.push(field);
     }
 

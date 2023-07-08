@@ -17,18 +17,18 @@ pub internal struct bool {}
 //Basic math operations, implemented internally by the compiler.
 //Equality
 #[priority(-1)]
-pub internal operation fn {}=={}(first: i64, second: i64) -> bool {
+pub internal operation fn {}=={}(first: u64, second: u64) -> bool {
     return first + second;
 }
 
 //Addition
 #[priority(0)]
-pub internal operation fn {}+{}(first: i64, second: i64) -> i64 {
+pub internal operation fn {}+{}(first: u64, second: u64) -> u64 {
     return first + second;
 }
 
 //Division
 #[priority(1)]
-pub internal operation fn {}/{}(first: i64, second: i64) -> i64 {
+pub internal operation fn {}/{}(first: u64, second: u64) -> u64 {
     return first / second;
 }

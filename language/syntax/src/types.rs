@@ -115,9 +115,16 @@ impl FinalizedTypes {
     pub async fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
         let output = match self {
             FinalizedTypes::Struct(found) => match other {
-                FinalizedTypes::Struct(other_struct) =>
-                    found == other_struct ||
-                        ImplementationGetter::new(syntax.clone(), self.clone(), other.clone()).await.is_ok(),
+                FinalizedTypes::Struct(other_struct) => {
+                    if found == other_struct {
+                        true
+                    } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
+                        //Only check for implementations if being compared against a trait.
+                        ImplementationGetter::new(syntax.clone(), self.clone(), other.clone()).await.is_ok()
+                    } else {
+                        false
+                    }
+                },
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
                         if !self.of_type(bound, syntax).await {
@@ -127,7 +134,7 @@ impl FinalizedTypes {
                     true
                 }
                 FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax).await,
-                _ => false
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await
             },
             FinalizedTypes::GenericType(base, _generics) => match other {
                 FinalizedTypes::GenericType(_other_base, _other_generics) => {
@@ -145,13 +152,13 @@ impl FinalizedTypes {
                         }
                     }
                     true
-                }
-                _ => false
+                },
+                FinalizedTypes::Struct(_) => {
+                    base.of_type(other, syntax).await
+                },
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await
             }
-            FinalizedTypes::Reference(referencing) => match other {
-                FinalizedTypes::Reference(other) => referencing.of_type(other, syntax).await,
-                _ => false
-            },
+            FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax).await,
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
                     'outer: for bound in bounds {
@@ -210,6 +217,7 @@ impl FinalizedTypes {
 
     #[async_recursion]
     pub async fn flatten(&mut self, generics: &mut Vec<FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedTypes, ParsingError> {
+        println!("Degenericing {:?}", self);
         for generic in &mut *generics {
             if let FinalizedTypes::GenericType(base, bounds) = generic {
                 *generic = base.flatten(bounds, syntax).await?;

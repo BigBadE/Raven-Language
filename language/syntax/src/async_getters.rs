@@ -67,6 +67,7 @@ impl Future for ImplementationGetter {
             if let Some(found) = result {
                 return Poll::Ready(Ok(found.clone()));
             } else if locked.async_manager.finished && locked.async_manager.parsing_impls == 0 {
+                println!("Failed! {} vs {}", self.target, self.testing);
                 return Poll::Ready(Err(()));
             }
         }

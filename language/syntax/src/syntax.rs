@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::ops::DerefMut;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
@@ -60,15 +62,35 @@ impl Syntax {
     /// Checks if the given target type matches the base type.
     /// Can false negative unless parsing is finished.
     pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<Vec<Arc<FunctionData>>> {
+        //TODO check if this can be optimized. Must be a future because syntax will be locked to prevent
+        //copying the entire implementation.
+        //Though at this point, that may just be faster.
+        //Directly reading implementations from a pointer would theoretically cause race issues,
+        //But it's unknown if those would cause crashes or just a stale read, if it's the latter it's fine.
+        let mut found: Vec<Pin<Box<dyn Future<Output=Option<Vec<Arc<FunctionData>>>>>>> = Vec::new();
+        {
+            let locked = syntax.lock().unwrap();
+            for (implementor, (other, _, functions)) in &locked.implementations {
+                found.push(Box::pin(Self::check_types(base, target, implementor.clone(),
+                                                      syntax, other.clone(), functions.clone())));
+            }
+        }
 
-        let implementations = syntax.lock().unwrap().implementations.clone();
-        for (implementor, (other, _, functions)) in implementations {
-            if base.of_type(&implementor, syntax).await &&
-                other.of_type(&target, syntax).await {
+        for future in found {
+            if let Some(functions) = future.await {
                 return Some(functions);
             }
         }
 
+        return None;
+    }
+
+    async fn check_types(base: &FinalizedTypes, target: &FinalizedTypes, implementor: FinalizedTypes,
+                         syntax: &Arc<Mutex<Syntax>>, other: FinalizedTypes, functions: Vec<Arc<FunctionData>>) -> Option<Vec<Arc<FunctionData>>> {
+        if base.of_type(&implementor, syntax).await &&
+            other.of_type(&target, syntax).await {
+            return Some(functions.clone());
+        }
         return None;
     }
 

@@ -147,11 +147,11 @@ async fn create_for(name: String, effect: ParsingFuture<Effects>,
     let mut body = body.await?;
     let effect = effect.await?;
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
-    Effects::Set(Box::new(Effects::LoadVariable(name)), Box::new(Effects::MethodCall(
-        None, "iter::Iter::next".to_string(), vec!(effect.clone()))))));
+    Effects::CreateVariable(name.clone(), Box::new(Effects::ImplementationCall(
+        Box::new(effect.clone()), "iter::Iter".to_string(), "iter::next".to_string(), vec!())))));
 
-    top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::MethodCall(
-        None, "iter::Iter::has_next".to_string(),vec!(effect))),
+    top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::ImplementationCall(
+        Box::new(effect), "iter::Iter".to_string(), "iter::has_next".to_string(), vec!())),
                                   body.label.clone(), (id + 1).to_string())));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
 

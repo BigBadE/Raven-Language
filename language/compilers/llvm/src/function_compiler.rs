@@ -13,14 +13,14 @@ use syntax::r#struct::FinalizedStruct;
 
 use crate::internal::instructions::compile_internal;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::{create_function_value, print_formatted};
+use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value = create_function_value(&function, type_getter);
 
-    if is_modifier(function.data.modifiers, Modifier::Internal) {
+    if is_modifier(function.data.modifiers, Modifier::Internal) && !is_modifier(function.data.modifiers, Modifier::Trait) {
         compile_internal(&type_getter.compiler, &function.data.name, value);
-    } else if is_modifier(function.data.modifiers, Modifier::Extern) {
+    } else if is_modifier(function.data.modifiers, Modifier::Extern) && !is_modifier(function.data.modifiers, Modifier::Trait){
         todo!()
     } else {
         unsafe { Rc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
@@ -174,13 +174,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Sets pointer to value
         FinalizedEffects::Set(setting, value) => {
-            println!("{:?}\nto\n{:?}", setting, value);
             let output = compile_effect(type_getter, function, setting, id).unwrap();
             let storing = compile_effect(type_getter, function, value, id).unwrap();
-            print_formatted(output.to_string());
-            println!("vs");
-            print_formatted(storing.to_string());
-            println!("{} vs {}", output.is_int_value(), storing.is_int_value());
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }
@@ -240,25 +235,35 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
             Some(pointer.as_basic_value_enum())
         },
-        FinalizedEffects::Float(float) => Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum()),
-        FinalizedEffects::Int(int) => Some(type_getter.compiler.context.i64_type().const_int(*int as u64, false).as_basic_value_enum()),
-        FinalizedEffects::UInt(uint) => Some(type_getter.compiler.context.i64_type().const_int(*uint, true).as_basic_value_enum()),
-        FinalizedEffects::Bool(bool) => Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum()),
-        FinalizedEffects::String(string) => Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum())
+        FinalizedEffects::Float(float) => store_and_load(type_getter, type_getter.compiler.context.f64_type(),
+                                                         type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum(), id),
+        FinalizedEffects::UInt(int) => store_and_load(type_getter, type_getter.compiler.context.i64_type(),
+                                                     type_getter.compiler.context.i64_type().const_int(*int, false).as_basic_value_enum(), id),
+        FinalizedEffects::Bool(bool) => store_and_load(type_getter,  type_getter.compiler.context.bool_type(),
+                                                       type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum(), id),
+        FinalizedEffects::String(string) => store_and_load(type_getter,  type_getter.compiler.context.i8_type().array_type(string.len() as u32),
+                                                           type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum(), id)
     };
 }
 
+fn store_and_load<'ctx, T: BasicType<'ctx>>(type_getter: &mut CompilerTypeGetter<'ctx>, types: T, inputer: BasicValueEnum<'ctx>, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
+    let pointer = type_getter.compiler.builder.build_alloca(types, &id.to_string());
+    *id += 1;
+    type_getter.compiler.builder.build_store(pointer, inputer);
+    return Some(pointer.as_basic_value_enum());
+}
+
 fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
-            function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, fields: &Vec<FinalizedMemberField>, id: &mut u64) {
+            function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, _fields: &Vec<FinalizedMemberField>, id: &mut u64) {
     for i in offset as usize..arguments.len() {
         let argument = arguments.get(i).unwrap();
-        let field: &FinalizedMemberField = fields.get(i).unwrap();
-        let mut value = compile_effect(type_getter, function, argument, id).unwrap();
+        //let field: &FinalizedMemberField = fields.get(i).unwrap();
+        let value = compile_effect(type_getter, function, argument, id).unwrap();
         //Primitives must be loaded
-        if value.is_pointer_value() && field.field.field_type.is_primitive() {
+        /*if value.is_pointer_value() && field.field.field_type.is_primitive() {
             value = type_getter.compiler.builder.build_load(value.into_pointer_value(), &id.to_string()).as_basic_value_enum();
             *id += 1;
-        }
+        }*/
         final_arguments.push(From::from(value));
     }
 }

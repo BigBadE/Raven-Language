@@ -68,6 +68,34 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                            operation, true, Box::new(EmptyNameResolver {})).await?;
             }
         },
+        Effects::ImplementationCall(calling, traits, method, effects) => {
+            let mut finalized_effects = Vec::new();
+            for effect in effects {
+                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?)
+            }
+
+            let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, syntax, variables).await?;
+            let return_type = found.get_return(variables).unwrap();
+            finalized_effects.push(found);
+
+            if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
+                               traits, resolver.boxed_clone()).await {
+                let mut output = None;
+                if let Ok(value) = ImplementationGetter::new(syntax.clone(),
+                                                             inner.finalize(syntax.clone()).await, return_type.clone()).await {
+                    for temp in value {
+                        if temp.name == method {
+                            output = Some(temp.clone());
+                        }
+                    }
+                }
+
+                check_method(process_manager, AsyncDataGetter::new(syntax.clone(), output.unwrap()).await,
+                             finalized_effects, syntax, variables).await?
+            } else {
+                panic!("Screwed up trait!");
+            }
+        },
         Effects::MethodCall(calling, method, effects) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
@@ -85,7 +113,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for import in resolver.imports() {
                         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                               import.clone(), resolver.boxed_clone()).await {
-                            while let Ok(value) = ImplementationGetter::new(syntax.clone(),
+                            if let Ok(value) = ImplementationGetter::new(syntax.clone(),
                                                                             return_type.clone(), value.finalize(syntax.clone()).await).await {
                                 for temp in value {
                                     if temp.name == method {
@@ -106,7 +134,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
             } else {
                 Syntax::get_function(syntax.clone(), placeholder_error(format!("Unknown method {}", method)),
-                                     method.clone(), false, resolver.boxed_clone()).await?
+                                     method, false, resolver.boxed_clone()).await?
             };
 
             check_method(process_manager, AsyncDataGetter::new(syntax.clone(), method).await,
@@ -162,7 +190,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
         Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
         Effects::Float(float) => FinalizedEffects::Float(float),
-        Effects::Int(int) => FinalizedEffects::Int(int),
+        Effects::Int(int) => FinalizedEffects::UInt(int as u64),
         Effects::UInt(uint) => FinalizedEffects::UInt(uint),
         Effects::Bool(bool) => FinalizedEffects::Bool(bool),
         Effects::String(string) => FinalizedEffects::String(string)
