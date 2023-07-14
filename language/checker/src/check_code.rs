@@ -19,11 +19,11 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
         body.push(FinalizedExpression::new(line.expression_type,
                    verify_effect(process_manager, resolver.boxed_clone(), line.effect, syntax, variables).await?));
         if let ExpressionType::Return = line.expression_type {
-            return Ok((true, FinalizedCodeBody::new(body, code.label.clone())));
+            return Ok((true, FinalizedCodeBody::new(body, code.label.clone(), true)));
         }
     }
 
-    return Ok((false, FinalizedCodeBody::new(body, code.label.clone())));
+    return Ok((false, FinalizedCodeBody::new(body, code.label.clone(), false)));
 }
 
 //IntelliJ seems to think the operation loop is unreachable for some reason.

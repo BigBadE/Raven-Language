@@ -20,7 +20,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
 
     if is_modifier(function.data.modifiers, Modifier::Internal) && !is_modifier(function.data.modifiers, Modifier::Trait) {
         compile_internal(&type_getter.compiler, &function.data.name, value);
-    } else if is_modifier(function.data.modifiers, Modifier::Extern) && !is_modifier(function.data.modifiers, Modifier::Trait){
+    } else if is_modifier(function.data.modifiers, Modifier::Extern) && !is_modifier(function.data.modifiers, Modifier::Trait) {
         todo!()
     } else {
         unsafe { Rc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
@@ -54,42 +54,38 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
     for line in &code.expressions {
         match line.expression_type {
             ExpressionType::Return => {
-                match &line.effect {
-                    _ => {
-                        if let FinalizedEffects::CodeBody(body) = &line.effect {
-                            if !broke {
-                                let destination = unwrap_or_create(&body.label, function, type_getter);
-                                type_getter.compiler.builder.build_unconditional_branch(destination);
-                            }
-                            compile_effect(type_getter, function, &line.effect, id);
-                            broke = true;
-                        }
+                if let FinalizedEffects::CodeBody(body) = &line.effect {
+                    if !broke {
+                        let destination = unwrap_or_create(&body.label, function, type_getter);
+                        type_getter.compiler.builder.build_unconditional_branch(destination);
+                    }
+                    compile_effect(type_getter, function, &line.effect, id);
+                    broke = true;
+                }
 
-                        let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
+                let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
-                        if !broke {
-                            if returned.is_struct_value() {
-                                type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
-                                                                         returned);
-                                type_getter.compiler.builder.build_return(None);
-                            } else if returned.is_pointer_value() &&
-                                returned.into_pointer_value().get_type().get_element_type().is_struct_type() {
-                                type_getter.compiler.builder.build_store(
-                                    function.get_first_param().unwrap().into_pointer_value(),
-                                    type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
-                                *id += 1;
-                                type_getter.compiler.builder.build_return(None);
-                            } else if returned.is_pointer_value() {
-                                let load = type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string());
-                                *id += 1;
-                                type_getter.compiler.builder.build_return(Some(&load));
-                            } else {
-                                type_getter.compiler.builder.build_return(Some(&returned));
-                            }
-                        }
-                        broke = true;
+                if !broke {
+                    if returned.is_struct_value() {
+                        type_getter.compiler.builder.build_store(function.get_first_param().unwrap().into_pointer_value(),
+                                                                 returned);
+                        type_getter.compiler.builder.build_return(None);
+                    } else if returned.is_pointer_value() &&
+                        returned.into_pointer_value().get_type().get_element_type().is_struct_type() {
+                        type_getter.compiler.builder.build_store(
+                            function.get_first_param().unwrap().into_pointer_value(),
+                            type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string()));
+                        *id += 1;
+                        type_getter.compiler.builder.build_return(None);
+                    } else if returned.is_pointer_value() {
+                        let load = type_getter.compiler.builder.build_load(returned.into_pointer_value(), &id.to_string());
+                        *id += 1;
+                        type_getter.compiler.builder.build_return(Some(&load));
+                    } else {
+                        type_getter.compiler.builder.build_return(Some(&returned));
                     }
                 }
+                broke = true;
             }
             ExpressionType::Line => {
                 if broke {
@@ -103,12 +99,31 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
                                 unwrap_or_create(&body.label, function, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(
                                 destination);
+
+                            compile_effect(type_getter, function, &line.effect, id);
+
+                            if !body.returns {
+                                let label = body.label.clone() + "end";
+                                let temp = if let Some(block) = type_getter.blocks.get(&label) {
+                                    type_getter.compiler.builder.position_at_end(block.clone());
+                                    block.clone()
+                                } else {
+                                    type_getter.compiler.context.append_basic_block(function, &label)
+                                };
+
+                                type_getter.blocks.insert(label, temp);
+                                type_getter.current_block = Some(temp);
+                                type_getter.compiler.builder.position_at_end(temp);
+                            }
+                        }
+                        FinalizedEffects::Jump(_) | FinalizedEffects::CompareJump(_, _, _) => {
                             broke = true;
+                            compile_effect(type_getter, function, &line.effect, id);
                         },
-                        FinalizedEffects::Jump(_) | FinalizedEffects::CompareJump(_, _, _) => broke = true,
-                        _ => {}
+                        _ => {
+                            compile_effect(type_getter, function, &line.effect, id);
+                        }
                     }
-                    compile_effect(type_getter, function, &line.effect, id);
                 }
             }
             ExpressionType::Break => return compile_effect(type_getter, function, &line.effect, id)
@@ -126,7 +141,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));
             Some(compiled.as_basic_value_enum())
-        },
+        }
         //Label of jumping to body
         FinalizedEffects::Jump(label) => {
             let destination = unwrap_or_create(label, function, type_getter);
@@ -168,7 +183,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
-                                                             &(*id - 1).to_string()).try_as_basic_value().left()
+                                                        &(*id - 1).to_string()).try_as_basic_value().left()
                     .map_or(None, |value| Some(value))
             }
         }
@@ -221,7 +236,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
             type_getter.compiler.builder.build_store(pointer,
                                                      type_getter.compiler.context.i64_type()
-                .const_int(structure.id(), false));
+                                                         .const_int(structure.id(), false));
 
             let mut offset = 1;
             for argument in out_arguments {
@@ -234,14 +249,14 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             }
 
             Some(pointer.as_basic_value_enum())
-        },
+        }
         FinalizedEffects::Float(float) => store_and_load(type_getter, type_getter.compiler.context.f64_type(),
                                                          type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum(), id),
         FinalizedEffects::UInt(int) => store_and_load(type_getter, type_getter.compiler.context.i64_type(),
-                                                     type_getter.compiler.context.i64_type().const_int(*int, false).as_basic_value_enum(), id),
-        FinalizedEffects::Bool(bool) => store_and_load(type_getter,  type_getter.compiler.context.bool_type(),
+                                                      type_getter.compiler.context.i64_type().const_int(*int, false).as_basic_value_enum(), id),
+        FinalizedEffects::Bool(bool) => store_and_load(type_getter, type_getter.compiler.context.bool_type(),
                                                        type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum(), id),
-        FinalizedEffects::String(string) => store_and_load(type_getter,  type_getter.compiler.context.i8_type().array_type(string.len() as u32),
+        FinalizedEffects::String(string) => store_and_load(type_getter, type_getter.compiler.context.i8_type().array_type(string.len() as u32),
                                                            type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum(), id)
     };
 }
@@ -254,7 +269,7 @@ fn store_and_load<'ctx, T: BasicType<'ctx>>(type_getter: &mut CompilerTypeGetter
 }
 
 fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
-            function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, _fields: &Vec<FinalizedMemberField>, id: &mut u64) {
+                      function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, _fields: &Vec<FinalizedMemberField>, id: &mut u64) {
     for i in offset as usize..arguments.len() {
         let argument = arguments.get(i).unwrap();
         //let field: &FinalizedMemberField = fields.get(i).unwrap();
@@ -276,5 +291,5 @@ fn unwrap_or_create<'ctx>(name: &String, function: FunctionValue<'ctx>, type_get
         type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
         type_getter.blocks.insert(name.clone(), temp);
         temp
-    }
+    };
 }

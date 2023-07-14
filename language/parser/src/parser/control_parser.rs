@@ -82,7 +82,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
     let body = parse_code(parser_utils).1;
     parser_utils.imports.last_id += 2;
     return Box::pin(create_for(name, effect.unwrap().1,
-                               body, parser_utils.imports.last_id - 1));
+                               body, parser_utils.imports.last_id - 2));
 }
 
 #[async_recursion]
@@ -149,10 +149,11 @@ async fn create_for(name: String, effect: ParsingFuture<Effects>,
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
     Effects::CreateVariable(name.clone(), Box::new(Effects::ImplementationCall(
         Box::new(effect.clone()), "iter::Iter".to_string(), "iter::next".to_string(), vec!())))));
+    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string())));
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::ImplementationCall(
         Box::new(effect), "iter::Iter".to_string(), "iter::has_next".to_string(), vec!())),
-                                  body.label.clone(), (id + 1).to_string())));
+                                  body.label.clone(), id.to_string() + "end")));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
 
     return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));

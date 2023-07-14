@@ -63,7 +63,7 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
 
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(function.data.modifiers, Modifier::Internal) || is_modifier(function.data.modifiers, Modifier::Extern) {
-        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new())));
+        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
     let mut code_output = verify_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?;

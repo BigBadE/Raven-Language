@@ -143,6 +143,7 @@ pub struct CodeBody {
 pub struct FinalizedCodeBody {
     pub label: String,
     pub expressions: Vec<FinalizedExpression>,
+    pub returns: bool
 }
 
 impl CodeBody {
@@ -155,10 +156,11 @@ impl CodeBody {
 }
 
 impl FinalizedCodeBody {
-    pub fn new(expressions: Vec<FinalizedExpression>, label: String) -> Self {
+    pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: bool) -> Self {
         return Self {
             label,
             expressions,
+            returns
         };
     }
 }
