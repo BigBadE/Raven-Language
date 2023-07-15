@@ -150,7 +150,13 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Comparison effect, and label to jump to the first if true, second if false
         FinalizedEffects::CompareJump(effect, then_body, else_body) => {
-            let effect = compile_effect(type_getter, function, effect, id).unwrap().into_int_value();
+            let effect = compile_effect(type_getter, function, effect, id).unwrap();
+            let effect = if effect.is_pointer_value() {
+                *id += 1;
+                type_getter.compiler.builder.build_load(effect.into_pointer_value(), &(*id-1).to_string()).into_int_value()
+            } else {
+                effect.into_int_value()
+            };
             let then = unwrap_or_create(then_body, function, type_getter);
             let else_block = unwrap_or_create(else_body, function, type_getter);
             type_getter.compiler.builder.build_conditional_branch(effect, then, else_block);
@@ -184,7 +190,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
                                                         &(*id - 1).to_string()).try_as_basic_value().left()
-                    .map_or(None, |value| Some(value))
+                    .map_or(None, |value| store_and_load(type_getter, calling.get_type().get_return_type().unwrap(), value, id))
             }
         }
         //Sets pointer to value

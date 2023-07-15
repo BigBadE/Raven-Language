@@ -9,7 +9,7 @@ pub fn main() -> bool {
 
     let i = 0;
     for value in iter {
-        i = i + value;
+        return value;
     }
 
     return i;
