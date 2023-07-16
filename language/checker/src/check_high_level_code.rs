@@ -12,8 +12,8 @@ use syntax::code::Effects::NOP;
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
-pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody,
-                   syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(bool, FinalizedCodeBody), ParsingError> {
+pub async fn verify_high_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody,
+                              syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(bool, FinalizedCodeBody), ParsingError> {
     let mut body = Vec::new();
     for line in code.expressions {
         body.push(FinalizedExpression::new(line.expression_type,
@@ -33,7 +33,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<FinalizedEffects, ParsingError> {
     let output = match effect.clone() {
         Effects::CodeBody(body) =>
-            FinalizedEffects::CodeBody(verify_code(process_manager, &resolver, body, syntax, &mut variables.clone()).await?.1),
+            FinalizedEffects::CodeBody(verify_high_code(process_manager, &resolver, body, syntax, &mut variables.clone()).await?.1),
         Effects::Set(first, second) => {
             FinalizedEffects::Set(Box::new(
                 verify_effect(process_manager, resolver.boxed_clone(), *first, syntax, variables).await?),
@@ -269,7 +269,7 @@ pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
-async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                          variables: &mut CheckerVariableManager) -> Result<Option<FinalizedEffects>, ParsingError> {
     if check_args(&operation, &values, syntax, variables).await? {
         return Ok(Some(FinalizedEffects::MethodCall(operation, values.clone())));
@@ -277,7 +277,7 @@ async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec
     return Ok(None);
 }
 
-async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                     variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);

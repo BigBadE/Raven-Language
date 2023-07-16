@@ -7,12 +7,14 @@ use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use crate::check_code::{placeholder_error, verify_code};
+use crate::check_high_level_code::{placeholder_error, verify_high_code};
 use crate::{CheckerVariableManager, finalize_generics};
+use crate::check_low_level_code::verify_low_code;
 use crate::output::TypesChecker;
 
 pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
-                             mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedFunction, ParsingError> {
+                             mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
+include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
     let mut variable_manager = CheckerVariableManager { variables: HashMap::new() };
 
     let mut fields = Vec::new();
@@ -66,7 +68,12 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
-    let mut code_output = verify_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?;
+    let mut code_output = if include_refs {
+        verify_low_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?
+    } else {
+        verify_high_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?
+    };
+
     if !code_output.0 {
         if function.return_type.is_none() {
             code_output.1.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));

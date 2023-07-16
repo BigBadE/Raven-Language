@@ -27,6 +27,15 @@ pub fn get_compiler(compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>, str
     });
 }
 
+impl RunnerSettings {
+    pub fn include_references(&self) -> bool {
+        return match self.compiler.to_lowercase().as_str() {
+            "llvm" => true,
+            _ => panic!("Unknown compiler {}", self.compiler)
+        }
+    }
+}
+
 pub struct SourceSet {
     pub root: PathBuf,
 }

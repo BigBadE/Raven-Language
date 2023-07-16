@@ -18,13 +18,15 @@ use crate::check_struct::verify_struct;
 pub struct TypesChecker {
     runtime: Handle,
     pub generics: HashMap<String, FinalizedTypes>,
+    include_refs: bool
 }
 
 impl TypesChecker {
-    pub fn new(runtime: Handle) -> Self {
+    pub fn new(runtime: Handle, include_refs: bool) -> Self {
         return Self {
             runtime,
-            generics: HashMap::new()
+            generics: HashMap::new(),
+            include_refs
         };
     }
 }
@@ -36,7 +38,7 @@ impl ProcessManager for TypesChecker {
     }
 
     async fn verify_func(&self, function: UnfinalizedFunction, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction {
-        return match verify_function(self, resolver, function, syntax).await {
+        return match verify_function(self, resolver, function, syntax, self.include_refs).await {
             Ok(output) => output,
             Err(error) => {
                 println!("Error: {}", error);
