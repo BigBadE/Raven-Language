@@ -10,7 +10,8 @@ use crate::{get_compiler, RunnerSettings};
 
 pub async fn run(settings: &RunnerSettings)
     -> Result<Option<Output>, Vec<ParsingError>> {
-    let syntax = Syntax::new(Box::new(TypesChecker::new(settings.cpu_runtime.handle().clone())));
+    let syntax = Syntax::new(Box::new(
+        TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.include_references())));
     let syntax = Arc::new(Mutex::new(syntax));
 
     let (sender, receiver) = mpsc::channel();

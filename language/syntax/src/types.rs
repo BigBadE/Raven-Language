@@ -120,7 +120,7 @@ impl FinalizedTypes {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         //Only check for implementations if being compared against a trait.
-                        ImplementationGetter::new(syntax.clone(), self.clone(), other.clone()).await.is_ok()
+                        ImplementationGetter::new(syntax.clone(), self.clone(), other.clone(), ParsingError::empty()).await.is_ok()
                     } else {
                         false
                     }

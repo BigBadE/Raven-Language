@@ -1,7 +1,8 @@
 import iter;
 import iter::Iter;
 
-pub fn main() -> bool {
+#[extern]
+pub fn main() -> i64 {
     let iter = new NumberIter {
         current: 1,
         end: 5,
@@ -9,8 +10,12 @@ pub fn main() -> bool {
 
     let i = 0;
     for value in iter {
-        return value;
+        i = i + value;
     }
 
     return i;
 }
+
+/*pub extern alloc() {
+
+}*/

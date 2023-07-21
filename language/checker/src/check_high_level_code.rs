@@ -17,7 +17,7 @@ pub async fn verify_high_code(process_manager: &TypesChecker, resolver: &Box<dyn
     let mut body = Vec::new();
     for line in code.expressions {
         body.push(FinalizedExpression::new(line.expression_type,
-                   verify_effect(process_manager, resolver.boxed_clone(), line.effect, syntax, variables).await?));
+                                           verify_effect(process_manager, resolver.boxed_clone(), line.effect, syntax, variables).await?));
         if let ExpressionType::Return = line.expression_type {
             return Ok((true, FinalizedCodeBody::new(body, code.label.clone(), true)));
         }
@@ -39,7 +39,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 verify_effect(process_manager, resolver.boxed_clone(), *first, syntax, variables).await?),
                                   Box::new(
                                       verify_effect(process_manager, resolver, *second, syntax, variables).await?))
-        },
+        }
         Effects::Operation(operation, values) => 'outer: {
             let mut args = Vec::new();
             for arg in values {
@@ -58,16 +58,16 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for potential_operation in operations {
                         if let Some(new_effect) = check_operation(
                             AsyncDataGetter::new(syntax.clone(), potential_operation).await, &args,
-                        syntax, variables).await? {
+                            syntax, variables).await? {
                             break 'outer assign_with_priority(new_effect);
                         }
                     }
                 }
 
                 Syntax::get_function(syntax.clone(), error.clone(),
-                                           operation, true, Box::new(EmptyNameResolver {})).await?;
+                                     operation, true, Box::new(EmptyNameResolver {})).await?;
             }
-        },
+        }
         Effects::ImplementationCall(calling, traits, method, effects) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
@@ -78,24 +78,21 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let return_type = found.get_return(variables).unwrap();
             finalized_effects.push(found);
 
-            if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                               traits, resolver.boxed_clone()).await {
-                let mut output = None;
-                if let Ok(value) = ImplementationGetter::new(syntax.clone(),
-                                                             inner.finalize(syntax.clone()).await, return_type.clone()).await {
-                    for temp in value {
-                        if temp.name == method {
-                            output = Some(temp.clone());
-                        }
-                    }
+            let inner = Syntax::get_struct(syntax.clone(), placeholder_error(format!("Screwed up trait {}", traits)),
+                                           traits, resolver.boxed_clone()).await?;
+            let output = ImplementationGetter::new(syntax.clone(),
+                                                   inner.finalize(syntax.clone()).await, return_type.clone(),
+                                                   placeholder_error(format!("{} isn't a {}", inner, return_type))).await?;
+            let mut out = None;
+            for temp in output {
+                if temp.name == method {
+                    out = Some(check_method(process_manager, AsyncDataGetter::new(syntax.clone(), temp).await,
+                                 finalized_effects, syntax, variables).await?);
+                    break
                 }
-
-                check_method(process_manager, AsyncDataGetter::new(syntax.clone(), output.unwrap()).await,
-                             finalized_effects, syntax, variables).await?
-            } else {
-                panic!("Screwed up trait!");
             }
-        },
+            out.unwrap()
+        }
         Effects::MethodCall(calling, method, effects) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
@@ -114,7 +111,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                               import.clone(), resolver.boxed_clone()).await {
                             if let Ok(value) = ImplementationGetter::new(syntax.clone(),
-                                                                            return_type.clone(), value.finalize(syntax.clone()).await).await {
+                                                                         return_type.clone(), value.finalize(syntax.clone()).await,
+                            placeholder_error(String::new())).await {
                                 for temp in value {
                                     if temp.name == method {
                                         if output.is_some() {
@@ -139,7 +137,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             check_method(process_manager, AsyncDataGetter::new(syntax.clone(), method).await,
                          finalized_effects, syntax, variables).await?
-        },
+        }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
                 verify_effect(process_manager, resolver, *effect, syntax, variables).await?),
@@ -168,13 +166,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             FinalizedEffects::CreateStruct(target, final_effects)
-        },
+        }
         Effects::Load(effect, target) => {
             let output = verify_effect(process_manager, resolver, *effect, syntax, variables).await?;
 
             let types = output.get_return(variables).unwrap().inner_struct().clone();
             FinalizedEffects::Load(Box::new(output), target.clone(), types)
-        },
+        }
         Effects::CreateVariable(name, effect) => {
             let effect = verify_effect(process_manager, resolver, *effect, syntax, variables).await?;
             let found;
@@ -185,7 +183,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
-        },
+        }
         NOP() => panic!("Tried to compile a NOP!"),
         Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
         Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
@@ -270,7 +268,7 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                         variables: &mut CheckerVariableManager) -> Result<Option<FinalizedEffects>, ParsingError> {
+                             variables: &mut CheckerVariableManager) -> Result<Option<FinalizedEffects>, ParsingError> {
     if check_args(&operation, &values, syntax, variables).await? {
         return Ok(Some(FinalizedEffects::MethodCall(operation, values.clone())));
     }
@@ -278,7 +276,7 @@ pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: 
 }
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                    variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
+                        variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);
     }

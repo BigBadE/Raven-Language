@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use crate::function::FunctionData;
 use crate::syntax::Syntax;
-use crate::TopElement;
+use crate::{ParsingError, TopElement};
 use crate::types::FinalizedTypes;
 
 /// The async manager, just stores the basic post-parsing tasks.
@@ -44,20 +44,22 @@ pub struct ImplementationGetter {
     syntax: Arc<Mutex<Syntax>>,
     testing: FinalizedTypes,
     target: FinalizedTypes,
+    error: ParsingError
 }
 
 impl ImplementationGetter {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, testing: FinalizedTypes, target: FinalizedTypes) -> Self {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, testing: FinalizedTypes, target: FinalizedTypes, error: ParsingError) -> Self {
         return ImplementationGetter {
             syntax,
             testing,
             target,
+            error
         };
     }
 }
 
 impl Future for ImplementationGetter {
-    type Output = Result<Vec<Arc<FunctionData>>, ()>;
+    type Output = Result<Vec<Arc<FunctionData>>, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // TODO see if there is a safe alternative or see why this is safe
@@ -68,7 +70,7 @@ impl Future for ImplementationGetter {
                 return Poll::Ready(Ok(found.clone()));
             } else if locked.async_manager.finished && locked.async_manager.parsing_impls == 0 {
                 println!("Failed! {} vs {}", self.target, self.testing);
-                return Poll::Ready(Err(()));
+                return Poll::Ready(Err(self.error.clone()));
             }
         }
 

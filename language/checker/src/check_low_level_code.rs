@@ -12,13 +12,18 @@ use syntax::types::FinalizedTypes;
 use crate::check_high_level_code::{assign_with_priority, check_args, check_operation, placeholder_error};
 use crate::output::TypesChecker;
 
-pub async fn verify_low_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody,
+pub async fn verify_low_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody, external: bool,
                              syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<(bool, FinalizedCodeBody), ParsingError> {
     let mut body = Vec::new();
     for line in code.expressions {
         body.push(FinalizedExpression::new(line.expression_type,
-                                           verify_effect(process_manager, resolver.boxed_clone(), line.effect, syntax, variables).await?));
+                                           verify_effect(process_manager, resolver.boxed_clone(), line.effect, external, syntax, variables).await?));
         if let ExpressionType::Return = line.expression_type {
+            if external {
+                //Load if the function is external
+                let effect = FinalizedEffects::HeapLoad(Box::new(body.pop().unwrap().effect));
+                body.push(FinalizedExpression::new(ExpressionType::Return, effect));
+            }
             return Ok((true, FinalizedCodeBody::new(body, code.label.clone(), true)));
         }
     }
@@ -29,21 +34,21 @@ pub async fn verify_low_code(process_manager: &TypesChecker, resolver: &Box<dyn 
 //IntelliJ seems to think the operation loop is unreachable for some reason.
 #[allow(unreachable_code)]
 #[async_recursion]
-async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
+async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects, external: bool,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<FinalizedEffects, ParsingError> {
     let output = match effect.clone() {
         Effects::CodeBody(body) =>
-            FinalizedEffects::CodeBody(verify_low_code(process_manager, &resolver, body, syntax, &mut variables.clone()).await?.1),
+            FinalizedEffects::CodeBody(verify_low_code(process_manager, &resolver, body, external, syntax, &mut variables.clone()).await?.1),
         Effects::Set(first, second) => {
             FinalizedEffects::Set(Box::new(
-                verify_effect(process_manager, resolver.boxed_clone(), *first, syntax, variables).await?),
+                verify_effect(process_manager, resolver.boxed_clone(), *first, external, syntax, variables).await?),
                                   Box::new(
-                                      verify_effect(process_manager, resolver, *second, syntax, variables).await?))
-        },
+                                      verify_effect(process_manager, resolver, *second, external, syntax, variables).await?))
+        }
         Effects::Operation(operation, values) => 'outer: {
             let mut args = Vec::new();
             for arg in values {
-                args.push(verify_effect(process_manager, resolver.boxed_clone(), arg, syntax, variables).await?);
+                args.push(verify_effect(process_manager, resolver.boxed_clone(), arg, external, syntax, variables).await?);
             }
 
             let error = ParsingError::new(String::new(), (0, 0), 0,
@@ -67,26 +72,26 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 Syntax::get_function(syntax.clone(), error.clone(),
                                      operation, true, Box::new(EmptyNameResolver {})).await?;
             }
-        },
+        }
         Effects::ImplementationCall(calling, traits, method, effects) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
-                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?)
+                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables).await?)
             }
 
-            let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, syntax, variables).await?;
+            let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, external, syntax, variables).await?;
             let return_type = found.get_return(variables).unwrap();
             finalized_effects.push(found);
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits, resolver.boxed_clone()).await {
                 let mut output = None;
-                if let Ok(value) = ImplementationGetter::new(syntax.clone(),
-                                                             inner.finalize(syntax.clone()).await, return_type.clone()).await {
-                    for temp in value {
-                        if temp.name == method {
-                            output = Some(temp.clone());
-                        }
+                let result = ImplementationGetter::new(syntax.clone(),
+                                                       inner.finalize(syntax.clone()).await, return_type.clone(),
+                placeholder_error(format!("{} doesn't implement {}", inner, return_type))).await?;
+                for temp in result {
+                    if temp.name == method {
+                        output = Some(temp.clone());
                     }
                 }
 
@@ -95,14 +100,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             } else {
                 panic!("Screwed up trait!");
             }
-        },
+        }
         Effects::MethodCall(calling, method, effects) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
-                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?)
+                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables).await?)
             }
             let method = if let Some(found) = calling {
-                let found = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables).await?;
+                let found = verify_effect(process_manager, resolver.boxed_clone(), *found, external, syntax, variables).await?;
                 let return_type = found.get_return(variables).unwrap();
                 finalized_effects.push(found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
@@ -114,7 +119,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                               import.clone(), resolver.boxed_clone()).await {
                             if let Ok(value) = ImplementationGetter::new(syntax.clone(),
-                                                                         return_type.clone(), value.finalize(syntax.clone()).await).await {
+                                                                         return_type.clone(), value.finalize(syntax.clone()).await,
+                                                                         placeholder_error(String::new())).await {
                                 for temp in value {
                                     if temp.name == method {
                                         if output.is_some() {
@@ -139,10 +145,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             check_method(process_manager, AsyncDataGetter::new(syntax.clone(), method).await,
                          finalized_effects, syntax, variables).await?
-        },
+        }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
-                verify_effect(process_manager, resolver, *effect, syntax, variables).await?),
+                verify_effect(process_manager, resolver, *effect, external, syntax, variables).await?),
                                           first, second),
         Effects::CreateStruct(target, effects) => {
             let mut target = target.finalize(syntax.clone()).await;
@@ -164,19 +170,19 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     return Err(placeholder_error(format!("Unknown field {}!", field_name)));
                 }
 
-                final_effects.push((i, verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables).await?));
+                final_effects.push((i, verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables).await?));
             }
 
-            FinalizedEffects::CreateStruct(target, final_effects)
-        },
+            store(FinalizedEffects::CreateStruct(target, final_effects))
+        }
         Effects::Load(effect, target) => {
-            let output = verify_effect(process_manager, resolver, *effect, syntax, variables).await?;
+            let output = verify_effect(process_manager, resolver, *effect, external, syntax, variables).await?;
 
             let types = output.get_return(variables).unwrap().inner_struct().clone();
             FinalizedEffects::Load(Box::new(output), target.clone(), types)
-        },
+        }
         Effects::CreateVariable(name, effect) => {
-            let effect = verify_effect(process_manager, resolver, *effect, syntax, variables).await?;
+            let effect = verify_effect(process_manager, resolver, *effect, external, syntax, variables).await?;
             let found;
             if let Some(temp_found) = effect.get_return(variables) {
                 found = temp_found;
@@ -185,17 +191,21 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
-        },
+        }
         NOP() => panic!("Tried to compile a NOP!"),
         Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
         Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
-        Effects::Float(float) => FinalizedEffects::Float(float),
-        Effects::Int(int) => FinalizedEffects::UInt(int as u64),
-        Effects::UInt(uint) => FinalizedEffects::UInt(uint),
-        Effects::Bool(bool) => FinalizedEffects::Bool(bool),
-        Effects::String(string) => FinalizedEffects::String(string)
+        Effects::Float(float) => store(FinalizedEffects::Float(float)),
+        Effects::Int(int) => store(FinalizedEffects::UInt(int as u64)),
+        Effects::UInt(uint) => store(FinalizedEffects::UInt(uint)),
+        Effects::Bool(bool) => store(FinalizedEffects::Bool(bool)),
+        Effects::String(string) => store(FinalizedEffects::String(string))
     };
     return Ok(output);
+}
+
+fn store(effect: FinalizedEffects) -> FinalizedEffects {
+    return FinalizedEffects::HeapStore(Box::new(effect));
 }
 
 async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
@@ -253,7 +263,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
         }
 
         let temp_effect = FinalizedEffects::MethodCall(method.clone(), effects);
-        return Ok(temp_effect);
+        return Ok(store(temp_effect));
     }
 
     if !check_args(&method, &effects, syntax, variables).await? {
@@ -262,5 +272,5 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
-    return Ok(FinalizedEffects::MethodCall(method, effects));
+    return Ok(store(FinalizedEffects::MethodCall(method, effects)));
 }

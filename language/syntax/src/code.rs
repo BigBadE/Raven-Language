@@ -134,7 +134,7 @@ pub enum Effects {
     Int(i64),
     UInt(u64),
     Bool(bool),
-    String(String),
+    String(String)
 }
 
 #[derive(Clone, Debug)]
@@ -162,6 +162,9 @@ pub enum FinalizedEffects {
     UInt(u64),
     Bool(bool),
     String(String),
+    //Internally used by low-level verifier
+    HeapStore(Box<FinalizedEffects>),
+    HeapLoad(Box<FinalizedEffects>)
 }
 
 impl FinalizedEffects {
@@ -200,7 +203,12 @@ impl FinalizedEffects {
             FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
             FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
-            FinalizedEffects::String(_) => Some(FinalizedTypes::Reference(Box::new(FinalizedTypes::Struct(STR.clone()))))
+            FinalizedEffects::String(_) => Some(FinalizedTypes::Reference(Box::new(FinalizedTypes::Struct(STR.clone())))),
+            FinalizedEffects::HeapStore(inner) => inner.get_return(variables),
+            FinalizedEffects::HeapLoad(inner) => match inner.get_return(variables).unwrap() {
+                FinalizedTypes::Reference(inner) => Some(*inner),
+                _ => panic!("Tried to load non-reference!")
+            }
         };
         return temp;
     }

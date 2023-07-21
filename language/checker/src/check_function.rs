@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::mem;
 use std::sync::{Arc, Mutex};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
-use syntax::{is_modifier, Modifier, ParsingError};
+use syntax::{Attribute, is_modifier, Modifier, ParsingError};
 use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
 use syntax::syntax::Syntax;
@@ -14,21 +13,23 @@ use crate::output::TypesChecker;
 
 pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
                              mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
-include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
+                             include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
     let mut variable_manager = CheckerVariableManager { variables: HashMap::new() };
 
     let mut fields = Vec::new();
     for argument in &mut function.fields {
         let field = argument.await?;
-        let mut field = FinalizedMemberField { modifiers: field.modifiers, attributes: field.attributes,
-            field: FinalizedField { field_type: field.field.field_type.finalize(syntax.clone()).await, name: field.field.name } };
+        let mut field = FinalizedMemberField {
+            modifiers: field.modifiers,
+            attributes: field.attributes,
+            field: FinalizedField { field_type: field.field.field_type.finalize(syntax.clone()).await, name: field.field.name },
+        };
+        if include_refs {
+            field.field.field_type = FinalizedTypes::Reference(Box::new(field.field.field_type));
+        }
         variable_manager.variables.insert(field.field.name.clone(),
                                           field.field.field_type.clone());
-        //if !field.field.field_type.is_primitive() {
-            let mut temp = FinalizedTypes::Generic(String::new(), vec!());
-            mem::swap(&mut temp, &mut field.field.field_type);
-            field.field.field_type = FinalizedTypes::Reference(Box::new(temp));
-        //}
+
         fields.push(field);
     }
 
@@ -69,7 +70,12 @@ include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
     }
 
     let mut code_output = if include_refs {
-        verify_low_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?
+        verify_low_code(process_manager, &resolver, function.code.await?, function.data.attributes.iter()
+            .any(|inner| if let Attribute::Basic(inner) = inner {
+                inner == "extern"
+            } else {
+                false
+            }), syntax, &mut variable_manager).await?
     } else {
         verify_high_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?
     };
