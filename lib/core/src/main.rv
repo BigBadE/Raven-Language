@@ -1,5 +1,6 @@
 import iter;
 import iter::Iter;
+import stdio;
 
 #[extern]
 pub fn main() -> i64 {
@@ -8,14 +9,6 @@ pub fn main() -> i64 {
         end: 5,
     };
 
-    let i = 0;
-    for value in iter {
-        i = i + value;
-    }
-
-    return i;
+    printf(41);
+    return 0;
 }
-
-/*pub extern alloc() {
-
-}*/

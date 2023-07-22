@@ -8,7 +8,6 @@ use crate::{CheckerVariableManager, EmptyNameResolver};
 use async_recursion::async_recursion;
 use syntax::async_getters::ImplementationGetter;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
-use syntax::code::Effects::NOP;
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
@@ -184,7 +183,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
         }
-        NOP() => panic!("Tried to compile a NOP!"),
+        Effects::NOP() => panic!("Tried to compile a NOP!"),
         Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
         Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
         Effects::Float(float) => FinalizedEffects::Float(float),

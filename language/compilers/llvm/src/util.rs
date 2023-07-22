@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use inkwell::AddressSpace;
+use inkwell::module::Linkage;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
 use syntax::function::CodelessFinalizedFunction;
@@ -28,7 +29,8 @@ pub fn print_formatted(input: String) {
     println!("{}", output);
 }
 
-pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
+pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>,
+                                   linkage: Option<Linkage>) -> FunctionValue<'ctx> {
     let mut params = Vec::new();
 
     for param in &function.fields {
@@ -49,5 +51,5 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
         None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
     };
 
-    return type_getter.compiler.module.add_function(&function.data.name, llvm_function, None);
+    return type_getter.compiler.module.add_function(&function.data.name, llvm_function, linkage);
 }

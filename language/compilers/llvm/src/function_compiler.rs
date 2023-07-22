@@ -2,27 +2,36 @@ use std::mem::MaybeUninit;
 use std::rc::Rc;
 use std::sync::Arc;
 use inkwell::basic_block::BasicBlock;
+use inkwell::module::Linkage;
 
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::types::{BasicType, StructType};
 
-use syntax::{is_modifier, Modifier};
+use syntax::{Attribute, is_modifier, Modifier};
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedMemberField};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::r#struct::FinalizedStruct;
 
 use crate::internal::instructions::compile_internal;
+use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
 use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
-    let value = create_function_value(&function, type_getter);
-
-    if is_modifier(function.data.modifiers, Modifier::Internal) && !is_modifier(function.data.modifiers, Modifier::Trait) {
+    let value;
+    if function.data.attributes.iter().any(|attribute| if let Attribute::Basic(inner) = attribute {
+        inner == "llvm_intrinsic"
+    } else {
+        false
+    }) {
+        value = compile_llvm_intrinsics(&function, type_getter);
+    }else if is_modifier(function.data.modifiers, Modifier::Internal) && !is_modifier(function.data.modifiers, Modifier::Trait) {
+        value = create_function_value(&function, type_getter, None);
         compile_internal(&type_getter.compiler, &function.data.name, value);
     } else if is_modifier(function.data.modifiers, Modifier::Extern) && !is_modifier(function.data.modifiers, Modifier::Trait) {
-        todo!()
+        value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
+        value = create_function_value(&function, type_getter, None);
         unsafe { Rc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
     }
     return value;
@@ -273,8 +282,16 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             } else {
                 Some(output)
             }
+        },
+        FinalizedEffects::StackStore(inner) => {
+            let output = compile_effect(type_getter, function, inner, id).unwrap();
+            if !output.is_pointer_value() {
+                store_and_load(type_getter, output.get_type(), output, id)
+            } else {
+                Some(output)
+            }
         }
-        FinalizedEffects::HeapLoad(inner) => {
+        FinalizedEffects::PointerLoad(inner) => {
             let inner = compile_effect(type_getter, function, inner, id).unwrap();
             let output = type_getter.compiler.builder.build_load(inner.into_pointer_value(), &id.to_string());
             *id += 1;

@@ -7,7 +7,6 @@ use crate::{CheckerVariableManager, EmptyNameResolver};
 use async_recursion::async_recursion;
 use syntax::async_getters::ImplementationGetter;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
-use syntax::code::Effects::NOP;
 use syntax::types::FinalizedTypes;
 use crate::check_high_level_code::{assign_with_priority, check_args, check_operation, placeholder_error};
 use crate::output::TypesChecker;
@@ -21,7 +20,7 @@ pub async fn verify_low_code(process_manager: &TypesChecker, resolver: &Box<dyn 
         if let ExpressionType::Return = line.expression_type {
             if external {
                 //Load if the function is external
-                let effect = FinalizedEffects::HeapLoad(Box::new(body.pop().unwrap().effect));
+                let effect = FinalizedEffects::PointerLoad(Box::new(body.pop().unwrap().effect));
                 body.push(FinalizedExpression::new(ExpressionType::Return, effect));
             }
             return Ok((true, FinalizedCodeBody::new(body, code.label.clone(), true)));
@@ -192,7 +191,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
         }
-        NOP() => panic!("Tried to compile a NOP!"),
+        Effects::NOP() => panic!("Tried to compile a NOP!"),
         Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
         Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
         Effects::Float(float) => store(FinalizedEffects::Float(float)),

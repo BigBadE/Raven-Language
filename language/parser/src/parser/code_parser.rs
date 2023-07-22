@@ -31,6 +31,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap().clone();
 
+        println!("Token: {:?}", token.token_type);
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::ParenOpen => {
@@ -134,6 +135,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Period | TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
+    }
+    if effect.is_none() {
+        println!("Bad NOP! {}", parser_utils.file);
     }
     return Some((expression_type, effect.unwrap_or(constant_effect(Effects::NOP()))));
 }
