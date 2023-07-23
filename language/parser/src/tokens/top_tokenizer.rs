@@ -11,10 +11,11 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.handle_invalid()
         },
         TokenTypes::AttributesStart | TokenTypes::AttributeEnd => if tokenizer.matches("#[") {
-            parse_ident(tokenizer, TokenTypes::Attribute, &[b']'])
+            tokenizer.make_token(TokenTypes::AttributeStart)
         } else {
             tokenizer.make_token(TokenTypes::ModifiersStart)
-        }
+        },
+        TokenTypes::AttributeStart => parse_ident(tokenizer, TokenTypes::Attribute, &[b']']),
         TokenTypes::ModifiersStart | TokenTypes::Modifier => if let Some(modifier) = parse_modifier(tokenizer) {
             modifier
         } else if tokenizer.matches("fn") {

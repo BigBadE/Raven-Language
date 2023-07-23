@@ -94,11 +94,11 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
 
 pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attribute>) {
     loop {
-        let next = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let next = parser_utils.tokens.get(parser_utils.index+1).unwrap();
         if next.token_type != TokenTypes::Attribute {
             return;
         }
-        parser_utils.index += 1;
+        parser_utils.index += 2;
         let string = next.to_string(parser_utils.buffer);
         attributes.push(if string.contains("(") {
             let mut split = string.split("(");

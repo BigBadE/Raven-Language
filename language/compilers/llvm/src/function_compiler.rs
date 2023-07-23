@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 use std::sync::Arc;
+use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 
@@ -15,7 +16,7 @@ use syntax::r#struct::FinalizedStruct;
 use crate::internal::instructions::compile_internal;
 use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::create_function_value;
+use crate::util::{create_function_value, print_formatted};
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value;
@@ -24,7 +25,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
     } else {
         false
     }) {
-        value = compile_llvm_intrinsics(&function, type_getter);
+        value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
     }else if is_modifier(function.data.modifiers, Modifier::Internal) && !is_modifier(function.data.modifiers, Modifier::Trait) {
         value = create_function_value(&function, type_getter, None);
         compile_internal(&type_getter.compiler, &function.data.name, value);
@@ -237,8 +238,10 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             } else {
                 pointer = from.into_pointer_value();
             }
+
+            print_formatted(function.to_string());
+            let gep = type_getter.compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
             *id += 2;
-            let gep = type_getter.compiler.builder.build_struct_gep(pointer, offset, &(*id - 2).to_string()).unwrap();
             Some(type_getter.compiler.builder.build_load(gep, &(*id-1).to_string()))
         }
         //Struct to create and a tuple of the index of the argument and the argument
@@ -275,13 +278,30 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         FinalizedEffects::Bool(bool) => Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum()),
         FinalizedEffects::String(string) => Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum()),
         FinalizedEffects::HeapStore(inner) => {
-            let output = compile_effect(type_getter, function, inner, id).unwrap();
-            //TODO find an efficient way to move structures onto the stack
-            if !output.is_pointer_value() {
-                store_and_load(type_getter, output.get_type(), output, id)
-            } else {
-                Some(output)
+            let mut output = compile_effect(type_getter, function, inner, id).unwrap();
+
+            let null_pointer = type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()).const_zero();
+            let size = unsafe { type_getter.compiler.builder.build_gep(null_pointer,
+                                                              &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string()) };
+
+            *id += 1;
+
+            let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
+                                                                     .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+            &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
+            *id += 1;
+
+            println!("Output: {:?}", inner);
+            let malloc = type_getter.compiler.builder.build_pointer_cast(malloc, output.get_type()
+                .ptr_type(AddressSpace::default()), &id.to_string());
+            *id += 1;
+
+            if output.is_pointer_value() {
+                output = type_getter.compiler.builder.build_load(output.into_pointer_value(), &id.to_string());
+                *id += 1;
             }
+            type_getter.compiler.builder.build_store(malloc, output);
+            Some(malloc.as_basic_value_enum())
         },
         FinalizedEffects::StackStore(inner) => {
             let output = compile_effect(type_getter, function, inner, id).unwrap();

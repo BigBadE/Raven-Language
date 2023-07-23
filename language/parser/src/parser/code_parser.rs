@@ -31,7 +31,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap().clone();
 
-        println!("Token: {:?}", token.token_type);
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::ParenOpen => {
@@ -39,19 +38,17 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 match last.token_type {
                     TokenTypes::Variable | TokenTypes::CallingType => {
                         let mut effects = Vec::new();
-                        parser_utils.index += 1;
-                        if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type != TokenTypes::ParenClose {
+                        if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
                             while let Some((_, effect)) = parse_line(parser_utils, false, false) {
                                 effects.push(effect);
                                 if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {} else {
                                     break;
                                 }
                             }
-                            parser_utils.index -= 1;
                         }
 
                         let name = last.to_string(parser_utils.buffer);
-                        effect = Some(Box::pin(method_call(effect, name.clone(), effects)))
+                        effect = Some(Box::pin(method_call(effect, name.clone(), effects)));
                     }
                     _ => if let Some((_, in_effect)) = parse_line(parser_utils, break_at_body, true) {
                         effect = Some(in_effect);
@@ -135,9 +132,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Period | TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
-    }
-    if effect.is_none() {
-        println!("Bad NOP! {}", parser_utils.file);
     }
     return Some((expression_type, effect.unwrap_or(constant_effect(Effects::NOP()))));
 }

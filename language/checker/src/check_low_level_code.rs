@@ -271,5 +271,9 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
-    return Ok(store(FinalizedEffects::MethodCall(method, effects)));
+    return if method.return_type.is_some() {
+        Ok(store(FinalizedEffects::MethodCall(method, effects)))
+    } else {
+        Ok(FinalizedEffects::MethodCall(method, effects))
+    }
 }

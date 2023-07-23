@@ -72,10 +72,15 @@ impl Arguments {
     }
 
     fn parse_runner_settings(arguments: &HashMap<String, Vec<String>>) -> RunnerSettings {
+        let (mut io_runtime, mut cpu_runtime) = if arguments.get("single-threaded").is_some() {
+            (Builder::new_current_thread(), Builder::new_current_thread())
+        } else {
+            (Builder::new_multi_thread(), Builder::new_multi_thread())
+        };
         return RunnerSettings {
-            io_runtime: Builder::new_multi_thread().thread_name("io-runtime").build()
+            io_runtime: io_runtime.thread_name("io-runtime").build()
                 .expect("Failed to build I/O runtime"),
-            cpu_runtime: Builder::new_multi_thread().thread_name("cpu-runtime").build()
+            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
             sources: arguments.get("root").expect("Need a source root, \
             pass it with the \"--root (root)\" argument").iter()

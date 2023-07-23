@@ -9,6 +9,5 @@ pub fn main() -> i64 {
         end: 5,
     };
 
-    printf(41);
-    return 0;
+    return iter.end;
 }

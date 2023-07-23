@@ -133,5 +133,6 @@ pub enum TokenTypes {
     Period = 62,
     Comment = 63,
     True = 64,
-    False = 65
+    False = 65,
+    AttributeStart = 66
 }
