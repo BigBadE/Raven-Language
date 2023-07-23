@@ -9,5 +9,9 @@ pub fn main() -> i64 {
         end: 5,
     };
 
-    return iter.end;
+    let i = 0;
+    for value in iter {
+        printf(value);
+    }
+    return 0;
 }

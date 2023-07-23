@@ -156,14 +156,16 @@ pub enum FinalizedEffects {
     LoadVariable(String),
     //Loads field pointer from structure, with the given struct
     Load(Box<FinalizedEffects>, String, Arc<FinalizedStruct>),
-    //Struct to create and a tuple of the index of the argument and the argument
-    CreateStruct(FinalizedTypes, Vec<(usize, FinalizedEffects)>),
+    //Where to put the struct, struct to create and a tuple of the index of the argument and the argument
+    CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
     Float(f64),
     UInt(u64),
     Bool(bool),
     String(String),
     //Internally used by low-level verifier
     HeapStore(Box<FinalizedEffects>),
+    //Allocates space
+    HeapAllocate(FinalizedTypes),
     PointerLoad(Box<FinalizedEffects>),
     StackStore(Box<FinalizedEffects>)
 }
@@ -200,7 +202,7 @@ impl FinalizedEffects {
                 loading.fields.iter()
                     .find(|field| &field.field.name == name)
                     .map(|field| field.field.field_type.clone()),
-            FinalizedEffects::CreateStruct(types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
+            FinalizedEffects::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
             FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
@@ -210,7 +212,8 @@ impl FinalizedEffects {
             FinalizedEffects::PointerLoad(inner) => match inner.get_return(variables).unwrap() {
                 FinalizedTypes::Reference(inner) => Some(*inner),
                 _ => panic!("Tried to load non-reference!")
-            }
+            },
+            FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!")
         };
         return temp;
     }

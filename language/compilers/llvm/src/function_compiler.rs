@@ -16,7 +16,7 @@ use syntax::r#struct::FinalizedStruct;
 use crate::internal::instructions::compile_internal;
 use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::{create_function_value, print_formatted};
+use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value;
@@ -239,13 +239,12 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 pointer = from.into_pointer_value();
             }
 
-            print_formatted(function.to_string());
             let gep = type_getter.compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
             *id += 2;
             Some(type_getter.compiler.builder.build_load(gep, &(*id-1).to_string()))
         }
         //Struct to create and a tuple of the index of the argument and the argument
-        FinalizedEffects::CreateStruct(structure, arguments) => {
+        FinalizedEffects::CreateStruct(effect, structure, arguments) => {
             let mut out_arguments = vec![MaybeUninit::uninit(); arguments.len()];
 
             for (index, effect) in arguments {
@@ -253,8 +252,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 *out_arguments.get_mut(*index).unwrap() = MaybeUninit::new(returned);
             }
 
-            let storing = type_getter.get_type(structure);
-            let pointer = type_getter.compiler.builder.build_alloca(storing, &id.to_string());
+            let pointer = compile_effect(type_getter, function, effect.as_ref().unwrap(), id).unwrap().into_pointer_value();
             *id += 1;
 
             type_getter.compiler.builder.build_store(pointer,
@@ -280,8 +278,13 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         FinalizedEffects::HeapStore(inner) => {
             let mut output = compile_effect(type_getter, function, inner, id).unwrap();
 
-            let null_pointer = type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()).const_zero();
-            let size = unsafe { type_getter.compiler.builder.build_gep(null_pointer,
+            let pointer_type = if output.get_type().is_pointer_type() {
+                output.get_type().into_pointer_type()
+            } else {
+                output.get_type().ptr_type(AddressSpace::default())
+            };
+
+            let size = unsafe { type_getter.compiler.builder.build_gep(pointer_type.const_zero(),
                                                               &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string()) };
 
             *id += 1;
@@ -291,9 +294,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
             *id += 1;
 
-            println!("Output: {:?}", inner);
-            let malloc = type_getter.compiler.builder.build_pointer_cast(malloc, output.get_type()
-                .ptr_type(AddressSpace::default()), &id.to_string());
+            let malloc =
+                type_getter.compiler.builder.build_pointer_cast(malloc, pointer_type, &id.to_string());
             *id += 1;
 
             if output.is_pointer_value() {
@@ -316,6 +318,31 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let output = type_getter.compiler.builder.build_load(inner.into_pointer_value(), &id.to_string());
             *id += 1;
             Some(output)
+        }
+        FinalizedEffects::HeapAllocate(types) => {
+            let output = type_getter.get_type(types);
+
+            let pointer_type = if output.is_pointer_type() {
+                output.into_pointer_type()
+            } else {
+                output.ptr_type(AddressSpace::default())
+            };
+
+            let size = unsafe { type_getter.compiler.builder.build_gep(pointer_type.const_zero(),
+                                                                       &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string()) };
+
+            *id += 1;
+
+            let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
+                                                                     .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                                 &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
+            *id += 1;
+
+            let malloc =
+                type_getter.compiler.builder.build_pointer_cast(malloc, pointer_type, &id.to_string());
+            *id += 1;
+
+            Some(malloc.as_basic_value_enum())
         }
     };
 }

@@ -45,6 +45,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                                     break;
                                 }
                             }
+                        } else {
+                            parser_utils.index += 1;
                         }
 
                         let name = last.to_string(parser_utils.buffer);
@@ -133,6 +135,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
+
     return Some((expression_type, effect.unwrap_or(constant_effect(Effects::NOP()))));
 }
 

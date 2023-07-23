@@ -172,7 +172,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 final_effects.push((i, verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables).await?));
             }
 
-            store(FinalizedEffects::CreateStruct(target, final_effects))
+            FinalizedEffects::CreateStruct(Some(Box::new(FinalizedEffects::HeapAllocate(target.clone()))),
+                                           target, final_effects)
         }
         Effects::Load(effect, target) => {
             let output = verify_effect(process_manager, resolver, *effect, external, syntax, variables).await?;
