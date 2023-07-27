@@ -148,8 +148,8 @@ pub enum FinalizedEffects {
     //Comparison effect, and label to jump to the first if true, second if false
     CompareJump(Box<FinalizedEffects>, String, String),
     CodeBody(FinalizedCodeBody),
-    //Calling and function arguments
-    MethodCall(Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    //Output pointer, calling and function arguments
+    MethodCall(Option<Box<FinalizedEffects>>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     //Sets pointer to value
     Set(Box<FinalizedEffects>, Box<FinalizedEffects>),
     //Loads variable
@@ -178,7 +178,7 @@ impl FinalizedEffects {
             FinalizedEffects::CompareJump(_, _, _) => None,
             FinalizedEffects::CodeBody(_) => None,
             FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
-            FinalizedEffects::MethodCall(function, _) =>
+            FinalizedEffects::MethodCall(_, function, _) =>
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),

@@ -176,18 +176,16 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             compile_block(body, function, type_getter, id)
         }
         //Calling function, function arguments
-        FinalizedEffects::MethodCall(calling_function, arguments) => {
+        FinalizedEffects::MethodCall(pointer, calling_function, arguments) => {
             let mut final_arguments = Vec::new();
 
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
             if calling_function.return_type.is_some() && !calling.get_type().get_return_type().is_some() {
-                let types = type_getter.get_type(&calling_function.return_type.as_ref().unwrap());
-                let pointer = type_getter.compiler.builder.build_alloca(
-                    types, &id.to_string());
-                *id += 1;
-                final_arguments.push(From::from(pointer.as_basic_value_enum()));
+                let pointer = compile_effect(type_getter, function,
+                                             pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
+                final_arguments.push(From::from(pointer));
 
                 add_args(&mut final_arguments, type_getter, function, arguments, true, &calling_function.fields, id);
 
@@ -197,10 +195,19 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             } else {
                 add_args(&mut final_arguments, type_getter, function, arguments, false, &calling_function.fields, id);
 
+                let call = type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
+                                                        &id.to_string()).try_as_basic_value().left();
                 *id += 1;
-                type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
-                                                        &(*id - 1).to_string()).try_as_basic_value().left()
-                    .map_or(None, |value| store_and_load(type_getter, calling.get_type().get_return_type().unwrap(), value, id))
+                return match call {
+                    Some(inner) => {
+                        println!("Checking {}", calling_function.data.name);
+                        let pointer = compile_effect(type_getter, function,
+                                                     pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
+                        type_getter.compiler.builder.build_store(pointer, inner);
+                        Some(pointer.as_basic_value_enum())
+                    },
+                    None => None
+                }
             }
         }
         //Sets pointer to value
@@ -230,16 +237,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 }
             }
 
-            let pointer;
-            if !from.is_pointer_value() {
-                pointer = type_getter.compiler.builder.build_alloca(from.get_type(), &id.to_string());
-                *id += 1;
-                type_getter.compiler.builder.build_store(pointer, from.into_struct_value().as_basic_value_enum());
-            } else {
-                pointer = from.into_pointer_value();
-            }
-
-            let gep = type_getter.compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
+            let gep = type_getter.compiler.builder.build_struct_gep(from.into_pointer_value(), offset, &id.to_string()).unwrap();
             *id += 2;
             Some(type_getter.compiler.builder.build_load(gep, &(*id-1).to_string()))
         }

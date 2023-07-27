@@ -262,8 +262,13 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             };
         }
 
-        let temp_effect = FinalizedEffects::MethodCall(method.clone(), effects);
-        return Ok(store(temp_effect));
+
+        let temp_effect = match method.return_type.as_ref() {
+            Some(returning) => FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
+                                         method.clone(), effects),
+            None => FinalizedEffects::MethodCall(None, method.clone(), effects),
+        };
+        return Ok(temp_effect);
     }
 
     if !check_args(&method, &effects, syntax, variables).await? {
@@ -272,9 +277,9 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
-    return if method.return_type.is_some() {
-        Ok(store(FinalizedEffects::MethodCall(method, effects)))
-    } else {
-        Ok(FinalizedEffects::MethodCall(method, effects))
-    }
+    return Ok(match method.return_type.as_ref() {
+        Some(returning) => FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
+                                                      method, effects),
+        None => FinalizedEffects::MethodCall(None, method, effects)
+    });
 }

@@ -249,7 +249,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             };
         }
 
-        let temp_effect = FinalizedEffects::MethodCall(method.clone(), effects);
+        let temp_effect = FinalizedEffects::MethodCall(None, method.clone(), effects);
         return Ok(temp_effect);
     }
 
@@ -259,7 +259,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
-    return Ok(FinalizedEffects::MethodCall(method, effects));
+    return Ok(FinalizedEffects::MethodCall(None, method, effects));
 }
 
 pub fn placeholder_error(message: String) -> ParsingError {
@@ -269,7 +269,7 @@ pub fn placeholder_error(message: String) -> ParsingError {
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                              variables: &mut CheckerVariableManager) -> Result<Option<FinalizedEffects>, ParsingError> {
     if check_args(&operation, &values, syntax, variables).await? {
-        return Ok(Some(FinalizedEffects::MethodCall(operation, values.clone())));
+        return Ok(Some(FinalizedEffects::MethodCall(None, operation, values.clone())));
     }
     return Ok(None);
 }
@@ -294,13 +294,13 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<Fi
 
 pub fn assign_with_priority(operator: FinalizedEffects) -> FinalizedEffects {
     //Needs ownership of the value
-    let (func, mut effects) = if let FinalizedEffects::MethodCall(func, effects) = operator {
-        (func, effects)
+    let (target, func, mut effects) = if let FinalizedEffects::MethodCall(target, func, effects) = operator {
+        (target, func, effects)
     } else {
         panic!("If your seeing this, something went VERY wrong");
     };
     if effects.len() != 2 {
-        return FinalizedEffects::MethodCall(func, effects);
+        return FinalizedEffects::MethodCall(None, func, effects);
     }
 
     let op_priority = match Attribute::find_attribute("priority", &func.data.attributes) {
@@ -331,22 +331,22 @@ pub fn assign_with_priority(operator: FinalizedEffects) -> FinalizedEffects {
 
     match lhs {
         // Code explained using the following example: 1 + 2 / 2
-        FinalizedEffects::MethodCall(lhs_func, mut lhs) => {
+        FinalizedEffects::MethodCall(lhs_target, lhs_func, mut lhs) => {
             // temp_lhs = (1 + 2), operator = {} / 2
             if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
                 // temp_lhs = 1 + {}, operator = 2 / 2
                 mem::swap(lhs.last_mut().unwrap(), effects.first_mut().unwrap());
 
                 // 1 + (2 / 2)
-                mem::swap(lhs.last_mut().unwrap(), &mut FinalizedEffects::MethodCall(func, effects));
+                mem::swap(lhs.last_mut().unwrap(), &mut FinalizedEffects::MethodCall(target, func, effects));
 
-                return FinalizedEffects::MethodCall(lhs_func.clone(), lhs);
+                return FinalizedEffects::MethodCall(lhs_target, lhs_func.clone(), lhs);
             } else {
-                effects.insert(0, FinalizedEffects::MethodCall(lhs_func.clone(), lhs));
+                effects.insert(0, FinalizedEffects::MethodCall(lhs_target, lhs_func.clone(), lhs));
             }
         }
         _ => effects.insert(0, lhs)
     }
 
-    return FinalizedEffects::MethodCall(func, effects);
+    return FinalizedEffects::MethodCall(target, func, effects);
 }
