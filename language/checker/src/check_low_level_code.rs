@@ -60,9 +60,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 if let Some(operations) = operations {
                     ops = operations.len();
                     for potential_operation in operations {
+                        let operation = AsyncDataGetter::new(syntax.clone(), potential_operation).await;
+                        let returning = operation.return_type.as_ref().unwrap().clone();
                         if let Some(new_effect) = check_operation(
-                            AsyncDataGetter::new(syntax.clone(), potential_operation).await, &args,
-                            syntax, variables).await? {
+                            operation, &args,
+                            syntax, Some(Box::new(FinalizedEffects::HeapAllocate(returning))),
+                            variables).await? {
                             break 'outer assign_with_priority(new_effect);
                         }
                     }

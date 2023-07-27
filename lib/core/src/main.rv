@@ -5,13 +5,12 @@ import stdio;
 #[extern]
 pub fn main() -> i64 {
     let iter = new NumberIter {
-        current: 1,
-        end: 5,
+        current: 41,
+        end: 47,
     };
 
     let i = 0;
     for value in iter {
-        printf(value);
     }
     return 0;
 }

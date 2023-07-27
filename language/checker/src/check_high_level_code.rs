@@ -57,7 +57,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for potential_operation in operations {
                         if let Some(new_effect) = check_operation(
                             AsyncDataGetter::new(syntax.clone(), potential_operation).await, &args,
-                            syntax, variables).await? {
+                            syntax, None, variables).await? {
                             break 'outer assign_with_priority(new_effect);
                         }
                     }
@@ -267,9 +267,10 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                             variables: &mut CheckerVariableManager) -> Result<Option<FinalizedEffects>, ParsingError> {
+                             storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
+    -> Result<Option<FinalizedEffects>, ParsingError> {
     if check_args(&operation, &values, syntax, variables).await? {
-        return Ok(Some(FinalizedEffects::MethodCall(None, operation, values.clone())));
+        return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
     }
     return Ok(None);
 }

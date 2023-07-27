@@ -16,6 +16,7 @@ impl Iter<u64> for NumberIter {
     }
 
     pub fn has_next(self) -> bool {
+        printf(self.current);
         return self.current == self.end;
     }
 }
