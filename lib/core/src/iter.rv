@@ -1,3 +1,5 @@
+import stdio;
+
 pub trait Iter<T> {
     pub fn next(self) -> T;
 
@@ -16,7 +18,7 @@ impl Iter<u64> for NumberIter {
     }
 
     pub fn has_next(self) -> bool {
-        printf(self.current);
+        printf(51 + self.current);
         return self.current == self.end;
     }
 }

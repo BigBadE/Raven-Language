@@ -36,6 +36,7 @@ impl RunnerSettings {
     }
 }
 
+#[derive(Debug)]
 pub struct SourceSet {
     pub root: PathBuf,
 }
