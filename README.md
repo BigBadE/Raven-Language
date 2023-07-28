@@ -1,3 +1,11 @@
+# Raven
+
+Raven is an experimental language bringing modern features to every platform.
+
+Raven's goal is to allow one codebase to run on every platform, without having to sacrifice speed or usability.
+
+Currently, Raven mainly targets desktop applications, but web, mobile, and JVM targets are planned.
+
 # Building
 
 Requires LLVM set with the environmental variable LLVM_SYS_130_PREFIX = (path to folder with bin)
@@ -11,3 +19,5 @@ Nightly is required for building the compiler
 # Running
 
 ```cargo run -- "--root ../../lib/core/src"```
+
+That command will build and run Raven's CLI with the following options
