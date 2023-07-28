@@ -101,6 +101,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             let (function_type, function) = unsafe {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
+
             let function = if let Some(found) = functions.get(&function.data.name) {
                 found
             } else {

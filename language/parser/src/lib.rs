@@ -21,6 +21,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
             break
         }
     }
+
     let mut parser_utils = ParserUtils {
         buffer: file.as_bytes(),
         index: 0,

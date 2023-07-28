@@ -200,7 +200,6 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 *id += 1;
                 return match call {
                     Some(inner) => {
-                        println!("Checking {}", calling_function.data.name);
                         let pointer = compile_effect(type_getter, function,
                                                      pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
                         type_getter.compiler.builder.build_store(pointer, inner);

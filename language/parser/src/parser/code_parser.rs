@@ -95,7 +95,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 if expression_type == ExpressionType::Line {
                     expression_type = returning;
                 }
-                effect = Some(body)
+                return Some((expression_type, body));
             }
             TokenTypes::For => return Some((expression_type, parse_for(parser_utils))),
             TokenTypes::Equals => {

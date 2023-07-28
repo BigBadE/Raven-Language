@@ -55,7 +55,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> (ExpressionType, ParsingFutur
         returning = ExpressionType::Line;
     }
 
-    let adding = 2;
+    let adding = 1 + else_ifs.len() as u32 + else_body.is_some() as u32;
     parser_utils.imports.last_id += adding;
     return (returning, Box::pin(create_if(effect.unwrap().1, body, else_ifs, else_body,
                                           parser_utils.imports.last_id-adding)));
@@ -90,7 +90,7 @@ async fn create_if(effect: ParsingFuture<Effects>, body: ParsingFuture<CodeBody>
                    mut else_ifs: Vec<(ParsingFuture<Effects>, ParsingFuture<CodeBody>)>,
                    else_body: Option<ParsingFuture<CodeBody>>, mut id: u32) -> Result<Effects, ParsingError> {
     let body = body.await?;
-    let end = CodeBody::new(Vec::new(), id.to_string());
+    let end = CodeBody::new(Vec::new(), id.to_string() + "end");
 
     let mut else_body = if let Some(body) = else_body {
         Some(body.await?)

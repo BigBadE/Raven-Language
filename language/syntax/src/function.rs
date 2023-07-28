@@ -11,7 +11,7 @@ use crate::async_util::NameResolver;
 use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug)]
 pub struct FunctionData {
     pub attributes: Vec<Attribute>,
     pub modifiers: u8,
@@ -236,4 +236,8 @@ impl PartialEq for FunctionData {
     fn eq(&self, other: &Self) -> bool {
         return self.name == other.name;
     }
+}
+
+impl Eq for FunctionData {
+
 }

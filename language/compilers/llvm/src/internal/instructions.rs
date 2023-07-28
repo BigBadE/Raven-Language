@@ -9,25 +9,34 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
     match name.as_str() {
         "math::{}+{}" => {
             let returning = compiler.builder.build_int_add(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                                           compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
             compiler.builder.build_return(Some(&returning));
         }
         "math::{}-{}" => {
-            let returning = compiler.builder.build_int_sub(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "1");
+            let returning = compiler.builder.build_int_sub(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
             compiler.builder.build_return(Some(&returning));
         }
         "math::{}/{}" => {
-            let returning = compiler.builder.build_int_signed_div(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "1");
+            let returning = compiler.builder.build_int_signed_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
             compiler.builder.build_return(Some(&returning));
         }
         "math::{}*{}" => {
-            let returning = compiler.builder.build_int_mul(params.get(0).unwrap().into_int_value(), params.get(1).unwrap().into_int_value(), "1");
+            let returning = compiler.builder.build_int_mul(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
             compiler.builder.build_return(Some(&returning));
         }
         "math::{}=={}" => {
             let returning = compiler.builder
                 .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                   compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+            compiler.builder.build_return(Some(&returning));
+        }
+        "math::{}!={}" => {
+            let returning = compiler.builder
+                .build_int_compare(IntPredicate::NE, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
             compiler.builder.build_return(Some(&returning));
         }
         "math::{}>={}" => {

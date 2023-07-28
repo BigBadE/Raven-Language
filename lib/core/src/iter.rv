@@ -14,11 +14,10 @@ pub struct NumberIter {
 impl Iter<u64> for NumberIter {
     pub fn next(self) -> u64 {
         self.current = self.current + 1;
-        return self.current;
+        return self.current - 1;
     }
 
     pub fn has_next(self) -> bool {
-        printf(51 + self.current);
-        return self.current == self.end;
+        return self.current != self.end;
     }
 }

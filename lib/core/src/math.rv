@@ -21,10 +21,22 @@ pub internal operation fn {}=={}(first: u64, second: u64) -> bool {
     return first + second;
 }
 
+//Equality
+#[priority(-1)]
+pub internal operation fn {}!={}(first: u64, second: u64) -> bool {
+    return first + second;
+}
+
 //Addition
 #[priority(0)]
 pub internal operation fn {}+{}(first: u64, second: u64) -> u64 {
     return first + second;
+}
+
+//Subtraction
+#[priority(0)]
+pub internal operation fn {}-{}(first: u64, second: u64) -> u64 {
+    return first - second;
 }
 
 //Division
