@@ -164,8 +164,8 @@ impl Syntax {
     #[async_recursion]
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                             getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
-        if getting.ends_with("[]") {
-            return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[0..getting.len()-2].to_string(),
+        if getting.as_bytes()[0] == b'[' {
+            return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[1..getting.len()-1].to_string(),
                                                        name_resolver).await?)));
         }
         if let Some(found) = name_resolver.generic(&getting) {

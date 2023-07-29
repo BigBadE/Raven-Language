@@ -44,7 +44,7 @@ impl Types {
         return match self {
             Types::Struct(structs) => structs.name.clone(),
             Types::Reference(structs) => structs.name(),
-            Types::Array(types) => format!("{}[]", types.name()),
+            Types::Array(types) => format!("[{}]", types.name()),
             Types::Generic(_, _) => panic!("Generics should never be named"),
             Types::GenericType(_, _) => panic!("Generics should never be named")
         };
@@ -269,7 +269,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structs) => structs.data.name.clone(),
             FinalizedTypes::Reference(structs) => structs.name(),
-            FinalizedTypes::Array(inner) => format!("{}[]", inner.name()),
+            FinalizedTypes::Array(inner) => format!("[{}]", inner.name()),
             FinalizedTypes::Generic(_, _) => panic!("Generics should never be named"),
             FinalizedTypes::GenericType(_, _) => panic!("Generics should never be named")
         };
@@ -281,7 +281,7 @@ impl Display for Types {
         match self {
             Types::Struct(structure) => write!(f, "{}", structure.name),
             Types::Reference(structure) => write!(f, "&{}", structure),
-            Types::Array(inner) => write!(f, "{}[]", inner),
+            Types::Array(inner) => write!(f, "[{}]", inner),
             Types::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
             Types::GenericType(types, generics) =>
