@@ -2,31 +2,31 @@ use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_acceptable, parse_numbers};
 
-pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
+pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     if let TokenTypes::Period = tokenizer.last.token_type {
         parse_acceptable(tokenizer, TokenTypes::CallingType)
     } else if tokenizer.matches(";") {
         tokenizer.for_loop = false;
-        if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 12 {
+        if (tokenizer.state.clone() & TokenizerState::CODE_TO_STRUCT_TOP) != 12 {
             tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
             tokenizer.make_token(TokenTypes::CodeEnd)
         } else {
             tokenizer.make_token(TokenTypes::LineEnd)
         }
     } else if tokenizer.matches("{") {
-        tokenizer.state += 0x1000;
+        tokenizer.bracket_depth += 1;
         tokenizer.make_token(TokenTypes::BlockStart)
     } else if tokenizer.matches("}") {
         tokenizer.for_loop = false;
-        if bracket_depth == 0 {
-            if (tokenizer.state.clone() as u64 & TokenizerState::CODE_TO_STRUCT_TOP as u64) != 0 {
+        if tokenizer.bracket_depth == 0 {
+            if (tokenizer.state.clone() & TokenizerState::CODE_TO_STRUCT_TOP) != 0 {
                 tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
             } else {
                 tokenizer.state = TokenizerState::TOP_ELEMENT;
             }
             tokenizer.make_token(TokenTypes::CodeEnd)
         } else {
-            tokenizer.state -= 0x100;
+            tokenizer.bracket_depth -= 1;
             tokenizer.make_token(TokenTypes::BlockEnd)
         }
     } else if tokenizer.matches(",") {
@@ -80,7 +80,11 @@ pub fn next_code_token(tokenizer: &mut Tokenizer, bracket_depth: u64) -> Token {
     } else if tokenizer.matches("=") {
         tokenizer.make_token(TokenTypes::Equals)
     } else if tokenizer.matches("\"") {
-        tokenizer.state = tokenizer.state & 0xFF;
+        tokenizer.state = if tokenizer.state == TokenizerState::CODE {
+            TokenizerState::STRING
+        } else {
+            TokenizerState::STRING_TO_CODE_STRUCT_TOP
+        };
         tokenizer.make_token(TokenTypes::StringStart)
     } else {
         let found = tokenizer.next_included()?;

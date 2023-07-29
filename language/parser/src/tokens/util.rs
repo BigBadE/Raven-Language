@@ -62,21 +62,34 @@ pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
 
 pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
     loop {
-        if tokenizer.next_included()? == b'"' && tokenizer.last.token_type != TokenTypes::StringEscape {
-            if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
-                tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP + (tokenizer.state ^ 0xFFF);
+        if tokenizer.len == tokenizer.index {
+            return tokenizer.make_token(TokenTypes::EOF);
+        }
+        let next = tokenizer.buffer[tokenizer.index];
+        tokenizer.index += 1;
+        match next {
+            b'"' => return if tokenizer.last.token_type != TokenTypes::StringEscape {
+                tokenizer.state = if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
+                    TokenizerState::CODE_TO_STRUCT_TOP
+                } else {
+                    TokenizerState::CODE
+                };
+                tokenizer.make_token(TokenTypes::StringEnd)
             } else {
-                tokenizer.state = TokenizerState::CODE + (tokenizer.state ^ 0xFFF);
-            }
-            return tokenizer.make_token(TokenTypes::StringEnd);
+                tokenizer.make_token(TokenTypes::StringStart)
+            },
+            b'\\' => {
+                return tokenizer.make_token(TokenTypes::StringEscape)
+            },
+            _ => {}
         }
     }
 }
 
-pub fn next_generic(tokenizer: &mut Tokenizer, state: u64) -> Token {
+pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::GenericsStart => {
-            tokenizer.state += 0x1000;
+            tokenizer.generic_depth += 1;
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
         }
         TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericEnd =>
@@ -85,16 +98,15 @@ pub fn next_generic(tokenizer: &mut Tokenizer, state: u64) -> Token {
             } else if tokenizer.matches(",") {
                 parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
             } else if tokenizer.matches(">") {
-                if state == 0x1000 {
-                    tokenizer.state = match tokenizer.state & 0xFFF {
+                tokenizer.generic_depth -= 1;
+                if tokenizer.generic_depth == 0 {
+                    tokenizer.state = match tokenizer.state {
                         TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
                         TokenizerState::GENERIC_TO_FUNC_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
                         TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
                         TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
                         _ => panic!("Unexpected generic state!")
                     };
-                } else {
-                    tokenizer.state -= 0x1000;
                 }
 
                 tokenizer.make_token(TokenTypes::GenericEnd)

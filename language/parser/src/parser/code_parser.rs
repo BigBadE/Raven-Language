@@ -70,6 +70,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::False => {
                 effect = Some(Effects::Bool(false))
             }
+            TokenTypes::StringStart => {
+                effect = Some(parse_string(parser_utils)?)
+            }
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => return Ok(None),
             TokenTypes::Variable =>
@@ -135,6 +138,27 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
     }
 
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
+}
+
+fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
+    let mut string = String::new();
+    loop {
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
+        match token.token_type {
+            TokenTypes::StringEnd => {
+                let found = token.to_string(parser_utils.buffer);
+                string += &found[0..found.len()-1];
+                return Ok(Effects::String(string + "\0"));
+            },
+            TokenTypes::StringEscape => {
+                let found = token.to_string(parser_utils.buffer);
+                string += &found[0..found.len()-1];
+            },
+            TokenTypes::StringStart => {},
+            _ => panic!("How'd you get here? {:?}", token.token_type)
+        }
+    }
 }
 
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {

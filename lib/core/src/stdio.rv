@@ -1,5 +1,5 @@
 //LLVM intrinsic method, it has excluded varargs and a changed string type
 #[llvm_intrinsic]
-pub internal fn printf(string: u64) -> u64 {
+pub internal fn printf(string: u8[]) -> u64 {
 
 }

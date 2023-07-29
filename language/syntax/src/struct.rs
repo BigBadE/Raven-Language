@@ -21,7 +21,6 @@ pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(St
 pub static ref U32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u32".to_string())));
 pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u16".to_string())));
 pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u8".to_string())));
-pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "str".to_string())));
 pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "bool".to_string())));
 }
 
@@ -37,7 +36,6 @@ pub fn get_internal(name: String) -> Arc<StructData> {
         "u32" => U32.data.clone(),
         "u16" => U16.data.clone(),
         "u8" => U8.data.clone(),
-        "str" => STR.data.clone(),
         "bool" => BOOL.data.clone(),
         _ => panic!("Unknown internal type {}", name)
     }

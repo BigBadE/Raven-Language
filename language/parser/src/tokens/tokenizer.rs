@@ -5,6 +5,8 @@ use crate::tokens::util::{next_generic, next_string};
 
 pub struct Tokenizer<'a> {
     pub state: u64,
+    pub bracket_depth: u8,
+    pub generic_depth: u8,
     pub index: usize,
     pub line: u32,
     pub line_index: u32,
@@ -18,6 +20,8 @@ impl<'a> Tokenizer<'a> {
     pub fn new(buffer: &'a [u8]) -> Self {
         return Tokenizer {
             state: TokenizerState::TOP_ELEMENT,
+            bracket_depth: 0,
+            generic_depth: 0,
             index: 0,
             line: 1,
             line_index: 0,
@@ -61,14 +65,11 @@ impl<'a> Tokenizer<'a> {
             TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => next_func_token(self),
             TokenizerState::STRUCTURE => next_struct_token(self),
             TokenizerState::IMPLEMENTATION => next_implementation_token(self),
-            state =>
-                if state & 0xFF <= TokenizerState::STRING_TO_CODE_STRUCT_TOP {
-                    next_string(self)
-                } else if state & 0xFF == TokenizerState::CODE || state & 0xFF == TokenizerState::CODE_TO_STRUCT_TOP {
-                    next_code_token(self, state & 0xFFFFF000)
-                } else {
-                    next_generic(self, state & 0xFFFFF000)
-                },
+            TokenizerState::STRING | TokenizerState::STRING_TO_CODE_STRUCT_TOP => next_string(self),
+            TokenizerState::CODE | TokenizerState::CODE_TO_STRUCT_TOP => next_code_token(self),
+            TokenizerState::GENERIC_TO_IMPL | TokenizerState::GENERIC_TO_FUNC |
+            TokenizerState::GENERIC_TO_STRUCT | TokenizerState::GENERIC_TO_FUNC_TOP => next_generic(self),
+            _ => panic!("Unknown state {}!", self.state)
         };
         return self.last.clone();
     }
@@ -179,10 +180,10 @@ impl TokenizerState {
     pub const IMPLEMENTATION: u64 = 4;
     pub const FUNCTION: u64 = 5;
     pub const FUNCTION_TO_STRUCT_TOP: u64 = 6;
-    pub const GENERIC_TO_FUNC: u64 = 0xF01;
-    pub const GENERIC_TO_FUNC_TOP: u64 = 0xF02;
-    pub const GENERIC_TO_STRUCT: u64 = 0xF03;
-    pub const GENERIC_TO_IMPL: u64 = 0xF04;
+    pub const GENERIC_TO_FUNC: u64 = 0x7;
+    pub const GENERIC_TO_FUNC_TOP: u64 = 0x8;
+    pub const GENERIC_TO_STRUCT: u64 = 0x9;
+    pub const GENERIC_TO_IMPL: u64 = 0xA;
     pub const TOP_ELEMENT_TO_STRUCT: u64 = 0xB;
     pub const CODE: u64 = 0xC;
     pub const CODE_TO_STRUCT_TOP: u64 = 0xD;

@@ -21,6 +21,8 @@ pub enum Types {
     Reference(Box<Types>),
     //A generic with bounds
     Generic(String, Vec<Types>),
+    //An array
+    Array(Box<Types>)
 }
 
 #[derive(Clone, Debug, Eq, Hash)]
@@ -33,6 +35,8 @@ pub enum FinalizedTypes {
     Reference(Box<FinalizedTypes>),
     //A generic with bounds
     Generic(String, Vec<FinalizedTypes>),
+    //An array
+    Array(Box<FinalizedTypes>)
 }
 
 impl Types {
@@ -40,6 +44,7 @@ impl Types {
         return match self {
             Types::Struct(structs) => structs.name.clone(),
             Types::Reference(structs) => structs.name(),
+            Types::Array(types) => format!("{}[]", types.name()),
             Types::Generic(_, _) => panic!("Generics should never be named"),
             Types::GenericType(_, _) => panic!("Generics should never be named")
         };
@@ -50,6 +55,7 @@ impl Types {
         return match self {
             Types::Struct(structs) => FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
             Types::Reference(structs) => FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
+            Types::Array(inner) => FinalizedTypes::Array(Box::new(inner.finalize(syntax).await)),
             Types::Generic(name, bounds) => FinalizedTypes::Generic(name.clone(),
                                                                     Self::finalize_all(syntax, bounds).await),
             Types::GenericType(base, bounds) => FinalizedTypes::GenericType(Box::new(base.finalize(syntax.clone()).await),
@@ -100,17 +106,6 @@ impl FinalizedTypes {
         };
     }
 
-    pub fn downcast(&self) -> Types {
-        return match self {
-            FinalizedTypes::Struct(inner) => Types::Struct(inner.data.clone()),
-            FinalizedTypes::Reference(inner) => inner.downcast(),
-            FinalizedTypes::Generic(name, bounds) => Types::Generic(name.clone(),
-                                                                    bounds.iter().map(|bound| bound.downcast()).collect::<Vec<_>>()),
-            FinalizedTypes::GenericType(base, bounds) =>
-                Types::GenericType(Box::new(base.downcast()),
-                                   bounds.iter().map(|bound| bound.downcast()).collect::<Vec<_>>())
-        };
-    }
     #[async_recursion]
     pub async fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
         let output = match self {
@@ -134,7 +129,13 @@ impl FinalizedTypes {
                     true
                 }
                 FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax).await,
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
+                FinalizedTypes::Array(_) => false
+            },
+            FinalizedTypes::Array(inner) => match other {
+                FinalizedTypes::Array(other) => inner.of_type(other, syntax).await,
+                FinalizedTypes::Reference(other) => self.of_type(other, syntax).await,
+                _ => false
             },
             FinalizedTypes::GenericType(base, _generics) => match other {
                 FinalizedTypes::GenericType(_other_base, _other_generics) => {
@@ -156,7 +157,8 @@ impl FinalizedTypes {
                 FinalizedTypes::Struct(_) => {
                     base.of_type(other, syntax).await
                 },
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
+                FinalizedTypes::Array(_) => false
             }
             FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax).await,
             FinalizedTypes::Generic(_, bounds) => match other {
@@ -217,7 +219,6 @@ impl FinalizedTypes {
 
     #[async_recursion]
     pub async fn flatten(&mut self, generics: &mut Vec<FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedTypes, ParsingError> {
-        println!("Degenericing {:?}", self);
         for generic in &mut *generics {
             if let FinalizedTypes::GenericType(base, bounds) = generic {
                 *generic = base.flatten(bounds, syntax).await?;
@@ -257,6 +258,7 @@ impl FinalizedTypes {
                 }
             }
             FinalizedTypes::Reference(other) => other.flatten(generics, syntax).await,
+            FinalizedTypes::Array(inner) => inner.flatten(generics, syntax).await,
             FinalizedTypes::Generic(_, _) => panic!("Unresolved generic!"),
             FinalizedTypes::GenericType(base, effects) =>
                 base.flatten(effects, syntax).await
@@ -267,6 +269,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structs) => structs.data.name.clone(),
             FinalizedTypes::Reference(structs) => structs.name(),
+            FinalizedTypes::Array(inner) => format!("{}[]", inner.name()),
             FinalizedTypes::Generic(_, _) => panic!("Generics should never be named"),
             FinalizedTypes::GenericType(_, _) => panic!("Generics should never be named")
         };
@@ -278,6 +281,7 @@ impl Display for Types {
         match self {
             Types::Struct(structure) => write!(f, "{}", structure.name),
             Types::Reference(structure) => write!(f, "&{}", structure),
+            Types::Array(inner) => write!(f, "{}[]", inner),
             Types::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
             Types::GenericType(types, generics) =>
@@ -291,6 +295,7 @@ impl Display for FinalizedTypes {
         match self {
             FinalizedTypes::Struct(structure) => write!(f, "{}", structure.data.name),
             FinalizedTypes::Reference(structure) => write!(f, "&{}", structure),
+            FinalizedTypes::Array(inner) => write!(f, "{}[]", inner),
             FinalizedTypes::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
             FinalizedTypes::GenericType(types, generics) =>

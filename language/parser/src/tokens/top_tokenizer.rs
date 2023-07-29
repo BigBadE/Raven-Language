@@ -3,6 +3,10 @@ use crate::tokens::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_ident, parse_modifier};
 
 pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
+    if tokenizer.index == tokenizer.len {
+        return tokenizer.make_token(TokenTypes::EOF);
+    }
+
     return match tokenizer.last.token_type {
         TokenTypes::ImportStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b';']),
         TokenTypes::Attribute => if tokenizer.matches("]") {

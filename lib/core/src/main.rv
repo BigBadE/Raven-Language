@@ -1,4 +1,5 @@
 import iter;
+import stdio;
 
 #[extern]
 pub fn main() -> i64 {
@@ -7,6 +8,7 @@ pub fn main() -> i64 {
         end: 6,
     };
 
+    printf("This is a printed string! Wowie!");
     let i = 0;
     for value in iter {
         i = i + value;
