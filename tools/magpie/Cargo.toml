@@ -1,9 +1,10 @@
 [package]
-name = "cli"
+name = "magpie"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-runner = { path = "../runner" }
+runner = { path = "../../language/runner" }
+syntax = { path = "../../language/syntax" }
 
 tokio = { version = "1.25.0", features = ["rt-multi-thread", "macros"] }

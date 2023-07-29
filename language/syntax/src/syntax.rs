@@ -201,9 +201,7 @@ impl Syntax {
     }
 }
 
-pub type Output = i64;
-
-pub trait Compiler {
+pub trait Compiler<T> {
     /// Compiles the main function and returns the main runner.
-    fn compile(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<Output>, Vec<ParsingError>>;
+    fn compile(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<T>, Vec<ParsingError>>;
 }

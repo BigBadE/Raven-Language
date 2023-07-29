@@ -13,6 +13,7 @@ impl Arguments {
     pub fn from_arguments(mut arguments: Args) -> Self {
         let mut all_args = HashMap::new();
         all_args.insert(ArgumentTypes::Runner, HashMap::new());
+        all_args.insert(ArgumentTypes::Magpie, HashMap::new());
         let mut last: Option<(ArgumentTypes, String)> = None;
 
         //Skip the first arg (running location)
@@ -43,29 +44,18 @@ impl Arguments {
                         None
                     }
                     None => {
-                        panic!("Unknown argument type: {}\n", arg)
+                        let args = all_args.get_mut(&ArgumentTypes::Magpie).unwrap();
+                        if let Some(found) = args.get_mut("") {
+                            found.push(vec!(arg));
+                        } else {
+                            args.insert("", vec!(arg));
+                        }
                     }
                 };
             }
         }
 
         let runner_args = all_args.get_mut(&ArgumentTypes::Runner).unwrap();
-        if let Some(test) = runner_args.get("test") {
-            match test.get(0).unwrap().as_str() {
-                "ten_mil_lines" => {
-                    println!("Writing test file:");
-                    let test_folder = env::temp_dir().join("raven_test");
-                    fs::remove_dir_all(test_folder.clone()).unwrap();
-                    fs::create_dir_all(test_folder.clone()).unwrap();
-                    let test_file = test_folder.clone().join("main.rv");
-                    fs::write(test_file.clone(), format!("pub internal struct i64 {{}} pub fn main() -> i64 {{{}return 123;}}",
-                    "let a = 1;".repeat(1000000))).unwrap();
-                    runner_args.insert("root".to_string(), vec!(test_folder.to_str().unwrap().to_string()));
-                    println!("Test file written to {:?}", test_file);
-                }
-                test => panic!("Unknown test {}", test)
-            }
-        }
         return Self {
             runner_settings: Self::parse_runner_settings(runner_args)
         };
@@ -93,5 +83,6 @@ impl Arguments {
 
 #[derive(Eq, PartialOrd, PartialEq, Hash)]
 enum ArgumentTypes {
-    Runner
+    Runner,
+    Magpie
 }

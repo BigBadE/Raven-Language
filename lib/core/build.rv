@@ -1,0 +1,16 @@
+pub fn project() -> RavenProject {
+    return new RavenProject {
+        name: "core",
+        version: "1.0",
+        dependencies: dependencies(),
+        build_tasks: build_tasks()
+    };
+}
+
+pub fn dependencies() -> List<Dependency> {
+    return ArrayList::new([]);
+}
+
+pub fn build_tasks() -> List<BuildTask> {
+    return ArrayList::new([]);
+}

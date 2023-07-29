@@ -8,6 +8,7 @@ members = [
 
     "language/compilers/llvm",
 
+    "tools/magpie",
     "tools/ide-plugins/raven-intellij-natives",
     "tools/ide-plugins/raven-language-server"
 ]

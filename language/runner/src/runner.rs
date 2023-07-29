@@ -5,13 +5,13 @@ use anyhow::Error;
 use checker::output::TypesChecker;
 use parser::parse;
 use syntax::ParsingError;
-use syntax::syntax::{Output, Syntax};
+use syntax::syntax::Syntax;
 use crate::{get_compiler, RunnerSettings};
 
-pub async fn run(settings: &RunnerSettings)
-    -> Result<Option<Output>, Vec<ParsingError>> {
+pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
+    -> Result<Option<T>, Vec<ParsingError>> {
     let syntax = Syntax::new(Box::new(
-        TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.include_references())));
+        TypesChecker::new(settings.cpu_runtime.clone(), settings.include_references())));
     let syntax = Arc::new(Mutex::new(syntax));
 
     let (sender, receiver) = mpsc::channel();
@@ -26,7 +26,7 @@ pub async fn run(settings: &RunnerSettings)
                 continue;
             }
             handles.push(
-                settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
+                settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.clone(),
                                                 source_set.relative(&file).clone(),
                                                 fs::read_to_string(file.clone()).expect(
                                                     &format!("Failed to read source file: {}", file.to_str().unwrap())))));
@@ -49,7 +49,7 @@ pub async fn run(settings: &RunnerSettings)
     if !errors.is_empty() {
         println!("Error detected, this likely poisoned the mutexes. Please report any non-poison errors");
         for error in errors {
-            println!("{}", error)
+            println!("Error: {}", error)
         }
         return Err(Vec::new());
     }
@@ -57,7 +57,7 @@ pub async fn run(settings: &RunnerSettings)
     return receiver.recv().unwrap();
 }
 
-pub async fn start(compiler: String, sender: Sender<Result<Option<Output>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start<T>(compiler: String, sender: Sender<Result<Option<T>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();

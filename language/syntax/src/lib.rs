@@ -9,6 +9,7 @@ use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
+use crate::code::FinalizedEffects;
 use crate::function::{FinalizedFunction, FunctionData, UnfinalizedFunction};
 use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
@@ -169,6 +170,7 @@ impl Display for ParsingError {
 // A variable manager used for getting return types from effects
 pub trait VariableManager: Debug {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes>;
+    fn get_const_variable(&self, name: &String) -> Option<FinalizedEffects>;
 }
 
 // Top elements are structures or functions

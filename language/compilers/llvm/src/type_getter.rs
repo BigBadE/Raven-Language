@@ -10,15 +10,16 @@ use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
 use syntax::{ParsingError, VariableManager};
+use syntax::code::FinalizedEffects;
 use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::{Output, Syntax};
+use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_struct};
 use crate::internal::structs::get_internal_struct;
 use crate::util::print_formatted;
 
-pub type Main = unsafe extern "C" fn() -> Output;
+pub type Main<T> = unsafe extern "C" fn() -> T;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
@@ -82,8 +83,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile(&mut self, functions: &HashMap<String, Arc<FinalizedFunction>>, _structures: &HashMap<String, Arc<FinalizedStruct>>)
-                   -> Result<Option<JitFunction<'_, Main>>, Vec<ParsingError>> {
+    pub fn compile<T>(&mut self, functions: &HashMap<String, Arc<FinalizedFunction>>, _structures: &HashMap<String, Arc<FinalizedStruct>>)
+                   -> Result<Option<JitFunction<'_, Main<T>>>, Vec<ParsingError>> {
         while !functions.contains_key("main::main") {
             //Waiting
             thread::yield_now();
@@ -124,7 +125,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         return Ok(self.get_main());
     }
 
-    fn get_main(&self) -> Option<JitFunction<'_, Main>> {
+    fn get_main<T>(&self) -> Option<JitFunction<'_, Main<T>>> {
         return unsafe {
             match self.compiler.execution_engine.get_function("main::main") {
                 Ok(value) => Some(value),
@@ -143,5 +144,9 @@ impl Debug for CompilerTypeGetter<'_> {
 impl VariableManager for CompilerTypeGetter<'_> {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
         return self.variables.get(name).map(|found| found.0.clone());
+    }
+
+    fn get_const_variable(&self, _name: &String) -> Option<FinalizedEffects> {
+        panic!("Unexpected const variable call!");
     }
 }

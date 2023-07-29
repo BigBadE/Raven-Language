@@ -8,7 +8,7 @@ use inkwell::context::Context;
 use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::{Compiler, Output, Syntax};
+use syntax::syntax::{Compiler, Syntax};
 
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
@@ -38,9 +38,9 @@ impl LLVMCompiler {
     }
 }
 
-impl Compiler for LLVMCompiler {
+impl<T> Compiler<T> for LLVMCompiler {
     fn compile(&self, syntax: &Arc<Mutex<Syntax>>)
-        -> Result<Option<Output>, Vec<ParsingError>> {
+        -> Result<Option<T>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
