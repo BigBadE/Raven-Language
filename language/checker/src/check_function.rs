@@ -14,7 +14,7 @@ use crate::output::TypesChecker;
 pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
                              mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
-    let mut variable_manager = CheckerVariableManager { variables: HashMap::new() };
+    let mut variable_manager = CheckerVariableManager { variables: HashMap::new(), variable_instructions: HashMap::new() };
 
     let mut fields = Vec::new();
     for argument in &mut function.fields {
@@ -34,15 +34,7 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
     }
 
     let return_type = if let Some(return_type) = function.return_type.as_mut() {
-        let first = match return_type.await {
-            Ok(result) => result,
-            Err(error) => {
-                println!("Found dumb error: {}", error);
-                return Err(error);
-            }
-        };
-
-        Some(first.finalize(syntax.clone()).await)
+        Some(return_type.await?.finalize(syntax.clone()).await)
     } else {
         None
     };
