@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use anyhow::Error;
-use tokio::runtime::Handle;
+use tokio::runtime::Runtime;
 use compiler_llvm::LLVMCompiler;
 use syntax::function::FinalizedFunction;
 use syntax::r#struct::FinalizedStruct;
@@ -12,8 +12,8 @@ use syntax::syntax::Compiler;
 pub mod runner;
 
 pub struct RunnerSettings {
-    pub io_runtime: Handle,
-    pub cpu_runtime: Handle,
+    pub io_runtime: Runtime,
+    pub cpu_runtime: Runtime,
     pub sources: Vec<SourceSet>,
     pub debug: bool,
     pub compiler: String,

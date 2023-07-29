@@ -11,7 +11,7 @@ use crate::{get_compiler, RunnerSettings};
 pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
     -> Result<Option<T>, Vec<ParsingError>> {
     let syntax = Syntax::new(Box::new(
-        TypesChecker::new(settings.cpu_runtime.clone(), settings.include_references())));
+        TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.include_references())));
     let syntax = Arc::new(Mutex::new(syntax));
 
     let (sender, receiver) = mpsc::channel();
@@ -26,7 +26,7 @@ pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
                 continue;
             }
             handles.push(
-                settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.clone(),
+                settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
                                                 source_set.relative(&file).clone(),
                                                 fs::read_to_string(file.clone()).expect(
                                                     &format!("Failed to read source file: {}", file.to_str().unwrap())))));

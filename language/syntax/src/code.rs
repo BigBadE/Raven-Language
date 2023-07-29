@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 use crate::{Attribute, DisplayIndented, to_modifiers, VariableManager};
+use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
 use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::types::{FinalizedTypes, Types};
@@ -129,7 +130,7 @@ pub enum Effects {
     //An unresolved operation, sent to the checker.
     Operation(String, Vec<Effects>),
     //Struct to create and a tuple of the index of the argument and the argument
-    CreateStruct(Types, Vec<(String, Effects)>),
+    CreateStruct(UnparsedType, Vec<(String, Effects)>),
     Float(f64),
     Int(i64),
     UInt(u64),
@@ -216,5 +217,12 @@ impl FinalizedEffects {
             FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!")
         };
         return temp;
+    }
+
+    pub fn is_constant(&self, _variables: &dyn VariableManager) -> bool {
+        return match self {
+            FinalizedEffects::Float(_) | FinalizedEffects::Bool(_) | FinalizedEffects::String(_) => true,
+            _ => false
+        }
     }
 }

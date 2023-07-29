@@ -62,14 +62,14 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
     }
 
     let mut code_output = if include_refs {
-        verify_low_code(process_manager, &resolver, function.code.await?, function.data.attributes.iter()
+        verify_low_code(process_manager, &resolver, function.code, function.data.attributes.iter()
             .any(|inner| if let Attribute::Basic(inner) = inner {
                 inner == "extern"
             } else {
                 false
             }), syntax, &mut variable_manager).await?
     } else {
-        verify_high_code(process_manager, &resolver, function.code.await?, syntax, &mut variable_manager).await?
+        verify_high_code(process_manager, &resolver, function.code, syntax, &mut variable_manager).await?
     };
 
     if !code_output.0 {

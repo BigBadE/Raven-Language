@@ -52,7 +52,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
                 return_type = Some(parser_utils.get_struct(token, ret_name))
             }
             TokenTypes::CodeStart => {
-                code = Some(parse_code(parser_utils).1);
+                code = Some(parse_code(parser_utils)?.1);
                 break;
             }
             TokenTypes::CodeEnd => break,
@@ -78,14 +78,10 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
     return Ok(UnfinalizedFunction {
         generics,
         fields,
-        code: code.unwrap_or(Box::pin(const_finished())),
+        code: code.unwrap_or(CodeBody::new(Vec::new(), "empty".to_string())),
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name)),
     });
-}
-
-async fn const_finished() -> Result<CodeBody, ParsingError> {
-    return Ok(CodeBody::new(Vec::new(), String::new()));
 }
 
 pub async fn get_generics(generics: IndexMap<String, Vec<ParsingFuture<Types>>>)

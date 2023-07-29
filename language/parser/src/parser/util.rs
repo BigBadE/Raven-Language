@@ -38,10 +38,13 @@ impl<'a> ParserUtils<'a> {
                       structure: Result<UnfinalizedStruct, ParsingError>) {
         let structure = match structure {
             Ok(adding) => adding,
-            Err(error) => UnfinalizedStruct {
-                generics: Default::default(),
-                fields: Vec::new(),
-                data: Arc::new(StructData::new_poisoned(format!("${}", file), error)),
+            Err(error) => {
+                println!("Error: {}", error);
+                UnfinalizedStruct {
+                    generics: Default::default(),
+                    fields: Vec::new(),
+                    data: Arc::new(StructData::new_poisoned(format!("${}", file), error)),
+                }
             }
         };
 
@@ -86,12 +89,15 @@ impl<'a> ParserUtils<'a> {
                         function: Result<UnfinalizedFunction, ParsingError>) -> Arc<FunctionData> {
         let adding = match function {
             Ok(adding) => adding,
-            Err(error) => UnfinalizedFunction {
-                generics: Default::default(),
-                fields: Vec::new(),
-                code: Box::pin(empty_code()),
-                return_type: None,
-                data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
+            Err(error) => {
+                println!("Error: {}", error);
+                UnfinalizedFunction {
+                    generics: Default::default(),
+                    fields: Vec::new(),
+                    code: CodeBody::new(Vec::new(), "empty".to_string()),
+                    return_type: None,
+                    data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
+                }
             }
         };
         let data = adding.data.clone();
@@ -100,10 +106,6 @@ impl<'a> ParserUtils<'a> {
                                    adding.data.clone(), adding);
         return data;
     }
-}
-
-async fn empty_code() -> Result<CodeBody, ParsingError> {
-    return Ok(CodeBody::new(Vec::new(), String::new()));
 }
 
 pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {

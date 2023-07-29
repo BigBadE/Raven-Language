@@ -22,7 +22,7 @@ pub struct FunctionData {
 pub struct UnfinalizedFunction {
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
     pub fields: Vec<ParsingFuture<MemberField>>,
-    pub code: ParsingFuture<CodeBody>,
+    pub code: CodeBody,
     pub return_type: Option<ParsingFuture<Types>>,
     pub data: Arc<FunctionData>,
 }
@@ -73,6 +73,7 @@ impl FinalizedFunction {
         }
     }
 }
+
 impl FunctionData {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
         return Self {

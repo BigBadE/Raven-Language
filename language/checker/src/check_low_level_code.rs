@@ -153,7 +153,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 verify_effect(process_manager, resolver, *effect, external, syntax, variables).await?),
                                           first, second),
         Effects::CreateStruct(target, effects) => {
-            let mut target = target.finalize(syntax.clone()).await;
+            let mut target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
+                                                resolver.boxed_clone(), target)
+                .await?.finalize(syntax.clone()).await;
             if let FinalizedTypes::GenericType(mut base, mut bounds) = target {
                 target = base.flatten(&mut bounds, syntax).await?;
             }

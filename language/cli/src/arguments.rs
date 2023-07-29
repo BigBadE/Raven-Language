@@ -79,9 +79,9 @@ impl Arguments {
         };
         return RunnerSettings {
             io_runtime: io_runtime.thread_name("io-runtime").build()
-                .expect("Failed to build I/O runtime").handle().clone(),
+                .expect("Failed to build I/O runtime"),
             cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
-                .expect("Failed to build CPU runtime").handle().clone(),
+                .expect("Failed to build CPU runtime"),
             sources: arguments.get("root").expect("Need a source root, \
             pass it with the \"--root (root)\" argument").iter()
                 .map(|root| SourceSet { root: PathBuf::from(root) }).collect(),

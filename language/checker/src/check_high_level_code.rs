@@ -30,7 +30,7 @@ pub async fn verify_high_code(process_manager: &TypesChecker, resolver: &Box<dyn
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager) -> Result<FinalizedEffects, ParsingError> {
-    let output = match effect.clone() {
+    let output = match effect {
         Effects::CodeBody(body) =>
             FinalizedEffects::CodeBody(verify_high_code(process_manager, &resolver, body, syntax, &mut variables.clone()).await?.1),
         Effects::Set(first, second) => {
@@ -142,7 +142,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 verify_effect(process_manager, resolver, *effect, syntax, variables).await?),
                                           first, second),
         Effects::CreateStruct(target, effects) => {
-            let mut target = target.finalize(syntax.clone()).await;
+            let mut target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
+            resolver.boxed_clone(), target).await?.finalize(syntax.clone()).await;
             if let FinalizedTypes::GenericType(mut base, mut bounds) = target {
                 target = base.flatten(&mut bounds, syntax).await?;
             }
@@ -181,6 +182,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 return Err(placeholder_error("No return type!".to_string()));
             };
             variables.variables.insert(name.clone(), found.clone());
+            if effect.is_constant(variables) {
+                variables.variable_instructions.insert(name.clone(), effect.clone());
+            }
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
         }
         Effects::NOP() => panic!("Tried to compile a NOP!"),
@@ -192,7 +196,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::Bool(bool) => FinalizedEffects::Bool(bool),
         Effects::String(string) => FinalizedEffects::String(string)
     };
-    return Ok(output);
+    return Ok(fold_constant(output));
+}
+
+fn fold_constant(effect: FinalizedEffects) -> FinalizedEffects {
+    return match effect {
+        _ => effect
+    };
 }
 
 async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,

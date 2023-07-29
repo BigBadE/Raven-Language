@@ -1,10 +1,10 @@
 use syntax::code::Effects;
-use syntax::{ParsingError, ParsingFuture};
+use syntax::ParsingError;
 
 use crate::parser::code_parser::parse_line;
 use crate::{ParserUtils, TokenTypes};
 
-pub fn parse_operator(last: Option<ParsingFuture<Effects>>, parser_utils: &mut ParserUtils) -> ParsingFuture<Effects> {
+pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let mut operation = String::new();
     if last.is_some() {
         operation += "{}";
@@ -20,23 +20,23 @@ pub fn parse_operator(last: Option<ParsingFuture<Effects>>, parser_utils: &mut P
         parser_utils.index += 1;
     }
 
-    let right = parse_line(parser_utils, true, false);
+    let right = parse_line(parser_utils, true, false)?;
     if right.is_some() {
         operation += "{}";
     }
 
-    return Box::pin(create_operator(operation, last, right.map(|found| found.1)));
+    return create_operator(operation, last, right.map(|inner| inner.effect));
 }
 
-async fn create_operator(name: String, lhs: Option<ParsingFuture<Effects>>,
-                         rhs: Option<ParsingFuture<Effects>>) -> Result<Effects, ParsingError> {
+fn create_operator(name: String, lhs: Option<Effects>,
+                         rhs: Option<Effects>) -> Result<Effects, ParsingError> {
     let mut arguments = Vec::new();
 
     if let Some(found) = lhs {
-        arguments.push(found.await?);
+        arguments.push(found);
     }
     if let Some(found) = rhs {
-        arguments.push(found.await?);
+        arguments.push(found);
     }
 
     return Ok(Effects::Operation(name, arguments));
