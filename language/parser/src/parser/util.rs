@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
+use indexmap::IndexMap;
 
 use tokio::runtime::Handle;
 
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
-use syntax::{ParsingError, ParsingFuture, TopElement, TraitImplementor};
+use syntax::{FinishedTraitImplementor, ParsingError, ParsingFuture, TopElement, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
@@ -72,11 +73,24 @@ impl<'a> ParserUtils<'a> {
     }
 
     async fn add_implementation(syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor) -> Result<(), ParsingError> {
-        let output = (implementor.implementor.await?.finalize(syntax.clone()).await,
-                      (implementor.base.await?.finalize(syntax.clone()).await,
-                       implementor.attributes, implementor.functions));
+        let mut generics = IndexMap::new();
+        for (generic, bounds) in implementor.generics {
+            let mut final_bounds = Vec::new();
+            for bound in bounds {
+                final_bounds.push(bound.await?.finalize(syntax.clone()).await);
+            }
+            generics.insert(generic, final_bounds);
+        }
+        let output = FinishedTraitImplementor {
+            base: implementor.base.await?.finalize(syntax.clone()).await,
+            generics,
+            implementor: implementor.implementor.await?.finalize(syntax.clone()).await,
+            attributes: implementor.attributes,
+            functions: implementor.functions,
+        };
+
         let mut locked = syntax.lock().unwrap();
-        locked.implementations.insert(output.0, output.1);
+        locked.implementations.push(output);
         locked.async_manager.parsing_impls -= 1;
         for waker in &locked.async_manager.impl_waiters {
             waker.wake_by_ref();

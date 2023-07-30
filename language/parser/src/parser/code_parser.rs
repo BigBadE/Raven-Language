@@ -109,12 +109,19 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     } else {
                         return Err(token.make_error(parser_utils.file.clone(), "Tried to assign a void value!".to_string()));
                     }
-                    break
+                    break;
                 } else {
                     return Ok(Some(Expression::new(expression_type, parse_operator(effect, parser_utils)?)));
                 }
             }
             TokenTypes::Operator => {
+                let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap();
+                //If there is a variable right next to a less than, it's probably a generic method call.
+                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) &&
+                    token.to_string(parser_utils.buffer) == "<" &&
+                    last.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
+                    return Ok(Some(Expression::new(expression_type, parse_generic_method(effect, parser_utils)?)));
+                }
                 return Ok(Some(Expression::new(expression_type, parse_operator(effect, parser_utils)?)));
             }
             TokenTypes::ArgumentEnd => if !deep {
@@ -137,6 +144,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
         }
     }
 
+    if effect.is_none() {
+        panic!("No effect! {:?} and {}", parser_utils.tokens.get(parser_utils.index - 1), parser_utils.file);
+    }
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
 }
 
@@ -148,17 +158,46 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
         match token.token_type {
             TokenTypes::StringEnd => {
                 let found = token.to_string(parser_utils.buffer);
-                string += &found[0..found.len()-1];
+                string += &found[0..found.len() - 1];
                 return Ok(Effects::String(string + "\0"));
-            },
+            }
             TokenTypes::StringEscape => {
                 let found = token.to_string(parser_utils.buffer);
-                string += &found[0..found.len()-1];
-            },
-            TokenTypes::StringStart => {},
+                string += &found[0..found.len() - 1];
+            }
+            TokenTypes::StringStart => {}
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
+}
+
+fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
+    -> Result<Effects, ParsingError> {
+    let returning;
+    if let UnparsedType::Generic(_, bounds) = add_generics(String::new(), parser_utils).0 {
+        if bounds.len() != 1 {
+            parser_utils.tokens.get(parser_utils.index-1).unwrap().make_error(parser_utils.file.clone(),
+            format!("Expected one generic argument!"));
+        }
+        returning = bounds.get(0).unwrap();
+    }
+
+    let mut effects = Vec::new();
+    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
+        while let Some(expression) = parse_line(parser_utils, false, false)? {
+            effects.push(expression.effect);
+            if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type
+                == TokenTypes::ArgumentEnd {} else {
+                break;
+            }
+        }
+    } else {
+        parser_utils.index += 1;
+    }
+
+    let name = parser_utils.tokens.get(parser_utils.index-1).unwrap().to_string(parser_utils.buffer);
+    return Ok(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
+                                      name.clone(), effects));
 }
 
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {

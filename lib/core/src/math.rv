@@ -1,18 +1,40 @@
+pub trait Number {
+
+}
+
 //Primitive numbers, prefixed by signed/unsigned, suffixed by the amount of bits.
 //Signed types
 pub internal struct i64 {}
+impl Number for i64 {}
 pub internal struct i32 {}
+impl Number for i32 {}
 pub internal struct i16 {}
+impl Number for i16 {}
 pub internal struct i8 {}
+impl Number for i8 {}
 
 //Unsigned types
 pub internal struct u64 {}
+impl Number for u64 {}
 pub internal struct u32 {}
+impl Number for u32 {}
 pub internal struct u16 {}
+impl Number for u16 {}
 pub internal struct u8 {}
+impl Number for u8 {}
 
 //Booleans, either true or false (1 or 0)
 pub internal struct bool {}
+
+pub trait Cast<T> {
+    pub fn cast(self) -> T;
+}
+
+pub internal impl<T: Number> Cast<Number> for T {
+    pub fn cast(self) -> T {
+
+    }
+}
 
 //Basic math operations, implemented internally by the compiler.
 //Equality

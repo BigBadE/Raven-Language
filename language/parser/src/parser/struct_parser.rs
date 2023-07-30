@@ -135,7 +135,8 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
-            _ => panic!("How'd you get here? {:?}", token.token_type)
+            _ => panic!("How'd you get here? {:?}: {}", token.token_type,
+            token.to_string(parser_utils.buffer))
         }
     }
 
@@ -155,6 +156,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
 
     return Ok(TraitImplementor {
         base,
+        generics,
         implementor,
         functions,
         attributes,

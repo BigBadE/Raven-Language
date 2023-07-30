@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::{Attribute, DisplayIndented, to_modifiers, VariableManager};
 use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
-use crate::r#struct::{BOOL, F64, FinalizedStruct, U64, U8};
+use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::types::{FinalizedTypes, Types};
 
 #[derive(Clone, Debug)]
@@ -207,7 +207,7 @@ impl FinalizedEffects {
             FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
             FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
-            FinalizedEffects::String(_) => Some(FinalizedTypes::Array(Box::new(FinalizedTypes::Struct(U8.clone())))),
+            FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone())),
             FinalizedEffects::HeapStore(inner) => inner.get_return(variables),
             FinalizedEffects::StackStore(inner) => inner.get_return(variables),
             FinalizedEffects::PointerLoad(inner) => match inner.get_return(variables).unwrap() {

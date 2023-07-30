@@ -32,7 +32,6 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
 
         fields.push(field);
     }
-
     let return_type = if let Some(return_type) = function.return_type.as_mut() {
         Some(return_type.await?.finalize(syntax.clone()).await)
     } else {

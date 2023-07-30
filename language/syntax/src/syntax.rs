@@ -1,13 +1,11 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::ops::DerefMut;
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
 
-use crate::{Attribute, ParsingError, ProcessManager, TopElement, Types};
+use crate::{FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
@@ -27,7 +25,7 @@ pub struct Syntax {
     // All functions in the program
     pub functions: AsyncGetter<FunctionData>,
     // All implementations in the program
-    pub implementations: HashMap<FinalizedTypes, (FinalizedTypes, Vec<Attribute>, Vec<Arc<FunctionData>>)>,
+    pub implementations: Vec<FinishedTraitImplementor>,
     // Stores the async parsing state
     pub async_manager: GetterManager,
     // All operations without namespaces, for example {}+{} or {}/{}
@@ -44,7 +42,7 @@ impl Syntax {
             errors: Vec::new(),
             structures: AsyncGetter::new(),
             functions: AsyncGetter::new(),
-            implementations: HashMap::new(),
+            implementations: Vec::new(),
             async_manager: GetterManager::default(),
             operations: HashMap::new(),
             process_manager,
@@ -62,42 +60,21 @@ impl Syntax {
     /// Checks if the given target type matches the base type.
     /// Can false negative unless parsing is finished.
     pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<Vec<Arc<FunctionData>>> {
-        //TODO check if this can be optimized. Must be a future because syntax will be locked to prevent
-        //copying the entire implementation.
-        //Though at this point, that may just be faster.
-        //Directly reading implementations from a pointer would theoretically cause race issues,
-        //But it's unknown if those would cause crashes or just a stale read, if it's the latter it's fine.
-        let mut found: Vec<Pin<Box<dyn Future<Output=Option<Vec<Arc<FunctionData>>>>>>> = Vec::new();
-        {
-            let locked = syntax.lock().unwrap();
-            for (implementor, (other, _, functions)) in &locked.implementations {
-                found.push(Box::pin(Self::check_types(base, target, implementor.clone(),
-                                                      syntax, other.clone(), functions.clone())));
+        for implementor in syntax.lock().unwrap().implementations.clone() {
+            println!("Checking implementor for {} of {}", implementor.base, implementor.implementor);
+            if base.of_type(&implementor.implementor, syntax).await &&
+                implementor.base.of_type(&target, syntax).await {
+                return Some(implementor.functions.clone());
             }
         }
 
-        for future in found {
-            if let Some(functions) = future.await {
-                return Some(functions);
-            }
-        }
-
-        return None;
-    }
-
-    async fn check_types(base: &FinalizedTypes, target: &FinalizedTypes, implementor: FinalizedTypes,
-                         syntax: &Arc<Mutex<Syntax>>, other: FinalizedTypes, functions: Vec<Arc<FunctionData>>) -> Option<Vec<Arc<FunctionData>>> {
-        if base.of_type(&implementor, syntax).await &&
-            other.of_type(&target, syntax).await {
-            return Some(functions.clone());
-        }
         return None;
     }
 
     // Adds the top element to the syntax
     pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
-                                              resolver: Box<dyn NameResolver>, dupe_error: ParsingError,
-                                              adding: Arc<T>, verifying: T::Unfinalized) {
+                                        resolver: Box<dyn NameResolver>, dupe_error: ParsingError,
+                                        adding: Arc<T>, verifying: T::Unfinalized) {
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
@@ -165,8 +142,8 @@ impl Syntax {
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                             getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
         if getting.as_bytes()[0] == b'[' {
-            return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[1..getting.len()-1].to_string(),
-                                                       name_resolver).await?)));
+            return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[1..getting.len() - 1].to_string(),
+                                                             name_resolver).await?)));
         }
         if let Some(found) = name_resolver.generic(&getting) {
             let mut bounds = Vec::new();

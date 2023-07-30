@@ -5,6 +5,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use indexmap::IndexMap;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
@@ -204,7 +205,18 @@ pub trait TopElement where Self: Sized {
 // An impl block for a type
 pub struct TraitImplementor {
     pub base: ParsingFuture<Types>,
+    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
     pub implementor: ParsingFuture<Types>,
+    pub attributes: Vec<Attribute>,
+    pub functions: Vec<Arc<FunctionData>>,
+}
+
+// Finished impl block for a type
+#[derive(Clone)]
+pub struct FinishedTraitImplementor {
+    pub base: FinalizedTypes,
+    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub implementor: FinalizedTypes,
     pub attributes: Vec<Attribute>,
     pub functions: Vec<Arc<FunctionData>>,
 }

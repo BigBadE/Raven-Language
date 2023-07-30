@@ -1,8 +1,9 @@
 import iter;
 import stdio;
+import math::Cast;
 
 #[extern]
-pub fn main() -> i64 {
+pub fn main() -> u64 {
     let iter = new NumberIter {
         current: 1,
         end: 6,
@@ -13,5 +14,5 @@ pub fn main() -> i64 {
     for value in iter {
         i = i + value;
     }
-    return i;
+    return i.cast();
 }

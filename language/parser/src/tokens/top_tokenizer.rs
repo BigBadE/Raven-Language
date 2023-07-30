@@ -44,7 +44,9 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::TraitStart)
             }
         } else if tokenizer.matches("impl") {
-            tokenizer.index += 1;
+            if tokenizer.buffer[tokenizer.index] == b' ' {
+                tokenizer.index += 1;
+            }
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
@@ -201,9 +203,11 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("for") {
             tokenizer.state = TokenizerState::STRUCTURE;
-            tokenizer.make_token(TokenTypes::TraitStart)
+            tokenizer.make_token(TokenTypes::For)
         } else {
             tokenizer.state = TokenizerState::TOP_ELEMENT;
+            println!("Invalid: {}, last: {}", String::from_utf8_lossy(&tokenizer.buffer[tokenizer.index-5..tokenizer.index+10]),
+            tokenizer.last.to_string(tokenizer.buffer));
             tokenizer.handle_invalid()
         },
         token => panic!("How'd you get here? {:?}", token)
