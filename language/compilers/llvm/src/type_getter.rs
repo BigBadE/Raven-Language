@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use std::thread;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;

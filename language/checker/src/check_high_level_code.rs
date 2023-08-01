@@ -1,5 +1,5 @@
 use std::mem;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, display_parenless, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
 use syntax::{Attribute, ParsingError};

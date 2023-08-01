@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use indexmap::IndexMap;
 
 use tokio::runtime::Handle;
@@ -9,6 +9,8 @@ use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
+
+use no_deadlocks::Mutex;
 
 use crate::{ImportNameResolver, TokenTypes};
 use crate::tokens::tokens::Token;
@@ -82,9 +84,9 @@ impl<'a> ParserUtils<'a> {
             generics.insert(generic, final_bounds);
         }
         let output = FinishedTraitImplementor {
-            base: implementor.base.await?.finalize(syntax.clone()).await,
+            target: implementor.base.await?.finalize(syntax.clone()).await,
             generics,
-            implementor: implementor.implementor.await?.finalize(syntax.clone()).await,
+            base: implementor.implementor.await?.finalize(syntax.clone()).await,
             attributes: implementor.attributes,
             functions: implementor.functions,
         };

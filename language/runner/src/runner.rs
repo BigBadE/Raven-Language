@@ -1,5 +1,5 @@
 use std::fs;
-use std::sync::{Arc, mpsc, Mutex};
+use std::sync::{Arc, mpsc};
 use std::sync::mpsc::Sender;
 use anyhow::Error;
 use checker::output::TypesChecker;
@@ -7,6 +7,8 @@ use parser::parse;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use crate::{get_compiler, RunnerSettings};
+
+use no_deadlocks::Mutex;
 
 pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
     -> Result<Option<T>, Vec<ParsingError>> {
@@ -47,7 +49,6 @@ pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
     syntax.lock().unwrap().finish();
 
     if !errors.is_empty() {
-        println!("Error detected, this likely poisoned the mutexes. Please report any non-poison errors");
         for error in errors {
             println!("Error: {}", error)
         }
@@ -64,5 +65,6 @@ pub async fn start<T>(compiler: String, sender: Sender<Result<Option<T>, Vec<Par
         code_compiler = get_compiler(locked.compiling.clone(),
                                 locked.strut_compiling.clone(), compiler);
     }
-    sender.send(code_compiler.compile(&syntax)).unwrap();
+    let returning = code_compiler.compile(&syntax);
+    sender.send(returning).unwrap();
 }

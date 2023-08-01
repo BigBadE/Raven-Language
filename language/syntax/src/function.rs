@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;

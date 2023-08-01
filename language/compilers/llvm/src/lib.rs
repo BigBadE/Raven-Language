@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 
 use inkwell::context::Context;
 use syntax::function::FinalizedFunction;

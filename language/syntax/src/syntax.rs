@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
@@ -55,15 +55,30 @@ impl Syntax {
             panic!("Tried to finish already-finished syntax!")
         }
         self.async_manager.finished = true;
+
+        for wakers in &mut self.structures.wakers.values() {
+            for waker in wakers {
+                waker.wake_by_ref();
+            }
+        }
+        for wakers in &mut self.functions.wakers.values() {
+            for waker in wakers {
+                waker.wake_by_ref();
+            }
+        }
+        self.structures.wakers.clear();
+        self.functions.wakers.clear();
     }
 
     /// Checks if the given target type matches the base type.
     /// Can false negative unless parsing is finished.
+    /// Example: base = NumberIter<u64>, target = Iter<u64>, implementor.base = NumberIter<T>, implementor.implementor = Iter<T>
+    /// Checks if base == implementor.base && target == implementor.implementor
     pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<Vec<Arc<FunctionData>>> {
-        for implementor in syntax.lock().unwrap().implementations.clone() {
-            println!("Checking implementor for {} of {}", implementor.base, implementor.implementor);
-            if base.of_type(&implementor.implementor, syntax).await &&
-                implementor.base.of_type(&target, syntax).await {
+        let implementations = syntax.lock().unwrap().implementations.clone();
+        for implementor in implementations {
+            if base.of_type(&implementor.base, syntax).await &&
+                implementor.target.of_type(&target, syntax).await {
                 return Some(implementor.functions.clone());
             }
         }

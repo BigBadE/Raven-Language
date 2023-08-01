@@ -4,7 +4,7 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use indexmap::IndexMap;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
@@ -211,12 +211,15 @@ pub struct TraitImplementor {
     pub functions: Vec<Arc<FunctionData>>,
 }
 
-// Finished impl block for a type
+// Finished impl block for a type.
+// Ex: impl<T> Iter<T> for NumberIter<T>
 #[derive(Clone)]
 pub struct FinishedTraitImplementor {
+    //Would be Iter<T>
+    pub target: FinalizedTypes,
+    //Would be NumberIter<T>
     pub base: FinalizedTypes,
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
-    pub implementor: FinalizedTypes,
     pub attributes: Vec<Attribute>,
     pub functions: Vec<Arc<FunctionData>>,
 }

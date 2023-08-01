@@ -32,6 +32,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                     name = parser_utils.file.clone() + "::" + name.as_str();
                 }
 
+                println!("Set name to {} 1", name);
                 parser_utils.imports.parent = Some(name.clone());
             }
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
@@ -209,7 +210,6 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             }
             TokenTypes::GenericBound => {
                 let token = parser_utils.tokens.get(parser_utils.index).unwrap();
-                parser_utils.index += 1;
                 let name = token.to_string(parser_utils.buffer);
                 let (unparsed, bound) = add_generics(name, parser_utils);
                 unparsed_bounds.push(unparsed);

@@ -1,7 +1,7 @@
 #![feature(get_mut_unchecked)]
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use indexmap::IndexMap;
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::types::{FinalizedTypes, Types};
@@ -26,8 +26,12 @@ impl NameResolver for EmptyNameResolver {
         return &EMPTY;
     }
 
+    fn parent(&self) -> &String {
+        panic!("Should not be called after finalizing!")
+    }
+
     fn generic(&self, _name: &String) -> Option<Vec<UnparsedType>> {
-        return None;
+        panic!("Should not be called after finalizing!")
     }
 
     fn boxed_clone(&self) -> Box<dyn NameResolver> {

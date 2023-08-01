@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use async_recursion::async_recursion;
 use crate::function::{display, display_parenless};
 use crate::{is_modifier, Modifier, ParsingError, StructData};

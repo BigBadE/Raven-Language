@@ -3,8 +3,9 @@ use std::future::Future;
 use std::hash::Hash;
 use std::ops::DerefMut;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::task::{Context, Poll, Waker};
+use no_deadlocks::Mutex;
 
 use crate::{ParsingError, TopElement};
 use crate::function::{display_parenless, FunctionData};
@@ -204,6 +205,8 @@ impl Display for UnparsedType {
 
 pub trait NameResolver: Send + Sync {
     fn imports(&self) -> &Vec<String>;
+
+    fn parent(&self) -> &String;
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
 

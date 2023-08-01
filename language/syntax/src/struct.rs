@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
@@ -43,7 +43,7 @@ pub fn get_internal(name: String) -> Arc<StructData> {
     }
 }
 
-pub static ID: Mutex<u64> = Mutex::new(0);
+pub static ID: std::sync::Mutex<u64> = std::sync::Mutex::new(0);
 
 #[derive(Clone)]
 pub struct StructData {

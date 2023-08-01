@@ -1,6 +1,6 @@
 #![feature(try_trait_v2, get_mut_unchecked)]
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use tokio::runtime::Handle;
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
@@ -56,6 +56,10 @@ impl ImportNameResolver {
 impl NameResolver for ImportNameResolver {
     fn imports(&self) -> &Vec<String> {
         return &self.imports;
+    }
+
+    fn parent(&self) -> &String {
+        return self.parent.as_ref().unwrap();
     }
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>> {

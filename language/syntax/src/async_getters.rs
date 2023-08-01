@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc; use no_deadlocks::Mutex;
 use std::task::{Context, Poll, Waker};
 use crate::function::FunctionData;
 use crate::syntax::Syntax;
