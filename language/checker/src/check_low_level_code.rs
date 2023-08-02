@@ -89,8 +89,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                   traits, resolver.boxed_clone()).await {
                 let mut output = None;
                 let result = ImplementationGetter::new(syntax.clone(),
-                                                       inner.finalize(syntax.clone()).await, return_type.clone(),
-                placeholder_error(format!("{} doesn't implement {}", inner, return_type))).await?;
+                                                       return_type.clone(), inner.finalize(syntax.clone()).await,
+                placeholder_error(format!("{} doesn't implement {}", return_type, inner))).await?;
                 for temp in result {
                     if temp.name == method {
                         output = Some(temp.clone());

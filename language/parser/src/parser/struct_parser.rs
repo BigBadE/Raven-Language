@@ -32,7 +32,6 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                     name = parser_utils.file.clone() + "::" + name.as_str();
                 }
 
-                println!("Set name to {} 1", name);
                 parser_utils.imports.parent = Some(name.clone());
             }
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
@@ -102,7 +101,11 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                     base = temp;
                     state = 1;
                 } else {
-                    parser_utils.imports.parent = Some(format!("{}::{}", parser_utils.file.clone(), name));
+                    if generics.contains_key(&name) {
+                        parser_utils.imports.parent = Some(name);
+                    } else {
+                        parser_utils.imports.parent = Some(format!("{}::{}", parser_utils.file.clone(), name));
+                    }
                     implementor = temp;
                 }
             }
@@ -201,6 +204,10 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
         match token.token_type {
             TokenTypes::Generic => {
                 name = token.to_string(parser_utils.buffer);
+                if name.starts_with(",") {
+                    name = name[1..].to_string();
+                }
+                name = name.trim().to_string();
             }
             TokenTypes::GenericEnd => {
                 parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
@@ -209,8 +216,12 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 unparsed_bounds = Vec::new();
             }
             TokenTypes::GenericBound => {
-                let token = parser_utils.tokens.get(parser_utils.index).unwrap();
-                let name = token.to_string(parser_utils.buffer);
+                let token = parser_utils.tokens.get(parser_utils.index-1).unwrap();
+                let mut name = token.to_string(parser_utils.buffer);
+                if name.starts_with(":") {
+                    name = name[1..].to_string();
+                }
+                let name = name.trim().to_string();
                 let (unparsed, bound) = add_generics(name, parser_utils);
                 unparsed_bounds.push(unparsed);
                 bounds.push(bound);

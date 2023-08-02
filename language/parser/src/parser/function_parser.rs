@@ -25,10 +25,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Identifier => {
-                name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer);
-                println!("Name for {}: {}", parser_utils.file.clone(), token.to_string(parser_utils.buffer));
-            },
+            TokenTypes::Identifier => name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer),
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::ArgumentsStart | TokenTypes::ArgumentSeparator | TokenTypes::ArgumentTypeSeparator => {}
             TokenTypes::ArgumentName => last_arg = token.to_string(parser_utils.buffer),

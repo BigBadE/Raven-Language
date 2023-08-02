@@ -44,7 +44,8 @@ pub struct ImplementationGetter {
     syntax: Arc<Mutex<Syntax>>,
     testing: FinalizedTypes,
     target: FinalizedTypes,
-    error: ParsingError
+    error: ParsingError,
+    index: usize
 }
 
 impl ImplementationGetter {
@@ -53,7 +54,18 @@ impl ImplementationGetter {
             syntax,
             testing,
             target,
-            error
+            error,
+            index: 0
+        };
+    }
+    
+    pub fn new_with_index(syntax: Arc<Mutex<Syntax>>, testing: FinalizedTypes, target: FinalizedTypes, error: ParsingError, index: usize) -> Self {
+        return ImplementationGetter {
+            syntax,
+            testing,
+            target,
+            error,
+            index
         };
     }
 }
@@ -62,9 +74,15 @@ impl Future for ImplementationGetter {
     type Output = Result<Vec<Arc<FunctionData>>, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // TODO see if there is a safe alternative or see why this is safe
-        if let Poll::Ready(result) = Future::poll(unsafe { Pin::new_unchecked(
-            &mut Syntax::of_types(&self.target, &self.testing, &self.syntax)) }, cx) {
+        // Safety:
+        // Pin requires the type to be Unpin, which Future isn't.
+        // This could be fixed with Box::pin, but Future::poll requires a Pin<&mut impl Future>.
+        // Luckily, all pointers are implicitly Unpin (because moving a pointer doesn't change the
+        // object it points to).
+        // Sadly, Rust fails to detect this. The futures crate could be used to avoid the unsafe,
+        // but it seems unreasonable to use the entire crate for one macro.
+        let mut future = Syntax::of_types(&self.target, &self.testing, &self.syntax, self.index);
+        if let Poll::Ready(result) = Future::poll(unsafe { Pin::new_unchecked(&mut future)}, cx) {
             let locked = self.syntax.lock().unwrap();
             if let Some(found) = result {
                 return Poll::Ready(Ok(found.clone()));

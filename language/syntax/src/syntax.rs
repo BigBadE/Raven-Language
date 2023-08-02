@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use no_deadlocks::Mutex;
 use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
@@ -74,13 +75,17 @@ impl Syntax {
     /// Can false negative unless parsing is finished.
     /// Example: base = NumberIter<u64>, target = Iter<u64>, implementor.base = NumberIter<T>, implementor.implementor = Iter<T>
     /// Checks if base == implementor.base && target == implementor.implementor
-    pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> Option<Vec<Arc<FunctionData>>> {
+    pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>, index: usize) -> Option<Vec<Arc<FunctionData>>> {
         let implementations = syntax.lock().unwrap().implementations.clone();
-        for implementor in implementations {
-            if base.of_type(&implementor.base, syntax).await &&
-                implementor.target.of_type(&target, syntax).await {
+        for i in index..implementations.len() {
+            let implementor = implementations.get(i).unwrap();
+            println!("{} - {} is {} and {} is {}", index, implementor.base, base, target, implementor.target);
+            if implementor.base.of_type_inner(&base, syntax, i+1).await &&
+                target.of_type(&implementor.target, syntax).await {
+                println!("{} - Yep! {} is {} and {} is {}", index, implementor.base, base, target, implementor.target);
                 return Some(implementor.functions.clone());
             }
+            println!("{} - Nope! {} is {} and {} is {}", index, implementor.base, base, target, implementor.target);
         }
 
         return None;

@@ -106,40 +106,48 @@ impl FinalizedTypes {
         };
     }
 
-    #[async_recursion]
     pub async fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
+        return self.of_type_inner(other, syntax, 0).await;
+    }
+
+    #[async_recursion]
+    pub(crate) async fn of_type_inner(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>, index: usize) -> bool {
         let output = match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
                     if found == other_struct {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
+                        println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
-                        ImplementationGetter::new(syntax.clone(), self.clone(), other.clone(), ParsingError::empty()).await.is_ok()
+                        let output = ImplementationGetter::
+                        new_with_index(syntax.clone(), self.clone(), other.clone(), ParsingError::empty(), index).await.is_ok();
+                        println!("Done: {}", output);
+                        output
                     } else {
                         false
                     }
                 },
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
-                        if !self.of_type(bound, syntax).await {
+                        if !self.of_type_inner(bound, syntax, index).await {
                             return false;
                         }
                     }
                     true
                 }
-                FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax).await,
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
+                FinalizedTypes::GenericType(base, _) => self.of_type_inner(base, syntax, index).await,
+                FinalizedTypes::Reference(inner) => self.of_type_inner(inner, syntax, index).await,
                 FinalizedTypes::Array(_) => false
             },
             FinalizedTypes::Array(inner) => match other {
-                FinalizedTypes::Array(other) => inner.of_type(other, syntax).await,
-                FinalizedTypes::Reference(other) => self.of_type(other, syntax).await,
+                FinalizedTypes::Array(other) => inner.of_type_inner(other, syntax, index).await,
+                FinalizedTypes::Reference(other) => self.of_type_inner(other, syntax, index).await,
                 _ => false
             },
             FinalizedTypes::GenericType(base, _generics) => match other {
                 FinalizedTypes::GenericType(_other_base, _other_generics) => {
-                    if !base.of_type(self, syntax).await {
+                    if !base.of_type_inner(self, syntax, index).await {
                         return false;
                     }
 
@@ -148,24 +156,24 @@ impl FinalizedTypes {
                 }
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
-                        if !self.of_type(bound, syntax).await {
+                        if !self.of_type_inner(bound, syntax, index).await {
                             return false;
                         }
                     }
                     true
                 },
                 FinalizedTypes::Struct(_) => {
-                    base.of_type(other, syntax).await
+                    base.of_type_inner(other, syntax, index).await
                 },
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
+                FinalizedTypes::Reference(inner) => self.of_type_inner(inner, syntax, index).await,
                 FinalizedTypes::Array(_) => false
             }
-            FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax).await,
+            FinalizedTypes::Reference(referencing) => referencing.of_type_inner(other, syntax, index).await,
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
                     'outer: for bound in bounds {
                         for other_bound in other_bounds {
-                            if other_bound.of_type(bound, syntax).await {
+                            if other_bound.of_type_inner(bound, syntax, index).await {
                                 continue 'outer;
                             }
                         }
@@ -173,7 +181,7 @@ impl FinalizedTypes {
                     }
                     true
                 }
-                _ => other.of_type(self, syntax).await
+                _ => other.of_type_inner(self, syntax, index).await
             }
         };
         return output;

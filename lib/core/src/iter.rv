@@ -1,6 +1,4 @@
-import stdio;
-
-pub trait Iter<T> {
+/*pub trait Iter<T> {
     pub fn next(self) -> T;
 
     pub fn has_next(self) -> bool;
@@ -20,4 +18,4 @@ impl Iter<u64> for NumberIter {
     pub fn has_next(self) -> bool {
         return self.current != self.end;
     }
-}
+}*/
