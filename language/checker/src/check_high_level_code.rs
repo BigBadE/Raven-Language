@@ -1,12 +1,12 @@
 use std::mem;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use no_deadlocks::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, display_parenless, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
 use syntax::{Attribute, ParsingError};
 use syntax::syntax::Syntax;
 use crate::{CheckerVariableManager, EmptyNameResolver};
 use async_recursion::async_recursion;
-use syntax::async_getters::ImplementationGetter;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
@@ -79,15 +79,21 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             let inner = Syntax::get_struct(syntax.clone(), placeholder_error(format!("Screwed up trait {}", traits)),
                                            traits, resolver.boxed_clone()).await?;
-            let output = ImplementationGetter::new(syntax.clone(),
-                                                   inner.finalize(syntax.clone()).await, return_type.clone(),
-                                                   placeholder_error(format!("{} isn't a {}", inner, return_type))).await?;
+            let output;
+            {
+                let locked = syntax.lock().unwrap();
+                output = match locked.get_implementation(
+                    &inner.finalize(syntax.clone()).await.inner_struct().data, &return_type.clone().inner_struct().data) {
+                    Some(inner) => inner,
+                    None => return Err(placeholder_error(format!("{} isn't a {}", inner, return_type)))
+                }.functions.clone();
+            }
             let mut out = None;
             for temp in output {
                 if temp.name == method {
                     out = Some(check_method(process_manager, AsyncDataGetter::new(syntax.clone(), temp).await,
-                                 finalized_effects, syntax, variables).await?);
-                    break
+                                            finalized_effects, syntax, variables).await?);
+                    break;
                 }
             }
             out.unwrap()
@@ -109,10 +115,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for import in resolver.imports() {
                         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                               import.clone(), resolver.boxed_clone()).await {
-                            if let Ok(value) = ImplementationGetter::new(syntax.clone(),
-                                                                         return_type.clone(), value.finalize(syntax.clone()).await,
-                            placeholder_error(String::new())).await {
-                                for temp in value {
+                            if let Some(value) = syntax.lock().unwrap().get_implementation(
+                                &return_type.clone().inner_struct().data, &value.finalize(syntax.clone()).await.inner_struct().data) {
+                                for temp in &value.functions {
                                     if temp.name == method {
                                         if output.is_some() {
                                             return Err(placeholder_error(format!("Ambiguous method {}", method)));
@@ -143,7 +148,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                           first, second),
         Effects::CreateStruct(target, effects) => {
             let mut target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
-            resolver.boxed_clone(), target).await?.finalize(syntax.clone()).await;
+                                                resolver.boxed_clone(), target).await?.finalize(syntax.clone()).await;
             if let FinalizedTypes::GenericType(mut base, mut bounds) = target {
                 target = base.flatten(&mut bounds, syntax).await?;
             }
@@ -263,7 +268,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &effects, syntax, variables).await? {
+    if !check_args(&method, &effects, syntax, variables)? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -278,14 +283,14 @@ pub fn placeholder_error(message: String) -> ParsingError {
 
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                              storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
-    -> Result<Option<FinalizedEffects>, ParsingError> {
-    if check_args(&operation, &values, syntax, variables).await? {
+                             -> Result<Option<FinalizedEffects>, ParsingError> {
+    if check_args(&operation, &values, syntax, variables)? {
         return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
     }
     return Ok(None);
 }
 
-pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                         variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);
@@ -294,7 +299,7 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<Fi
     for i in 0..function.fields.len() {
         let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() && !returning.as_ref().unwrap().of_type(
-            &function.fields.get(i).unwrap().field.field_type, syntax).await {
+            &function.fields.get(i).unwrap().field.field_type, syntax) {
             println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().field.field_type);
             return Ok(false);
         }

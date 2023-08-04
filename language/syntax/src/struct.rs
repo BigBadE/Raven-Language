@@ -1,12 +1,18 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use chalk_integration::interner::ChalkIr;
+use chalk_integration::RawId;
+use chalk_ir::{AdtId, Binders, GenericArg, Substitution, TraitId, Ty, TyKind};
+use chalk_solve::rust_ir::{AdtDatum, AdtDatumBound, AdtFlags, AdtKind, TraitDatum, TraitDatumBound, TraitFlags};
+use no_deadlocks::Mutex;
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
-use crate::{AsyncGetter, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
+use crate::{is_modifier, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
 use crate::code::{FinalizedMemberField, MemberField};
 use crate::{Attribute, ParsingError};
+use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
 use crate::types::{FinalizedTypes, Types};
 
@@ -40,18 +46,24 @@ pub fn get_internal(name: String) -> Arc<StructData> {
         "bool" => BOOL.data.clone(),
         "str" => STR.data.clone(),
         _ => panic!("Unknown internal type {}", name)
-    }
+    };
 }
 
 pub static ID: std::sync::Mutex<u64> = std::sync::Mutex::new(0);
 
 #[derive(Clone)]
+pub enum ChalkData {
+    Trait(TraitDatum<ChalkIr>),
+    Struct(Ty<ChalkIr>, AdtDatum<ChalkIr>),
+}
+
+#[derive(Clone)]
 pub struct StructData {
     pub modifiers: u8,
+    pub chalk_data: ChalkData,
     pub id: u64,
     pub name: String,
     pub attributes: Vec<Attribute>,
-    pub traits: Vec<Arc<StructData>>,
     pub poisoned: Vec<ParsingError>,
 }
 
@@ -96,14 +108,61 @@ impl StructData {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
         let mut id = ID.lock().unwrap();
         *id += 1;
-        return Self {
-            attributes,
-            id: *id,
-            modifiers,
-            name,
-            traits: Vec::new(),
-            poisoned: Vec::new(),
-        };
+        if is_modifier(modifiers, Modifier::Trait) {
+            let trait_id = TraitId(RawId {
+                index: *id as u32
+            });
+            return Self {
+                attributes,
+                chalk_data: ChalkData::Trait(TraitDatum {
+                    id: trait_id,
+                    binders: Binders::empty(ChalkIr, TraitDatumBound {
+                        where_clauses: vec![],
+                    }),
+                    flags: TraitFlags {
+                        auto: false,
+                        marker: false,
+                        upstream: false,
+                        fundamental: false,
+                        non_enumerable: false,
+                        coinductive: false,
+                    },
+                    associated_ty_ids: vec![],
+                    well_known: None,
+                }),
+                id: *id,
+                modifiers,
+                name,
+                poisoned: Vec::new(),
+            };
+        } else {
+            let temp: &[GenericArg<ChalkIr>] = &[];
+            let adt_id = AdtId(RawId {
+                index: *id as u32
+            });
+            return Self {
+                attributes,
+                chalk_data: ChalkData::Struct(TyKind::Adt(adt_id,
+                                                          Substitution::from_iter(ChalkIr, temp.into_iter())).intern(ChalkIr),
+                                              AdtDatum {
+                                                  binders: Binders::empty(ChalkIr, AdtDatumBound {
+                                                      variants: vec![],
+                                                      where_clauses: vec![],
+                                                  }),
+                                                  id: adt_id,
+                                                  flags: AdtFlags {
+                                                      upstream: false,
+                                                      fundamental: false,
+                                                      phantom_data: false,
+                                                  },
+                                                  kind: AdtKind::Struct,
+                                              }),
+                id: *id,
+                modifiers,
+                name,
+                poisoned: Vec::new(),
+            };
+        }
     }
 
     pub fn fix_id(&mut self) {
@@ -111,15 +170,11 @@ impl StructData {
         *id += 1;
         self.id = *id;
     }
+
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
-        return Self {
-            attributes: Vec::new(),
-            id: 0,
-            modifiers: 0,
-            name,
-            traits: Vec::new(),
-            poisoned: vec!(error),
-        };
+        let mut output = Self::new(Vec::new(), 0, name);
+        output.poisoned = vec!(error);
+        return output;
     }
 }
 
@@ -140,7 +195,7 @@ impl FinalizedStruct {
                     let name = name.clone();
                     let temp: &FinalizedTypes = generics.get(i).unwrap();
                     for bound in bounds {
-                        if !temp.of_type(&bound, syntax).await {
+                        if !temp.of_type(&bound, syntax) {
                             panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
                         }
                     }

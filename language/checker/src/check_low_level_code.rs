@@ -5,7 +5,6 @@ use syntax::ParsingError;
 use syntax::syntax::Syntax;
 use crate::{CheckerVariableManager, EmptyNameResolver};
 use async_recursion::async_recursion;
-use syntax::async_getters::ImplementationGetter;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::types::FinalizedTypes;
 use crate::check_high_level_code::{assign_with_priority, check_args, check_operation, placeholder_error};
@@ -88,12 +87,20 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits, resolver.boxed_clone()).await {
                 let mut output = None;
-                let result = ImplementationGetter::new(syntax.clone(),
-                                                       return_type.clone(), inner.finalize(syntax.clone()).await,
-                placeholder_error(format!("{} doesn't implement {}", return_type, inner))).await?;
-                for temp in result {
-                    if temp.name == method {
-                        output = Some(temp.clone());
+                {
+                    let locked = syntax.lock().unwrap();
+                    let result = match locked.get_implementation(
+                        &return_type.inner_struct().data,
+                        &inner.finalize(syntax.clone()).await.inner_struct().data)
+                    {
+                        Some(inner) => inner,
+                        None => return Err(placeholder_error(format!("{} doesn't implement {}", return_type, inner)))
+                    };
+
+                    for temp in &result.functions {
+                        if temp.name == method {
+                            output = Some(temp.clone());
+                        }
                     }
                 }
 
@@ -120,10 +127,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     for import in resolver.imports() {
                         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                               import.clone(), resolver.boxed_clone()).await {
-                            if let Ok(value) = ImplementationGetter::new(syntax.clone(),
-                                                                         return_type.clone(), value.finalize(syntax.clone()).await,
-                                                                         placeholder_error(String::new())).await {
-                                for temp in value {
+                            if let Some(value) = syntax.lock().unwrap().get_implementation(
+                                                                         &return_type.inner_struct().data,
+                                                                         &value.finalize(syntax.clone()).await.inner_struct().data) {
+                                for temp in &value.functions {
                                     if temp.name == method {
                                         if output.is_some() {
                                             return Err(placeholder_error(format!("Ambiguous method {}", method)));
@@ -276,7 +283,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &effects, syntax, variables).await? {
+    if !check_args(&method, &effects, syntax, variables)? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));

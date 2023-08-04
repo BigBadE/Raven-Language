@@ -7,3 +7,6 @@
 [submodule "crates/async-trait"]
 	path = crates/async-trait
 	url = git@github.com:BigBadE/async-trait.git
+[submodule "crates/chalk"]
+	path = crates/chalk
+	url = git@github.com:rust-lang/chalk.git

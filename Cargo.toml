@@ -12,3 +12,8 @@ members = [
     "tools/ide-plugins/raven-intellij-natives",
     "tools/ide-plugins/raven-language-server"
 ]
+
+exclude = [
+
+    "crates/chalk"
+]

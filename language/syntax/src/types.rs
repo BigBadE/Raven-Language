@@ -5,7 +5,6 @@ use std::sync::Arc; use no_deadlocks::Mutex;
 use async_recursion::async_recursion;
 use crate::function::{display, display_parenless};
 use crate::{is_modifier, Modifier, ParsingError, StructData};
-use crate::async_getters::ImplementationGetter;
 use crate::async_util::AsyncDataGetter;
 use crate::code::FinalizedMemberField;
 use crate::r#struct::FinalizedStruct;
@@ -93,7 +92,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structure) => structure,
             FinalizedTypes::Reference(inner) => inner.inner_struct(),
-            _ => panic!("Tried to get inner struct of invalid type!")
+            _ => panic!("Tried to get inner struct of invalid type! {:?}", self)
         };
     }
 
@@ -106,12 +105,7 @@ impl FinalizedTypes {
         };
     }
 
-    pub async fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
-        return self.of_type_inner(other, syntax, 0).await;
-    }
-
-    #[async_recursion]
-    pub(crate) async fn of_type_inner(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>, index: usize) -> bool {
+    pub fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
         let output = match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
@@ -120,34 +114,31 @@ impl FinalizedTypes {
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
-                        let output = ImplementationGetter::
-                        new_with_index(syntax.clone(), self.clone(), other.clone(), ParsingError::empty(), index).await.is_ok();
-                        println!("Done: {}", output);
-                        output
+                        syntax.lock().unwrap().solve(&found.data, &other_struct.data)
                     } else {
                         false
                     }
                 },
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
-                        if !self.of_type_inner(bound, syntax, index).await {
+                        if !self.of_type(bound, syntax) {
                             return false;
                         }
                     }
                     true
                 }
-                FinalizedTypes::GenericType(base, _) => self.of_type_inner(base, syntax, index).await,
-                FinalizedTypes::Reference(inner) => self.of_type_inner(inner, syntax, index).await,
+                FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax),
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
                 FinalizedTypes::Array(_) => false
             },
             FinalizedTypes::Array(inner) => match other {
-                FinalizedTypes::Array(other) => inner.of_type_inner(other, syntax, index).await,
-                FinalizedTypes::Reference(other) => self.of_type_inner(other, syntax, index).await,
+                FinalizedTypes::Array(other) => inner.of_type(other, syntax),
+                FinalizedTypes::Reference(other) => self.of_type(other, syntax),
                 _ => false
             },
             FinalizedTypes::GenericType(base, _generics) => match other {
                 FinalizedTypes::GenericType(_other_base, _other_generics) => {
-                    if !base.of_type_inner(self, syntax, index).await {
+                    if !base.of_type(self, syntax) {
                         return false;
                     }
 
@@ -156,24 +147,24 @@ impl FinalizedTypes {
                 }
                 FinalizedTypes::Generic(_, bounds) => {
                     for bound in bounds {
-                        if !self.of_type_inner(bound, syntax, index).await {
+                        if !self.of_type(bound, syntax) {
                             return false;
                         }
                     }
                     true
                 },
                 FinalizedTypes::Struct(_) => {
-                    base.of_type_inner(other, syntax, index).await
+                    base.of_type(other, syntax)
                 },
-                FinalizedTypes::Reference(inner) => self.of_type_inner(inner, syntax, index).await,
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
                 FinalizedTypes::Array(_) => false
             }
-            FinalizedTypes::Reference(referencing) => referencing.of_type_inner(other, syntax, index).await,
+            FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax),
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
                     'outer: for bound in bounds {
                         for other_bound in other_bounds {
-                            if other_bound.of_type_inner(bound, syntax, index).await {
+                            if other_bound.of_type(bound, syntax) {
                                 continue 'outer;
                             }
                         }
@@ -181,7 +172,7 @@ impl FinalizedTypes {
                     }
                     true
                 }
-                _ => other.of_type_inner(self, syntax, index).await
+                _ => other.of_type(self, syntax)
             }
         };
         return output;
@@ -192,7 +183,7 @@ impl FinalizedTypes {
         match self {
             FinalizedTypes::Generic(_name, bounds) => {
                 for bound in bounds {
-                    if !other.of_type(bound, syntax).await {
+                    if !other.of_type(bound, syntax) {
                         return Err(bounds_error);
                     }
                 }
@@ -209,7 +200,7 @@ impl FinalizedTypes {
             FinalizedTypes::Generic(name, bounds) => {
                 return if let Some(found) = generics.get(name) {
                     for bound in bounds {
-                        if !found.of_type(bound, syntax).await {
+                        if !found.of_type(bound, syntax) {
                             return Err(bounds_error);
                         }
                     }
@@ -251,6 +242,7 @@ impl FinalizedTypes {
                     other.name = name.clone();
                     let other = Arc::new(other);
                     syntax.lock().unwrap().structures.types.insert(name, other.clone());
+                    syntax.lock().unwrap().structures.sorted.push(other.clone());
                     let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), other.clone()).await.deref());
                     data.degeneric(generics, syntax).await?;
                     let data = Arc::new(data);

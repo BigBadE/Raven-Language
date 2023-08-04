@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use chalk_integration::interner::ChalkIr;
+use chalk_integration::RawId;
+use chalk_ir::{DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, WhereClause};
+use chalk_recursive::RecursiveSolver;
+use chalk_solve::ext::GoalExt;
+use chalk_solve::Solver;
 use no_deadlocks::Mutex;
 use tokio::runtime::Handle;
 
@@ -10,8 +16,7 @@ use crate::{FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, 
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
-use crate::r#struct::{FinalizedStruct, StructData};
-use crate::types::FinalizedTypes;
+use crate::r#struct::{ChalkData, FinalizedStruct, StructData};
 
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
@@ -71,24 +76,33 @@ impl Syntax {
         self.functions.wakers.clear();
     }
 
-    /// Checks if the given target type matches the base type.
-    /// Can false negative unless parsing is finished.
-    /// Example: base = NumberIter<u64>, target = Iter<u64>, implementor.base = NumberIter<T>, implementor.implementor = Iter<T>
-    /// Checks if base == implementor.base && target == implementor.implementor
-    pub async fn of_types(base: &FinalizedTypes, target: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>, index: usize) -> Option<Vec<Arc<FunctionData>>> {
-        let implementations = syntax.lock().unwrap().implementations.clone();
-        for i in index..implementations.len() {
-            let implementor = implementations.get(i).unwrap();
-            println!("{} - {} is {} and {} is {}", index, implementor.base, base, target, implementor.target);
-            if implementor.base.of_type_inner(&base, syntax, i+1).await &&
-                target.of_type(&implementor.target, syntax).await {
-                println!("{} - Yep! {} is {} and {} is {}", index, implementor.base, base, target, implementor.target);
-                return Some(implementor.functions.clone());
+    pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<&FinishedTraitImplementor> {
+        for implementation in &self.implementations {
+            if self.solve(&implementation.base.inner_struct().data, first) &&
+                self.solve(second, &implementation.target.inner_struct().data) {
+                return Some(implementation);
             }
-            println!("{} - Nope! {} is {} and {} is {}", index, implementor.base, base, target, implementor.target);
         }
-
         return None;
+    }
+
+    pub fn solve(&self, first: &StructData, second: &StructData) -> bool {
+        let types;
+        if let ChalkData::Struct(found_type, _) = &first.chalk_data {
+            types = found_type.clone();
+        } else {
+            panic!("Tried to solve with a trait arg!");
+        }
+        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(types))];
+        let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
+            WhereClause::Implemented(TraitRef {
+                trait_id: TraitId(RawId { index: second.id as u32 }),
+                substitution: Substitution::from_iter(ChalkIr, elements.into_iter())
+            })
+        )));
+
+        return RecursiveSolver::new(30, 3000, None)
+            .solve(self, &goal.into_closed_goal(ChalkIr)).is_some();
     }
 
     // Adds the top element to the syntax
@@ -107,7 +121,9 @@ impl Syntax {
                 //Ignored if one is poisoned
             }
         } else {
-            T::get_manager(locked.deref_mut()).types.insert(adding.name().clone(), adding.clone());
+            let manager = T::get_manager(locked.deref_mut());
+            manager.sorted.push(adding.clone());
+            manager.types.insert(adding.name().clone(), adding.clone());
         }
 
         let name = adding.name().clone();
@@ -143,6 +159,7 @@ impl Syntax {
 
         let getter = T::get_manager(self);
         if getter.types.get_mut(element.name()).is_none() {
+            getter.sorted.push(element.clone());
             getter.types.insert(element.name().clone(), element.clone());
         }
 

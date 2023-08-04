@@ -18,6 +18,7 @@ use crate::types::{FinalizedTypes, Types};
 
 pub mod async_getters;
 pub mod async_util;
+pub mod chalk_support;
 pub mod code;
 pub mod function;
 pub mod r#struct;
