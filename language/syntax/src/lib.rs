@@ -4,7 +4,10 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use chalk_integration::interner::ChalkIr;
+use chalk_solve::rust_ir::ImplDatum;
+use no_deadlocks::Mutex;
 use indexmap::IndexMap;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
@@ -220,6 +223,7 @@ pub struct FinishedTraitImplementor {
     pub target: FinalizedTypes,
     //Would be NumberIter<T>
     pub base: FinalizedTypes,
+    pub chalk_type: Arc<ImplDatum<ChalkIr>>,
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
     pub attributes: Vec<Attribute>,
     pub functions: Vec<Arc<FunctionData>>,

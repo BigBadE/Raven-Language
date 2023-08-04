@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use chalk_integration::interner::ChalkIr;
+use chalk_integration::RawId;
 use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
 use chalk_solve::rust_ir::{AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum,
                            AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
@@ -17,7 +18,7 @@ impl Debug for Syntax {
 }
 
 impl RustIrDatabase<ChalkIr> for Syntax {
-    fn custom_clauses(&self) -> Vec<chalk_ir::ProgramClause<ChalkIr>> {
+    fn custom_clauses(&self) -> Vec<ProgramClause<ChalkIr>> {
         return Vec::new();
     }
 
@@ -63,8 +64,8 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         todo!()
     }
 
-    fn impl_datum(&self, _impl_id: chalk_ir::ImplId<ChalkIr>) -> Arc<ImplDatum<ChalkIr>> {
-        todo!()
+    fn impl_datum(&self, impl_id: ImplId<ChalkIr>) -> Arc<ImplDatum<ChalkIr>> {
+        return self.implementations.get(impl_id.0.index as usize).unwrap().chalk_type.clone();
     }
 
     fn associated_ty_value(&self, _id: AssociatedTyValueId<ChalkIr>) -> Arc<AssociatedTyValue<ChalkIr>> {
@@ -82,11 +83,16 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     fn impls_for_trait(&self, trait_id: chalk_ir::TraitId<ChalkIr>, _parameters: &[chalk_ir::GenericArg<ChalkIr>],
                        _binders: &chalk_ir::CanonicalVarKinds<ChalkIr>) -> Vec<ImplId<ChalkIr>> {
         let mut output = Vec::new();
+        let mut i = 0;
         for implementation in &self.implementations {
-            if implementation.base.inner_struct().data.id as u32 == trait_id.0.index {
-                output.push(ImplId(trait_id.0));
+            if implementation.target.inner_struct().data.id as u32 == trait_id.0.index {
+                output.push(ImplId(RawId {
+                    index: i
+                }));
             }
+            i += 1;
         }
+        println!("Found impls: {} of {}", output.len(), self.implementations.len());
         output
     }
 
@@ -102,9 +108,8 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         todo!()
     }
 
-    fn program_clauses_for_env(&self, _environment: &chalk_ir::Environment<ChalkIr>) -> ProgramClauses<ChalkIr> {
-        let temp: &[ProgramClause<ChalkIr>] = &[];
-        ProgramClauses::from_iter(ChalkIr, temp)
+    fn program_clauses_for_env(&self, environment: &chalk_ir::Environment<ChalkIr>) -> ProgramClauses<ChalkIr> {
+        chalk_solve::program_clauses_for_env(self, environment)
     }
 
     fn interner(&self) -> ChalkIr {

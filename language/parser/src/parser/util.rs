@@ -83,12 +83,17 @@ impl<'a> ParserUtils<'a> {
             }
             generics.insert(generic, final_bounds);
         }
+        let target = implementor.base.await?.finalize(syntax.clone()).await;
+        let base = implementor.implementor.await?.finalize(syntax.clone()).await;
+        let chalk_type = Arc::new(Syntax::make_impldatum(&target.inner_struct().data.chalk_data.to_trait(),
+                                                         &base.inner_struct().data.chalk_data.to_struct().0));
         let output = FinishedTraitImplementor {
-            target: implementor.base.await?.finalize(syntax.clone()).await,
-            generics,
-            base: implementor.implementor.await?.finalize(syntax.clone()).await,
+            target,
+            base,
             attributes: implementor.attributes,
             functions: implementor.functions,
+            chalk_type,
+            generics,
         };
 
         let mut locked = syntax.lock().unwrap();

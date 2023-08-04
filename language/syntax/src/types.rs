@@ -92,6 +92,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structure) => structure,
             FinalizedTypes::Reference(inner) => inner.inner_struct(),
+            FinalizedTypes::GenericType(base, _) => base.inner_struct(),
             _ => panic!("Tried to get inner struct of invalid type! {:?}", self)
         };
     }

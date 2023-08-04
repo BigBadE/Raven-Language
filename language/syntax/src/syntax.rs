@@ -3,9 +3,10 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
-use chalk_ir::{DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, WhereClause};
+use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
+use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity, TraitDatum};
 use chalk_solve::Solver;
 use no_deadlocks::Mutex;
 use tokio::runtime::Handle;
@@ -74,6 +75,19 @@ impl Syntax {
         }
         self.structures.wakers.clear();
         self.functions.wakers.clear();
+    }
+
+    pub fn make_impldatum(first: &TraitDatum<ChalkIr>, second: &Ty<ChalkIr>) -> ImplDatum<ChalkIr> {
+        let data: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(second.clone()))];
+        return ImplDatum {
+            polarity: Polarity::Positive,
+            binders: Binders::empty(ChalkIr, ImplDatumBound {
+                trait_ref: TraitRef { trait_id: first.id.clone(), substitution: Substitution::from_iter(ChalkIr, data) },
+                where_clauses: vec![],
+            }),
+            impl_type: ImplType::Local,
+            associated_ty_value_ids: vec![],
+        }
     }
 
     pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<&FinishedTraitImplementor> {

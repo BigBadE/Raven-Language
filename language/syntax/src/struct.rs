@@ -57,6 +57,22 @@ pub enum ChalkData {
     Struct(Ty<ChalkIr>, AdtDatum<ChalkIr>),
 }
 
+impl ChalkData {
+    pub fn to_trait(&self) -> &TraitDatum<ChalkIr> {
+        return match self {
+            ChalkData::Trait(inner) => inner,
+            _ => panic!("Expected struct, found trait")
+        }
+    }
+
+    pub fn to_struct(&self) -> (&Ty<ChalkIr>, &AdtDatum<ChalkIr>) {
+        return match self {
+            ChalkData::Struct(types, inner) => (types, inner),
+            _ => panic!("Expected struct, found trait"),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct StructData {
     pub modifiers: u8,
