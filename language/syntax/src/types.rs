@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use chalk_integration::interner::ChalkIr;
+use chalk_integration::ty;
+use chalk_ir::{BoundVar, Const, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind, TyVariableKind, VariableKind};
+use chalk_solve::rust_ir::TraitDatum;
+use indexmap::IndexMap;
+use no_deadlocks::Mutex;
 use async_recursion::async_recursion;
 use crate::function::{display, display_parenless};
 use crate::{is_modifier, Modifier, ParsingError, StructData};
 use crate::async_util::AsyncDataGetter;
 use crate::code::FinalizedMemberField;
-use crate::r#struct::FinalizedStruct;
+use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -88,11 +94,60 @@ impl FinalizedTypes {
         }
     }
 
+    pub fn to_trait(&self, binders: &Vec<&String>) -> TraitDatum<ChalkIr> {
+        if let FinalizedTypes::Struct(inner) = self {
+            if let ChalkData::Trait(traits) = &inner.data.chalk_data {
+                return traits.clone();
+            } else {
+                panic!("Expected trait, found struct!");
+            }
+        } else if let FinalizedTypes::GenericType(base, _) = self {
+            return base.to_trait(binders);
+        } else if let FinalizedTypes::Reference(inner) = self {
+            return inner.to_trait(binders);
+        } else {
+            panic!("Expected trait, found {:?}", self);
+        }
+    }
+
+    pub fn to_chalk_type(&self, binders: &Vec<&String>) -> Ty<ChalkIr> {
+        return match self {
+            FinalizedTypes::Struct(structure) =>
+                if let ChalkData::Struct(types, _) = &structure.data.chalk_data {
+                    return types.clone();
+                } else {
+                    panic!("Tried to get chalk type of struct!")
+                },
+            FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
+            FinalizedTypes::Array(inner) => TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
+            FinalizedTypes::Generic(name, _bounds) => {
+                let index = binders.iter().position(|found| *found == name).unwrap();
+                TyKind::BoundVar(BoundVar {
+                    debruijn: DebruijnIndex::INNERMOST,
+                    index,
+                }).intern(ChalkIr)
+            },
+            FinalizedTypes::GenericType(inner, bounds) => {
+                if let TyKind::Adt(id, _) = inner.to_chalk_type(binders).data(ChalkIr).kind {
+                    let mut generic_args = Vec::new();
+                    for arg in bounds {
+                        generic_args.push(GenericArgData::Ty(arg.to_chalk_type(binders)).intern(ChalkIr));
+                    }
+                    return TyKind::Adt(id,
+                                       Substitution::from_iter(ChalkIr, generic_args))
+                        .intern(ChalkIr);
+                } else {
+                    panic!()
+                }
+            }
+        }
+    }
+
     pub fn inner_struct(&self) -> &Arc<FinalizedStruct> {
         return match self {
             FinalizedTypes::Struct(structure) => structure,
             FinalizedTypes::Reference(inner) => inner.inner_struct(),
-            FinalizedTypes::GenericType(base, _) => base.inner_struct(),
+            FinalizedTypes::GenericType(inner, _) => inner.inner_struct(),
             _ => panic!("Tried to get inner struct of invalid type! {:?}", self)
         };
     }

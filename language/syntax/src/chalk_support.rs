@@ -85,6 +85,12 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         let mut output = Vec::new();
         let mut i = 0;
         for implementation in &self.implementations {
+            println!("{} vs {}", implementation.target.inner_struct().data.id as u32, trait_id.0.index);
+            for (name, value) in &self.structures.types {
+                if let ChalkData::Trait(_) = value.chalk_data {
+                    println!("Trait {}: {}", name, value.id);
+                }
+            }
             if implementation.target.inner_struct().data.id as u32 == trait_id.0.index {
                 output.push(ImplId(RawId {
                     index: i

@@ -85,8 +85,8 @@ impl<'a> ParserUtils<'a> {
         }
         let target = implementor.base.await?.finalize(syntax.clone()).await;
         let base = implementor.implementor.await?.finalize(syntax.clone()).await;
-        let chalk_type = Arc::new(Syntax::make_impldatum(&target.inner_struct().data.chalk_data.to_trait(),
-                                                         &base.inner_struct().data.chalk_data.to_struct().0));
+        let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
+                                                         &target, &base));
         let output = FinishedTraitImplementor {
             target,
             base,

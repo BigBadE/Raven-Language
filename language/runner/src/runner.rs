@@ -46,6 +46,7 @@ pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
         }
     }
 
+    println!("Finished!");
     syntax.lock().unwrap().finish();
 
     if !errors.is_empty() {

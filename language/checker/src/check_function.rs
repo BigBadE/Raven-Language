@@ -1,14 +1,14 @@
 use std::collections::HashMap;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use no_deadlocks::Mutex;
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::{Attribute, is_modifier, Modifier, ParsingError};
 use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use crate::check_high_level_code::{placeholder_error, verify_high_code};
 use crate::{CheckerVariableManager, finalize_generics};
-use crate::check_low_level_code::verify_low_code;
+use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
 pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
@@ -60,25 +60,21 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
-    let mut code_output = if include_refs {
-        verify_low_code(process_manager, &resolver, function.code, function.data.attributes.iter()
-            .any(|inner| if let Attribute::Basic(inner) = inner {
-                inner == "extern"
-            } else {
-                false
-            }), syntax, &mut variable_manager).await?
-    } else {
-        verify_high_code(process_manager, &resolver, function.code, syntax, &mut variable_manager).await?
-    };
+    let (returns, mut code) = verify_code(process_manager, &resolver, function.code, function.data.attributes.iter()
+        .any(|inner| if let Attribute::Basic(inner) = inner {
+            inner == "extern"
+        } else {
+            false
+        }), syntax, &mut variable_manager, include_refs).await?;
 
-    if !code_output.0 {
+    if !returns {
         if function.return_type.is_none() {
-            code_output.1.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
+            code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
         } else if is_modifier(function.data.modifiers, Modifier::Trait) {
             return Err(placeholder_error(format!("Function {} doesn't return a {}!", function.data.name,
                                                  codeless.return_type.as_ref().unwrap())));
         }
     }
 
-    return Ok(codeless.clone().add_code(code_output.1));
+    return Ok(codeless.clone().add_code(code));
 }

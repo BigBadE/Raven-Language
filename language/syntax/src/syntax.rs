@@ -3,11 +3,12 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
-use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, WhereClause};
+use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity, TraitDatum};
 use chalk_solve::Solver;
+use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 use tokio::runtime::Handle;
 
@@ -18,6 +19,7 @@ use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct, StructData};
+use crate::types::FinalizedTypes;
 
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
@@ -77,11 +79,21 @@ impl Syntax {
         self.functions.wakers.clear();
     }
 
-    pub fn make_impldatum(first: &TraitDatum<ChalkIr>, second: &Ty<ChalkIr>) -> ImplDatum<ChalkIr> {
+    pub fn make_impldatum(generics: &IndexMap<String, Vec<FinalizedTypes>>,
+                          first: &FinalizedTypes, second: &FinalizedTypes) -> ImplDatum<ChalkIr> {
+
+        let vec_generics = generics.keys().collect::<Vec<_>>();
+        let first = first.to_trait(&vec_generics);
+        let mut binders: Vec<VariableKind<ChalkIr>> = Vec::new();
+        //TODO figure out where this is used.
+        for _value in generics.values() {
+            binders.push(VariableKind::Ty(TyVariableKind::General));
+        }
+        let second = second.to_chalk_type(&vec_generics);
         let data: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(second.clone()))];
         return ImplDatum {
             polarity: Polarity::Positive,
-            binders: Binders::empty(ChalkIr, ImplDatumBound {
+            binders: Binders::new(VariableKinds::from_iter(ChalkIr, binders), ImplDatumBound {
                 trait_ref: TraitRef { trait_id: first.id.clone(), substitution: Substitution::from_iter(ChalkIr, data) },
                 where_clauses: vec![],
             }),
@@ -90,11 +102,11 @@ impl Syntax {
         }
     }
 
-    pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<&FinishedTraitImplementor> {
+    pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
         for implementation in &self.implementations {
             if self.solve(&implementation.base.inner_struct().data, first) &&
                 self.solve(second, &implementation.target.inner_struct().data) {
-                return Some(implementation);
+                return Some(implementation.functions.clone());
             }
         }
         return None;

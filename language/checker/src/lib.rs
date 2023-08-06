@@ -9,9 +9,8 @@ use syntax::{ParsingError, ParsingFuture, VariableManager};
 use syntax::code::FinalizedEffects;
 use syntax::syntax::Syntax;
 
-pub mod check_high_level_code;
 pub mod check_function;
-pub mod check_low_level_code;
+pub mod check_code;
 pub mod check_struct;
 pub mod output;
 
