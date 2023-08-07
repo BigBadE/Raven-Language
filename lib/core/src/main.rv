@@ -6,5 +6,5 @@ import math::Cast;
 pub fn main() -> u64 {
     printf("This is a printed string! Wowie!");
     let i = 0;
-    return i.cast();
+    return i.cast<u64>();
 }

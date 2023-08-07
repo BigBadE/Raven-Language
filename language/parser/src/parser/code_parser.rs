@@ -49,7 +49,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
 
                         let name = last.to_string(parser_utils.buffer);
                         effect = Some(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
-                                                          name.clone(), effects));
+                                                          name.clone(), effects, None));
                     }
                     _ => if let Some(expression) = parse_line(parser_utils, break_at_body, true)? {
                         effect = Some(expression.effect);
@@ -120,19 +120,24 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) &&
                     token.to_string(parser_utils.buffer) == "<" &&
                     last.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
-                    return Ok(Some(Expression::new(expression_type, parse_generic_method(effect, parser_utils)?)));
+                    effect = Some(parse_generic_method(effect, parser_utils)?);
+                } else {
+                    return Ok(Some(Expression::new(expression_type, parse_operator(effect, parser_utils)?)));
                 }
-                return Ok(Some(Expression::new(expression_type, parse_operator(effect, parser_utils)?)));
             }
             TokenTypes::ArgumentEnd => if !deep {
                 break;
             },
-            TokenTypes::CallingType =>
-                if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {
-                    //Ignored, ParenOpen handles this
+            TokenTypes::CallingType => {
+                let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
+                if next.token_type == TokenTypes::ParenOpen ||
+                    (next.token_type == TokenTypes::Operator && next.to_string(parser_utils.buffer) == "<" &&
+                    token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ') {
+                    //Ignored, ParenOpen or Operator handles this
                 } else {
                     effect = Some(Effects::Load(Box::new(effect.unwrap()), token.to_string(parser_utils.buffer)))
-                },
+                }
+            },
             TokenTypes::EOF => {
                 parser_utils.index -= 1;
                 break;
@@ -173,15 +178,19 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
 
 fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     -> Result<Effects, ParsingError> {
-    let returning;
-    if let UnparsedType::Generic(_, bounds) = add_generics(String::new(), parser_utils).0 {
+    let name = parser_utils.tokens.get(parser_utils.index-2).unwrap().to_string(parser_utils.buffer);
+    let returning: Option<UnparsedType> = if let UnparsedType::Generic(_, bounds) = add_generics(String::new(), parser_utils).0 {
         if bounds.len() != 1 {
             parser_utils.tokens.get(parser_utils.index-1).unwrap().make_error(parser_utils.file.clone(),
             format!("Expected one generic argument!"));
         }
-        returning = bounds.get(0).unwrap();
-    }
+        let types: &UnparsedType = bounds.get(0).unwrap();
+        Some(types.clone())
+    } else {
+        None
+    };
 
+    parser_utils.index += 1;
     let mut effects = Vec::new();
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
         while let Some(expression) = parse_line(parser_utils, false, false)? {
@@ -195,9 +204,8 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
         parser_utils.index += 1;
     }
 
-    let name = parser_utils.tokens.get(parser_utils.index-1).unwrap().to_string(parser_utils.buffer);
     return Ok(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
-                                      name.clone(), effects));
+                                      name.clone(), effects, returning));
 }
 
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {

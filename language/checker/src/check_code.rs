@@ -77,7 +77,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                      operation, true, Box::new(EmptyNameResolver {})).await?;
             }
         }
-        Effects::ImplementationCall(calling, traits, method, effects) => {
+        Effects::ImplementationCall(calling, traits, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables, references).await?)
@@ -123,13 +123,19 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
                 }
 
+                let returning = match returning {
+                    Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
+                                                           resolver, inner).await?.finalize(syntax.clone()).await),
+                    None => None
+                };
+
                 check_method(process_manager, AsyncDataGetter::new(syntax.clone(), output.unwrap()).await,
-                             finalized_effects, syntax, variables).await?
+                             finalized_effects, syntax, variables, returning).await?
             } else {
                 panic!("Screwed up trait!");
             }
         }
-        Effects::MethodCall(calling, method, effects) => {
+        Effects::MethodCall(calling, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables, references).await?)
@@ -142,7 +148,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                         method.clone(), false, resolver.boxed_clone()).await {
                     value
                 } else {
-                    let mut output = None;
+                    let output = None;
                     while !syntax.lock().unwrap().async_manager.finished {
                         check(syntax, &resolver, &method, &return_type).await?;
                         thread::yield_now();
@@ -163,8 +169,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                      method, false, resolver.boxed_clone()).await?
             };
 
+            let returning = match returning {
+                Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
+                                                       resolver, inner).await?.finalize(syntax.clone()).await),
+                None => None
+            };
             check_method(process_manager, AsyncDataGetter::new(syntax.clone(), method).await,
-                         finalized_effects, syntax, variables).await?
+                         finalized_effects, syntax, variables, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
@@ -252,8 +263,10 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 
 async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                      variables: &mut CheckerVariableManager) -> Result<FinalizedEffects, ParsingError> {
+                      variables: &mut CheckerVariableManager,
+                      returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
+        println!("Returning for {}? {}", method.data.name, returning.is_some());
         let mut manager = process_manager.clone();
 
         for i in 0..method.fields.len() {
@@ -264,6 +277,18 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                     manager.generics.insert(name, effect);
                 } else {
                     panic!("Guh?");
+                }
+            }
+        }
+
+        if let Some(inner) = method.return_type.clone() {
+            if let Some(returning) = returning {
+                if let Some(old) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
+                    if let FinalizedTypes::Generic(name, _) = old {
+                        manager.generics.insert(name, returning);
+                    } else {
+                        panic!("Guh?");
+                    }
                 }
             }
         }
@@ -313,7 +338,17 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &effects, syntax, variables)? {
+    let mut found = false;
+    while !syntax.lock().unwrap().async_manager.finished {
+        if !check_args(&method, &effects, syntax, variables)? {
+            thread::yield_now();
+        } else {
+            found = true;
+            break;
+        }
+    }
+
+    if !found && !check_args(&method, &effects, syntax, variables)? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -334,6 +369,12 @@ pub fn placeholder_error(message: String) -> ParsingError {
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                              storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
                              -> Result<Option<FinalizedEffects>, ParsingError> {
+    while !syntax.lock().unwrap().async_manager.finished {
+        if check_args(&operation, &values, syntax, variables)? {
+            return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
+        }
+        thread::yield_now();
+    }
     if check_args(&operation, &values, syntax, variables)? {
         return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
     }

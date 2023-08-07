@@ -140,11 +140,11 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
     let mut top = Vec::new();
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
     Effects::CreateVariable(name.clone(), Box::new(Effects::ImplementationCall(
-        Box::new(effect.clone()), "iter::Iter".to_string(), "iter::next".to_string(), vec!())))));
+        Box::new(effect.clone()), "iter::Iter".to_string(), "iter::next".to_string(), vec!(), None)))));
     body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string())));
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::ImplementationCall(
-        Box::new(effect), "iter::Iter".to_string(), "iter::has_next".to_string(), vec!())),
+        Box::new(effect), "iter::Iter".to_string(), "iter::has_next".to_string(), vec!(), None)),
                                   body.label.clone(), id.to_string() + "end")));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
 

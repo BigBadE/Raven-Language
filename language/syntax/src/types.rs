@@ -3,10 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 use chalk_integration::interner::ChalkIr;
-use chalk_integration::ty;
-use chalk_ir::{BoundVar, Const, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind, TyVariableKind, VariableKind};
+use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
-use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 use async_recursion::async_recursion;
 use crate::function::{display, display_parenless};
@@ -326,7 +324,7 @@ impl FinalizedTypes {
             FinalizedTypes::Struct(structs) => structs.data.name.clone(),
             FinalizedTypes::Reference(structs) => structs.name(),
             FinalizedTypes::Array(inner) => format!("[{}]", inner.name()),
-            FinalizedTypes::Generic(_, _) => panic!("Generics should never be named"),
+            FinalizedTypes::Generic(name, _) => panic!("Generics should never be named, tried to get {}", name),
             FinalizedTypes::GenericType(_, _) => panic!("Generics should never be named")
         };
     }

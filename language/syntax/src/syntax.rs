@@ -3,10 +3,11 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
-use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, TyVariableKind, VariableKind, VariableKinds, WhereClause};
+use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution,
+               TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
-use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity, TraitDatum};
+use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
 use chalk_solve::Solver;
 use indexmap::IndexMap;
 use no_deadlocks::Mutex;

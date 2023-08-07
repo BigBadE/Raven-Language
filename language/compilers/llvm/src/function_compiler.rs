@@ -179,6 +179,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         FinalizedEffects::MethodCall(pointer, calling_function, arguments) => {
             let mut final_arguments = Vec::new();
 
+            println!("Calling {}", calling_function.data.name);
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 

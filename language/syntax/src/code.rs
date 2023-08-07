@@ -117,10 +117,10 @@ pub enum Effects {
     //Comparison effect, and label to jump to the first if true, second if false
     CompareJump(Box<Effects>, String, String),
     CodeBody(CodeBody),
-    //Calling, trait to call, function name, args
-    ImplementationCall(Box<Effects>, String, String, Vec<Effects>),
-    //Calling, calling function, function arguments
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>),
+    //Calling, trait to call, function name, args, and return type (if explicitly required)
+    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
+    //Calling, calling function, function arguments, and return type (if explicitly required)
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>),
     //Sets pointer to value
     Set(Box<Effects>, Box<Effects>),
     //Loads variable
