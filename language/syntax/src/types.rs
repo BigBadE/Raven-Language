@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
+use std::thread;
 use chalk_integration::interner::ChalkIr;
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
@@ -168,7 +169,13 @@ impl FinalizedTypes {
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
-                        syntax.lock().unwrap().solve(&found.data, &other_struct.data)
+                        while !syntax.lock().unwrap().async_manager.finished {
+                            if syntax.lock().unwrap().solve(&found.data, &other_struct.data) {
+                                return true;
+                            }
+                            thread::yield_now();
+                        }
+                        return syntax.lock().unwrap().solve(&found.data, &other_struct.data);
                     } else {
                         false
                     }

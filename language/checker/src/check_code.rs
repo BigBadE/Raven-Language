@@ -338,17 +338,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
         return Ok(temp_effect);
     }
 
-    let mut found = false;
-    while !syntax.lock().unwrap().async_manager.finished {
-        if !check_args(&method, &effects, syntax, variables)? {
-            thread::yield_now();
-        } else {
-            found = true;
-            break;
-        }
-    }
-
-    if !found && !check_args(&method, &effects, syntax, variables)? {
+    if !check_args(&method, &effects, syntax, variables)? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -369,12 +359,6 @@ pub fn placeholder_error(message: String) -> ParsingError {
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                              storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
                              -> Result<Option<FinalizedEffects>, ParsingError> {
-    while !syntax.lock().unwrap().async_manager.finished {
-        if check_args(&operation, &values, syntax, variables)? {
-            return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
-        }
-        thread::yield_now();
-    }
     if check_args(&operation, &values, syntax, variables)? {
         return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
     }

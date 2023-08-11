@@ -59,6 +59,10 @@ impl Syntax {
         };
     }
 
+    pub fn finished_impls(&self) -> bool {
+        return self.async_manager.finished && self.async_manager.parsing_impls == 0;
+    }
+
     // Sets the syntax to be finished
     pub fn finish(&mut self) {
         if self.async_manager.finished {
@@ -82,7 +86,6 @@ impl Syntax {
 
     pub fn make_impldatum(generics: &IndexMap<String, Vec<FinalizedTypes>>,
                           first: &FinalizedTypes, second: &FinalizedTypes) -> ImplDatum<ChalkIr> {
-
         let vec_generics = generics.keys().collect::<Vec<_>>();
         let first = first.to_trait(&vec_generics);
         let mut binders: Vec<VariableKind<ChalkIr>> = Vec::new();
