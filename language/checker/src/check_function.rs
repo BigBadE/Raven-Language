@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use indexmap::IndexMap;
 use no_deadlocks::Mutex;
-use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
+use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::{Attribute, is_modifier, Modifier, ParsingError};
 use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
@@ -12,11 +12,8 @@ use crate::{CheckerVariableManager, finalize_generics};
 use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
-pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
-                             mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
-                             include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
-    let mut variable_manager = CheckerVariableManager { variables: HashMap::new(), variable_instructions: HashMap::new() };
-
+pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
+                             include_refs: bool) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
     let mut fields = Vec::new();
     for argument in &mut function.fields {
         let field = argument.await?;
@@ -28,11 +25,10 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         if include_refs {
             field.field.field_type = FinalizedTypes::Reference(Box::new(field.field.field_type));
         }
-        variable_manager.variables.insert(field.field.name.clone(),
-                                          field.field.field_type.clone());
 
         fields.push(field);
     }
+
     let return_type = if let Some(return_type) = function.return_type.as_mut() {
         Some(return_type.await?.finalize(syntax.clone()).await)
     } else {
@@ -48,23 +44,37 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         return_type,
         data: function.data.clone(),
     };
+    
+    return Ok((codeless, function.code));
+}
 
-    {
-        let mut locked = syntax.lock().unwrap();
-        if let Some(wakers) = locked.functions.wakers.remove(&function.data.name) {
-            for waker in wakers {
-                waker.wake();
-            }
+
+pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
+                             code: CodeBody,
+                             mut codeless: CodelessFinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
+                             include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
+
+    let mut locked = syntax.lock().unwrap();
+    if let Some(wakers) = locked.functions.wakers.remove(&codeless.data.name) {
+        for waker in wakers {
+            waker.wake();
         }
-        locked.functions.data.insert(function.data.clone(), Arc::new(codeless.clone()));
     }
-
+    locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
+    
     //Internal/external/trait functions verify everything but the code.
-    if is_modifier(function.data.modifiers, Modifier::Internal) || is_modifier(function.data.modifiers, Modifier::Extern) {
+    if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
-    let (returns, mut code) = verify_code(process_manager, &resolver, function.code, function.data.attributes.iter()
+    let mut variable_manager = CheckerVariableManager { variables: HashMap::new(), variable_instructions: HashMap::new() };
+
+    for field in &codeless.fields {
+        variable_manager.variables.insert(field.field.name.clone(),
+                                          field.field.field_type.clone());
+    }
+    
+    let (returns, mut code) = verify_code(process_manager, &resolver, code, codeless.data.attributes.iter()
         .any(|inner| if let Attribute::Basic(inner) = inner {
             inner == "extern"
         } else {
@@ -72,10 +82,10 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         }), syntax, &mut variable_manager, include_refs).await?;
 
     if !returns {
-        if function.return_type.is_none() {
+        if codeless.return_type.is_none() {
             code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
-        } else if is_modifier(function.data.modifiers, Modifier::Trait) {
-            return Err(placeholder_error(format!("Function {} doesn't return a {}!", function.data.name,
+        } else if is_modifier(codeless.data.modifiers, Modifier::Trait) {
+            return Err(placeholder_error(format!("Function {} doesn't return a {}!", codeless.data.name,
                                                  codeless.return_type.as_ref().unwrap())));
         }
     }

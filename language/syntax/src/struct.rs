@@ -63,14 +63,14 @@ impl ChalkData {
         return match self {
             ChalkData::Trait(inner) => inner,
             _ => panic!("Expected struct, found trait")
-        }
+        };
     }
 
     pub fn to_struct(&self) -> (&Ty<ChalkIr>, &AdtDatum<ChalkIr>) {
         return match self {
             ChalkData::Struct(types, inner) => (types, inner),
             _ => panic!("Expected struct, found trait"),
-        }
+        };
     }
 }
 
@@ -269,17 +269,38 @@ impl TopElement for StructData {
         return StructData::new_poisoned(name, error);
     }
 
-    async fn verify(current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+    async fn verify(mut current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let data = current.data.clone();
-        let structure = process_manager.verify_struct(current, resolver, &syntax).await;
-        let mut locked = syntax.lock().unwrap();
-        if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
-            for waker in wakers {
-                waker.wake();
+        println!("Verifying {}", data.name);
+        let functions = current.functions;
+        current.functions = Vec::new();
+        let structure = Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);
+        {
+            let mut locked = syntax.lock().unwrap();
+            if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
+                for waker in wakers {
+                    waker.wake();
+                }
             }
+
+            locked.structures.data.insert(data, structure.clone());
         }
 
-        locked.structures.data.insert(data, Arc::new(structure));
+        for function in functions {
+            let (mut function, code) = process_manager.verify_func(function, &syntax).await;
+
+            for (name, bounds) in &structure.generics {
+                function.generics.insert(name.clone(), bounds.clone());
+            }
+
+            let function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
+
+            //SAFETY: compiling is only accessed from here and in the compiler, and neither is dropped
+            //until after both finish.
+            unsafe {
+                Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling)
+            }.insert(function.data.name.clone(), Arc::new(function));
+        }
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {

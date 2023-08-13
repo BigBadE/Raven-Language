@@ -126,7 +126,8 @@ impl TopElement for FunctionData {
 
     async fn verify(current: UnfinalizedFunction, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let name = current.data.name.clone();
-        let output = process_manager.verify_func(current, resolver, &syntax).await;
+        let (output, code) = process_manager.verify_func(current, &syntax).await;
+        let output = process_manager.verify_code(output, code, resolver, &syntax).await;
         //SAFETY: compiling is only accessed from here and in the compiler, and neither is dropped
         //until after both finish.
         unsafe {

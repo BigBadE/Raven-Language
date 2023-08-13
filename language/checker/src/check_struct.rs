@@ -11,6 +11,7 @@ use crate::output::TypesChecker;
 
 pub async fn verify_struct(_process_manager: &TypesChecker, structure: UnfinalizedStruct,
                            syntax: &Arc<Mutex<Syntax>>, include_refs: bool) -> Result<FinalizedStruct, ParsingError> {
+    println!("Here: {}", structure.data.name);
     let mut finalized_fields = Vec::new();
     for field in structure.fields {
         let field = field.await?;
@@ -23,6 +24,7 @@ pub async fn verify_struct(_process_manager: &TypesChecker, structure: Unfinaliz
     }
 
     let mut generics = IndexMap::new();
+
     finalize_generics(syntax, structure.generics, &mut generics).await?;
 
     return Ok(FinalizedStruct {

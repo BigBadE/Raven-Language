@@ -5,13 +5,13 @@ use tokio::runtime::Handle;
 
 use async_trait::async_trait;
 
-use syntax::function::{FinalizedFunction, FunctionData, UnfinalizedFunction};
+use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use syntax::ProcessManager;
 use syntax::async_util::NameResolver;
 use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use crate::check_function::verify_function;
+use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
 
 #[derive(Clone)]
@@ -37,8 +37,25 @@ impl ProcessManager for TypesChecker {
         return &self.runtime;
     }
 
-    async fn verify_func(&self, function: UnfinalizedFunction, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction {
-        return match verify_function(self, resolver, function, syntax, self.include_refs).await {
+    async fn verify_func(&self, function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> (CodelessFinalizedFunction, CodeBody) {
+        return match verify_function(function, syntax, self.include_refs).await {
+            Ok(output) => output,
+            Err(error) => {
+                println!("Error: {}", error);
+                syntax.lock().unwrap().errors.push(error.clone());
+                (CodelessFinalizedFunction {
+                    generics: Default::default(),
+                    fields: vec![],
+                    return_type: None,
+                    data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
+                }, CodeBody::new(Vec::new(), String::new()))
+            }
+        }
+    }
+
+    async fn verify_code(&self, function: CodelessFinalizedFunction, code: CodeBody,
+                         resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction {
+        return match verify_function_code(self, resolver, code, function, syntax, self.include_refs).await {
             Ok(output) => output,
             Err(error) => {
                 println!("Error: {}", error);
@@ -55,18 +72,8 @@ impl ProcessManager for TypesChecker {
     }
 
     async fn verify_struct(&self, mut structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct {
-        let mut functions = Vec::new();
-        for function in structure.functions {
-            functions.push(self.verify_func(function, resolver.boxed_clone(), syntax).await);
-        }
-        structure.functions = Vec::new();
         match verify_struct(self, structure, &syntax, self.include_refs).await {
             Ok(output) => {
-                for mut function in functions {
-                    for (name, bounds) in &output.generics {
-                        function.generics.insert(name.clone(), bounds.clone());
-                    }
-                }
                 return output
             },
             Err(error) => {

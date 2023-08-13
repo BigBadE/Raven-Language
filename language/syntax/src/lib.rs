@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
 use crate::code::FinalizedEffects;
-use crate::function::{FinalizedFunction, FunctionData, UnfinalizedFunction};
+use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
@@ -122,7 +122,9 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Handle;
 
-    async fn verify_func(&self, function: UnfinalizedFunction, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction;
+    async fn verify_func(&self, function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> (CodelessFinalizedFunction, CodeBody);
+
+    async fn verify_code(&self, function: CodelessFinalizedFunction, code: CodeBody, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction;
 
     async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct;
 
