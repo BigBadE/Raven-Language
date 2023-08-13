@@ -15,7 +15,7 @@ use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
 
-use crate::{FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
+use crate::{DataType, FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
@@ -136,9 +136,7 @@ impl Syntax {
     }
 
     // Adds the top element to the syntax
-    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, handle: &Handle,
-                                        resolver: Box<dyn NameResolver>, dupe_error: ParsingError,
-                                        adding: Arc<T>, verifying: T::Unfinalized) {
+    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
@@ -152,8 +150,8 @@ impl Syntax {
             }
         } else {
             let manager = T::get_manager(locked.deref_mut());
-            manager.sorted.push(adding.clone());
-            manager.types.insert(adding.name().clone(), adding.clone());
+            manager.sorted.push(Arc::clone(adding));
+            manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 
         let name = adding.name().clone();
@@ -177,9 +175,6 @@ impl Syntax {
                 waker.wake();
             }
         }
-
-        let process_manager = locked.process_manager.cloned();
-        handle.spawn(T::verify(verifying, syntax.clone(), resolver, process_manager));
     }
 
     pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {

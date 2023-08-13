@@ -1,4 +1,6 @@
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use indexmap::IndexMap;
+use no_deadlocks::Mutex;
 use syntax::ParsingError;
 use syntax::code::{FinalizedField, FinalizedMemberField};
 use syntax::r#struct::{FinalizedStruct, UnfinalizedStruct};
@@ -19,8 +21,12 @@ pub async fn verify_struct(_process_manager: &TypesChecker, structure: Unfinaliz
         finalized_fields.push(FinalizedMemberField { modifiers: field.modifiers, attributes: field.attributes,
             field: FinalizedField { field_type, name: field.field.name } })
     }
+
+    let mut generics = IndexMap::new();
+    finalize_generics(syntax, structure.generics, &mut generics).await?;
+
     return Ok(FinalizedStruct {
-        generics: finalize_generics(syntax, structure.generics).await?,
+        generics,
         fields: finalized_fields,
         data: structure.data,
     });

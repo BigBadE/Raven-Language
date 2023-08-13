@@ -169,7 +169,7 @@ impl FinalizedTypes {
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
-                        while !syntax.lock().unwrap().async_manager.finished {
+                        while !syntax.lock().unwrap().finished_impls() {
                             if syntax.lock().unwrap().solve(&found.data, &other_struct.data) {
                                 return true;
                             }

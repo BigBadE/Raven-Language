@@ -54,9 +54,21 @@ impl ProcessManager for TypesChecker {
         }
     }
 
-    async fn verify_struct(&self, structure: UnfinalizedStruct, _resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>) -> FinalizedStruct {
+    async fn verify_struct(&self, mut structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct {
+        let mut functions = Vec::new();
+        for function in structure.functions {
+            functions.push(self.verify_func(function, resolver.boxed_clone(), syntax).await);
+        }
+        structure.functions = Vec::new();
         match verify_struct(self, structure, &syntax, self.include_refs).await {
-            Ok(output) => return output,
+            Ok(output) => {
+                for mut function in functions {
+                    for (name, bounds) in &output.generics {
+                        function.generics.insert(name.clone(), bounds.clone());
+                    }
+                }
+                return output
+            },
             Err(error) => {
                 syntax.lock().unwrap().errors.push(error.clone());
                 FinalizedStruct {

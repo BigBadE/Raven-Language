@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::{Attribute, is_modifier, Modifier, ParsingError};
@@ -38,8 +39,11 @@ pub async fn verify_function(process_manager: &TypesChecker, resolver: Box<dyn N
         None
     };
 
+    let mut generics = IndexMap::new();
+    finalize_generics(syntax, function.generics, &mut generics).await?;
+
     let codeless = CodelessFinalizedFunction {
-        generics: finalize_generics(syntax, function.generics).await?,
+        generics,
         fields,
         return_type,
         data: function.data.clone(),

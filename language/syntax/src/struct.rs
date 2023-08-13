@@ -9,11 +9,12 @@ use no_deadlocks::Mutex;
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
-use crate::{is_modifier, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
+use crate::{DataType, is_modifier, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
 use crate::code::{FinalizedMemberField, MemberField};
 use crate::{Attribute, ParsingError};
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
+use crate::function::UnfinalizedFunction;
 use crate::types::{FinalizedTypes, Types};
 
 lazy_static! {
@@ -86,7 +87,14 @@ pub struct StructData {
 pub struct UnfinalizedStruct {
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
     pub fields: Vec<ParsingFuture<MemberField>>,
+    pub functions: Vec<UnfinalizedFunction>,
     pub data: Arc<StructData>,
+}
+
+impl DataType<StructData> for UnfinalizedStruct {
+    fn data(&self) -> &Arc<StructData> {
+        return &self.data;
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -263,7 +271,7 @@ impl TopElement for StructData {
 
     async fn verify(current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let data = current.data.clone();
-        let structure = process_manager.verify_struct(current, resolver, syntax.clone()).await;
+        let structure = process_manager.verify_struct(current, resolver, &syntax).await;
         let mut locked = syntax.lock().unwrap();
         if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
             for waker in wakers {

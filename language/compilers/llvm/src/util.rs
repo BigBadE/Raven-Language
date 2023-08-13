@@ -39,6 +39,7 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
 
     let llvm_function = match &function.return_type {
         Some(returning) => {
+            println!("Getting {:?} for generics {:?} in function {}", returning, function.generics, function.data.name);
             let types = type_getter.get_type(&returning);
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             if types.is_struct_type() {

@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use tokio::runtime::Handle;
 
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
-use syntax::{FinishedTraitImplementor, ParsingError, ParsingFuture, TopElement, TraitImplementor};
+use syntax::{DataType, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
@@ -37,8 +37,7 @@ impl<'a> ParserUtils<'a> {
             name, Box::new(self.imports.clone())));
     }
 
-    pub fn add_struct(syntax: &Arc<Mutex<Syntax>>, handle: &Handle, resolver: Box<dyn NameResolver>, token: Token, file: String,
-                      structure: Result<UnfinalizedStruct, ParsingError>) {
+    pub fn add_struct(&self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
         let structure = match structure {
             Ok(adding) => adding,
             Err(error) => {
@@ -46,22 +45,27 @@ impl<'a> ParserUtils<'a> {
                 UnfinalizedStruct {
                     generics: Default::default(),
                     fields: Vec::new(),
-                    data: Arc::new(StructData::new_poisoned(format!("${}", file), error)),
+                    functions: Vec::new(),
+                    data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
                 }
             }
         };
 
-        Syntax::add(&syntax, handle, resolver.boxed_clone(), token.make_error(file.clone(),
-                                                        format!("Duplicate structure {}", structure.data.name)),
-                    structure.data.clone(), structure);
+        Syntax::add::<StructData>(&self.syntax, token.make_error(self.file.clone(),
+                                                            format!("Duplicate structure {}", structure.data.name)),
+                                  structure.data());
+        let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
+        self.handle.spawn(StructData::verify(structure, self.syntax.clone(),
+                                             Box::new(self.imports.clone()), process_manager));
     }
 
-    pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>) {
+    pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>,
+                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         match implementor {
             Ok(implementor) => {
                 syntax.lock().unwrap().async_manager.parsing_impls += 1;
 
-                match Self::add_implementation(&syntax, implementor).await {
+                match Self::add_implementation(&syntax, implementor, resolver, process_manager).await {
                     Ok(_) => {},
                     Err(error) => {
                         syntax.lock().unwrap().errors.push(error);
@@ -74,7 +78,7 @@ impl<'a> ParserUtils<'a> {
         }
     }
 
-    async fn add_implementation(syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor) -> Result<(), ParsingError> {
+    async fn add_implementation(syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();
@@ -87,11 +91,19 @@ impl<'a> ParserUtils<'a> {
         let base = implementor.implementor.await?.finalize(syntax.clone()).await;
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
+
+        let mut functions = Vec::new();
+        for function in implementor.functions {
+            functions.push(function.data.clone());
+            FunctionData::verify(function, syntax.clone(), resolver.boxed_clone(),
+                                 process_manager.cloned()).await;
+        }
+
         let output = FinishedTraitImplementor {
             target,
             base,
             attributes: implementor.attributes,
-            functions: implementor.functions,
+            functions,
             chalk_type,
             generics,
         };
@@ -106,8 +118,8 @@ impl<'a> ParserUtils<'a> {
         return Ok(());
     }
 
-    pub fn add_function(syntax: &Arc<Mutex<Syntax>>, handle: &Handle, resolver: Box<dyn NameResolver>, file: String, token: Token,
-                        function: Result<UnfinalizedFunction, ParsingError>) -> Arc<FunctionData> {
+    pub fn add_function(syntax: &Arc<Mutex<Syntax>>, file: String,
+                        function: Result<UnfinalizedFunction, ParsingError>) -> UnfinalizedFunction {
         let adding = match function {
             Ok(adding) => adding,
             Err(error) => {
@@ -121,11 +133,9 @@ impl<'a> ParserUtils<'a> {
                 }
             }
         };
-        let data = adding.data.clone();
-        Syntax::add(syntax, handle, resolver,
-                    token.make_error(file, format!("Duplicate {}", adding.data.name())),
-                                   adding.data.clone(), adding);
-        return data;
+
+        Syntax::add(syntax, ParsingError::empty(), &adding.data);
+        return adding;
     }
 }
 

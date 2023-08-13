@@ -1,7 +1,8 @@
 #![feature(get_mut_unchecked)]
 
 use std::collections::HashMap;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::Arc;
+use no_deadlocks::Mutex;
 use indexmap::IndexMap;
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::types::{FinalizedTypes, Types};
@@ -16,9 +17,7 @@ pub mod output;
 
 static EMPTY: Vec<String> = Vec::new();
 
-pub struct EmptyNameResolver {
-    
-}
+pub struct EmptyNameResolver {}
 
 impl NameResolver for EmptyNameResolver {
     fn imports(&self) -> &Vec<String> {
@@ -41,7 +40,7 @@ impl NameResolver for EmptyNameResolver {
 #[derive(Debug, Clone)]
 pub struct CheckerVariableManager {
     pub variables: HashMap<String, FinalizedTypes>,
-    pub variable_instructions: HashMap<String, FinalizedEffects>
+    pub variable_instructions: HashMap<String, FinalizedEffects>,
 }
 
 impl VariableManager for CheckerVariableManager {
@@ -54,14 +53,14 @@ impl VariableManager for CheckerVariableManager {
     }
 }
 
-pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<String, Vec<ParsingFuture<Types>>>) -> Result<IndexMap<String, Vec<FinalizedTypes>>, ParsingError> {
-    let mut finalized_generics = IndexMap::new();
+pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+                               output: &mut IndexMap<String, Vec<FinalizedTypes>>) -> Result<(), ParsingError> {
     for (generic, value) in generics {
         let mut values = Vec::new();
         for found in value {
             values.push(found.await?.finalize(syntax.clone()).await);
         }
-        finalized_generics.insert(generic, values);
+        output.insert(generic, values);
     }
-    return Ok(finalized_generics);
+    return Ok(());
 }

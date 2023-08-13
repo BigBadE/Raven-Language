@@ -1,5 +1,7 @@
 use std::sync::Arc;
-use syntax::{Attribute, Modifier, MODIFIERS};
+use syntax::{Attribute, Modifier, MODIFIERS, TopElement};
+use syntax::async_util::NameResolver;
+use syntax::function::FunctionData;
 use syntax::r#struct::StructData;
 use crate::parser::function_parser::parse_function;
 use crate::parser::struct_parser::{parse_implementor, parse_structure};
@@ -22,20 +24,19 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
-                let token = token.clone();
                 let function = parse_function(parser_utils, false, attributes, modifiers);
-                ParserUtils::add_function(&parser_utils.syntax, &parser_utils.handle,
-                                          Box::new(parser_utils.imports.clone()),
-                                              parser_utils.file.clone(), token, function);
+                let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
+                parser_utils.handle.spawn(FunctionData::verify(function, parser_utils.syntax.clone(),
+                                                               Box::new(parser_utils.imports.clone()),
+                                                               parser_utils.syntax.lock().unwrap().process_manager.cloned()));
+
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::StructStart => {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                ParserUtils::add_struct(&parser_utils.syntax, &parser_utils.handle,
-                                        Box::new(parser_utils.imports.clone()), token,
-                                            parser_utils.file.clone(), structure);
+                parser_utils.add_struct(token, structure);
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
@@ -53,16 +54,17 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 modifiers.push(Modifier::Trait);
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                ParserUtils::add_struct(&parser_utils.syntax, &parser_utils.handle, Box::new(parser_utils.imports.clone()), token,
-                                            parser_utils.file.clone(), structure);
+                parser_utils.add_struct(token, structure);
                 attributes = Vec::new();
                 modifiers = Vec::new();
             }
             TokenTypes::ImplStart => {
                 let implementor = parse_implementor(parser_utils,
                                                     attributes, modifiers);
+                let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
                 parser_utils.handle.spawn(
-                        ParserUtils::add_implementor(parser_utils.syntax.clone(), implementor));
+                        ParserUtils::add_implementor(parser_utils.syntax.clone(), implementor,
+                        parser_utils.imports.boxed_clone(), process_manager));
                 attributes = Vec::new();
                 modifiers = Vec::new();
             },

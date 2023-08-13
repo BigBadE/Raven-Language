@@ -21,6 +21,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
     let mut name = String::new();
     let mut fields = Vec::new();
     let mut generics = IndexMap::new();
+    let mut functions = Vec::new();
     while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         let token: Token = token.clone();
@@ -48,9 +49,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                 parser_utils.file = name.clone();
                 let function = parse_function(parser_utils,
                                               is_modifier(modifiers, Modifier::Trait), member_attributes, member_modifiers);
-                ParserUtils::add_function(&parser_utils.syntax,
-                                          &parser_utils.handle, Box::new(parser_utils.imports.clone()),
-                                              parser_utils.file.clone(), token.clone(), function);
+                functions.push(ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function));
                 parser_utils.file = file;
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
@@ -76,6 +75,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
     return Ok(UnfinalizedStruct {
         generics,
         fields,
+        functions,
         data
     });
 }
@@ -128,11 +128,9 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
             TokenTypes::FunctionStart => {
-                let token: Token = token.clone();
                 let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
                 let function =
-                    ParserUtils::add_function(&parser_utils.syntax, &parser_utils.handle, parser_utils.imports.boxed_clone(),
-                                              parser_utils.file.clone(), token, function);
+                    ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
                 functions.push(function);
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();

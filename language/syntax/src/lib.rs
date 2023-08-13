@@ -124,7 +124,7 @@ pub trait ProcessManager: Send + Sync {
 
     async fn verify_func(&self, function: UnfinalizedFunction, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction;
 
-    async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: Arc<Mutex<Syntax>>) -> FinalizedStruct;
+    async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct;
 
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }
@@ -178,10 +178,15 @@ pub trait VariableManager: Debug {
     fn get_const_variable(&self, name: &String) -> Option<FinalizedEffects>;
 }
 
+pub trait DataType<T: TopElement> {
+    // The element's data
+    fn data(&self) -> &Arc<T>;
+}
+
 // Top elements are structures or functions
 #[async_trait]
 pub trait TopElement where Self: Sized {
-    type Unfinalized;
+    type Unfinalized: DataType<Self>;
     type Finalized;
 
     // Poisons the element, adding an error to it and forcing users to ignore issues with it
@@ -212,7 +217,7 @@ pub struct TraitImplementor {
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
     pub implementor: ParsingFuture<Types>,
     pub attributes: Vec<Attribute>,
-    pub functions: Vec<Arc<FunctionData>>,
+    pub functions: Vec<UnfinalizedFunction>,
 }
 
 // Finished impl block for a type.

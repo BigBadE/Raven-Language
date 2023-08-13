@@ -5,8 +5,7 @@ use std::sync::Arc; use no_deadlocks::Mutex;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::{Attribute, DisplayIndented, ParsingError, TopElement, Types, ProcessManager, Syntax,
-            AsyncGetter, is_modifier, Modifier, ParsingFuture};
+use crate::{Attribute, DisplayIndented, ParsingError, TopElement, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture, DataType};
 use crate::async_util::NameResolver;
 use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
@@ -25,6 +24,12 @@ pub struct UnfinalizedFunction {
     pub code: CodeBody,
     pub return_type: Option<ParsingFuture<Types>>,
     pub data: Arc<FunctionData>,
+}
+
+impl DataType<FunctionData> for UnfinalizedFunction {
+    fn data(&self) -> &Arc<FunctionData> {
+        return &self.data;
+    }
 }
 
 /// If the code is required to finalize the function, then recursion will deadlock
