@@ -65,7 +65,7 @@ impl<'a> ParserUtils<'a> {
             Ok(implementor) => {
                 syntax.lock().unwrap().async_manager.parsing_impls += 1;
 
-                match Self::add_implementation(&syntax, implementor, resolver, process_manager).await {
+                match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {},
                     Err(error) => {
                         syntax.lock().unwrap().errors.push(error);
@@ -78,7 +78,8 @@ impl<'a> ParserUtils<'a> {
         }
     }
 
-    async fn add_implementation(syntax: &Arc<Mutex<Syntax>>, implementor: TraitImplementor, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
+    async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
+                                resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();

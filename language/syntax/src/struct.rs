@@ -271,7 +271,6 @@ impl TopElement for StructData {
 
     async fn verify(mut current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let data = current.data.clone();
-        println!("Verifying {}", data.name);
         let functions = current.functions;
         current.functions = Vec::new();
         let structure = Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);

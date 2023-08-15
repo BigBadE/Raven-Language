@@ -53,8 +53,9 @@ impl VariableManager for CheckerVariableManager {
     }
 }
 
-pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
-                               output: &mut IndexMap<String, Vec<FinalizedTypes>>) -> Result<(), ParsingError> {
+pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<String, Vec<ParsingFuture<Types>>>)
+    -> Result<IndexMap<String, Vec<FinalizedTypes>>, ParsingError> {
+    let mut output = IndexMap::new();
     for (generic, value) in generics {
         let mut values = Vec::new();
         for found in value {
@@ -62,5 +63,5 @@ pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<S
         }
         output.insert(generic, values);
     }
-    return Ok(());
+    return Ok(output);
 }

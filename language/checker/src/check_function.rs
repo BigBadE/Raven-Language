@@ -35,11 +35,8 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
         None
     };
 
-    let mut generics = IndexMap::new();
-    finalize_generics(syntax, function.generics, &mut generics).await?;
-
     let codeless = CodelessFinalizedFunction {
-        generics,
+        generics: finalize_generics(syntax, function.generics).await?,
         fields,
         return_type,
         data: function.data.clone(),
@@ -53,15 +50,16 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
                              code: CodeBody,
                              mut codeless: CodelessFinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
-
-    let mut locked = syntax.lock().unwrap();
-    if let Some(wakers) = locked.functions.wakers.remove(&codeless.data.name) {
-        for waker in wakers {
-            waker.wake();
+    {
+        let mut locked = syntax.lock().unwrap();
+        if let Some(wakers) = locked.functions.wakers.remove(&codeless.data.name) {
+            for waker in wakers {
+                waker.wake();
+            }
         }
+        locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
     }
-    locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
-    
+
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));

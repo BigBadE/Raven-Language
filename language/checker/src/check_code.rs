@@ -266,20 +266,8 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
-        println!("Returning for {}? {}", method.data.name, returning.is_some());
+        println!("Returning for {}? {} ({:?})", method.data.name, returning.is_some(), method.generics);
         let mut manager = process_manager.clone();
-
-        for i in 0..method.fields.len() {
-            let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
-                &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
-                if let FinalizedTypes::Generic(name, _) = old {
-                    manager.generics.insert(name, effect);
-                } else {
-                    panic!("Guh?");
-                }
-            }
-        }
 
         if let Some(inner) = method.return_type.clone() {
             if let Some(returning) = returning {
@@ -293,6 +281,20 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             }
         }
 
+        println!("Generics: {:?}", method.generics);
+        for i in 0..method.fields.len() {
+            let effect = effects.get(i).unwrap().get_return(variables).unwrap();
+            if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
+                &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
+                if let FinalizedTypes::Generic(name, _) = old {
+                    manager.generics.insert(name, effect);
+                } else {
+                    panic!("Guh?");
+                }
+            }
+        }
+
+        println!("Generics: {:?}", method.generics);
         let name = format!("{}_{}", method.data.name, display_parenless(
             &manager.generics.values().collect(), "_"));
         {
