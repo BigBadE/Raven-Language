@@ -21,9 +21,10 @@ pub async fn verify_struct(_process_manager: &TypesChecker, structure: Unfinaliz
             field: FinalizedField { field_type, name: field.field.name } })
     }
 
-    return Ok(FinalizedStruct {
+    let output = FinalizedStruct {
         generics: finalize_generics(syntax, structure.generics).await?,
         fields: finalized_fields,
         data: structure.data,
-    });
+    };
+    return Ok(output);
 }

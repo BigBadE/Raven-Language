@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::{Attribute, is_modifier, Modifier, ParsingError};
@@ -48,7 +47,7 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
 
 pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
                              code: CodeBody,
-                             mut codeless: CodelessFinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
+                             codeless: CodelessFinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
     {
         let mut locked = syntax.lock().unwrap();
@@ -72,18 +71,18 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
                                           field.field.field_type.clone());
     }
     
-    let (returns, mut code) = verify_code(process_manager, &resolver, code, codeless.data.attributes.iter()
+    let mut code = verify_code(process_manager, &resolver, code, codeless.data.attributes.iter()
         .any(|inner| if let Attribute::Basic(inner) = inner {
             inner == "extern"
         } else {
             false
         }), syntax, &mut variable_manager, include_refs).await?;
 
-    if !returns {
+    if !code.returns {
         if codeless.return_type.is_none() {
             code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
         } else if is_modifier(codeless.data.modifiers, Modifier::Trait) {
-            return Err(placeholder_error(format!("Function {} doesn't return a {}!", codeless.data.name,
+            return Err(placeholder_error(format!("Function {} returns void instead of a {}!", codeless.data.name,
                                                  codeless.return_type.as_ref().unwrap())));
         }
     }

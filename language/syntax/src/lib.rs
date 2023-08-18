@@ -44,7 +44,7 @@ pub enum Modifier {
     Internal = 0b1000,
     Operation = 0b1_0000,
     // Hidden from the user, only used internally
-    Trait = 0b1100,
+    Trait = 0b10_0000,
 }
 
 impl Display for Modifier {

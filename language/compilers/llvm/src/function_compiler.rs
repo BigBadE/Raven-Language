@@ -20,16 +20,19 @@ use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value;
+    println!("Instancing {}: {} ({} and {})", function.data.name, function.data.modifiers,
+             is_modifier(function.data.modifiers, Modifier::Internal), !is_modifier(function.data.modifiers, Modifier::Trait));
     if function.data.attributes.iter().any(|attribute| if let Attribute::Basic(inner) = attribute {
         inner == "llvm_intrinsic"
     } else {
         false
     }) {
         value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
-    }else if is_modifier(function.data.modifiers, Modifier::Internal) && !is_modifier(function.data.modifiers, Modifier::Trait) {
+    } else if is_modifier(function.data.modifiers, Modifier::Internal) {
+        println!("Internal: {}", function.data.name);
         value = create_function_value(&function, type_getter, None);
         compile_internal(&type_getter.compiler, &function.data.name, value);
-    } else if is_modifier(function.data.modifiers, Modifier::Extern) && !is_modifier(function.data.modifiers, Modifier::Trait) {
+    } else if is_modifier(function.data.modifiers, Modifier::Extern) {
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
         value = create_function_value(&function, type_getter, None);
@@ -129,7 +132,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
                         FinalizedEffects::Jump(_) | FinalizedEffects::CompareJump(_, _, _) => {
                             broke = true;
                             compile_effect(type_getter, function, &line.effect, id);
-                        },
+                        }
                         _ => {
                             compile_effect(type_getter, function, &line.effect, id);
                         }
@@ -163,7 +166,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let effect = compile_effect(type_getter, function, effect, id).unwrap();
             let effect = if effect.is_pointer_value() {
                 *id += 1;
-                type_getter.compiler.builder.build_load(effect.into_pointer_value(), &(*id-1).to_string()).into_int_value()
+                type_getter.compiler.builder.build_load(effect.into_pointer_value(), &(*id - 1).to_string()).into_int_value()
             } else {
                 effect.into_int_value()
             };
@@ -179,7 +182,6 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         FinalizedEffects::MethodCall(pointer, calling_function, arguments) => {
             let mut final_arguments = Vec::new();
 
-            println!("Calling {}", calling_function.data.name);
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
@@ -197,7 +199,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 add_args(&mut final_arguments, type_getter, function, arguments, false, &calling_function.fields, id);
 
                 let call = type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
-                                                        &id.to_string()).try_as_basic_value().left();
+                                                                   &id.to_string()).try_as_basic_value().left();
                 *id += 1;
                 return match call {
                     Some(inner) => {
@@ -205,9 +207,9 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                                                      pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
                         type_getter.compiler.builder.build_store(pointer, inner);
                         Some(pointer.as_basic_value_enum())
-                    },
+                    }
                     None => None
-                }
+                };
             }
         }
         //Sets pointer to value
@@ -239,7 +241,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
             let gep = type_getter.compiler.builder.build_struct_gep(from.into_pointer_value(), offset, &id.to_string()).unwrap();
             *id += 2;
-            Some(type_getter.compiler.builder.build_load(gep, &(*id-1).to_string()))
+            Some(type_getter.compiler.builder.build_load(gep, &(*id - 1).to_string()))
         }
         //Struct to create and a tuple of the index of the argument and the argument
         FinalizedEffects::CreateStruct(effect, structure, arguments) => {
@@ -282,14 +284,16 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 output.get_type().ptr_type(AddressSpace::default())
             };
 
-            let size = unsafe { type_getter.compiler.builder.build_gep(pointer_type.const_zero(),
-                                                              &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string()) };
+            let size = unsafe {
+                type_getter.compiler.builder.build_gep(pointer_type.const_zero(),
+                                                       &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string())
+            };
 
             *id += 1;
 
             let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
                                                                      .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
-            &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
+                                                                 &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
             *id += 1;
 
             let malloc =
@@ -302,7 +306,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             }
             type_getter.compiler.builder.build_store(malloc, output);
             Some(malloc.as_basic_value_enum())
-        },
+        }
         FinalizedEffects::StackStore(inner) => {
             let output = compile_effect(type_getter, function, inner, id).unwrap();
             if !output.is_pointer_value() {
@@ -326,8 +330,10 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 output.ptr_type(AddressSpace::default())
             };
 
-            let size = unsafe { type_getter.compiler.builder.build_gep(pointer_type.const_zero(),
-                                                                       &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string()) };
+            let size = unsafe {
+                type_getter.compiler.builder.build_gep(pointer_type.const_zero(),
+                                                       &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string())
+            };
 
             *id += 1;
 

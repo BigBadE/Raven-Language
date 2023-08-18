@@ -11,11 +11,10 @@ use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
 use chalk_solve::Solver;
 use indexmap::IndexMap;
 use no_deadlocks::Mutex;
-use tokio::runtime::Handle;
 
 use async_recursion::async_recursion;
 
-use crate::{DataType, FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
+use crate::{FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};

@@ -1,4 +1,5 @@
 use std::{mem, thread};
+use std::ops::Deref;
 use std::sync::Arc;
 use no_deadlocks::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
@@ -12,7 +13,7 @@ use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
 pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody, external: bool,
-                         syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<(bool, FinalizedCodeBody), ParsingError> {
+                         syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<FinalizedCodeBody, ParsingError> {
     let mut body = Vec::new();
     for line in code.expressions {
         body.push(FinalizedExpression::new(line.expression_type,
@@ -24,11 +25,11 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
                 let effect = FinalizedEffects::PointerLoad(Box::new(body.pop().unwrap().effect));
                 body.push(FinalizedExpression::new(ExpressionType::Return, effect));
             }
-            return Ok((true, FinalizedCodeBody::new(body, code.label.clone(), true)));
+            return Ok(FinalizedCodeBody::new(body, code.label.clone(), true));
         }
     }
 
-    return Ok((false, FinalizedCodeBody::new(body, code.label.clone(), false)));
+    return Ok(FinalizedCodeBody::new(body, code.label.clone(), false));
 }
 
 //IntelliJ seems to think the operation loop is unreachable for some reason.
@@ -39,7 +40,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     let output = match effect.clone() {
         Effects::CodeBody(body) =>
             FinalizedEffects::CodeBody(verify_code(process_manager, &resolver, body, external,
-                                                   syntax, &mut variables.clone(), references).await?.1),
+                                                   syntax, &mut variables.clone(), references).await?),
         Effects::Set(first, second) => {
             FinalizedEffects::Set(Box::new(
                 verify_effect(process_manager, resolver.boxed_clone(), *first, external, syntax, variables, references).await?),
@@ -266,11 +267,13 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
-        println!("Returning for {}? {} ({:?})", method.data.name, returning.is_some(), method.generics);
         let mut manager = process_manager.clone();
 
         if let Some(inner) = method.return_type.clone() {
-            if let Some(returning) = returning {
+            if let Some(mut returning) = returning {
+                if let FinalizedTypes::GenericType(inner, _) = returning {
+                    returning = FinalizedTypes::clone(inner.deref());
+                }
                 if let Some(old) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                     if let FinalizedTypes::Generic(name, _) = old {
                         manager.generics.insert(name, returning);
@@ -281,7 +284,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             }
         }
 
-        println!("Generics: {:?}", method.generics);
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
             if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
@@ -294,7 +296,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             }
         }
 
-        println!("Generics: {:?}", method.generics);
         let name = format!("{}_{}", method.data.name, display_parenless(
             &manager.generics.values().collect(), "_"));
         {
