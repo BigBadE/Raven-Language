@@ -36,7 +36,7 @@ pub type ParsingFuture<T> = Pin<Box<dyn Future<Output=Result<T, ParsingError>> +
 pub static MODIFIERS: [Modifier; 5] = [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal, Modifier::Operation];
 
 // All the modifiers structures/functions/fields can have
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Modifier {
     Public = 0b1,
     Protected = 0b10,

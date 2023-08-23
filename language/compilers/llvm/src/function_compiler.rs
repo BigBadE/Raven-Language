@@ -20,8 +20,7 @@ use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value;
-    println!("Instancing {}: {} ({} and {})", function.data.name, function.data.modifiers,
-             is_modifier(function.data.modifiers, Modifier::Internal), !is_modifier(function.data.modifiers, Modifier::Trait));
+    println!("Instancing {}: {:b}", function.data.name, function.data.modifiers);
     if function.data.attributes.iter().any(|attribute| if let Attribute::Basic(inner) = attribute {
         inner == "llvm_intrinsic"
     } else {
@@ -29,7 +28,6 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
     }) {
         value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
     } else if is_modifier(function.data.modifiers, Modifier::Internal) {
-        println!("Internal: {}", function.data.name);
         value = create_function_value(&function, type_getter, None);
         compile_internal(&type_getter.compiler, &function.data.name, value);
     } else if is_modifier(function.data.modifiers, Modifier::Extern) {

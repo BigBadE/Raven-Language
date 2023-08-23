@@ -40,10 +40,9 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
         return_type,
         data: function.data.clone(),
     };
-    
+
     return Ok((codeless, function.code));
 }
-
 
 pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
                              code: CodeBody,
@@ -81,7 +80,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
     if !code.returns {
         if codeless.return_type.is_none() {
             code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
-        } else if is_modifier(codeless.data.modifiers, Modifier::Trait) {
+        } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(placeholder_error(format!("Function {} returns void instead of a {}!", codeless.data.name,
                                                  codeless.return_type.as_ref().unwrap())));
         }

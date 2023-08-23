@@ -71,7 +71,7 @@ impl ProcessManager for TypesChecker {
         }
     }
 
-    async fn verify_struct(&self, mut structure: UnfinalizedStruct, _resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct {
+    async fn verify_struct(&self, structure: UnfinalizedStruct, _resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct {
         match verify_struct(self, structure, &syntax, self.include_refs).await {
             Ok(output) => {
                 return output

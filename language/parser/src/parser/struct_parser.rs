@@ -43,7 +43,12 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                                                                            "Unexpected top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
-            TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
+            TokenTypes::ModifiersStart => {
+                parse_modifier(parser_utils, &mut member_modifiers);
+                if is_modifier(modifiers, Modifier::Internal) {
+                    member_modifiers.push(Modifier::Internal);
+                }
+            },
             TokenTypes::FunctionStart => {
                 let file = parser_utils.file.clone();
                 parser_utils.file = name.clone();
@@ -66,7 +71,8 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         }
     }
 
-    let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Extern) {
+    println!("Modifiers: {:b} for {}", modifiers, name);
+    let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Trait) {
         get_internal(name)
     } else {
         Arc::new(StructData::new(attributes, modifiers, name))
@@ -81,7 +87,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
 }
 
 pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>,
-                         _modifiers: Vec<Modifier>) -> Result<TraitImplementor, ParsingError> {
+                         modifiers: Vec<Modifier>) -> Result<TraitImplementor, ParsingError> {
     let mut base = None;
     let mut implementor = None;
     let mut member_attributes = Vec::new();
@@ -126,9 +132,14 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::For => state = 2,
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
-            TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut member_modifiers),
+            TokenTypes::ModifiersStart => {
+                parse_modifier(parser_utils, &mut member_modifiers);
+                if modifiers.contains(&Modifier::Internal) {
+                    member_modifiers.push(Modifier::Internal);
+                }
+            },
             TokenTypes::FunctionStart => {
-                let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
+                let function = parse_function(parser_utils, false, member_attributes, member_modifiers.clone());
                 let function =
                     ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
                 functions.push(function);
