@@ -266,7 +266,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
-    println!("Degenericing {}: {:b}", method.data.name, method.data.modifiers);
+    println!("Checking {}", method.data.name);
     if !method.generics.is_empty() {
         let mut manager = process_manager.clone();
 
@@ -299,6 +299,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
 
         let name = format!("{}_{}", method.data.name, display_parenless(
             &manager.generics.values().collect(), "_"));
+        println!("New name {}", name);
         {
             if syntax.lock().unwrap().functions.types.contains_key(&name) {
                 let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
@@ -333,7 +334,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             };
         }
 
-        println!("Degeneric'd to {}: {:b}", method.data.name, method.data.modifiers);
         let temp_effect = match method.return_type.as_ref() {
             Some(returning) => FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
                                                             method.clone(), effects),

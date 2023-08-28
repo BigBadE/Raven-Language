@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use tokio::runtime::Handle;
 
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
-use syntax::{DataType, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement, TraitImplementor};
+use syntax::{DataType, FinishedTraitImplementor, is_modifier, Modifier, ParsingError, ParsingFuture, ProcessManager, TopElement, TraitImplementor};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
