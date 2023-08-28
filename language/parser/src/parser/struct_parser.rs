@@ -147,8 +147,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
-            _ => panic!("How'd you get here? {:?}: {}", token.token_type,
-            token.to_string(parser_utils.buffer))
+            _ => panic!("How'd you get here? {:?}: {}", token.token_type, token.to_string(parser_utils.buffer))
         }
     }
 
@@ -233,8 +232,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 let unparsed = if let Some(inner) = parse_bounds(name, parser_utils) {
                     inner
                 } else {
-                    parser_utils.index -= 1;
-                    return;
+                    break;
                 };
                 unparsed_bounds.push(unparsed.clone());
                 bounds.push(Syntax::parse_type(parser_utils.syntax.clone(),
@@ -244,7 +242,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             }
             _ => {
                 parser_utils.index -= 1;
-                return;
+                break;
             }
         }
     }
@@ -270,7 +268,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
                     return None;
                 }
             },
-            TokenTypes::GenericBoundEnd => {
+            TokenTypes::GenericBoundEnd | TokenTypes::GenericEnd => {
                 break
             }
             _ => {

@@ -93,7 +93,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 let mut output = None;
                 {
                     let mut result = None;
-                    while !syntax.lock().unwrap().async_manager.finished {
+                    while !syntax.lock().unwrap().finished_impls() {
                         {
                             let locked = syntax.lock().unwrap();
                             result = locked.get_implementation(

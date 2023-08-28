@@ -89,7 +89,7 @@ pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
 pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::GenericsStart | TokenTypes::GenericEnd => {
-            tokenizer.generic_depth += 1;
+            tokenizer.generic_depth = 1;
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
         }
         //              T       : Test       <             Other   <             Second  >               >               ,          E       : Yep
@@ -98,6 +98,7 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
             if tokenizer.matches(":") || tokenizer.matches("+") {
                 parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
             } else if tokenizer.matches("<") {
+                tokenizer.generic_depth += 1;
                 tokenizer.make_token(TokenTypes::GenericsStart)
             } else if tokenizer.matches(",") {
                 tokenizer.make_token(TokenTypes::GenericEnd)

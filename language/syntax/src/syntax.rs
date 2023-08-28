@@ -107,12 +107,11 @@ impl Syntax {
 
     pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
         for implementation in &self.implementations {
-            panic!();
-            println!("{} is {}?", implementation.base, second.name);
-            println!("First: {}", self.solve(implementation.base.to_chalk_type(
-                &implementation.generics.keys().collect::<Vec<_>>()), second));
-            println!("Second: {}",
-                     self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data));
+            //println!("{} is {}?", implementation.base, second.name);
+            //println!("First: {}", self.solve(implementation.base.to_chalk_type(
+            //    &implementation.generics.keys().collect::<Vec<_>>()), second));
+            //println!("Second: {}",
+            //         self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data));
             if self.solve(implementation.base.to_chalk_type(
                 &implementation.generics.keys().collect::<Vec<_>>()), second) &&
                 self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data) {

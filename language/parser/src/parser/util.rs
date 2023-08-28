@@ -80,6 +80,7 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
+        println!("Adding!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();
@@ -88,16 +89,15 @@ impl<'a> ParserUtils<'a> {
             }
             generics.insert(generic, final_bounds);
         }
+
         let target = implementor.base.await?.finalize(syntax.clone()).await;
         let base = implementor.implementor.await?.finalize(syntax.clone()).await;
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
 
         let mut functions = Vec::new();
-        for function in implementor.functions {
+        for function in &implementor.functions {
             functions.push(function.data.clone());
-            FunctionData::verify(function, syntax.clone(), resolver.boxed_clone(),
-                                 process_manager.cloned()).await;
         }
 
         let output = FinishedTraitImplementor {
@@ -109,13 +109,22 @@ impl<'a> ParserUtils<'a> {
             generics,
         };
 
-        let mut locked = syntax.lock().unwrap();
-        locked.implementations.push(output);
-        locked.async_manager.parsing_impls -= 1;
-        for waker in &locked.async_manager.impl_waiters {
-            waker.wake_by_ref();
+        {
+            let mut locked = syntax.lock().unwrap();
+            locked.implementations.push(output);
+            locked.async_manager.parsing_impls -= 1;
+            println!("Done!");
+            for waker in &locked.async_manager.impl_waiters {
+                waker.wake_by_ref();
+            }
+            locked.async_manager.impl_waiters.clear();
         }
-        locked.async_manager.impl_waiters.clear();
+
+        for function in implementor.functions {
+            FunctionData::verify(function, syntax.clone(), resolver.boxed_clone(),
+                                 process_manager.cloned()).await;
+        }
+
         return Ok(());
     }
 
