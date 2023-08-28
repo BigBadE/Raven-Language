@@ -195,8 +195,9 @@ impl Syntax {
     }
 
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Result<Arc<FunctionData>, ParsingError> {
-        return AsyncTypesGetter::new_func(syntax, error, getting, operation, name_resolver).await;
+                              getting: String, operation: bool, name_resolver: Box<dyn NameResolver>,
+                                not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
+        return AsyncTypesGetter::new_func(syntax, error, getting, operation, name_resolver, not_trait).await;
     }
 
     #[async_recursion]

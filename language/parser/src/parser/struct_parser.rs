@@ -71,7 +71,6 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         }
     }
 
-    println!("Modifiers: {:b} for {}", modifiers, name);
     let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Trait) {
         get_internal(name)
     } else {

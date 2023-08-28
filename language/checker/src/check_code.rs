@@ -75,7 +75,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
 
                 Syntax::get_function(syntax.clone(), error.clone(),
-                                     operation, true, Box::new(EmptyNameResolver {})).await?;
+                                     operation, true, Box::new(EmptyNameResolver {}), true).await?;
             }
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {
@@ -130,7 +130,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     None => None
                 };
 
-                check_method(process_manager, AsyncDataGetter::new(syntax.clone(), output.unwrap()).await,
+                let method = AsyncDataGetter::new(syntax.clone(), output.unwrap()).await;
+                check_method(process_manager, method,
                              finalized_effects, syntax, variables, returning).await?
             } else {
                 panic!("Screwed up trait!");
@@ -146,19 +147,19 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 let return_type = found.get_return(variables).unwrap();
                 finalized_effects.push(found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
-                                                        method.clone(), false, resolver.boxed_clone()).await {
+                                                        method.clone(), false, resolver.boxed_clone(), true).await {
+                    println!("Found {} for {} ({:b})", value.name, method, value.modifiers);
                     value
                 } else {
-                    let output = None;
+                    let mut output = None;
                     while !syntax.lock().unwrap().async_manager.finished {
-                        check(syntax, &resolver, &method, &return_type).await?;
+                        output = check(syntax, &resolver, &method, &return_type).await?;
                         thread::yield_now();
                     }
                     if let Some(value) = output {
                         value
                     } else {
-                        check(syntax, &resolver, &method, &return_type).await?;
-                        if let Some(value) = output {
+                        if let Some(value) = check(syntax, &resolver, &method, &return_type).await? {
                             value
                         } else {
                             return Err(placeholder_error(format!("Unknown method {}", method)));
@@ -167,7 +168,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
             } else {
                 Syntax::get_function(syntax.clone(), placeholder_error(format!("Unknown method {}", method)),
-                                     method, false, resolver.boxed_clone()).await?
+                                     method, false, resolver.boxed_clone(), true).await?
             };
 
             let returning = match returning {
@@ -175,7 +176,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                        resolver, inner).await?.finalize(syntax.clone()).await),
                 None => None
             };
-            check_method(process_manager, AsyncDataGetter::new(syntax.clone(), method).await,
+
+            let method = AsyncDataGetter::new(syntax.clone(), method).await;
+            println!("Here with {}", method.data.name);
+            check_method(process_manager, method,
                          finalized_effects, syntax, variables, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>
@@ -266,7 +270,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
-    println!("Degenericing {}: {:b}", method.data.name, method.data.modifiers);
     if !method.generics.is_empty() {
         let mut manager = process_manager.clone();
 
@@ -333,7 +336,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             };
         }
 
-        println!("Degeneric'd to {}: {:b}", method.data.name, method.data.modifiers);
         let temp_effect = match method.return_type.as_ref() {
             Some(returning) => FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
                                                             method.clone(), effects),

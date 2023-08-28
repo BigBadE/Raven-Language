@@ -197,6 +197,9 @@ pub trait TopElement where Self: Sized {
     // Whether the top element is a function and has the operator modifier
     fn is_operator(&self) -> bool;
 
+    // Whether the top element is a trait or trait member
+    fn is_trait(&self) -> bool;
+    
     // All errors on the element
     fn errors(&self) -> &Vec<ParsingError>;
 

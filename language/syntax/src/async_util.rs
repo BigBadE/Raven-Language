@@ -18,6 +18,7 @@ pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub getting: String,
     pub operation: bool,
     pub name_resolver: Box<dyn NameResolver>,
+    pub not_trait: bool,
     pub finished: Option<Arc<T>>
 }
 
@@ -36,7 +37,7 @@ impl<T: TopElement> AsyncDataGetter<T> {
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
-    fn get_types(&mut self, locked: &mut Syntax, name: String, waker: Waker) -> Option<Result<Arc<T>, ParsingError>> {
+    fn get_types(&mut self, locked: &mut Syntax, name: String, waker: Waker, not_trait: bool) -> Option<Result<Arc<T>, ParsingError>> {
         let name = if name.is_empty() {
             self.getting.clone()
         } else {
@@ -46,9 +47,11 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         let getting = T::get_manager(locked);
         //Look for a structure of that name
         if let Some(found) = getting.types.get(&name).cloned() {
-            self.finished = Some(found.clone());
+            if !not_trait || !found.is_trait() {
+                self.finished = Some(found.clone());
 
-            return Some(Ok(found));
+                return Some(Ok(found));
+            }
         }
 
         //Add a waker for that type
@@ -63,14 +66,16 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 }
 
 impl AsyncTypesGetter<FunctionData> {
-    pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, operation: bool, name_resolver: Box<dyn NameResolver>) -> Self {
+    pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, operation: bool,
+                    name_resolver: Box<dyn NameResolver>, not_trait: bool) -> Self {
         return Self {
             syntax,
             error,
             getting,
             operation,
             name_resolver,
-            finished: None
+            finished: None,
+            not_trait
         };
     }
 }
@@ -83,7 +88,8 @@ impl AsyncTypesGetter<StructData> {
             getting,
             operation: false,
             name_resolver,
-            finished: None
+            finished: None,
+            not_trait: false
         };
     }
 }
@@ -96,6 +102,7 @@ impl Future for AsyncTypesGetter<FunctionData> {
             return Poll::Ready(Ok(finished.clone()));
         }
 
+        let not_trait = self.not_trait;
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
@@ -108,13 +115,13 @@ impl Future for AsyncTypesGetter<FunctionData> {
         }
 
         if let Some(output) = self.get_types(&mut locked,
-                                             String::new(), cx.waker().clone()) {
+                                             String::new(), cx.waker().clone(), not_trait) {
             return Poll::Ready(output);
         }
 
         for import in self.name_resolver.imports().clone() {
             if let Some(output) = self.get_types(&mut locked,
-                                                 import, cx.waker().clone()) {
+                                                 import, cx.waker().clone(), not_trait) {
                 return Poll::Ready(output);
             }
         }
@@ -134,6 +141,7 @@ impl Future for AsyncTypesGetter<StructData> {
     type Output = Result<Arc<StructData>, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let not_trait = self.not_trait;
         if let Some(finished) = &self.finished {
             return Poll::Ready(Ok(finished.clone()));
         }
@@ -142,13 +150,13 @@ impl Future for AsyncTypesGetter<StructData> {
         let mut locked = locked.lock().unwrap();
 
         if let Some(output) = self.get_types(&mut locked,
-                                             String::new(), cx.waker().clone()) {
+                                             String::new(), cx.waker().clone(), not_trait) {
             return Poll::Ready(output);
         }
 
         for import in self.name_resolver.imports().clone() {
             if let Some(output) = self.get_types(&mut locked,
-                                                 import, cx.waker().clone()) {
+                                                 import, cx.waker().clone(), not_trait) {
                 return Poll::Ready(output);
             }
         }

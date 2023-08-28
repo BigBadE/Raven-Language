@@ -20,7 +20,6 @@ use crate::util::create_function_value;
 
 pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     let value;
-    println!("Instancing {}: {:b}", function.data.name, function.data.modifiers);
     if function.data.attributes.iter().any(|attribute| if let Attribute::Basic(inner) = attribute {
         inner == "llvm_intrinsic"
     } else {

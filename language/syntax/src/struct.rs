@@ -257,6 +257,10 @@ impl TopElement for StructData {
         return false;
     }
 
+    fn is_trait(&self) -> bool {
+        return is_modifier(self.modifiers, Modifier::Trait);
+    }
+
     fn errors(&self) -> &Vec<ParsingError> {
         return &self.poisoned;
     }

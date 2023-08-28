@@ -112,6 +112,10 @@ impl TopElement for FunctionData {
         return is_modifier(self.modifiers, Modifier::Operation);
     }
 
+    fn is_trait(&self) -> bool {
+        return is_modifier(self.modifiers, Modifier::Trait);
+    }
+
     fn errors(&self) -> &Vec<ParsingError> {
         return &self.poisoned;
     }

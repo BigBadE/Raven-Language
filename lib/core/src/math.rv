@@ -20,8 +20,8 @@ pub internal struct u8 {}
 //Booleans, either true or false (1 or 0)
 pub internal struct bool {}
 
-pub internal trait Cast<T> {
-    pub fn cast(self) -> T;
+trait Cast<T> {
+    fn cast(self) -> T;
 }
 
 pub internal impl<T: Number, E: Number> Cast<T> for E {
