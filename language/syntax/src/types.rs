@@ -170,12 +170,14 @@ impl FinalizedTypes {
                         println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
                         while !syntax.lock().unwrap().finished_impls() {
-                            if syntax.lock().unwrap().solve(&found.data, &other_struct.data) {
+                            if syntax.lock().unwrap().solve(found.data.chalk_data.to_struct().0.clone(),
+                                                            &other_struct.data) {
                                 return true;
                             }
                             thread::yield_now();
                         }
-                        return syntax.lock().unwrap().solve(&found.data, &other_struct.data);
+                        return syntax.lock().unwrap().solve(found.data.chalk_data.to_struct().0.clone(),
+                                                            &other_struct.data);
                     } else {
                         false
                     }
@@ -303,6 +305,9 @@ impl FinalizedTypes {
                     other.name = name.clone();
                     let other = Arc::new(other);
                     syntax.lock().unwrap().structures.types.insert(name, other.clone());
+                    while syntax.lock().unwrap().structures.sorted.len() != other.id as usize {
+                        thread::yield_now();
+                    }
                     syntax.lock().unwrap().structures.sorted.push(other.clone());
                     let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), other.clone()).await.deref());
                     data.degeneric(generics, syntax).await?;

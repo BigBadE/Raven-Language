@@ -88,15 +88,19 @@ pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
 
 pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
-        TokenTypes::GenericsStart => {
+        TokenTypes::GenericsStart | TokenTypes::GenericEnd => {
             tokenizer.generic_depth += 1;
             parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
         }
-        TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericEnd =>
+        //              T       : Test       <             Other   <             Second  >               >               ,          E       : Yep
+        //GenericsStart Generic GenericBound GenericsStart Generic GenericsStart Generic GenericBoundEnd GenericBoundEnd GenericEnd Generic GenericBound
+        TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericBoundEnd =>
             if tokenizer.matches(":") || tokenizer.matches("+") {
                 parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
+            } else if tokenizer.matches("<") {
+                tokenizer.make_token(TokenTypes::GenericsStart)
             } else if tokenizer.matches(",") {
-                parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
+                tokenizer.make_token(TokenTypes::GenericEnd)
             } else if tokenizer.matches(">") {
                 tokenizer.generic_depth -= 1;
                 if tokenizer.generic_depth == 0 {
@@ -107,9 +111,10 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
                         TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
                         _ => panic!("Unexpected generic state!")
                     };
+                    tokenizer.make_token(TokenTypes::GenericEnd)
+                } else {
+                    tokenizer.make_token(TokenTypes::GenericBoundEnd)
                 }
-
-                tokenizer.make_token(TokenTypes::GenericEnd)
             } else {
                 tokenizer.handle_invalid()
             },

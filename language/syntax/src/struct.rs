@@ -52,7 +52,7 @@ pub fn get_internal(name: String) -> Arc<StructData> {
 
 pub static ID: std::sync::Mutex<u64> = std::sync::Mutex::new(0);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ChalkData {
     Trait(TraitDatum<ChalkIr>),
     Struct(Ty<ChalkIr>, AdtDatum<ChalkIr>),
@@ -248,6 +248,10 @@ impl FinalizedStruct {
 impl TopElement for StructData {
     type Unfinalized = UnfinalizedStruct;
     type Finalized = FinalizedStruct;
+
+    fn id(&self) -> u64 {
+        return self.id;
+    }
 
     fn poison(&mut self, error: ParsingError) {
         self.poisoned.push(error);

@@ -191,6 +191,9 @@ pub trait TopElement where Self: Sized {
     type Unfinalized: DataType<Self>;
     type Finalized;
 
+    // Element id
+    fn id(&self) -> u64;
+
     // Poisons the element, adding an error to it and forcing users to ignore issues with it
     fn poison(&mut self, error: ParsingError);
 

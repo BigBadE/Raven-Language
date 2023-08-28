@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
-use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
+use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variance, Variances};
 use chalk_solve::rust_ir::{AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum,
                            AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
                            FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum,
@@ -32,7 +32,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         if let ChalkData::Trait(inner) = found.chalk_data.clone() {
             return Arc::new(inner);
         }
-        panic!("Expected a trait, got something else!");
+        panic!("Expected a trait, got {:?}", found.name);
     }
 
     fn adt_datum(&self, adt_id: AdtId<ChalkIr>) -> Arc<AdtDatum<ChalkIr>> {
@@ -154,7 +154,7 @@ impl UnificationDatabase<ChalkIr> for Syntax {
     }
 
     fn adt_variance(&self, _adt_id: AdtId<ChalkIr>) -> Variances<ChalkIr> {
-        //Variances::from_iter(self.interner(), self.adt_variances[&adt_id].iter().copied())
-        todo!()
+        let variances: [Variance; 0] = [];
+        Variances::from_iter(ChalkIr, /*self.adt_variances[&adt_id].iter().copied()*/ variances)
     }
 }

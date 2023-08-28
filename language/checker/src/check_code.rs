@@ -148,11 +148,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.push(found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), false, resolver.boxed_clone(), true).await {
-                    println!("Found {} for {} ({:b})", value.name, method, value.modifiers);
                     value
                 } else {
                     let mut output = None;
-                    while !syntax.lock().unwrap().async_manager.finished {
+                    while !syntax.lock().unwrap().finished_impls() {
                         output = check(syntax, &resolver, &method, &return_type).await?;
                         thread::yield_now();
                     }
@@ -162,6 +161,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         if let Some(value) = check(syntax, &resolver, &method, &return_type).await? {
                             value
                         } else {
+                            println!("Failed for {}", method);
                             return Err(placeholder_error(format!("Unknown method {}", method)));
                         }
                     }
@@ -178,7 +178,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
-            println!("Here with {}", method.data.name);
             check_method(process_manager, method,
                          finalized_effects, syntax, variables, returning).await?
         }
@@ -248,9 +247,10 @@ async fn check(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                               import.clone(), resolver.boxed_clone()).await {
+            let value = value.finalize(syntax.clone()).await;
             if let Some(value) = syntax.lock().unwrap().get_implementation(
                 &return_type.inner_struct().data,
-                &value.finalize(syntax.clone()).await.inner_struct().data) {
+                &value.inner_struct().data) {
                 for temp in &value {
                     if &temp.name == method {
                         return Ok(Some(temp.clone()));

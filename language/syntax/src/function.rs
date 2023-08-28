@@ -104,6 +104,10 @@ impl TopElement for FunctionData {
     type Unfinalized = UnfinalizedFunction;
     type Finalized = CodelessFinalizedFunction;
 
+    fn id(&self) -> u64 {
+        return u64::MAX;
+    }
+
     fn poison(&mut self, error: ParsingError) {
         self.poisoned.push(error);
     }

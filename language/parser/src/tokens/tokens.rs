@@ -134,5 +134,6 @@ pub enum TokenTypes {
     Comment = 63,
     True = 64,
     False = 65,
-    AttributeStart = 66
+    AttributeStart = 66,
+    GenericBoundEnd = 67
 }

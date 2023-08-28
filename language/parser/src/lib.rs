@@ -1,4 +1,6 @@
 #![feature(try_trait_v2, get_mut_unchecked)]
+extern crate core;
+
 use std::collections::HashMap;
 use std::sync::Arc; use no_deadlocks::Mutex;
 use tokio::runtime::Handle;

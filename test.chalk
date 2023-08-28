@@ -1,0 +1,11 @@
+pub trait Cast<T> {}
+
+pub trait Number {}
+
+pub struct TestNumb {}
+
+impl Number for TestNumb {}
+
+impl<T: Number, E: Number> Cast<T> for E {
+
+}

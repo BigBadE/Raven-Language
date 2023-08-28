@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use std::thread;
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
-use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution,
-               TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
+use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
@@ -107,22 +107,24 @@ impl Syntax {
 
     pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
         for implementation in &self.implementations {
-            if self.solve(&implementation.base.inner_struct().data, first) &&
-                self.solve(second, &implementation.target.inner_struct().data) {
-                return Some(implementation.functions.clone());
+            panic!();
+            println!("{} is {}?", implementation.base, second.name);
+            println!("First: {}", self.solve(implementation.base.to_chalk_type(
+                &implementation.generics.keys().collect::<Vec<_>>()), second));
+            println!("Second: {}",
+                     self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data));
+            if self.solve(implementation.base.to_chalk_type(
+                &implementation.generics.keys().collect::<Vec<_>>()), second) &&
+                self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data) {
+                println!("Found for impl {} of {}", implementation.base, implementation.target);
+                //return Some(implementation.functions.clone());
             }
         }
         return None;
     }
 
-    pub fn solve(&self, first: &StructData, second: &StructData) -> bool {
-        let types;
-        if let ChalkData::Struct(found_type, _) = &first.chalk_data {
-            types = found_type.clone();
-        } else {
-            panic!("Tried to solve with a trait arg!");
-        }
-        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(types))];
+    pub fn solve(&self, first: Ty<ChalkIr>, second: &StructData) -> bool {
+        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first))];
         let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
             WhereClause::Implemented(TraitRef {
                 trait_id: TraitId(RawId { index: second.id as u32 }),
@@ -136,6 +138,10 @@ impl Syntax {
 
     // Adds the top element to the syntax
     pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
+        while adding.id() != u64::MAX && syntax.lock().unwrap().structures.sorted.len() != (adding.id()-1) as usize {
+            thread::yield_now();
+        }
+
         let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());

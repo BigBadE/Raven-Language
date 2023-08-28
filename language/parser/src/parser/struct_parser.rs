@@ -8,7 +8,7 @@ use syntax::syntax::Syntax;
 use syntax::types::Types;
 use crate::parser::function_parser::parse_function;
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
-use crate::parser::util::{add_generics, ParserUtils};
+use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::{Token, TokenTypes};
 
 pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
@@ -230,9 +230,17 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                     name = name[1..].to_string();
                 }
                 let name = name.trim().to_string();
-                let (unparsed, bound) = add_generics(name, parser_utils);
-                unparsed_bounds.push(unparsed);
-                bounds.push(bound);
+                let unparsed = if let Some(inner) = parse_bounds(name, parser_utils) {
+                    inner
+                } else {
+                    parser_utils.index -= 1;
+                    return;
+                };
+                unparsed_bounds.push(unparsed.clone());
+                bounds.push(Syntax::parse_type(parser_utils.syntax.clone(),
+                                               parser_utils.tokens.get(parser_utils.index-1).unwrap()
+                                                   .make_error(parser_utils.file.clone(), format!("Bounds error!")),
+                                               parser_utils.imports.boxed_clone(), unparsed));
             }
             _ => {
                 parser_utils.index -= 1;
@@ -240,6 +248,45 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             }
         }
     }
+}
+
+pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
+    let mut unparsed_bounds: Vec<UnparsedType> = Vec::new();
+    while parser_utils.tokens.len() != parser_utils.index {
+        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        parser_utils.index += 1;
+        match token.token_type {
+            TokenTypes::Generic | TokenTypes::GenericBound => {
+                let mut name = token.to_string(parser_utils.buffer);
+                if name.starts_with(":") {
+                    name = name[1..].to_string();
+                }
+                name = name.trim().to_string();
+            },
+            TokenTypes::GenericsStart => {
+                if let Some(inner) = parse_bounds(String::new(), parser_utils) {
+                    unparsed_bounds.push(inner);
+                } else {
+                    return None;
+                }
+            },
+            TokenTypes::GenericBoundEnd => {
+                break
+            }
+            _ => {
+                parser_utils.index -= 1;
+                return None;
+            }
+        }
+    }
+
+    let unparsed = if unparsed_bounds.is_empty() {
+        UnparsedType::Basic(name)
+    } else {
+        UnparsedType::Generic(Box::new(UnparsedType::Basic(name)), unparsed_bounds)
+    };
+
+    return Some(unparsed);
 }
 
 pub fn parse_field(parser_utils: &mut ParserUtils, name: String,
