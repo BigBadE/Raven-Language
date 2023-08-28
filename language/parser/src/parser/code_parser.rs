@@ -204,6 +204,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
         parser_utils.index += 1;
     }
 
+    println!("Trying to parse generic {}", name);
     return Ok(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
                                       name.clone(), effects, returning));
 }

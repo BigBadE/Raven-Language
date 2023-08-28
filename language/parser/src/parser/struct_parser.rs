@@ -138,7 +138,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                 }
             },
             TokenTypes::FunctionStart => {
-                let function = parse_function(parser_utils, false, member_attributes, member_modifiers.clone());
+                let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
                 let function =
                     ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
                 functions.push(function);
