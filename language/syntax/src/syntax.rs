@@ -18,7 +18,7 @@ use crate::{FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, 
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
-use crate::r#struct::{ChalkData, FinalizedStruct, StructData};
+use crate::r#struct::{FinalizedStruct, StructData};
 use crate::types::FinalizedTypes;
 
 /// The entire program's syntax, including libraries.
@@ -241,6 +241,17 @@ impl Syntax {
             }
         };
         return temp;
+    }
+
+    pub async fn parse_type_genericable(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
+                            types: UnparsedType) -> Result<Types, ParsingError> {
+        if let Ok(result) = Self::parse_type(syntax, error.clone(), resolver, types.clone()).await {
+            Ok(result)
+        } else if let UnparsedType::Basic(inner) = types {
+            Ok(Types::Generic(inner, Vec::new()))
+        } else {
+            Err(error)
+        }
     }
 
     fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {

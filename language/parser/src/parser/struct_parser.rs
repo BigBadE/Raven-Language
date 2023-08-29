@@ -94,6 +94,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
     let mut functions = Vec::new();
     let mut generics = IndexMap::new();
 
+    println!("Starting! ({:?})", parser_utils.imports.generics.keys());
     let mut state = 0;
     while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -116,7 +117,9 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::GenericsStart => {
                 if state == 0 {
+                    println!("Checking generics ({:?})", parser_utils.imports.generics.keys());
                     parse_generics(parser_utils, &mut generics);
+                    println!("Len: {} ({:?})", generics.len(), parser_utils.imports.generics.keys());
                 } else {
                     if state == 1 {
                         let found = UnparsedType::Generic(Box::new(base.unwrap()),
@@ -159,8 +162,10 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
             parser_utils.imports.boxed_clone(), base.unwrap()));
 
+    println!("Implementor: {}", implementor.clone().unwrap());
+
     let implementor = Box::pin(
-        Syntax::parse_type(
+        Syntax::parse_type_genericable(
             parser_utils.syntax.clone(),
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
             parser_utils.imports.boxed_clone(), implementor.unwrap()));
@@ -248,14 +253,14 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
     }
 }
 
-pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
+pub fn parse_bounds(mut name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
     let mut unparsed_bounds: Vec<UnparsedType> = Vec::new();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Generic | TokenTypes::GenericBound => {
-                let mut name = token.to_string(parser_utils.buffer);
+                name = token.to_string(parser_utils.buffer);
                 if name.starts_with(":") {
                     name = name[1..].to_string();
                 }

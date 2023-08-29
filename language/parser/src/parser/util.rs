@@ -80,7 +80,6 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
-        println!("Adding!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();
@@ -92,6 +91,7 @@ impl<'a> ParserUtils<'a> {
 
         let target = implementor.base.await?.finalize(syntax.clone()).await;
         let base = implementor.implementor.await?.finalize(syntax.clone()).await;
+
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
 
@@ -113,7 +113,6 @@ impl<'a> ParserUtils<'a> {
             let mut locked = syntax.lock().unwrap();
             locked.implementations.push(output);
             locked.async_manager.parsing_impls -= 1;
-            println!("Done!");
             for waker in &locked.async_manager.impl_waiters {
                 waker.wake_by_ref();
             }

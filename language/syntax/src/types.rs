@@ -120,6 +120,7 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
             FinalizedTypes::Array(inner) => TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
             FinalizedTypes::Generic(name, _bounds) => {
+                println!("Finding {} in binders {:?}", name, binders);
                 let index = binders.iter().position(|found| *found == name).unwrap();
                 TyKind::BoundVar(BoundVar {
                     debruijn: DebruijnIndex::INNERMOST,
