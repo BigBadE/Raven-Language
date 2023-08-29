@@ -94,7 +94,6 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
     let mut functions = Vec::new();
     let mut generics = IndexMap::new();
 
-    println!("Starting! ({:?})", parser_utils.imports.generics.keys());
     let mut state = 0;
     while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -117,9 +116,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::GenericsStart => {
                 if state == 0 {
-                    println!("Checking generics ({:?})", parser_utils.imports.generics.keys());
                     parse_generics(parser_utils, &mut generics);
-                    println!("Len: {} ({:?})", generics.len(), parser_utils.imports.generics.keys());
                 } else {
                     if state == 1 {
                         let found = UnparsedType::Generic(Box::new(base.unwrap()),
@@ -161,8 +158,6 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             parser_utils.syntax.clone(),
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
             parser_utils.imports.boxed_clone(), base.unwrap()));
-
-    println!("Implementor: {}", implementor.clone().unwrap());
 
     let implementor = Box::pin(
         Syntax::parse_type_genericable(
@@ -273,7 +268,11 @@ pub fn parse_bounds(mut name: String, parser_utils: &mut ParserUtils) -> Option<
                     return None;
                 }
             },
-            TokenTypes::GenericBoundEnd | TokenTypes::GenericEnd => {
+            TokenTypes::GenericBoundEnd => {
+                break
+            },
+            TokenTypes::GenericEnd => {
+                parser_utils.index -= 1;
                 break
             }
             _ => {
