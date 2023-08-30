@@ -29,7 +29,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     fn trait_datum(&self, trait_id: chalk_ir::TraitId<ChalkIr>) -> Arc<TraitDatum<ChalkIr>> {
         let found = self.structures.sorted.get(trait_id.0.index as usize - 1).unwrap();
         assert_eq!(found.id as u32, trait_id.0.index);
-        if let ChalkData::Trait(inner) = found.chalk_data.clone() {
+        if let ChalkData::Trait(_, _, inner) = found.chalk_data.clone() {
             return Arc::new(inner);
         }
         panic!("Expected a trait, got {:?}", found.name);
@@ -38,10 +38,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     fn adt_datum(&self, adt_id: AdtId<ChalkIr>) -> Arc<AdtDatum<ChalkIr>> {
         let found = self.structures.sorted.get(adt_id.0.index as usize - 1).unwrap();
         assert_eq!(found.id as u32, adt_id.0.index);
-        if let ChalkData::Struct(_, inner) = found.chalk_data.clone() {
-            return Arc::new(inner);
-        }
-        panic!("Expected an adt, got something else!");
+        return Arc::new(found.chalk_data.get_adt().clone());
     }
 
     fn generator_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorDatum<ChalkIr>> {

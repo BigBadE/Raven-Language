@@ -54,14 +54,28 @@ pub static ID: std::sync::Mutex<u64> = std::sync::Mutex::new(0);
 
 #[derive(Clone, Debug)]
 pub enum ChalkData {
-    Trait(TraitDatum<ChalkIr>),
+    Trait(Ty<ChalkIr>, AdtDatum<ChalkIr>, TraitDatum<ChalkIr>),
     Struct(Ty<ChalkIr>, AdtDatum<ChalkIr>),
 }
 
 impl ChalkData {
-    pub fn to_trait(&self) -> &TraitDatum<ChalkIr> {
+    pub fn get_ty(&self) -> &Ty<ChalkIr> {
         return match self {
-            ChalkData::Trait(inner) => inner,
+            ChalkData::Trait(first, _, _) => &first,
+            ChalkData::Struct(first, _) => &first
+        }
+    }
+
+    pub fn get_adt(&self) -> &AdtDatum<ChalkIr> {
+        return match self {
+            ChalkData::Trait(_, first, _) => &first,
+            ChalkData::Struct(_, first) => &first
+        }
+    }
+
+    pub fn to_trait(&self) -> (&Ty<ChalkIr>, &AdtDatum<ChalkIr>, &TraitDatum<ChalkIr>) {
+        return match self {
+            ChalkData::Trait(inner, data, other) => (inner, data, other),
             _ => panic!("Expected struct, found trait")
         };
     }
@@ -132,13 +146,32 @@ impl StructData {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
         let mut id = ID.lock().unwrap();
         *id += 1;
+        let temp: &[GenericArg<ChalkIr>] = &[];
+        let adt_id = AdtId(RawId {
+            index: *id as u32
+        });
+        let tykind = TyKind::Adt(adt_id, Substitution::from_iter(ChalkIr,
+                                                         temp.into_iter())).intern(ChalkIr);
+        let adt_data = AdtDatum {
+            binders: Binders::empty(ChalkIr, AdtDatumBound {
+                variants: vec![],
+                where_clauses: vec![],
+            }),
+            id: adt_id,
+            flags: AdtFlags {
+                upstream: false,
+                fundamental: false,
+                phantom_data: false,
+            },
+            kind: AdtKind::Struct,
+        };
         if is_modifier(modifiers, Modifier::Trait) {
             let trait_id = TraitId(RawId {
                 index: *id as u32
             });
             return Self {
                 attributes,
-                chalk_data: ChalkData::Trait(TraitDatum {
+                chalk_data: ChalkData::Trait(tykind, adt_data, TraitDatum {
                     id: trait_id,
                     binders: Binders::empty(ChalkIr, TraitDatumBound {
                         where_clauses: vec![],
@@ -160,27 +193,9 @@ impl StructData {
                 poisoned: Vec::new(),
             };
         } else {
-            let temp: &[GenericArg<ChalkIr>] = &[];
-            let adt_id = AdtId(RawId {
-                index: *id as u32
-            });
             return Self {
                 attributes,
-                chalk_data: ChalkData::Struct(TyKind::Adt(adt_id,
-                                                          Substitution::from_iter(ChalkIr, temp.into_iter())).intern(ChalkIr),
-                                              AdtDatum {
-                                                  binders: Binders::empty(ChalkIr, AdtDatumBound {
-                                                      variants: vec![],
-                                                      where_clauses: vec![],
-                                                  }),
-                                                  id: adt_id,
-                                                  flags: AdtFlags {
-                                                      upstream: false,
-                                                      fundamental: false,
-                                                      phantom_data: false,
-                                                  },
-                                                  kind: AdtKind::Struct,
-                                              }),
+                chalk_data: ChalkData::Struct(tykind, adt_data),
                 id: *id,
                 modifiers,
                 name,

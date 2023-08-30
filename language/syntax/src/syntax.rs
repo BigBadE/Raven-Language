@@ -3,7 +3,7 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use std::thread;
 use chalk_integration::interner::ChalkIr;
-use chalk_integration::RawId;
+use chalk_integration::{RawId, tls};
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
@@ -105,25 +105,33 @@ impl Syntax {
         }
     }
 
-    pub fn get_implementation(&self, first: &Arc<StructData>, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
+    pub fn get_implementation(&self, first: &FinalizedTypes, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
+        println!("Checking if {} is {}", first.name(), second.name);
         for implementation in &self.implementations {
-            println!("{} is {}?", implementation.base, second.name);
-            println!("First: {}", self.solve(implementation.base.to_chalk_type(
-                &implementation.generics.keys().collect::<Vec<_>>()), second));
-            println!("Second: {}",
-                     self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data));
-            if self.solve(implementation.base.to_chalk_type(
-                &implementation.generics.keys().collect::<Vec<_>>()), second) &&
-                self.solve(first.chalk_data.to_struct().0.clone(), &implementation.target.inner_struct().data) {
+            println!("{} is {} and {} is {}", implementation.base, second.name, first.name(), implementation.target);
+            if &implementation.target.inner_struct().data == second &&
+                self.solve(&first, &implementation.base.inner_struct().data) {
                 println!("Found for impl {} of {}", implementation.base, implementation.target);
-                //return Some(implementation.functions.clone());
+                return Some(implementation.functions.clone());
             }
         }
         return None;
     }
 
-    pub fn solve(&self, first: Ty<ChalkIr>, second: &StructData) -> bool {
-        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first))];
+    pub fn solve(&self, first: &FinalizedTypes, second: &StructData) -> bool {
+        if let FinalizedTypes::Generic(_, bounds) = first {
+            for bound in bounds {
+                println!("Checking if {:?} is {}", bound, second.name);
+                if self.solve(bound, second) {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        let first_ty = first.inner_struct().data.chalk_data.get_ty().clone();
+
+        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
         let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
             WhereClause::Implemented(TraitRef {
                 trait_id: TraitId(RawId { index: second.id as u32 }),

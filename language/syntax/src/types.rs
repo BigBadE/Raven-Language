@@ -95,7 +95,7 @@ impl FinalizedTypes {
 
     pub fn to_trait(&self, binders: &Vec<&String>) -> TraitDatum<ChalkIr> {
         if let FinalizedTypes::Struct(inner) = self {
-            if let ChalkData::Trait(traits) = &inner.data.chalk_data {
+            if let ChalkData::Trait(_, _, traits) = &inner.data.chalk_data {
                 return traits.clone();
             } else {
                 panic!("Expected trait, found struct!");
@@ -170,14 +170,12 @@ impl FinalizedTypes {
                         println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
                         while !syntax.lock().unwrap().finished_impls() {
-                            if syntax.lock().unwrap().solve(found.data.chalk_data.to_struct().0.clone(),
-                                                            &other_struct.data) {
+                            if syntax.lock().unwrap().solve(self, &other_struct.data) {
                                 return true;
                             }
                             thread::yield_now();
                         }
-                        return syntax.lock().unwrap().solve(found.data.chalk_data.to_struct().0.clone(),
-                                                            &other_struct.data);
+                        return syntax.lock().unwrap().solve(self, &other_struct.data);
                     } else {
                         false
                     }

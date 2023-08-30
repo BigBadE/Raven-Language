@@ -97,7 +97,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         {
                             let locked = syntax.lock().unwrap();
                             result = locked.get_implementation(
-                                &return_type.inner_struct().data,
+                                &return_type,
                                 &inner.finalize(syntax.clone()).await.inner_struct().data);
                         }
                         thread::yield_now();
@@ -108,7 +108,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         None => {
                             let locked = syntax.lock().unwrap();
                             match locked.get_implementation(
-                                &return_type.inner_struct().data,
+                                &return_type,
                                 &inner.finalize(syntax.clone()).await.inner_struct().data) {
                                 Some(inner) => inner,
                                 None => return Err(
@@ -249,7 +249,7 @@ async fn check(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
                                               import.clone(), resolver.boxed_clone()).await {
             let value = value.finalize(syntax.clone()).await;
             if let Some(value) = syntax.lock().unwrap().get_implementation(
-                &return_type.inner_struct().data,
+                &return_type,
                 &value.inner_struct().data) {
                 for temp in &value {
                     if &temp.name == method {

@@ -1,11 +1,15 @@
-pub trait Cast<T> {}
+trait Cast<T> {}
 
-pub trait Number {}
+trait Number {}
 
-pub struct TestNumb {}
+struct TestNumb {}
+
+struct OtherNumb {}
 
 impl Number for TestNumb {}
 
-impl<T: Number, E: Number> Cast<T> for E {
+impl Number for OtherNumb {}
+
+impl<T, E> Cast<T> for E where T: Number, E: Number {
 
 }
