@@ -167,7 +167,6 @@ impl FinalizedTypes {
                     if found == other_struct {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
-                        println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
                         while !syntax.lock().unwrap().finished_impls() {
                             if syntax.lock().unwrap().solve(self, &other) {
@@ -239,6 +238,7 @@ impl FinalizedTypes {
         return output;
     }
 
+    #[async_recursion]
     pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,
                                  bounds_error: ParsingError) -> Result<Option<FinalizedTypes>, ParsingError> {
         match self {
@@ -249,17 +249,21 @@ impl FinalizedTypes {
                     }
                 }
                 return Ok(Some(self.clone()));
+            },
+            FinalizedTypes::Reference(inner) => {
+                return inner.resolve_generic(other, syntax, bounds_error).await;
             }
             _ => {}
         }
         return Ok(None);
     }
 
+    #[async_recursion]
     pub async fn degeneric(&mut self, generics: &HashMap<String, FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>,
                            none_error: ParsingError, bounds_error: ParsingError) -> Result<(), ParsingError> {
-        match self {
+        return match self {
             FinalizedTypes::Generic(name, bounds) => {
-                return if let Some(found) = generics.get(name) {
+                if let Some(found) = generics.get(name) {
                     for bound in bounds {
                         if !found.of_type(bound, syntax) {
                             return Err(bounds_error);
@@ -270,11 +274,13 @@ impl FinalizedTypes {
                 } else {
                     println!("Failed to find {} in {:?}", name, generics.keys());
                     Err(none_error)
-                };
-            }
-            _ => {}
-        }
-        return Ok(());
+                }
+            },
+            FinalizedTypes::Reference(inner) => {
+                inner.degeneric(generics, syntax, none_error, bounds_error).await
+            },
+            _ => Ok(())
+        };
     }
 
     #[async_recursion]

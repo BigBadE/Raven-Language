@@ -16,11 +16,10 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
                          syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<FinalizedCodeBody, ParsingError> {
     let mut body = Vec::new();
     for line in code.expressions {
-        println!("Verifying {:?}", line.effect);
         body.push(FinalizedExpression::new(line.expression_type,
                                            verify_effect(process_manager, resolver.boxed_clone(),
                                                          line.effect, external, syntax, variables, references).await?));
-        println!("Done!");
+
         if let ExpressionType::Return = line.expression_type {
             if external {
                 //Load if the function is external
@@ -273,7 +272,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
-    println!("Checking {}: {:?} ({:?})", method.data.name, method.generics.keys(), process_manager.generics.keys());
     if !method.generics.is_empty() {
         let mut manager = process_manager.clone();
 

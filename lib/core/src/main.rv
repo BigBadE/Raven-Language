@@ -3,7 +3,7 @@ import stdio;
 import math::Cast;
 
 #[extern]
-pub fn main() -> u64 {
-    let i = 0;
-    return i.cast<u64>();
+pub fn main() -> bool {
+    let i = 204;
+    return i == 12;
 }

@@ -18,7 +18,7 @@ pub internal struct u16 {}
 pub internal struct u8 {}*/
 
 //Booleans, either true or false (1 or 0)
-//pub internal struct bool {}
+pub internal struct bool {}
 
 trait Cast<T> {
     fn cast(self) -> T;
@@ -30,10 +30,20 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
     }
 }
 
+#[priority(-1)]
+operation trait {}=={}<T> {
+    fn equal(self, other: T) -> bool;
+}
+
+pub internal impl<T: Number, E: Number> {}=={} for E {
+    pub fn equal(self, other: T) -> bool {
+
+    }
+}
+
 //Basic math operations, implemented internally by the compiler.
 //Equality
-/*#[priority(-1)]
-pub internal operation fn {}=={}(first: u64, second: u64) -> bool {
+/*pub internal operation fn {}=={}(first: u64, second: u64) -> bool {
     return first + second;
 }*/
 

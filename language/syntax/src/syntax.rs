@@ -67,7 +67,6 @@ impl Syntax {
         if self.async_manager.finished {
             panic!("Tried to finish already-finished syntax!")
         }
-        println!("Finished!");
         self.async_manager.finished = true;
 
         for wakers in &mut self.structures.wakers.values() {
@@ -233,7 +232,6 @@ impl Syntax {
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {
-        println!("Parsing {:?} ({:?})", types, resolver.generics());
         let temp = match types {
             UnparsedType::Basic(name) =>
                 Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,

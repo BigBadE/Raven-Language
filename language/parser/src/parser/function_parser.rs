@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use indexmap::IndexMap;
 use syntax::{Attribute, get_modifier, is_modifier, Modifier, ParsingError, ParsingFuture};
+use syntax::async_util::NameResolver;
 use syntax::code::MemberField;
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
+use syntax::syntax::Syntax;
 use syntax::types::Types;
 
 use crate::parser::code_parser::parse_code;
@@ -75,8 +77,15 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
         }
     }
 
-    println!("{}: {:?} ({:?})", name, generics.keys(), parser_utils.imports.generics.keys());
-    parser_utils.imports.generics.clear();
+    for (key, generic) in &parser_utils.imports.generics {
+        let mut bounds = Vec::new();
+        for bound in generic {
+            bounds.push(Syntax::parse_type(parser_utils.syntax.clone(),
+                                                    ParsingError::empty(), parser_utils.imports.boxed_clone(), bound.clone()));
+        }
+        generics.insert(key.clone(), bounds);
+    }
+
     return Ok(UnfinalizedFunction {
         generics,
         fields,
