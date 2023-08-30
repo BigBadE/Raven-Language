@@ -3,8 +3,8 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use std::thread;
 use chalk_integration::interner::ChalkIr;
-use chalk_integration::{RawId, tls};
-use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, Ty, TyVariableKind, VariableKind, VariableKinds, WhereClause};
+use chalk_integration::RawId;
+use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
@@ -67,6 +67,7 @@ impl Syntax {
         if self.async_manager.finished {
             panic!("Tried to finish already-finished syntax!")
         }
+        println!("Finished!");
         self.async_manager.finished = true;
 
         for wakers in &mut self.structures.wakers.values() {
@@ -106,35 +107,32 @@ impl Syntax {
     }
 
     pub fn get_implementation(&self, first: &FinalizedTypes, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
-        println!("Checking if {} is {}", first.name(), second.name);
         for implementation in &self.implementations {
-            println!("{} is {} and {} is {}", implementation.base, second.name, first.name(), implementation.target);
             if &implementation.target.inner_struct().data == second &&
-                self.solve(&first, &implementation.base.inner_struct().data) {
-                println!("Found for impl {} of {}", implementation.base, implementation.target);
+                self.solve(&first, &implementation.base) {
                 return Some(implementation.functions.clone());
             }
         }
         return None;
     }
 
-    pub fn solve(&self, first: &FinalizedTypes, second: &StructData) -> bool {
-        if let FinalizedTypes::Generic(_, bounds) = first {
+    pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
+        if let FinalizedTypes::Generic(_, bounds) = second {
             for bound in bounds {
-                println!("Checking if {:?} is {}", bound, second.name);
-                if self.solve(bound, second) {
-                    return true;
+                if !self.solve(first, bound) {
+                    return false;
                 }
-                return false;
             }
+            return true;
         }
+        let second_ty = &second.inner_struct().data;
 
         let first_ty = first.inner_struct().data.chalk_data.get_ty().clone();
 
         let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
         let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
             WhereClause::Implemented(TraitRef {
-                trait_id: TraitId(RawId { index: second.id as u32 }),
+                trait_id: TraitId(RawId { index: second_ty.id as u32 }),
                 substitution: Substitution::from_iter(ChalkIr, elements.into_iter())
             })
         )));
@@ -228,12 +226,14 @@ impl Syntax {
             }
             return Ok(Types::Generic(getting, bounds));
         }
+
         return Ok(Types::Struct(AsyncTypesGetter::new_struct(syntax, error, getting, name_resolver).await?));
     }
 
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {
+        println!("Parsing {:?} ({:?})", types, resolver.generics());
         let temp = match types {
             UnparsedType::Basic(name) =>
                 Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,

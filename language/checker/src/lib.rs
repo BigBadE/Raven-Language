@@ -32,6 +32,10 @@ impl NameResolver for EmptyNameResolver {
         panic!("Should not be called after finalizing!")
     }
 
+    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>> {
+        panic!("Should not be called after finalizing!")
+    }
+
     fn boxed_clone(&self) -> Box<dyn NameResolver> {
         return Box::new(EmptyNameResolver {});
     }

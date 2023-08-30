@@ -170,12 +170,12 @@ impl FinalizedTypes {
                         println!("Comparing {} to {}", self, other);
                         //Only check for implementations if being compared against a trait.
                         while !syntax.lock().unwrap().finished_impls() {
-                            if syntax.lock().unwrap().solve(self, &other_struct.data) {
+                            if syntax.lock().unwrap().solve(self, &other) {
                                 return true;
                             }
                             thread::yield_now();
                         }
-                        return syntax.lock().unwrap().solve(self, &other_struct.data);
+                        return syntax.lock().unwrap().solve(self, &other);
                     } else {
                         false
                     }

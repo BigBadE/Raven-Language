@@ -1,7 +1,7 @@
-pub internal struct str {}
+/*pub internal struct str {}
 
 //LLVM intrinsic method, it has excluded varargs and a changed string type
 #[llvm_intrinsic]
 pub internal fn printf(string: str) -> u64 {
 
-}
+}*/

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
@@ -217,6 +218,8 @@ pub trait NameResolver: Send + Sync {
     fn parent(&self) -> &String;
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
+
+    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>>;
 
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }

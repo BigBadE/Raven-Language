@@ -16,9 +16,11 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
                          syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<FinalizedCodeBody, ParsingError> {
     let mut body = Vec::new();
     for line in code.expressions {
+        println!("Verifying {:?}", line.effect);
         body.push(FinalizedExpression::new(line.expression_type,
                                            verify_effect(process_manager, resolver.boxed_clone(),
                                                          line.effect, external, syntax, variables, references).await?));
+        println!("Done!");
         if let ExpressionType::Return = line.expression_type {
             if external {
                 //Load if the function is external
@@ -142,6 +144,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             for effect in effects {
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables, references).await?)
             }
+
             let method = if let Some(found) = calling {
                 let found = verify_effect(process_manager, resolver.boxed_clone(), *found, external, syntax, variables, references).await?;
                 let return_type = found.get_return(variables).unwrap();
@@ -151,17 +154,17 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     value
                 } else {
                     let mut output = None;
-                    while !syntax.lock().unwrap().finished_impls() {
+                    while output.is_none() && !syntax.lock().unwrap().finished_impls() {
                         output = check(syntax, &resolver, &method, &return_type).await?;
                         thread::yield_now();
                     }
+
                     if let Some(value) = output {
                         value
                     } else {
                         if let Some(value) = check(syntax, &resolver, &method, &return_type).await? {
                             value
                         } else {
-                            println!("Failed for {}", method);
                             return Err(placeholder_error(format!("Unknown method {}", method)));
                         }
                     }
@@ -252,7 +255,7 @@ async fn check(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
                 &return_type,
                 &value.inner_struct().data) {
                 for temp in &value {
-                    if &temp.name == method {
+                    if &temp.name.split("::").last().unwrap() == method {
                         return Ok(Some(temp.clone()));
                     }
                 }
@@ -270,6 +273,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
+    println!("Checking {}: {:?} ({:?})", method.data.name, method.generics.keys(), process_manager.generics.keys());
     if !method.generics.is_empty() {
         let mut manager = process_manager.clone();
 

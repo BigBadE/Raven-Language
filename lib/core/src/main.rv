@@ -4,13 +4,6 @@ import math::Cast;
 
 #[extern]
 pub fn main() -> u64 {
-    printf("This is a printed string! Wowie!");
     let i = 0;
-    let test = new NumberIter {
-        current: 1,
-        end: 5,
-    };
-
-    i = test.next();
     return i.cast<u64>();
 }

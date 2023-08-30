@@ -68,6 +68,7 @@ impl<'a> ParserUtils<'a> {
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {},
                     Err(error) => {
+                        println!("Error: {}", error);
                         syntax.lock().unwrap().errors.push(error);
                     }
                 };
@@ -89,7 +90,9 @@ impl<'a> ParserUtils<'a> {
             generics.insert(generic, final_bounds);
         }
 
+        println!("1");
         let target = implementor.base.await?.finalize(syntax.clone()).await;
+        println!("2");
         let base = implementor.implementor.await?.finalize(syntax.clone()).await;
 
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
@@ -112,6 +115,7 @@ impl<'a> ParserUtils<'a> {
         {
             let mut locked = syntax.lock().unwrap();
             locked.implementations.push(output);
+
             locked.async_manager.parsing_impls -= 1;
             for waker in &locked.async_manager.impl_waiters {
                 waker.wake_by_ref();

@@ -69,7 +69,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         variable_manager.variables.insert(field.field.name.clone(),
                                           field.field.field_type.clone());
     }
-    
+
     let mut code = verify_code(process_manager, &resolver, code, codeless.data.attributes.iter()
         .any(|inner| if let Attribute::Basic(inner) = inner {
             inner == "extern"

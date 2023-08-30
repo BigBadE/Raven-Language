@@ -75,6 +75,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
         }
     }
 
+    println!("{}: {:?} ({:?})", name, generics.keys(), parser_utils.imports.generics.keys());
+    parser_utils.imports.generics.clear();
     return Ok(UnfinalizedFunction {
         generics,
         fields,

@@ -68,6 +68,10 @@ impl NameResolver for ImportNameResolver {
         return self.generics.get(name).map(|types| types.clone());
     }
 
+    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>> {
+        return &self.generics
+    }
+
     fn boxed_clone(&self) -> Box<dyn NameResolver> {
         return Box::new(self.clone());
     }
