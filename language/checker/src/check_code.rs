@@ -223,7 +223,25 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::Int(int) => store(FinalizedEffects::UInt(int as u64)),
         Effects::UInt(uint) => store(FinalizedEffects::UInt(uint)),
         Effects::Bool(bool) => store(FinalizedEffects::Bool(bool)),
-        Effects::String(string) => store(FinalizedEffects::String(string))
+        Effects::String(string) => store(FinalizedEffects::String(string)),
+        Effects::CreateArray(effects) => {
+            let mut output = Vec::new();
+            for effect in effects {
+                output.push(verify_effect(process_manager, resolver.boxed_clone(), effect,
+                                          external, syntax, variables, references).await?);
+            }
+
+            let types = output.get(0).map(|found| found.get_return(variables).unwrap());
+            if let Some(found) = &types {
+                for checking in &output {
+                    if !checking.get_return(variables).unwrap().of_type(found, syntax) {
+                        return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)))
+                    }
+                }
+            }
+
+            store(FinalizedEffects::CreateArray(types, output))
+        }
     };
     return Ok(output);
 }

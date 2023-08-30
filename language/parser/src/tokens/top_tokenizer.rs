@@ -1,6 +1,6 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
-use crate::tokens::util::{parse_ident, parse_modifier};
+use crate::tokens::util::{parse_attribute_val, parse_ident, parse_modifier};
 
 pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
     if tokenizer.index == tokenizer.len {
@@ -19,7 +19,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         } else {
             tokenizer.make_token(TokenTypes::ModifiersStart)
         },
-        TokenTypes::AttributeStart => parse_ident(tokenizer, TokenTypes::Attribute, &[b']']),
+        TokenTypes::AttributeStart => parse_attribute_val(tokenizer, TokenTypes::Attribute),
         TokenTypes::ModifiersStart | TokenTypes::Modifier => if let Some(modifier) = parse_modifier(tokenizer) {
             modifier
         } else if tokenizer.matches("fn") {

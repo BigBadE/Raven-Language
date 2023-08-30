@@ -131,6 +131,7 @@ pub enum Effects {
     Operation(String, Vec<Effects>),
     //Struct to create and a tuple of the index of the argument and the argument
     CreateStruct(UnparsedType, Vec<(String, Effects)>),
+    CreateArray(Vec<Effects>),
     Float(f64),
     Int(i64),
     UInt(u64),
@@ -159,6 +160,8 @@ pub enum FinalizedEffects {
     Load(Box<FinalizedEffects>, String, Arc<FinalizedStruct>),
     //Where to put the struct, struct to create and a tuple of the index of the argument and the argument
     CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
+    //Create an array with the type and values
+    CreateArray(Option<FinalizedTypes>, Vec<FinalizedEffects>),
     Float(f64),
     UInt(u64),
     Bool(bool),
@@ -214,7 +217,9 @@ impl FinalizedEffects {
                 FinalizedTypes::Reference(inner) => Some(*inner),
                 _ => panic!("Tried to load non-reference!")
             },
-            FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!")
+            FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!"),
+            FinalizedEffects::CreateArray(types, _) =>
+                types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner)))
         };
         return temp;
     }

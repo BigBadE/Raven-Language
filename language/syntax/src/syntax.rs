@@ -174,7 +174,7 @@ impl Syntax {
             let adding: Arc<StructData> = unsafe { std::mem::transmute(adding.clone()) };
 
             let name = match Attribute::find_attribute("operation", &adding.attributes).unwrap() {
-                Attribute::String(_, name) => name.clone(),
+                Attribute::String(_, name) => name.replace("{+}", "{}").clone(),
                 _ => {
                     let mut error = ParsingError::empty();
                     error.message = format!("Expected a string with attribute operator!");

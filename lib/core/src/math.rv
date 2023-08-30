@@ -36,6 +36,26 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
     }
 }
 
+#[operation([{+}])]
+trait Array<T> {
+    fn instance(self, values: [T]) -> [T];
+}
+
+pub impl<T> Array<T> for T {
+    fn instance(self, values: [T]) -> [T] {
+        return values;
+    }
+}
+
+#[operation({}[{}])]
+trait Index<T> {
+    fn index(self, index: u64);
+}
+
+pub internal impl<T> Index<T> for T[] {
+    fn index(self, index: u64) {}
+}
+
 #[priority(-1)]
 #[operation({}=={})]
 trait Equal<T> {
@@ -44,5 +64,7 @@ trait Equal<T> {
 
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number, E: Number> Equal for E {
-    pub fn equal(self, other: T) -> bool {}
+    fn equal(self, other: T) -> bool {
+
+    }
 }

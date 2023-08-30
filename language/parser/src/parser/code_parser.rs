@@ -122,7 +122,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     last.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
                     effect = Some(parse_generic_method(effect, parser_utils)?);
                 } else {
-                    return Ok(Some(Expression::new(expression_type, parse_operator(effect, parser_utils)?)));
+                    let operator = parse_operator(effect, parser_utils)?;
+                    return Ok(Some(Expression::new(expression_type, operator)));
                 }
             }
             TokenTypes::ArgumentEnd => if !deep {
@@ -149,9 +150,10 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
         }
     }
 
-    if effect.is_none() {
-        panic!("No effect! {:?} and {}", parser_utils.tokens.get(parser_utils.index - 1), parser_utils.file);
-    }
+    /*if effect.is_none() {
+        panic!("No effect! {:?} and {}", parser_utils.tokens[parser_utils.index-10..parser_utils.index].iter()
+            .map(|inner| &inner.token_type).collect::<Vec<_>>(), parser_utils.file);
+    }*/
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
 }
 

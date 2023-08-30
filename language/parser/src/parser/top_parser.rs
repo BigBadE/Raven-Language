@@ -19,7 +19,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().unwrap()
                 .add_poison(Arc::new(StructData::new_poisoned(format!("${}", parser_utils.file),
                                                               token.make_error(parser_utils.file.clone(),
-                                                                                         "Unexpected top element!".to_string())))),
+                                                                                         "Invalid top element!".to_string())))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),

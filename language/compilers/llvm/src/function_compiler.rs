@@ -5,7 +5,7 @@ use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode};
 use inkwell::types::{BasicType, StructType};
 
 use syntax::{Attribute, is_modifier, Modifier};
@@ -344,6 +344,49 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             *id += 1;
 
             Some(malloc.as_basic_value_enum())
+        }
+        FinalizedEffects::CreateArray(types, values) => {
+            let output = types.as_ref().map(|inner| type_getter.get_type(&inner))
+                .unwrap_or(type_getter.compiler.context.const_struct(&[], false).get_type().as_basic_type_enum());
+            let size = if types.is_some() {
+                let pointer_type = if output.is_pointer_type() {
+                    output.into_pointer_type()
+                } else {
+                    output.ptr_type(AddressSpace::default())
+                };
+
+                let value;
+                unsafe {
+                    value = type_getter.compiler.builder
+                        .build_gep(pointer_type.const_zero(),
+                                   &[type_getter.compiler.context.i64_type().const_int(1, false)],
+                                   &id.to_string())
+                }
+
+                let output = type_getter.compiler.builder.build_cast(InstructionOpcode::PtrToInt, value,
+                                                                     type_getter.compiler.context.i64_type(), &id.to_string());
+                *id += 1;
+                output.into_int_value()
+            } else {
+                type_getter.compiler.context.i64_type().const_int(0, false)
+            };
+            let alloc = type_getter.compiler.builder.build_array_alloca(output, size, &id.to_string());
+            *id += 1;
+
+            let mut i = 0;
+            for value in values {
+                let gep = unsafe {
+                    type_getter.compiler.builder
+                        .build_gep(alloc, &[type_getter.compiler.context.i64_type().const_int(i, false)],
+                                   &id.to_string())
+                };
+                i += 1;
+                *id += 1;
+                let effect = compile_effect(type_getter, function, value, id).unwrap();
+                type_getter.compiler.builder.build_store(gep, effect);
+            }
+
+            Some(alloc.as_basic_value_enum())
         }
     };
 }

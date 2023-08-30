@@ -22,6 +22,8 @@ impl Future for OperationGetter {
 
         if let Some(output) = locked.operations.get(&self.operation) {
             return Poll::Ready(Ok(output.clone()));
+        } else if let Some(output) = locked.operations.get(&self.operation.replace("{}", "{+}").to_string()) {
+            return Poll::Ready(Ok(output.clone()));
         }
 
         if locked.async_manager.finished {

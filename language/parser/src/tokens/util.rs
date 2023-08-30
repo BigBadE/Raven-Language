@@ -8,6 +8,24 @@ pub fn parse_ident(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]
     return tokenizer.make_token(token_type);
 }
 
+pub fn parse_attribute_val(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> Token {
+    let mut depth = 1;
+    let mut last;
+    loop {
+        last = tokenizer.next_included()?;
+        if last == b']' {
+            depth -= 1;
+            if depth == 0 {
+                break;
+            }
+        } else if last == b'[' {
+            depth += 1;
+        }
+    }
+    tokenizer.index -= 1;
+    return tokenizer.make_token(token_type);
+}
+
 pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> Token {
     loop {
         if tokenizer.index == tokenizer.len {
