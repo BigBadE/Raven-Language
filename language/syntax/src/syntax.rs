@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use std::task::Poll::Pending;
+use std::task::Waker;
 use std::thread;
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
@@ -14,7 +16,7 @@ use no_deadlocks::Mutex;
 
 use async_recursion::async_recursion;
 
-use crate::{FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
+use crate::{Attribute, FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
@@ -38,7 +40,8 @@ pub struct Syntax {
     // Stores the async parsing state
     pub async_manager: GetterManager,
     // All operations without namespaces, for example {}+{} or {}/{}
-    pub operations: HashMap<String, Vec<Arc<FunctionData>>>,
+    pub operations: HashMap<String, Arc<StructData>>,
+    pub operation_wakers: HashMap<String, Vec<Waker>>,
     // Manages the next steps of compilation after parsing
     pub process_manager: Box<dyn ProcessManager>,
 }
@@ -54,6 +57,7 @@ impl Syntax {
             implementations: Vec::new(),
             async_manager: GetterManager::default(),
             operations: HashMap::new(),
+            operation_wakers: HashMap::new(),
             process_manager,
         };
     }
@@ -153,7 +157,7 @@ impl Syntax {
         if let Some(mut old) = T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned() {
             if adding.errors().is_empty() && adding.errors().is_empty() {
                 locked.errors.push(dupe_error.clone());
-                unsafe { Arc::get_mut_unchecked(&mut old) }.poison(dupe_error);
+                unsafe { Arc::get_mut_unchecked(&mut old) }.poison(dupe_error.clone());
             } else {
                 //Ignored if one is poisoned
             }
@@ -165,18 +169,30 @@ impl Syntax {
 
         let name = adding.name().clone();
         if adding.is_operator() {
-            //Only functions can be operators. This will break if something else is.
+            //Only traits can be operators. This will break if something else is.
             //These is no better way to do this because Rust.
-            let adding: Arc<FunctionData> = unsafe { std::mem::transmute(adding.clone()) };
+            let adding: Arc<StructData> = unsafe { std::mem::transmute(adding.clone()) };
 
-            let name = adding.name().split("::").last().unwrap().to_string();
-            let name = format!("{}${}", name, locked.operations.get(&name).map(|found| found.len()).unwrap_or(0));
-            match locked.operations.get_mut(&name) {
-                Some(found) => found.push(adding),
-                None => {
-                    locked.operations.insert(name.clone(), vec!(adding));
+            let name = match Attribute::find_attribute("operation", &adding.attributes).unwrap() {
+                Attribute::String(_, name) => name.clone(),
+                _ => {
+                    let mut error = ParsingError::empty();
+                    error.message = format!("Expected a string with attribute operator!");
+                    locked.errors.push(error);
+                    return;
+                }
+            };
+
+            if locked.operations.contains_key(&name) {
+                locked.errors.push(dupe_error);
+            }
+            if let Some(wakers) = locked.operation_wakers.get(&name) {
+                for waker in wakers {
+                    waker.wake_by_ref();
                 }
             }
+
+            locked.operations.insert(name, adding);
         }
 
         if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
@@ -207,7 +223,7 @@ impl Syntax {
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                               getting: String, operation: bool, name_resolver: Box<dyn NameResolver>,
                                 not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
-        return AsyncTypesGetter::new_func(syntax, error, getting, operation, name_resolver, not_trait).await;
+        return AsyncTypesGetter::new_func(syntax, error, getting, name_resolver, not_trait).await;
     }
 
     #[async_recursion]

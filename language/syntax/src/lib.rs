@@ -24,6 +24,7 @@ pub mod async_util;
 pub mod chalk_support;
 pub mod code;
 pub mod function;
+pub mod operation_util;
 pub mod r#struct;
 pub mod syntax;
 pub mod types;

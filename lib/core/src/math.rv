@@ -1,24 +1,30 @@
-pub trait Number {
-
-}
+//A trait for every primitive number type.
+pub trait Number {}
 
 //Primitive numbers, prefixed by signed/unsigned, suffixed by the amount of bits.
 //Signed types
 pub internal struct i64 {}
 impl Number for i64 {}
-/*pub internal struct i32 {}
+pub internal struct i32 {}
+impl Number for i32 {}
 pub internal struct i16 {}
-pub internal struct i8 {}*/
+impl Number for i16 {}
+pub internal struct i8 {}
+impl Number for i8 {}
 
 //Unsigned types
 pub internal struct u64 {}
 impl Number for u64 {}
-/*pub internal struct u32 {}
+pub internal struct u32 {}
+impl Number for u32 {}
 pub internal struct u16 {}
-pub internal struct u8 {}*/
+impl Number for u16 {}
+pub internal struct u8 {}
+impl Number for u8 {}
 
 //Booleans, either true or false (1 or 0)
 pub internal struct bool {}
+impl Number for bool {}
 
 trait Cast<T> {
     fn cast(self) -> T;
@@ -31,42 +37,12 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
 }
 
 #[priority(-1)]
-operation trait {}=={}<T> {
+#[operation({}=={})]
+trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
-pub internal impl<T: Number, E: Number> {}=={} for E {
-    pub fn equal(self, other: T) -> bool {
-
-    }
-}
-
 //Basic math operations, implemented internally by the compiler.
-//Equality
-/*pub internal operation fn {}=={}(first: u64, second: u64) -> bool {
-    return first + second;
-}*/
-
-//Equality
-/*#[priority(-1)]
-pub internal operation fn {}!={}(first: u64, second: u64) -> bool {
-    return first + second;
-}*/
-
-//Addition
-/*#[priority(0)]
-pub internal operation fn {}+{}(first: u64, second: u64) -> u64 {
-    return first + second;
-}*/
-
-//Subtraction
-/*#[priority(0)]
-pub internal operation fn {}-{}(first: u64, second: u64) -> u64 {
-    return first - second;
-}*/
-
-//Division
-/*#[priority(1)]
-pub internal operation fn {}/{}(first: u64, second: u64) -> u64 {
-    return first / second;
-}*/
+pub internal impl<T: Number, E: Number> Equal for E {
+    pub fn equal(self, other: T) -> bool {}
+}

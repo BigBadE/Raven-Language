@@ -11,75 +11,17 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
     if name.starts_with("math::cast_") {
         build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
         return;
-    }
-    match name.as_str() {
-        "math::{}+{}" => {
-            let returning = compiler.builder.build_int_add(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}-{}" => {
-            let returning = compiler.builder.build_int_sub(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}/{}" => {
-            let returning = compiler.builder.build_int_signed_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}*{}" => {
-            let returning = compiler.builder.build_int_mul(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}=={}" => {
-            let returning = compiler.builder
-                .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}!={}" => {
-            let returning = compiler.builder
-                .build_int_compare(IntPredicate::NE, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}>={}" => {
-            let returning = compiler.builder
-                .build_int_compare(IntPredicate::SGE, params.get(0).unwrap().into_int_value(),
-                                   params.get(1).unwrap().into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}<={}" => {
-            let returning = compiler.builder
-                .build_int_compare(IntPredicate::SLE, params.get(0).unwrap().into_int_value(),
-                                   params.get(1).unwrap().into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}<{}" => {
-            let returning = compiler.builder
-                .build_int_compare(IntPredicate::SLT, params.get(0).unwrap().into_int_value(),
-                                   params.get(1).unwrap().into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}>{}" => {
-            let returning = compiler.builder
-                .build_int_compare(IntPredicate::SGT, params.get(0).unwrap().into_int_value(),
-                                   params.get(1).unwrap().into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}&&{}" => {
-            let returning = compiler.builder.build_and(params.get(0).unwrap().into_int_value(),
-                                                       params.get(1).unwrap().into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        "math::{}||{}" => {
-            let returning = compiler.builder.build_or(params.get(0).unwrap().into_int_value(),
-                                                      params.get(1).unwrap().into_int_value(), "1");
-            compiler.builder.build_return(Some(&returning));
-        }
-        _ => panic!("Unknown internal operation: {}", name)
+    } else if name.starts_with("math::add_") {
+        let returning = compiler.builder.build_int_add(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                       compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+        compiler.builder.build_return(Some(&returning));
+    } else if name.starts_with("math::equal_") {
+        let returning = compiler.builder
+            .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                               compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+        compiler.builder.build_return(Some(&returning));
+    } else {
+        panic!("Unknown internal operation: {}", name)
     }
 }
 

@@ -113,7 +113,7 @@ impl TopElement for FunctionData {
     }
 
     fn is_operator(&self) -> bool {
-        return is_modifier(self.modifiers, Modifier::Operation);
+        return false;
     }
 
     fn is_trait(&self) -> bool {

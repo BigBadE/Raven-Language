@@ -97,6 +97,10 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
 pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attribute>) {
     loop {
         let next = parser_utils.tokens.get(parser_utils.index+1).unwrap();
+        if next.token_type == TokenTypes::AttributeStart {
+            parser_utils.index += 1;
+            continue
+        }
         if next.token_type != TokenTypes::Attribute {
             return;
         }
@@ -104,7 +108,10 @@ pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attr
         let string = next.to_string(parser_utils.buffer);
         attributes.push(if string.contains("(") {
             let mut split = string.split("(");
-            let name = split.next().unwrap()[2..].to_string();
+            let mut name = split.next().unwrap().to_string().to_lowercase();
+            if name.starts_with("#[") {
+                name = name[2..].to_string();
+            }
             let value = split.next().unwrap();
             let value = &value[0..value.len()-1];
             match value.parse::<i64>() {

@@ -273,7 +273,7 @@ impl TopElement for StructData {
     }
 
     fn is_operator(&self) -> bool {
-        return false;
+        return self.is_trait() && Attribute::find_attribute("operation", &self.attributes).is_some();
     }
 
     fn is_trait(&self) -> bool {

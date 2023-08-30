@@ -17,7 +17,6 @@ pub(crate) struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub error: ParsingError,
     pub getting: String,
-    pub operation: bool,
     pub name_resolver: Box<dyn NameResolver>,
     pub not_trait: bool,
     pub finished: Option<Arc<T>>
@@ -67,13 +66,12 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 }
 
 impl AsyncTypesGetter<FunctionData> {
-    pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String, operation: bool,
+    pub fn new_func(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String,
                     name_resolver: Box<dyn NameResolver>, not_trait: bool) -> Self {
         return Self {
             syntax,
             error,
             getting,
-            operation,
             name_resolver,
             finished: None,
             not_trait
@@ -87,7 +85,6 @@ impl AsyncTypesGetter<StructData> {
             syntax,
             error,
             getting,
-            operation: false,
             name_resolver,
             finished: None,
             not_trait: false
@@ -106,14 +103,6 @@ impl Future for AsyncTypesGetter<FunctionData> {
         let not_trait = self.not_trait;
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
-
-        //Look for a structure of that name
-        if self.operation {
-            if let Some(found) = locked.operations.get(&self.getting) {
-                let data: &Arc<FunctionData> = found.get(0).unwrap();
-                return Poll::Ready(Ok(data.clone()));
-            }
-        }
 
         if let Some(output) = self.get_types(&mut locked,
                                              String::new(), cx.waker().clone(), not_trait) {

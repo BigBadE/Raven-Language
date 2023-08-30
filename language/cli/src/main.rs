@@ -12,7 +12,7 @@ fn main() {
 }
 
 async fn run(arguments: &Arguments) {
-    let compiler = runner::runner::run::<i64>(&arguments.runner_settings).await;
+    let compiler = runner::runner::run::<bool>(&arguments.runner_settings).await;
     match compiler {
         Err(errors) => {
             for error in errors {
