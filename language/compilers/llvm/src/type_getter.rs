@@ -15,7 +15,7 @@ use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use crate::compiler::CompilerImpl;
-use crate::function_compiler::{compile_block, instance_function, instance_struct};
+use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
 use crate::util::print_formatted;
 
@@ -73,13 +73,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         let found = match self.compiler.module.get_struct_type(&types.name()) {
             Some(found) => found.as_basic_type_enum(),
             None => get_internal_struct(self.compiler.context, &types.name()).unwrap_or(
-                instance_struct(types.inner_struct(), self)
-                    .as_basic_type_enum())
+                instance_types(types, self))
         }.as_basic_type_enum();
         return match types {
-            FinalizedTypes::Struct(_) => found,
+            FinalizedTypes::Struct(_) | FinalizedTypes::Array(_) => found,
             FinalizedTypes::Reference(_) => found.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-            _ => panic!("Can't compile a generic!")
+            _ => panic!("Can't compile a generic! {:?}", found)
         };
     }
 
@@ -103,6 +102,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
 
+            if !function.data.poisoned.is_empty() {
+                for error in &function.data.poisoned {
+                    errors.push(error.clone());
+                }
+                continue
+            }
             let function = if let Some(found) = functions.get(&function.data.name) {
                 found
             } else {
@@ -111,12 +116,6 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 }.push((function_type, function));
                 continue
             };
-            if !function.data.poisoned.is_empty() {
-                for error in &function.data.poisoned {
-                    errors.push(error.clone());
-                }
-                continue
-            }
             compile_block(&function.code, function_type,
                           &mut self.for_function(&function, function_type), &mut 0);
         }

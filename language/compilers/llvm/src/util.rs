@@ -34,7 +34,6 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
     let mut params = Vec::new();
 
     for param in &function.fields {
-        println!("Checking field {:?}", param.field.field_type);
         params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }
 

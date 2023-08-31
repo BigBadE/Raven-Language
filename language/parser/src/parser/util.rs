@@ -54,6 +54,7 @@ impl<'a> ParserUtils<'a> {
         Syntax::add::<StructData>(&self.syntax, token.make_error(self.file.clone(),
                                                             format!("Duplicate structure {}", structure.data.name)),
                                   structure.data());
+
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
         self.handle.spawn(StructData::verify(structure, self.syntax.clone(),
                                              Box::new(self.imports.clone()), process_manager));

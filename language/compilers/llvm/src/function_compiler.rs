@@ -6,12 +6,12 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode};
-use inkwell::types::{BasicType, StructType};
+use inkwell::types::{BasicType, BasicTypeEnum};
 
 use syntax::{Attribute, is_modifier, Modifier};
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedMemberField};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
-use syntax::r#struct::FinalizedStruct;
+use syntax::types::FinalizedTypes;
 
 use crate::internal::instructions::compile_internal;
 use crate::internal::intrinsics::compile_llvm_intrinsics;
@@ -38,13 +38,23 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
     return value;
 }
 
-pub fn instance_struct<'ctx>(structure: &Arc<FinalizedStruct>, type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
-    let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
-    for field in &structure.fields {
-        fields.push(type_getter.get_type(&field.field.field_type));
-    }
+pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTypeGetter<'ctx>) -> BasicTypeEnum<'ctx> {
+    return match types {
+        FinalizedTypes::Reference(inner) => instance_types(inner, type_getter),
+        FinalizedTypes::Array(inner) => {
+            let found_type = instance_types(inner, type_getter);
 
-    return type_getter.compiler.context.struct_type(fields.as_slice(), true);
+            found_type.array_type(0).as_basic_type_enum()
+        }
+        _ => {
+            let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
+            for field in &types.inner_struct().fields {
+                fields.push(type_getter.get_type(&field.field.field_type));
+            }
+
+            type_getter.compiler.context.struct_type(fields.as_slice(), true).as_basic_type_enum()
+        }
+    }
 }
 
 pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ctx>, type_getter: &mut CompilerTypeGetter<'ctx>,
@@ -220,7 +230,10 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }
-        FinalizedEffects::LoadVariable(name) => return Some(type_getter.variables.get(name).unwrap().1),
+        FinalizedEffects::LoadVariable(name) => {
+            println!("Tried to get {} for {}", name, function.get_name().to_str().unwrap());
+            return Some(type_getter.variables.get(name).unwrap().1)
+        },
         //Loads variable/field pointer from structure, or self if structure is None
         FinalizedEffects::Load(loading_from, field, _) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();

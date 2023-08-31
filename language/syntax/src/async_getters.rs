@@ -33,4 +33,13 @@ impl<T> AsyncGetter<T> where T: TopElement {
             wakers: HashMap::new(),
         };
     }
+
+    pub fn with_sorted(sorted: Vec<Arc<T>>) -> Self {
+        return Self {
+            types: HashMap::new(),
+            sorted,
+            data: HashMap::new(),
+            wakers: HashMap::new(),
+        };
+    }
 }

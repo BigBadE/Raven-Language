@@ -252,6 +252,9 @@ impl FinalizedTypes {
             },
             FinalizedTypes::Reference(inner) => {
                 return inner.resolve_generic(other, syntax, bounds_error).await;
+            },
+            FinalizedTypes::Array(inner) => {
+                return inner.resolve_generic(other, syntax, bounds_error).await;
             }
             _ => {}
         }
@@ -279,6 +282,9 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => {
                 inner.degeneric(generics, syntax, none_error, bounds_error).await
             },
+            FinalizedTypes::Array(inner) => {
+                inner.degeneric(generics, syntax, none_error, bounds_error).await
+            }
             _ => Ok(())
         };
     }

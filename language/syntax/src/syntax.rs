@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use std::task::Waker;
-use std::thread;
+use std::{mem, thread};
 use chalk_integration::interner::ChalkIr;
 use chalk_integration::RawId;
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
@@ -19,7 +19,7 @@ use crate::{Attribute, FinishedTraitImplementor, ParsingError, ProcessManager, T
 use crate::async_getters::{AsyncGetter, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::function::{FinalizedFunction, FunctionData};
-use crate::r#struct::{FinalizedStruct, StructData};
+use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
 use crate::types::FinalizedTypes;
 
 /// The entire program's syntax, including libraries.
@@ -51,7 +51,10 @@ impl Syntax {
             compiling: Arc::new(HashMap::new()),
             strut_compiling: Arc::new(HashMap::new()),
             errors: Vec::new(),
-            structures: AsyncGetter::new(),
+            structures: AsyncGetter::with_sorted(
+                vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),
+                     F64.data.clone(), F32.data.clone(), U64.data.clone(), U32.data.clone(), U16.data.clone(), U8.data.clone(),
+                BOOL.data.clone(), STR.data.clone())),
             functions: AsyncGetter::new(),
             implementations: Vec::new(),
             async_manager: GetterManager::default(),
@@ -144,8 +147,9 @@ impl Syntax {
     }
 
     // Adds the top element to the syntax
-    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
-        while adding.id() != u64::MAX && syntax.lock().unwrap().structures.sorted.len() != (adding.id()-1) as usize {
+    pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
+        while adding.id() != u64::MAX && !syntax.lock().unwrap().structures.sorted.contains(unsafe { mem::transmute(adding) }) &&
+            syntax.lock().unwrap().structures.sorted.len() != (adding.id()-1) as usize {
             thread::yield_now();
         }
 
@@ -162,7 +166,9 @@ impl Syntax {
             }
         } else {
             let manager = T::get_manager(locked.deref_mut());
-            manager.sorted.push(Arc::clone(adding));
+            if !manager.sorted.contains(adding) {
+                manager.sorted.push(Arc::clone(adding));
+            }
             manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 

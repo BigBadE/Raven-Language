@@ -33,6 +33,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
         imports: ImportNameResolver::new(name),
         handle,
     };
+
     parse_top(&mut parser_utils);
 }
 

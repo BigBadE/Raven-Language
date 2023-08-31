@@ -28,6 +28,9 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
         while parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
             let next = parse_line(parser_utils, true, false)?.map(|inner| inner.effect);
             if let Some(found) = next {
+                if let Effects::NOP() = &found {
+                    break
+                }
                 right = match right.unwrap() {
                     Effects::CreateArray(mut inner) => {
                         inner.push(found);
@@ -40,9 +43,9 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
             }
         }
 
-        if let Some(inner) = right {
+        if let Some(inner) = &right {
             if let Effects::NOP() = inner {
-
+                return Ok(Effects::Operation(operation, effects));
             } else {
                 operation += "{}";
             }
@@ -58,6 +61,10 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
             break
         }
         parser_utils.index += 1;
+    }
+
+    if let Some(found) = right {
+        effects.push(found);
     }
 
     return Ok(Effects::Operation(operation, effects));

@@ -59,7 +59,13 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
         } else {
             if !character.is_numeric() {
                 return if float {
-                    tokenizer.make_token(TokenTypes::Float)
+                    // If no number is after the period assume it's a method call not a float.
+                    if tokenizer.buffer[tokenizer.index-1] == b'.' {
+                        tokenizer.index -= 1;
+                        tokenizer.make_token(TokenTypes::Integer)
+                    } else {
+                        tokenizer.make_token(TokenTypes::Float)
+                    }
                 } else {
                     tokenizer.make_token(TokenTypes::Integer)
                 };

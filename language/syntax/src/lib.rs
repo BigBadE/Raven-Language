@@ -1,6 +1,7 @@
 #![feature(box_into_inner)]
 #![feature(get_mut_unchecked)]
 
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -128,6 +129,8 @@ pub trait ProcessManager: Send + Sync {
     async fn verify_code(&self, function: CodelessFinalizedFunction, code: CodeBody, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction;
 
     async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct;
+
+    fn generics(&self) -> &HashMap<String, FinalizedTypes>;
 
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }

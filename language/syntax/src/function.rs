@@ -178,6 +178,14 @@ impl FinalizedCodeBody {
             returns
         };
     }
+
+    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedCodeBody {
+        for expression in &mut self.expressions {
+            expression.effect.degeneric(process_manager, syntax).await;
+        }
+
+        return self;
+    }
 }
 
 pub fn display_joined<T>(input: &Vec<T>) -> String where T: Display {

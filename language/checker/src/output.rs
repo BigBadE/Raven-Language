@@ -87,6 +87,10 @@ impl ProcessManager for TypesChecker {
         }
     }
 
+    fn generics(&self) -> &HashMap<String, FinalizedTypes> {
+        return &self.generics;
+    }
+
     fn cloned(&self) -> Box<dyn ProcessManager> {
         return Box::new(self.clone());
     }

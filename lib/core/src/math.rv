@@ -38,12 +38,12 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
 
 #[operation([{+}])]
 trait Array<T> {
-    fn instance(self, values: [T]) -> [T];
+    fn instance(self) -> [T];
 }
 
 pub impl<T> Array<T> for T {
-    fn instance(self, values: [T]) -> [T] {
-        return values;
+    fn instance(self) -> [T] {
+        return self;
     }
 }
 

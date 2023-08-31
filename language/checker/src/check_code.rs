@@ -4,7 +4,7 @@ use std::sync::Arc;
 use no_deadlocks::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, display_parenless, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
-use syntax::{Attribute, ParsingError};
+use syntax::{Attribute, ParsingError, ProcessManager};
 use syntax::syntax::Syntax;
 use crate::CheckerVariableManager;
 use async_recursion::async_recursion;
@@ -50,17 +50,22 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                       verify_effect(process_manager, resolver, *second, external, syntax, variables, references).await?))
         }
         Effects::Operation(operation, mut values) => {
-            println!("Checking {}: {:?}", operation, values);
             let error = ParsingError::new(String::new(), (0, 0), 0,
                                           (0, 0), 0, format!("Failed to find operation {}", operation));
             let mut outer_operation = None;
             if values.len() > 0 {
-                if let Effects::Operation(inner_operation, _) = values.last().unwrap() {
+                let mut last = values.last().unwrap();
+                if let Effects::CreateArray(effects) = last {
+                    if effects.len() > 0 {
+                        last = effects.last().unwrap();
+                    }
+                }
+                if let Effects::Operation(inner_operation, _) = last {
                     if operation.ends_with("{}") && inner_operation.starts_with("{}") {
                         let getter = OperationGetter {
                             syntax: syntax.clone(),
-                            operation: operation[0..operation.len() - 2].to_string() + &inner_operation[2..inner_operation.len()],
-                            error: error.clone()
+                            operation: operation[0..operation.len() - 2].to_string() + &inner_operation,
+                            error: error.clone(),
                         };
                         if let Ok(found) = getter.await {
                             outer_operation = Some(found);
@@ -70,7 +75,15 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             let operation = if let Some(found) = outer_operation {
-                if let Effects::Operation(_, found) = values.pop().unwrap() {
+                let top = values.pop().unwrap();
+                if let Effects::CreateArray(mut inner) = top {
+                    if let Effects::Operation(_, found) = inner.pop().unwrap() {
+                        for effect in found {
+                            inner.push(effect);
+                        }
+                    }
+                    values.push(Effects::CreateArray(inner));
+                } else if let Effects::Operation(_, found) = top {
                     for value in found {
                         values.push(value);
                     }
@@ -80,7 +93,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 OperationGetter {
                     syntax: syntax.clone(),
                     operation,
-                    error
+                    error,
                 }.await?
             };
 
@@ -135,13 +148,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
                 }
 
+                let output = output.unwrap();
+                let method = AsyncDataGetter::new(syntax.clone(), output).await;
+
                 let returning = match returning {
                     Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
                                                            resolver, inner).await?.finalize(syntax.clone()).await),
                     None => None
                 };
-
-                let method = AsyncDataGetter::new(syntax.clone(), output.unwrap()).await;
                 check_method(process_manager, method,
                              finalized_effects, syntax, variables, returning).await?
             } else {
@@ -190,8 +204,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
-            check_method(process_manager, method,
-                         finalized_effects, syntax, variables, returning).await?
+            check_method(process_manager, method, finalized_effects, syntax, variables, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
@@ -261,7 +274,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             if let Some(found) = &types {
                 for checking in &output {
                     if !checking.get_return(variables).unwrap().of_type(found, syntax) {
-                        return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)))
+                        return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
                     }
                 }
             }
@@ -305,6 +318,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
 
         if let Some(inner) = method.return_type.clone() {
             if let Some(mut returning) = returning {
+                //TODO remove this and get generic types working with explicit generics?
                 if let FinalizedTypes::GenericType(inner, _) = returning {
                     returning = FinalizedTypes::clone(inner.deref());
                 }
@@ -353,6 +367,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                         placeholder_error("No generic!".to_string()),
                                         placeholder_error("Invalid bounds!".to_string())).await?;
                 }
+                let original = method;
                 method = Arc::new(new_method);
                 let mut locked = syntax.lock().unwrap();
                 if let Some(wakers) = locked.functions.wakers.remove(&name) {
@@ -363,6 +378,8 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
 
                 locked.functions.types.insert(name, method.data.clone());
                 locked.functions.data.insert(method.data.clone(), method.clone());
+
+                process_manager.handle().spawn(degeneric_code(syntax.clone(), original, method.clone(), Box::new(manager)));
             };
         }
 
@@ -387,6 +404,23 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
     });
 }
 
+async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>,
+                        degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
+    while !syntax.lock().unwrap().compiling.contains_key(&original.data.name) {
+        thread::yield_now();
+    }
+
+    let code = {
+        let locked = syntax.lock().unwrap();
+        locked.compiling.get(&original.data.name).unwrap().code.clone()
+    };
+
+    let output = CodelessFinalizedFunction::clone(degenericed_method.deref())
+        .add_code(code.degeneric(&manager, &syntax).await);
+
+    unsafe { Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling) }
+        .insert(output.data.name.clone(), Arc::new(output));
+}
 
 pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
