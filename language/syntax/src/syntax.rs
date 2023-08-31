@@ -121,14 +121,30 @@ impl Syntax {
         return None;
     }
 
-    pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
-        if let FinalizedTypes::Generic(_, bounds) = second {
-            for bound in bounds {
-                if !self.solve(first, bound) {
-                    return false;
+    fn generic_check(&self, checking: &FinalizedTypes, first: &FinalizedTypes) -> Option<bool> {
+        println!("Generic checking {:?} vs {:?}", first, checking);
+        return match checking {
+            FinalizedTypes::Generic(_, bounds) => {
+                for bound in bounds {
+                    if !self.solve(first, bound) {
+                        return Some(false);
+                    }
                 }
+                return Some(true);
+            },
+            FinalizedTypes::Array(inner) => {
+                if let FinalizedTypes::Array(other) = first {
+                    return self.generic_check(inner, other);
+                }
+                return Some(false);
             }
-            return true;
+            _ => return None
+        }
+    }
+
+    pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
+        if let Some(inner) = self.generic_check(second, first) {
+            return inner;
         }
         let second_ty = &second.inner_struct().data;
 

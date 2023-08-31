@@ -256,10 +256,12 @@ impl FinalizedEffects {
             }
             FinalizedEffects::LoadVariable(_) => {}
             FinalizedEffects::Load(effect, _, _) => effect.degeneric(process_manager, syntax).await,
-            FinalizedEffects::CreateStruct(target, _, effects) => {
+            FinalizedEffects::CreateStruct(target, types, effects) => {
                 if let Some(found) = target {
                     found.degeneric(process_manager, syntax).await;
                 }
+                types.degeneric(process_manager.generics(), syntax,
+                                ParsingError::empty(), ParsingError::empty()).await.unwrap();
                 for (_, effect) in effects {
                     effect.degeneric(process_manager, syntax).await;
                 }
