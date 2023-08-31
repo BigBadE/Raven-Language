@@ -122,7 +122,6 @@ impl Syntax {
     }
 
     fn generic_check(&self, checking: &FinalizedTypes, first: &FinalizedTypes) -> Option<bool> {
-        println!("Generic checking {:?} vs {:?}", first, checking);
         return match checking {
             FinalizedTypes::Generic(_, bounds) => {
                 for bound in bounds {
@@ -133,10 +132,17 @@ impl Syntax {
                 return Some(true);
             },
             FinalizedTypes::Array(inner) => {
+                let mut first = first;
+                if let FinalizedTypes::Reference(other) = first {
+                    first = other;
+                }
                 if let FinalizedTypes::Array(other) = first {
                     return self.generic_check(inner, other);
                 }
                 return Some(false);
+            },
+            FinalizedTypes::Reference(inner) => {
+                return self.generic_check(inner, first);
             }
             _ => return None
         }

@@ -4,6 +4,6 @@ import math::Cast;
 
 #[extern]
 pub fn main() -> i64 {
-    let value = [1, 2, 3];
-    return value[0];
+    let value = [1, 2];
+    return 0;
 }

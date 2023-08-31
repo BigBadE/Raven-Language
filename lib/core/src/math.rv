@@ -49,11 +49,11 @@ pub impl<T> Array<T> for [T] {
 
 #[operation({}[{}])]
 trait Index<T> {
-    fn index(self, index: u64);
+    fn index(self, index: u64) -> T;
 }
 
 pub internal impl<T> Index<T> for [T] {
-    fn index(self, index: u64) {}
+    fn index(self, index: u64) -> T {}
 }
 
 #[priority(-1)]

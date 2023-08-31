@@ -1,6 +1,6 @@
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
 use crate::compiler::CompilerImpl;
 
 pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, value: FunctionValue<'ctx>) {
@@ -20,6 +20,13 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
             .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_return(Some(&returning));
+    } else if name.starts_with("math::index_") {
+        unsafe {
+            compiler.builder.build_return(Some(&compiler.builder
+                .build_in_bounds_gep(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_pointer_value(),
+                           &[compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "1").into_int_value()],
+                           "0")));
+        }
     } else {
         panic!("Unknown internal operation: {}", name)
     }
