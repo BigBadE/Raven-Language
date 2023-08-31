@@ -187,6 +187,7 @@ async fn to_generic(name: String, generics: Vec<ParsingFuture<Types>>) -> Result
     for generic in generics {
         output.push(generic.await?.clone());
     }
+
     return Ok(Types::Generic(name, output));
 }
 

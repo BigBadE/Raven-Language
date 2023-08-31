@@ -103,6 +103,7 @@ pub async fn get_generics(generics: IndexMap<String, Vec<ParsingFuture<Types>>>)
         for found in generic {
             generics.push(found.await?);
         }
+
         done_generics.insert(name.clone(), Types::Generic(name, generics));
     }
     return Ok(done_generics);

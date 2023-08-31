@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
-use std::task::Poll::Pending;
 use std::task::Waker;
 use std::thread;
 use chalk_integration::interner::ChalkIr;
@@ -221,8 +220,8 @@ impl Syntax {
     }
 
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, operation: bool, name_resolver: Box<dyn NameResolver>,
-                                not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
+                              getting: String, name_resolver: Box<dyn NameResolver>,
+                              not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
         return AsyncTypesGetter::new_func(syntax, error, getting, name_resolver, not_trait).await;
     }
 
@@ -239,6 +238,7 @@ impl Syntax {
                 bounds.push(Self::parse_type(syntax.clone(), error.clone(),
                                              name_resolver.boxed_clone(), bound).await?);
             }
+
             return Ok(Types::Generic(getting, bounds));
         }
 
@@ -263,17 +263,6 @@ impl Syntax {
             }
         };
         return temp;
-    }
-
-    pub async fn parse_type_genericable(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
-                            types: UnparsedType) -> Result<Types, ParsingError> {
-        if let Ok(result) = Self::parse_type(syntax, error.clone(), resolver, types.clone()).await {
-            Ok(result)
-        } else if let UnparsedType::Basic(inner) = types {
-            Ok(Types::Generic(inner, Vec::new()))
-        } else {
-            Err(error)
-        }
     }
 
     fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {

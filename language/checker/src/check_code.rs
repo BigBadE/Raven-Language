@@ -50,13 +50,39 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                       verify_effect(process_manager, resolver, *second, external, syntax, variables, references).await?))
         }
         Effects::Operation(operation, mut values) => {
+            println!("Checking {}: {:?}", operation, values);
             let error = ParsingError::new(String::new(), (0, 0), 0,
                                           (0, 0), 0, format!("Failed to find operation {}", operation));
-            let operation = OperationGetter {
-                syntax: syntax.clone(),
-                operation,
-                error
-            }.await?;
+            let mut outer_operation = None;
+            if values.len() > 0 {
+                if let Effects::Operation(inner_operation, _) = values.last().unwrap() {
+                    if operation.ends_with("{}") && inner_operation.starts_with("{}") {
+                        let getter = OperationGetter {
+                            syntax: syntax.clone(),
+                            operation: operation[0..operation.len() - 2].to_string() + &inner_operation[2..inner_operation.len()],
+                            error: error.clone()
+                        };
+                        if let Ok(found) = getter.await {
+                            outer_operation = Some(found);
+                        }
+                    }
+                }
+            }
+
+            let operation = if let Some(found) = outer_operation {
+                if let Effects::Operation(_, found) = values.pop().unwrap() {
+                    for value in found {
+                        values.push(value);
+                    }
+                }
+                found
+            } else {
+                OperationGetter {
+                    syntax: syntax.clone(),
+                    operation,
+                    error
+                }.await?
+            };
 
             let calling = Box::new(values.remove(0));
 
@@ -133,7 +159,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 let return_type = found.get_return(variables).unwrap();
                 finalized_effects.push(found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
-                                                        method.clone(), false, resolver.boxed_clone(), true).await {
+                                                        method.clone(), resolver.boxed_clone(), true).await {
                     value
                 } else {
                     let mut output = None;
@@ -154,7 +180,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
             } else {
                 Syntax::get_function(syntax.clone(), placeholder_error(format!("Unknown method {}", method)),
-                                     method, false, resolver.boxed_clone(), true).await?
+                                     method, resolver.boxed_clone(), true).await?
             };
 
             let returning = match returning {

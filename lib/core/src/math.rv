@@ -52,7 +52,7 @@ trait Index<T> {
     fn index(self, index: u64);
 }
 
-pub internal impl<T> Index<T> for T[] {
+pub internal impl<T> Index<T> for [T] {
     fn index(self, index: u64) {}
 }
 

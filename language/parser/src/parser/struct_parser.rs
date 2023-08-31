@@ -106,10 +106,28 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                     base = temp;
                     state = 1;
                 } else {
-                    if generics.contains_key(&name) {
+                    let mut temp_name = name.clone();
+                    let mut depth = 0;
+                    while temp_name.as_bytes()[0] == b'[' {
+                        temp_name = temp_name[1..temp_name.len()-1].to_string();
+                        depth += 1;
+                    }
+                    
+                    if generics.contains_key(&temp_name) {
                         parser_utils.imports.parent = Some(name);
                     } else {
-                        parser_utils.imports.parent = Some(format!("{}::{}", parser_utils.file.clone(), name));
+                        let mut found = String::new();
+                        for _ in 0..depth {
+                            found += "[";
+                        }
+                        
+                        found += format!("{}::{}", parser_utils.file.clone(), temp_name).as_str();
+                        
+                        for _ in 0..depth {
+                            found += "]";
+                        }
+                        
+                        parser_utils.imports.parent = Some(found);
                     }
                     implementor = temp;
                 }
@@ -160,7 +178,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             parser_utils.imports.boxed_clone(), base.unwrap()));
 
     let implementor = Box::pin(
-        Syntax::parse_type_genericable(
+        Syntax::parse_type(
             parser_utils.syntax.clone(),
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
             parser_utils.imports.boxed_clone(), implementor.unwrap()));

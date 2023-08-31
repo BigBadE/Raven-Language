@@ -365,7 +365,7 @@ impl Display for FinalizedTypes {
         match self {
             FinalizedTypes::Struct(structure) => write!(f, "{}", structure.data.name),
             FinalizedTypes::Reference(structure) => write!(f, "&{}", structure),
-            FinalizedTypes::Array(inner) => write!(f, "{}[]", inner),
+            FinalizedTypes::Array(inner) => write!(f, "[{}]", inner),
             FinalizedTypes::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
             FinalizedTypes::GenericType(types, generics) =>
