@@ -41,7 +41,7 @@ trait Array<T> {
     fn instance(self) -> [T];
 }
 
-pub impl<T> Array<T> for [T] {
+pub impl<T> Array<T> for T {
     fn instance(self) -> [T] {
         return self;
     }

@@ -1,3 +1,4 @@
+use inkwell::builder::Builder;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
@@ -23,13 +24,19 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
     } else if name.starts_with("math::index_") {
         unsafe {
             compiler.builder.build_return(Some(&compiler.builder
-                .build_in_bounds_gep(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_pointer_value(),
-                           &[compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "1").into_int_value()],
-                           "0")));
+                .build_in_bounds_gep(params.get(0).unwrap().into_pointer_value(),
+                           &[get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value()], "1")));
         }
     } else {
         panic!("Unknown internal operation: {}", name)
     }
+}
+
+fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+    if value.is_pointer_value() {
+        return compiler.build_load(value.into_pointer_value(), "0");
+    }
+    return value.clone();
 }
 
 fn build_cast(first: &BasicValueEnum, second: BasicTypeEnum, compiler: &CompilerImpl) {

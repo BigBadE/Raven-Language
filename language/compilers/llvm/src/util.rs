@@ -4,6 +4,7 @@ use inkwell::module::Linkage;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
 use syntax::function::CodelessFinalizedFunction;
+use syntax::types::FinalizedTypes;
 use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
@@ -39,14 +40,15 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
 
     let llvm_function = match &function.return_type {
         Some(returning) => {
-            let types = type_getter.get_type(&returning);
+            let types = type_getter.get_type(&FinalizedTypes::Reference(Box::new(returning.clone())));
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
-            if types.is_struct_type() {
+            //TODO not used for now cause malloc is used, but for future speed ups will be needed
+            /*if types.is_struct_type() {
                 params.insert(0, From::from(types.ptr_type(AddressSpace::default())));
                 type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
-            } else {
+            } else {*/
                 types.fn_type(params.as_slice(), false)
-            }
+            //}
         }
         None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
     };
