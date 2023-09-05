@@ -198,7 +198,7 @@ impl Syntax {
         if adding.is_operator() {
             //Only traits can be operators. This will break if something else is.
             //These is no better way to do this because Rust.
-            let adding: Arc<StructData> = unsafe { std::mem::transmute(adding.clone()) };
+            let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
             let name = match Attribute::find_attribute("operation", &adding.attributes).unwrap() {
                 Attribute::String(_, name) => name.replace("{+}", "{}").clone(),

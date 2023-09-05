@@ -206,11 +206,15 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                                                                    &id.to_string()).try_as_basic_value().left();
                 *id += 1;
                 return match call {
-                    Some(_inner) => {
-                        let pointer = compile_effect(type_getter, function,
-                                                     pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
-                        //type_getter.compiler.builder.build_store(pointer, inner);
-                        Some(pointer.as_basic_value_enum())
+                    Some(inner) => {
+                        if inner.is_pointer_value() {
+                            Some(inner)
+                        } else {
+                            let pointer = compile_effect(type_getter, function,
+                                                         pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
+                            type_getter.compiler.builder.build_store(pointer, inner);
+                            Some(pointer.as_basic_value_enum())
+                        }
                     }
                     None => None
                 };
