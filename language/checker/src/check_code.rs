@@ -112,7 +112,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, external, syntax, variables, references).await?;
             let return_type = found.get_return(variables).unwrap();
-            finalized_effects.push(found);
+            finalized_effects.insert(0, found);
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits, resolver.boxed_clone()).await {
@@ -171,7 +171,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let method = if let Some(found) = calling {
                 let found = verify_effect(process_manager, resolver.boxed_clone(), *found, external, syntax, variables, references).await?;
                 let return_type = found.get_return(variables).unwrap();
-                finalized_effects.push(found);
+                finalized_effects.insert(0, found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
