@@ -314,7 +314,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
-    println!("Checking {}: {:?} ({:?})", method.data.name, effects, variables);
     if !method.generics.is_empty() {
         let mut manager = process_manager.clone();
 
@@ -324,9 +323,9 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                 if let FinalizedTypes::GenericType(inner, _) = returning {
                     returning = FinalizedTypes::clone(inner.deref());
                 }
-                if let Some(old) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
+                if let Some((old, other)) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                     if let FinalizedTypes::Generic(name, _) = old {
-                        manager.generics.insert(name, returning);
+                        manager.generics.insert(name, other);
                     } else {
                         panic!("Guh?");
                     }
@@ -336,10 +335,10 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
 
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            if let Some(old) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
+            if let Some((old, other)) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
                 &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                 if let FinalizedTypes::Generic(name, _) = old {
-                    manager.generics.insert(name, effect);
+                    manager.generics.insert(name, other);
                 } else {
                     panic!("Guh?");
                 }
@@ -391,7 +390,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
             None => FinalizedEffects::MethodCall(None, method.clone(), effects),
         };
 
-        println!("Checking {}: {:?}", method.data.name, method.return_type.as_ref().unwrap());
         return Ok(temp_effect);
     }
 

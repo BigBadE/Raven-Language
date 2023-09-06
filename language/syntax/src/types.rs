@@ -240,7 +240,8 @@ impl FinalizedTypes {
 
     #[async_recursion]
     pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,
-                                 bounds_error: ParsingError) -> Result<Option<FinalizedTypes>, ParsingError> {
+                                 bounds_error: ParsingError) -> Result<Option<(FinalizedTypes, FinalizedTypes)>, ParsingError> {
+        println!("Resolving generic of {:?} to {:?}", self, other);
         match self {
             FinalizedTypes::Generic(_name, bounds) => {
                 for bound in bounds {
@@ -248,13 +249,19 @@ impl FinalizedTypes {
                         return Err(bounds_error);
                     }
                 }
-                return Ok(Some(self.clone()));
+                return Ok(Some((self.clone(), other.clone())));
             },
             FinalizedTypes::Reference(inner) => {
+                if let FinalizedTypes::Reference(other) = other {
+                    return inner.resolve_generic(other, syntax, bounds_error).await;
+                }
                 return inner.resolve_generic(other, syntax, bounds_error).await;
             },
             FinalizedTypes::Array(inner) => {
-                return inner.resolve_generic(other, syntax, bounds_error).await;
+                if let FinalizedTypes::Array(other) = other {
+                    return inner.resolve_generic(other, syntax, bounds_error).await;
+                }
+                return Ok(None);
             }
             _ => {}
         }
