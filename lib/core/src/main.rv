@@ -5,6 +5,10 @@ import math::Cast;
 #[extern]
 pub fn main() -> u64 {
     let value = ["1", "2", "3", "4", "5"];
-    printf(value[4]);
+    printf(test(value, 4));
     return 0;
+}
+
+fn test<T>(value: [T], index: u64) -> T {
+    return value[index];
 }

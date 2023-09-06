@@ -204,7 +204,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
-            println!("Return: {:?}", finalized_effects.get(0).as_ref().unwrap());
             check_method(process_manager, method, finalized_effects, syntax, variables, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>
@@ -314,6 +313,7 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
+    println!("Found {} ({:?})", method.data.name, variables.variables);
     if !method.generics.is_empty() {
         let mut manager = process_manager.clone();
 
