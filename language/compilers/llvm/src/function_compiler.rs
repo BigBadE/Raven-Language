@@ -185,7 +185,6 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Calling function, function arguments
         FinalizedEffects::MethodCall(pointer, calling_function, arguments) => {
-            println!("Compiling {}", calling_function.data.name);
             let mut final_arguments = Vec::new();
 
             let calling = type_getter.get_function(calling_function);

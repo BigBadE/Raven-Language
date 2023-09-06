@@ -22,6 +22,7 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
                                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_return(Some(&returning));
     } else if name.starts_with("math::index_") {
+        println!("Getting {} ({:?})", value.get_name().to_str().unwrap(), value.get_type().get_return_type().unwrap());
         let gep;
         unsafe {
             gep = compiler.builder
