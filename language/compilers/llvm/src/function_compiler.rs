@@ -28,6 +28,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
         value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
     } else if is_modifier(function.data.modifiers, Modifier::Internal) {
         value = create_function_value(&function, type_getter, None);
+        println!("Found returning: {:?} ({:?})", function.return_type.as_ref().unwrap(), value.get_type().get_return_type().unwrap());
         compile_internal(&type_getter.compiler, &function.data.name, value);
     } else if is_modifier(function.data.modifiers, Modifier::Extern) {
         value = create_function_value(&function, type_getter, Some(Linkage::External))
@@ -184,6 +185,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Calling function, function arguments
         FinalizedEffects::MethodCall(pointer, calling_function, arguments) => {
+            println!("Compiling {}", calling_function.data.name);
             let mut final_arguments = Vec::new();
 
             let calling = type_getter.get_function(calling_function);
@@ -289,7 +291,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let mut output = compile_effect(type_getter, function, inner, id).unwrap();
 
             let pointer_type = if output.get_type().is_pointer_type() {
-                output.get_type().into_pointer_type()
+                return Some(output);
             } else {
                 output.get_type().ptr_type(AddressSpace::default())
             };

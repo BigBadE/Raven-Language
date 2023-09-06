@@ -4,6 +4,7 @@ import math::Cast;
 
 #[extern]
 pub fn main() -> u64 {
-    let value = [1, 5];
-    return value[1];
+    let value = [1, 2, 3, 4, 5];
+    let finding = 2;
+    return value[finding];
 }

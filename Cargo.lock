@@ -149,7 +149,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chalk-derive"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "chalk-engine"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "chalk-derive",
  "chalk-ir",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "chalk-integration"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "chalk-derive",
  "chalk-engine",
@@ -178,7 +178,7 @@ dependencies = [
  "chalk-parse",
  "chalk-recursive",
  "chalk-solve",
- "indexmap",
+ "indexmap 1.9.3",
  "salsa",
  "string_cache",
  "tracing",
@@ -186,7 +186,7 @@ dependencies = [
 
 [[package]]
 name = "chalk-ir"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "bitflags 1.3.2",
  "chalk-derive",
@@ -195,7 +195,7 @@ dependencies = [
 
 [[package]]
 name = "chalk-parse"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
@@ -205,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "chalk-recursive"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "chalk-derive",
  "chalk-ir",
@@ -216,14 +216,14 @@ dependencies = [
 
 [[package]]
 name = "chalk-solve"
-version = "0.93.0-dev.0"
+version = "0.94.0-dev.0"
 dependencies = [
  "chalk-derive",
  "chalk-ir",
  "ena",
- "indexmap",
+ "indexmap 1.9.3",
  "itertools",
- "petgraph 0.5.1",
+ "petgraph",
  "rustc-hash",
  "tracing",
  "tracing-subscriber",
@@ -237,7 +237,7 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "async-trait",
- "indexmap",
+ "indexmap 1.9.3",
  "no_deadlocks",
  "syntax",
  "tokio",
@@ -348,6 +348,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "equivalent"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+
+[[package]]
 name = "errno"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -367,12 +373,6 @@ dependencies = [
  "cc",
  "libc",
 ]
-
-[[package]]
-name = "fixedbitset"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "fixedbitset"
@@ -510,6 +510,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
+name = "hashbrown"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
+
+[[package]]
 name = "heck"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -540,7 +546,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.12.3",
+]
+
+[[package]]
+name = "indexmap"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
+dependencies = [
+ "equivalent",
+ "hashbrown 0.14.0",
 ]
 
 [[package]]
@@ -644,7 +660,7 @@ dependencies = [
  "is-terminal",
  "itertools",
  "lalrpop-util",
- "petgraph 0.6.3",
+ "petgraph",
  "regex",
  "regex-syntax",
  "string_cache",
@@ -862,7 +878,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-recursion",
- "indexmap",
+ "indexmap 1.9.3",
  "no_deadlocks",
  "syntax",
  "tokio",
@@ -880,22 +896,12 @@ dependencies = [
 
 [[package]]
 name = "petgraph"
-version = "0.5.1"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "467d164a6de56270bd7c4d070df81d07beace25012d5103ced4e9ff08d6afdb7"
+checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
 dependencies = [
- "fixedbitset 0.2.0",
- "indexmap",
-]
-
-[[package]]
-name = "petgraph"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dd7d28ee937e54fe3080c91faa1c3a46c06de6252988a7f4592ba2310ef22a4"
-dependencies = [
- "fixedbitset 0.4.2",
- "indexmap",
+ "fixedbitset",
+ "indexmap 2.0.0",
 ]
 
 [[package]]
@@ -1111,7 +1117,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b84d9f96071f3f3be0dc818eae3327625d8ebc95b58da37d6850724f31d3403"
 dependencies = [
  "crossbeam-utils",
- "indexmap",
+ "indexmap 1.9.3",
  "lock_api",
  "log",
  "oorandom",
@@ -1283,7 +1289,7 @@ dependencies = [
  "chalk-ir",
  "chalk-recursive",
  "chalk-solve",
- "indexmap",
+ "indexmap 1.9.3",
  "lazy_static",
  "no_deadlocks",
  "tokio",

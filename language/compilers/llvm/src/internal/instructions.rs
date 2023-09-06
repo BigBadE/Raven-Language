@@ -1,5 +1,5 @@
 use inkwell::builder::Builder;
-use inkwell::IntPredicate;
+use inkwell::{AddressSpace, IntPredicate};
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
 use crate::compiler::CompilerImpl;
@@ -22,11 +22,13 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
                                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_return(Some(&returning));
     } else if name.starts_with("math::index_") {
+        let gep;
         unsafe {
-            compiler.builder.build_return(Some(&compiler.builder
+            gep = compiler.builder
                 .build_in_bounds_gep(params.get(0).unwrap().into_pointer_value(),
-                           &[get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value()], "1")));
+                                     &[get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value()], "1");
         }
+        compiler.builder.build_return(Some(&compiler.builder.build_bitcast(gep, compiler.context.i64_type().ptr_type(AddressSpace::default()), "2")));
     } else {
         panic!("Unknown internal operation: {}", name)
     }
