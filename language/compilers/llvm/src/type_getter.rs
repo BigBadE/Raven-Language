@@ -82,14 +82,15 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T>(&mut self, functions: &HashMap<String, Arc<FinalizedFunction>>, _structures: &HashMap<String, Arc<FinalizedStruct>>)
+    pub fn compile<T>(&mut self, target: &str, functions: &HashMap<String, Arc<FinalizedFunction>>, 
+                      _structures: &HashMap<String, Arc<FinalizedStruct>>)
                    -> Result<Option<JitFunction<'_, Main<T>>>, Vec<ParsingError>> {
-        while !functions.contains_key("main::main") {
+        while !functions.contains_key(target) {
             //Waiting
             thread::yield_now();
         }
 
-        let function = match functions.get("main::main") {
+        let function = match functions.get(target) {
             Some(found) => found,
             None => return Ok(None)
         }.clone();

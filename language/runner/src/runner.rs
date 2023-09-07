@@ -10,7 +10,7 @@ use crate::{get_compiler, RunnerSettings};
 
 use no_deadlocks::Mutex;
 
-pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
+pub async fn run<T: Send + 'static>(target: &'static str, settings: &RunnerSettings)
     -> Result<Option<T>, Vec<ParsingError>> {
     let syntax = Syntax::new(Box::new(
         TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.include_references())));
@@ -18,7 +18,7 @@ pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
 
     let (sender, receiver) = mpsc::channel();
 
-    settings.cpu_runtime.spawn(start(settings.compiler.clone(), sender, syntax.clone()));
+    settings.cpu_runtime.spawn(start(target, settings.compiler.clone(), sender, syntax.clone()));
 
     //Parse source, getting handles and building into the unresolved syntax.
     let mut handles = Vec::new();
@@ -58,13 +58,13 @@ pub async fn run<T: Send + 'static>(settings: &RunnerSettings)
     return receiver.recv().unwrap();
 }
 
-pub async fn start<T>(compiler: String, sender: Sender<Result<Option<T>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start<T>(target: &str, compiler: String, sender: Sender<Result<Option<T>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();
         code_compiler = get_compiler(locked.compiling.clone(),
                                 locked.strut_compiling.clone(), compiler);
     }
-    let returning = code_compiler.compile(&syntax);
+    let returning = code_compiler.compile(target, &syntax);
     sender.send(returning).unwrap();
 }

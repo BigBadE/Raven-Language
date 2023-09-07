@@ -34,5 +34,5 @@ async fn main() {
 }
 
 async fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    return runner::runner::run::<T>(&arguments.runner_settings).await;
+    return runner::runner::run::<T>("build::project", &arguments.runner_settings).await;
 }

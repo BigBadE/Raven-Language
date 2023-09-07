@@ -39,12 +39,12 @@ impl LLVMCompiler {
 }
 
 impl<T> Compiler<T> for LLVMCompiler {
-    fn compile(&self, syntax: &Arc<Mutex<Syntax>>)
+    fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>)
         -> Result<Option<T>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        let result = binding.compile(&self.compiling,
+        let result = binding.compile(target, &self.compiling,
         &self.struct_compiling);
 
         let locked = syntax.lock().unwrap();

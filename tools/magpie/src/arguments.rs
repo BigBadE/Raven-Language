@@ -18,6 +18,13 @@ impl Arguments {
         //Skip the first arg (running location)
         arguments.next();
 
+        if arguments.len() == 0 {
+            let runner_args = all_args.get_mut(&ArgumentTypes::Runner).unwrap();
+            return Self {
+                runner_settings: Self::parse_runner_settings(runner_args)
+            };
+        }
+
         let str_args = arguments.next().unwrap();
         for arg in str_args[0..str_args.len()].split(" ") {
             if arg.is_empty() {
@@ -72,9 +79,8 @@ impl Arguments {
                 .expect("Failed to build I/O runtime"),
             cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
-            sources: arguments.get("root").expect("Need a source root, \
-            pass it with the \"--root (root)\" argument").iter()
-                .map(|root| SourceSet { root: PathBuf::from(root) }).collect(),
+            sources: arguments.get("root").map(|inner| inner.iter()
+                .map(|root| SourceSet { root: PathBuf::from(root) }).collect()).unwrap_or(Vec::new()),
             debug: arguments.get("debug").is_some(),
             compiler: "llvm".to_string(),
         };
