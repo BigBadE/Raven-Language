@@ -1,13 +1,16 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::ops::Deref;
+use std::sync::Arc;
+use std::thread;
+use no_deadlocks::Mutex;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::{Attribute, DisplayIndented, ParsingError, TopElement, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture, DataType};
-use crate::async_util::NameResolver;
-use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
+use crate::{Attribute, DisplayIndented, ParsingError, TopElement, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture, DataType, CheckerVariableManager};
+use crate::async_util::{AsyncDataGetter, NameResolver};
+use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
 
 #[derive(Clone, Debug)]
@@ -38,7 +41,7 @@ pub struct CodelessFinalizedFunction {
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
     pub fields: Vec<FinalizedMemberField>,
     pub return_type: Option<FinalizedTypes>,
-    pub data: Arc<FunctionData>
+    pub data: Arc<FunctionData>,
 }
 
 impl Debug for CodelessFinalizedFunction {
@@ -57,6 +60,107 @@ impl CodelessFinalizedFunction {
             data: self.data,
         };
     }
+
+    //The VariableManager here is for effects
+    pub async fn degeneric(method: Arc<CodelessFinalizedFunction>, mut manager: Box<dyn ProcessManager>,
+                           effects: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+                           variables: &CheckerVariableManager,
+                           returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
+        if let Some(inner) = method.return_type.clone() {
+            if let Some(mut returning) = returning {
+                //TODO remove this and get generic types working with explicit generics?
+                if let FinalizedTypes::GenericType(inner, _) = returning {
+                    returning = FinalizedTypes::clone(inner.deref());
+                }
+                if let Some((old, other)) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
+                    if let FinalizedTypes::Generic(name, _) = old {
+                        manager.mut_generics().insert(name, other);
+                    } else {
+                        panic!("Guh?");
+                    }
+                }
+            }
+        }
+
+        for i in 0..method.fields.len() {
+            let effect = effects.get(i).unwrap().get_return(variables).unwrap();
+            if let Some((old, other)) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
+                &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
+                if let FinalizedTypes::Generic(name, _) = old {
+                    manager.mut_generics().insert(name, other);
+                } else {
+                    panic!("Guh?");
+                }
+            }
+        }
+
+        let name = format!("{}_{}", method.data.name.split("_").next().unwrap(), display_parenless(
+            &manager.generics().values().collect(), "_"));
+        if syntax.lock().unwrap().functions.types.contains_key(&name) {
+            let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
+            return Ok(AsyncDataGetter::new(syntax.clone(), data).await);
+        } else {
+            let mut new_method = CodelessFinalizedFunction::clone(&method);
+            new_method.generics.clear();
+            let mut method_data = FunctionData::clone(&method.data);
+            method_data.name = name.clone();
+            new_method.data = Arc::new(method_data);
+            for field in &mut new_method.fields {
+                field.field.field_type.degeneric(&manager.generics(), syntax,
+                                                 placeholder_error("No generic!".to_string()),
+                                                 placeholder_error("Invalid bounds!".to_string())).await?;
+            }
+
+            if let Some(returning) = &mut new_method.return_type {
+                returning.degeneric(&manager.generics(), syntax,
+                                    placeholder_error("No generic!".to_string()),
+                                    placeholder_error("Invalid bounds!".to_string())).await?;
+            }
+            let original = method;
+            let new_method = Arc::new(new_method);
+            let mut locked = syntax.lock().unwrap();
+            if let Some(wakers) = locked.functions.wakers.remove(&name) {
+                for waker in wakers {
+                    waker.wake();
+                }
+            }
+
+            locked.functions.types.insert(name, new_method.data.clone());
+            locked.functions.data.insert(new_method.data.clone(), new_method.clone());
+
+            let handle = manager.handle().clone();
+            handle.spawn(degeneric_code(syntax.clone(), original, new_method.clone(), manager));
+            return Ok(new_method);
+        };
+    }
+}
+
+fn placeholder_error(error: String) -> ParsingError {
+    return ParsingError::new(String::new(), (0, 0), 0, (0, 0), 0, error);
+}
+
+async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>,
+                        degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
+    while !syntax.lock().unwrap().compiling.contains_key(&original.data.name) {
+        thread::yield_now();
+    }
+
+    let code = {
+        let locked = syntax.lock().unwrap();
+        locked.compiling.get(&original.data.name).unwrap().code.clone()
+    };
+
+    let mut variables = CheckerVariableManager::for_function(degenericed_method.deref());
+    let code = match code.degeneric(&manager, &mut variables, &syntax).await {
+        Ok(inner) => inner,
+        Err(error) => panic!("Error degenericing code: {}", error)
+    };
+
+    let output = CodelessFinalizedFunction::clone(degenericed_method.deref())
+        .add_code(code);
+
+    unsafe { Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling) }
+        .insert(output.data.name.clone(), Arc::new(output));
 }
 
 #[derive(Clone, Debug)]
@@ -75,7 +179,7 @@ impl FinalizedFunction {
             fields: self.fields.clone(),
             return_type: self.return_type.clone(),
             data: self.data.clone(),
-        }
+        };
     }
 }
 
@@ -158,7 +262,7 @@ pub struct CodeBody {
 pub struct FinalizedCodeBody {
     pub label: String,
     pub expressions: Vec<FinalizedExpression>,
-    pub returns: bool
+    pub returns: bool,
 }
 
 impl CodeBody {
@@ -175,16 +279,16 @@ impl FinalizedCodeBody {
         return Self {
             label,
             expressions,
-            returns
+            returns,
         };
     }
 
-    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedCodeBody {
+    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut CheckerVariableManager, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
-            expression.effect.degeneric(process_manager, syntax).await;
+            expression.effect.degeneric(process_manager, variables, syntax).await?;
         }
 
-        return self;
+        return Ok(self);
     }
 }
 
@@ -261,6 +365,4 @@ impl PartialEq for FunctionData {
     }
 }
 
-impl Eq for FunctionData {
-
-}
+impl Eq for FunctionData {}

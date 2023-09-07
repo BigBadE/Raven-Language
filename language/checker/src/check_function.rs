@@ -1,13 +1,12 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use no_deadlocks::Mutex;
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
-use syntax::{Attribute, is_modifier, Modifier, ParsingError};
+use syntax::{Attribute, CheckerVariableManager, is_modifier, Modifier, ParsingError};
 use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use crate::{CheckerVariableManager, finalize_generics};
+use crate::finalize_generics;
 use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
@@ -63,12 +62,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
-    let mut variable_manager = CheckerVariableManager { variables: HashMap::new(), variable_instructions: HashMap::new() };
-
-    for field in &codeless.fields {
-        variable_manager.variables.insert(field.field.name.clone(),
-                                          field.field.field_type.clone());
-    }
+    let mut variable_manager = CheckerVariableManager::for_function(&codeless);
 
     let mut code = verify_code(process_manager, &resolver, code, codeless.data.attributes.iter()
         .any(|inner| if let Attribute::Basic(inner) = inner {

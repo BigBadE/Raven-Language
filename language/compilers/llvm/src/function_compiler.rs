@@ -5,7 +5,7 @@ use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::types::{BasicType, BasicTypeEnum};
 
 use syntax::{Attribute, is_modifier, Modifier};

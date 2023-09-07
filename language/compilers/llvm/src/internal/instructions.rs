@@ -1,7 +1,7 @@
 use inkwell::builder::Builder;
 use inkwell::{AddressSpace, IntPredicate};
 use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicValueEnum, FunctionValue};
 use crate::compiler::CompilerImpl;
 
 pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, value: FunctionValue<'ctx>) {
@@ -42,7 +42,7 @@ fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> B
     return value.clone();
 }
 
-fn build_cast(first: &BasicValueEnum, second: BasicTypeEnum, compiler: &CompilerImpl) {
+fn build_cast(first: &BasicValueEnum, _second: BasicTypeEnum, compiler: &CompilerImpl) {
     //TODO float casting
     compiler.builder.build_return(Some(&compiler.builder.build_load(first.into_pointer_value(), "1")));
 }

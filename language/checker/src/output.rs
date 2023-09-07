@@ -91,6 +91,10 @@ impl ProcessManager for TypesChecker {
         return &self.generics;
     }
 
+    fn mut_generics(&mut self) -> &mut HashMap<String, FinalizedTypes> {
+        return &mut self.generics;
+    }
+
     fn cloned(&self) -> Box<dyn ProcessManager> {
         return Box::new(self.clone());
     }

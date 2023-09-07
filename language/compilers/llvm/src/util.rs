@@ -1,6 +1,5 @@
 use std::ops::Deref;
 use std::sync::Arc;
-use inkwell::AddressSpace;
 use inkwell::module::Linkage;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;

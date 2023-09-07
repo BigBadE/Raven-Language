@@ -132,6 +132,8 @@ pub trait ProcessManager: Send + Sync {
 
     fn generics(&self) -> &HashMap<String, FinalizedTypes>;
 
+    fn mut_generics(&mut self) -> &mut HashMap<String, FinalizedTypes>;
+
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }
 
@@ -175,6 +177,36 @@ impl ParsingError {
 impl Display for ParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "Error at {} ({}:{}):\n{}", self.file, self.start.0, self.start.1, self.message);
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct CheckerVariableManager {
+    pub variables: HashMap<String, FinalizedTypes>,
+    pub variable_instructions: HashMap<String, FinalizedEffects>,
+}
+
+impl CheckerVariableManager {
+    pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
+        let mut variable_manager = CheckerVariableManager { variables: HashMap::new(), variable_instructions: HashMap::new() };
+
+        for field in &codeless.fields {
+            variable_manager.variables.insert(field.field.name.clone(),
+                                              field.field.field_type.clone());
+        }
+
+        return variable_manager;
+    }
+}
+
+impl VariableManager for CheckerVariableManager {
+    fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
+        return self.variables.get(name).map(|inner| inner.clone());
+    }
+
+    fn get_const_variable(&self, name: &String) -> Option<FinalizedEffects> {
+        return self.variable_instructions.get(name).map(|inner| inner.clone());
     }
 }
 

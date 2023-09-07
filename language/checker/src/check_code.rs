@@ -1,12 +1,10 @@
 use std::{mem, thread};
-use std::ops::Deref;
 use std::sync::Arc;
 use no_deadlocks::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, display_parenless, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
-use syntax::{Attribute, ParsingError, ProcessManager};
+use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
+use syntax::{Attribute, CheckerVariableManager, ParsingError};
 use syntax::syntax::Syntax;
-use crate::CheckerVariableManager;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::operation_util::OperationGetter;
@@ -309,80 +307,16 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
     return FinalizedEffects::HeapStore(Box::new(effect));
 }
 
-async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
+//The CheckerVariableManager here is used for the effects calling the method
+pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     println!("Found {} ({:?})", method.data.name, variables.variables);
     if !method.generics.is_empty() {
-        let mut manager = process_manager.clone();
+        let manager = process_manager.clone();
 
-        if let Some(inner) = method.return_type.clone() {
-            if let Some(mut returning) = returning {
-                //TODO remove this and get generic types working with explicit generics?
-                if let FinalizedTypes::GenericType(inner, _) = returning {
-                    returning = FinalizedTypes::clone(inner.deref());
-                }
-                if let Some((old, other)) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
-                    if let FinalizedTypes::Generic(name, _) = old {
-                        manager.generics.insert(name, other);
-                    } else {
-                        panic!("Guh?");
-                    }
-                }
-            }
-        }
-
-        for i in 0..method.fields.len() {
-            let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            if let Some((old, other)) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
-                &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
-                if let FinalizedTypes::Generic(name, _) = old {
-                    manager.generics.insert(name, other);
-                } else {
-                    panic!("Guh?");
-                }
-            }
-        }
-
-        let name = format!("{}_{}", method.data.name, display_parenless(
-            &manager.generics.values().collect(), "_"));
-        {
-            if syntax.lock().unwrap().functions.types.contains_key(&name) {
-                let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
-                method = AsyncDataGetter::new(syntax.clone(), data).await;
-            } else {
-                let mut new_method = CodelessFinalizedFunction::clone(&method);
-                new_method.generics.clear();
-                let mut method_data = FunctionData::clone(&method.data);
-                method_data.name = name.clone();
-                new_method.data = Arc::new(method_data);
-                for field in &mut new_method.fields {
-                    field.field.field_type.degeneric(&manager.generics, syntax,
-                                                     placeholder_error("No generic!".to_string()),
-                                                     placeholder_error("Invalid bounds!".to_string())).await?;
-                }
-
-                if let Some(returning) = &mut new_method.return_type {
-                    returning.degeneric(&manager.generics, syntax,
-                                        placeholder_error("No generic!".to_string()),
-                                        placeholder_error("Invalid bounds!".to_string())).await?;
-                }
-                let original = method;
-                method = Arc::new(new_method);
-                let mut locked = syntax.lock().unwrap();
-                if let Some(wakers) = locked.functions.wakers.remove(&name) {
-                    for waker in wakers {
-                        waker.wake();
-                    }
-                }
-
-                locked.functions.types.insert(name, method.data.clone());
-                locked.functions.data.insert(method.data.clone(), method.clone());
-
-                process_manager.handle().spawn(degeneric_code(syntax.clone(), original, method.clone(), Box::new(manager)));
-            };
-        }
+        method = CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects, syntax, variables, returning).await?;
 
         let temp_effect = match method.return_type.as_ref() {
             Some(returning) => FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
@@ -404,24 +338,6 @@ async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFi
                                                         method, effects),
         None => FinalizedEffects::MethodCall(None, method, effects)
     });
-}
-
-async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>,
-                        degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
-    while !syntax.lock().unwrap().compiling.contains_key(&original.data.name) {
-        thread::yield_now();
-    }
-
-    let code = {
-        let locked = syntax.lock().unwrap();
-        locked.compiling.get(&original.data.name).unwrap().code.clone()
-    };
-
-    let output = CodelessFinalizedFunction::clone(degenericed_method.deref())
-        .add_code(code.degeneric(&manager, &syntax).await);
-
-    unsafe { Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling) }
-        .insert(output.data.name.clone(), Arc::new(output));
 }
 
 pub fn placeholder_error(message: String) -> ParsingError {

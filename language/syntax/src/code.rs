@@ -3,7 +3,7 @@ use std::sync::Arc;
 use no_deadlocks::Mutex;
 use async_recursion::async_recursion;
 
-use crate::{Attribute, DisplayIndented, ParsingError, ProcessManager, to_modifiers, VariableManager};
+use crate::{Attribute, CheckerVariableManager, DisplayIndented, ParsingError, ProcessManager, to_modifiers, VariableManager};
 use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
 use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
@@ -228,62 +228,65 @@ impl FinalizedEffects {
     }
 
     #[async_recursion]
-    pub async fn degeneric(&mut self, process_manager: &Box<dyn ProcessManager>, syntax: &Arc<Mutex<Syntax>>) {
+    pub async fn degeneric(&mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut CheckerVariableManager, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {
             FinalizedEffects::NOP() => {}
             FinalizedEffects::CreateVariable(_, first, other) => {
-                first.degeneric(process_manager, syntax).await;
-                other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await.unwrap();
+                first.degeneric(process_manager, variables, syntax).await?;
+                other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
             },
             FinalizedEffects::Jump(_) => {}
-            FinalizedEffects::CompareJump(comparing, _, _) => comparing.degeneric(process_manager, syntax).await,
+            FinalizedEffects::CompareJump(comparing, _, _) => comparing.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::CodeBody(body) => {
                 for statement in &mut body.expressions {
-                    statement.effect.degeneric(process_manager, syntax).await;
+                    statement.effect.degeneric(process_manager, variables, syntax).await?;
                 }
             }
-            FinalizedEffects::MethodCall(calling, _, effects) => {
+            FinalizedEffects::MethodCall(calling, method, effects) => {
                 if let Some(inner) = calling {
-                    inner.degeneric(process_manager, syntax).await;
+                    inner.degeneric(process_manager, variables, syntax).await?;
                 }
-                for effect in effects {
-                    effect.degeneric(process_manager, syntax).await;
+                for effect in &mut *effects {
+                    effect.degeneric(process_manager, variables, syntax).await?;
                 }
+                let manager: Box<dyn ProcessManager> = process_manager.cloned();
+                *method = CodelessFinalizedFunction::degeneric(method.clone(), manager, effects, syntax, variables, None).await?;
             }
             FinalizedEffects::Set(setting, value) => {
-                setting.degeneric(process_manager, syntax).await;
-                value.degeneric(process_manager, syntax).await;
+                setting.degeneric(process_manager, variables, syntax).await?;
+                value.degeneric(process_manager, variables, syntax).await?;
             }
             FinalizedEffects::LoadVariable(_) => {}
-            FinalizedEffects::Load(effect, _, _) => effect.degeneric(process_manager, syntax).await,
+            FinalizedEffects::Load(effect, _, _) => effect.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::CreateStruct(target, types, effects) => {
                 if let Some(found) = target {
-                    found.degeneric(process_manager, syntax).await;
+                    found.degeneric(process_manager, variables, syntax).await?;
                 }
                 types.degeneric(process_manager.generics(), syntax,
-                                ParsingError::empty(), ParsingError::empty()).await.unwrap();
+                                ParsingError::empty(), ParsingError::empty()).await?;
                 for (_, effect) in effects {
-                    effect.degeneric(process_manager, syntax).await;
+                    effect.degeneric(process_manager, variables, syntax).await?;
                 }
             }
             FinalizedEffects::CreateArray(other, effects) => {
                 if let Some(inner) = other {
-                    inner.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await.unwrap();
+                    inner.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
                 }
                 for effect in effects {
-                    effect.degeneric(process_manager, syntax).await;
+                    effect.degeneric(process_manager, variables, syntax).await?;
                 }
             }
             FinalizedEffects::Float(_) => {}
             FinalizedEffects::UInt(_) => {}
             FinalizedEffects::Bool(_) => {}
             FinalizedEffects::String(_) => {}
-            FinalizedEffects::HeapStore(storing) => storing.degeneric(process_manager, syntax).await,
+            FinalizedEffects::HeapStore(storing) => storing.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::HeapAllocate(other) =>
-                other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await.unwrap(),
-            FinalizedEffects::PointerLoad(loading) => loading.degeneric(process_manager, syntax).await,
-            FinalizedEffects::StackStore(storing) => storing.degeneric(process_manager, syntax).await
+                other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
+            FinalizedEffects::PointerLoad(loading) => loading.degeneric(process_manager, variables, syntax).await?,
+            FinalizedEffects::StackStore(storing) => storing.degeneric(process_manager, variables, syntax).await?
         }
+        return Ok(());
     }
 
     pub fn is_constant(&self, _variables: &dyn VariableManager) -> bool {

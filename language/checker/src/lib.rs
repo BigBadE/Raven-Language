@@ -6,8 +6,7 @@ use no_deadlocks::Mutex;
 use indexmap::IndexMap;
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::types::{FinalizedTypes, Types};
-use syntax::{ParsingError, ParsingFuture, VariableManager};
-use syntax::code::FinalizedEffects;
+use syntax::{ParsingError, ParsingFuture};
 use syntax::syntax::Syntax;
 
 pub mod check_function;
@@ -38,22 +37,6 @@ impl NameResolver for EmptyNameResolver {
 
     fn boxed_clone(&self) -> Box<dyn NameResolver> {
         return Box::new(EmptyNameResolver {});
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CheckerVariableManager {
-    pub variables: HashMap<String, FinalizedTypes>,
-    pub variable_instructions: HashMap<String, FinalizedEffects>,
-}
-
-impl VariableManager for CheckerVariableManager {
-    fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
-        return self.variables.get(name).map(|inner| inner.clone());
-    }
-
-    fn get_const_variable(&self, name: &String) -> Option<FinalizedEffects> {
-        return self.variable_instructions.get(name).map(|inner| inner.clone());
     }
 }
 

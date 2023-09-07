@@ -129,7 +129,7 @@ impl Syntax {
                         return Some(false);
                     }
                 }
-                return Some(true);
+                Some(true)
             },
             FinalizedTypes::Array(inner) => {
                 let mut first = first;
@@ -137,14 +137,15 @@ impl Syntax {
                     first = other;
                 }
                 if let FinalizedTypes::Array(other) = first {
-                    return self.generic_check(inner, other);
+                    self.generic_check(inner, other)
+                } else {
+                    Some(false)
                 }
-                return Some(false);
             },
             FinalizedTypes::Reference(inner) => {
-                return self.generic_check(inner, first);
+                self.generic_check(inner, first)
             }
-            _ => return None
+            _ => None
         }
     }
 
