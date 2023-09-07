@@ -1,11 +1,14 @@
-use std::{env, fs};
+use std::env;
 use tokio::main;
-use tokio::runtime::Builder;
 use runner::{RunnerSettings, SourceSet};
 use syntax::ParsingError;
 use crate::arguments::Arguments;
+use include_dir::{Dir, include_dir};
 
 pub mod arguments;
+
+static LIBRARY: Dir = include_dir!("lib/core");
+static CORE: Dir = include_dir!("tools/magpie/lib");
 
 #[main]
 async fn main() {
@@ -14,11 +17,15 @@ async fn main() {
 
     let arguments = Arguments {
         runner_settings: RunnerSettings {
-            io_runtime: base_arguments.runner_settings.io_runtime.clone(),
-            cpu_runtime: base_arguments.runner_settings.cpu_runtime.clone(),
+            io_runtime: base_arguments.runner_settings.io_runtime,
+            cpu_runtime: base_arguments.runner_settings.cpu_runtime,
             sources: vec!(SourceSet {
                 root: build_path,
-            }),
+            }, SourceSet {
+                root: LIBRARY.path().clone().to_path_buf()
+            }, SourceSet {
+                root: CORE.path().clone().to_path_buf()
+            }, ),
             debug: false,
             compiler: "llvm".to_string(),
         },

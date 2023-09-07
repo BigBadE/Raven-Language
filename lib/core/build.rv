@@ -7,10 +7,10 @@ pub fn project() -> RavenProject {
     };
 }
 
-pub fn dependencies() -> List<Dependency> {
-    return ArrayList::new([]);
+pub fn dependencies() -> [Dependency] {
+    return [];
 }
 
-pub fn build_tasks() -> List<BuildTask> {
-    return ArrayList::new([]);
+pub fn build_tasks() -> [BuildTask] {
+    return [];
 }

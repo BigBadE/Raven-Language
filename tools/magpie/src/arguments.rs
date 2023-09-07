@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::{env, fs};
 use std::env::Args;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
@@ -50,6 +49,7 @@ impl Arguments {
                         } else {
                             args.insert(String::new(), vec!(arg));
                         }
+                        None
                     }
                 };
             }
