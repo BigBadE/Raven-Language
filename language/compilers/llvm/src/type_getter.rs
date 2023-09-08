@@ -122,12 +122,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         }
 
         print_formatted(self.compiler.module.to_string());
-        return Ok(self.get_main());
+        return Ok(self.get_target(target));
     }
 
-    fn get_main<T>(&self) -> Option<JitFunction<'_, Main<T>>> {
+    fn get_target<T>(&self, target: &str) -> Option<JitFunction<'_, Main<T>>> {
         return unsafe {
-            match self.compiler.execution_engine.get_function("main::main") {
+            match self.compiler.execution_engine.get_function(target) {
                 Ok(value) => Some(value),
                 Err(_) => None
             }

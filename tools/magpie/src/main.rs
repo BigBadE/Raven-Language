@@ -4,14 +4,14 @@ use runner::{FileSourceSet, Readable, RunnerSettings, SourceSet};
 use syntax::ParsingError;
 use crate::arguments::Arguments;
 use include_dir::{Dir, DirEntry, File, include_dir};
+use tokio::runtime::Builder;
 
 pub mod arguments;
 
 static LIBRARY: Dir = include_dir!("lib/core/src");
 static CORE: Dir = include_dir!("tools/magpie/lib/src");
 
-#[main]
-async fn main() {
+fn main() {
     let base_arguments = Arguments::from_arguments(env::args());
     let build_path = env::current_dir().unwrap().join("build.rv");
 
@@ -30,7 +30,15 @@ async fn main() {
             compiler: "llvm".to_string(),
         },
     };
-    let value = run::<i64>(&arguments).await;
+
+    let runner = Builder::new_current_thread().thread_name("main").build().unwrap();
+    let value = runner.block_on(run::<i32>(&arguments));
+    match value {
+        Ok(inner) => println!("{}", inner.unwrap()),
+        Err(error) => for error in error {
+            println!("{}", error)
+        }
+    }
 }
 
 async fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
