@@ -3,7 +3,7 @@ pub fn project() -> RavenProject {
         name: "core",
         version: "1.0",
         dependencies: dependencies(),
-        build_tasks: build_tasks()
+        build_tasks: build_tasks(),
     };
 }
 

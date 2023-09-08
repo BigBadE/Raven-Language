@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env::Args;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
-use runner::{RunnerSettings, SourceSet};
+use runner::{FileSourceSet, RunnerSettings, SourceSet};
 
 pub struct Arguments {
     pub runner_settings: RunnerSettings,
@@ -74,13 +74,21 @@ impl Arguments {
         } else {
             (Builder::new_multi_thread(), Builder::new_multi_thread())
         };
+        let sources: Vec<Box<dyn SourceSet>> = if let Some(found) = arguments.get("root") {
+            let mut output: Vec<Box<dyn SourceSet>> = vec!();
+            for value in found {
+                output.push(Box::new(FileSourceSet { root: PathBuf::from(value)}));
+            }
+            output
+        } else {
+            vec!()
+        };
         return RunnerSettings {
             io_runtime: io_runtime.thread_name("io-runtime").build()
                 .expect("Failed to build I/O runtime"),
             cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
-            sources: arguments.get("root").map(|inner| inner.iter()
-                .map(|root| SourceSet { root: PathBuf::from(root) }).collect()).unwrap_or(Vec::new()),
+            sources,
             debug: arguments.get("debug").is_some(),
             compiler: "llvm".to_string(),
         };

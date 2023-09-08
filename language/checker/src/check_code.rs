@@ -312,7 +312,6 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
                       effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                       variables: &mut CheckerVariableManager,
                       returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
-    println!("Found {} ({:?})", method.data.name, variables.variables);
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
 

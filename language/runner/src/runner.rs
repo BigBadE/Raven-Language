@@ -1,4 +1,3 @@
-use std::fs;
 use std::sync::{Arc, mpsc};
 use std::sync::mpsc::Sender;
 use anyhow::Error;
@@ -24,14 +23,13 @@ pub async fn run<T: Send + 'static>(target: &'static str, settings: &RunnerSetti
     let mut handles = Vec::new();
     for source_set in &settings.sources {
         for file in source_set.get_files() {
-            if !file.as_path().to_str().unwrap().ends_with("rv") {
+            if !file.path().ends_with("rv") {
                 continue;
             }
             handles.push(
                 settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
                                                 source_set.relative(&file).clone(),
-                                                fs::read_to_string(file.clone()).expect(
-                                                    &format!("Failed to read source file: {}", file.to_str().unwrap())))));
+                                                file.read())));
         }
     }
 

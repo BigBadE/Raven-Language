@@ -14,7 +14,7 @@ pub mod runner;
 pub struct RunnerSettings {
     pub io_runtime: Runtime,
     pub cpu_runtime: Runtime,
-    pub sources: Vec<SourceSet>,
+    pub sources: Vec<Box<dyn SourceSet>>,
     pub debug: bool,
     pub compiler: String,
 }
@@ -36,39 +36,63 @@ impl RunnerSettings {
     }
 }
 
+pub trait Readable {
+    fn read(&self) -> String;
+
+    fn path(&self) -> String;
+}
+
+pub trait SourceSet {
+    fn get_files(&self) -> Vec<Box<dyn Readable>>;
+
+    fn relative(&self, other: &Box<dyn Readable>) -> String;
+}
+
 #[derive(Debug)]
-pub struct SourceSet {
+pub struct FileSourceSet {
     pub root: PathBuf,
 }
 
-impl SourceSet {
-    pub fn get_files(&self) -> Vec<PathBuf> {
+impl Readable for PathBuf {
+    fn read(&self) -> String {
+        return fs::read_to_string(self.clone()).expect(
+            &format!("Failed to read source file: {}", self.to_str().unwrap()));
+    }
+
+    fn path(&self) -> String {
+        return self.to_str().unwrap().to_string();
+    }
+}
+
+impl SourceSet for FileSourceSet {
+    fn get_files(&self) -> Vec<Box<dyn Readable>> {
         let mut output = Vec::new();
-        SourceSet::read_recursive(self.root.clone(), &mut output)
+        read_recursive(self.root.clone(), &mut output)
             .expect(&format!("Failed to read source files! Make sure {:?} exists", self.root));
         return output;
     }
 
-    pub fn relative(&self, other: &PathBuf) -> String {
-        let name = other.to_str().unwrap()
+    fn relative(&self, other: &Box<dyn Readable>) -> String {
+        let name = other.path()
             .replace(self.root.to_str().unwrap(), "")
             .replace(path::MAIN_SEPARATOR, "::");
         if name.len() == 0 {
-            let name: &str = other.to_str().unwrap().split(path::MAIN_SEPARATOR).last().unwrap();
+            let path = other.path();
+            let name: &str = path.split(path::MAIN_SEPARATOR).last().unwrap();
             return name[0..name.len()-3].to_string();
         }
         return name.as_str()[2..name.len() - 3].to_string();
     }
+}
 
-    fn read_recursive(base: PathBuf, output: &mut Vec<PathBuf>) -> Result<(), Error> {
-        if fs::metadata(&base)?.file_type().is_dir() {
-            for file in fs::read_dir(&base)? {
-                let file = file?;
-                SourceSet::read_recursive(file.path(), output)?;
-            }
-        } else {
-            output.push(base);
+fn read_recursive(base: PathBuf, output: &mut Vec<Box<dyn Readable>>) -> Result<(), Error> {
+    if fs::metadata(&base)?.file_type().is_dir() {
+        for file in fs::read_dir(&base)? {
+            let file = file?;
+            read_recursive(file.path(), output)?;
         }
-        return Ok(());
+    } else {
+        output.push(Box::new(base));
     }
+    return Ok(());
 }
