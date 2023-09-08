@@ -53,6 +53,10 @@ impl SourceSet {
         let name = other.to_str().unwrap()
             .replace(self.root.to_str().unwrap(), "")
             .replace(path::MAIN_SEPARATOR, "::");
+        if name.len() == 0 {
+            let name: &str = other.to_str().unwrap().split(path::MAIN_SEPARATOR).last().unwrap();
+            return name[0..name.len()-3].to_string();
+        }
         return name.as_str()[2..name.len() - 3].to_string();
     }
 
