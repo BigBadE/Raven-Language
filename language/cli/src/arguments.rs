@@ -3,7 +3,7 @@ use std::{env, fs};
 use std::env::Args;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
-use runner::{RunnerSettings, SourceSet};
+use runner::{FileSourceSet, RunnerSettings, SourceSet};
 
 pub struct Arguments {
     pub runner_settings: RunnerSettings,
@@ -59,7 +59,7 @@ impl Arguments {
                     fs::create_dir_all(test_folder.clone()).unwrap();
                     let test_file = test_folder.clone().join("main.rv");
                     fs::write(test_file.clone(), format!("pub internal struct i64 {{}} pub fn main() -> i64 {{{}return 123;}}",
-                    "let a = 1;".repeat(1000000))).unwrap();
+                                                         "let a = 1;".repeat(1000000))).unwrap();
                     runner_args.insert("root".to_string(), vec!(test_folder.to_str().unwrap().to_string()));
                     println!("Test file written to {:?}", test_file);
                 }
@@ -77,14 +77,18 @@ impl Arguments {
         } else {
             (Builder::new_multi_thread(), Builder::new_multi_thread())
         };
+        let temp = arguments.get("root").expect("Need a source root, \
+            pass it with the \"--root (root)\" argument");
+        let mut sources: Vec<Box<dyn SourceSet>> = vec!();
+        for value in temp {
+            sources.push(Box::new(FileSourceSet { root: PathBuf::from(value) }));
+        }
         return RunnerSettings {
             io_runtime: io_runtime.thread_name("io-runtime").build()
                 .expect("Failed to build I/O runtime"),
             cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
-            sources: arguments.get("root").expect("Need a source root, \
-            pass it with the \"--root (root)\" argument").iter()
-                .map(|root| SourceSet { root: PathBuf::from(root) }).collect(),
+            sources,
             debug: arguments.get("debug").is_some(),
             compiler: "llvm".to_string(),
         };

@@ -1,4 +1,10 @@
-#[extern]
-pub fn project() -> i64 {
-    return 0;
+pub fn project() -> Test {
+    let test = new Test {
+        inner: 123,
+    };
+    return test;
+}
+
+pub struct Test {
+    pub inner: i64;
 }

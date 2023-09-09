@@ -148,7 +148,11 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
             if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
                 tokenizer.make_token(TokenTypes::ReturnTypeArrow)
             } else if tokenizer.matches("{") {
-                tokenizer.state = TokenizerState::CODE;
+                if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
+                    tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP;
+                } else {
+                    tokenizer.state = TokenizerState::CODE;
+                }
                 tokenizer.make_token(TokenTypes::CodeStart)
             } else if tokenizer.matches(";") {
                 if tokenizer.state == TokenizerState::FUNCTION {
@@ -206,8 +210,7 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.make_token(TokenTypes::For)
         } else {
             tokenizer.state = TokenizerState::TOP_ELEMENT;
-            println!("Invalid: {}, last: {}", String::from_utf8_lossy(&tokenizer.buffer[tokenizer.index-5..tokenizer.index+10]),
-            tokenizer.last.to_string(tokenizer.buffer));
+            tokenizer.last.to_string(tokenizer.buffer);
             tokenizer.handle_invalid()
         },
         token => panic!("How'd you get here? {:?}", token)

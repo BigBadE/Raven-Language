@@ -9,7 +9,7 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
     compiler.builder.position_at_end(block);
     let params = value.get_params();
     //Trunc to go u64 -> u8
-    if name.starts_with("math::cast_") {
+    if name.starts_with("numbers::cast_") {
         build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
         return;
     } else if name.starts_with("math::add_") {
@@ -21,8 +21,7 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
             .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_return(Some(&returning));
-    } else if name.starts_with("math::index_") {
-        println!("Getting {} ({:?})", value.get_name().to_str().unwrap(), value.get_type().get_return_type().unwrap());
+    } else if name.starts_with("array::index_") {
         let gep;
         unsafe {
             gep = compiler.builder

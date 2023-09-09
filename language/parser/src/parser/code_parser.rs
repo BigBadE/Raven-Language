@@ -80,7 +80,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     effect = Some(
                         Effects::LoadVariable(token.to_string(parser_utils.buffer)))
                 },
-            TokenTypes::Return => expression_type = ExpressionType::Return,
+            TokenTypes::Return => {
+                expression_type = ExpressionType::Return
+            },
             TokenTypes::New => effect = Some(parse_new(parser_utils)?),
             TokenTypes::BlockStart => if break_at_body {
                 break;

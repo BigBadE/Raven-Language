@@ -70,7 +70,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             },
             TokenTypes::Comment => {},
             TokenTypes::EOF => return,
-            _ => panic!("How'd you get here? {:?}", token.token_type)
+            _ => panic!("How'd you get here? {}: {:?} ({})", parser_utils.file, token.token_type, token.to_string(parser_utils.buffer))
         }
     }
 }
@@ -95,8 +95,8 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
 }
 
 pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attribute>) {
-    loop {
-        let next = parser_utils.tokens.get(parser_utils.index+1).unwrap();
+    while parser_utils.index < parser_utils.tokens.len()-1 {
+        let next = parser_utils.tokens.get(parser_utils.index).unwrap();
         if next.token_type == TokenTypes::AttributeStart {
             parser_utils.index += 1;
             continue

@@ -7,19 +7,14 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         parse_acceptable(tokenizer, TokenTypes::CallingType)
     } else if tokenizer.matches(";") {
         tokenizer.for_loop = false;
-        if (tokenizer.state.clone() & TokenizerState::CODE_TO_STRUCT_TOP) != 12 {
-            tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
-            tokenizer.make_token(TokenTypes::CodeEnd)
-        } else {
-            tokenizer.make_token(TokenTypes::LineEnd)
-        }
+        tokenizer.make_token(TokenTypes::LineEnd)
     } else if tokenizer.matches("{") {
         tokenizer.bracket_depth += 1;
         tokenizer.make_token(TokenTypes::BlockStart)
     } else if tokenizer.matches("}") {
         tokenizer.for_loop = false;
         if tokenizer.bracket_depth == 0 {
-            if (tokenizer.state.clone() & TokenizerState::CODE_TO_STRUCT_TOP) != 0 {
+            if tokenizer.state == TokenizerState::CODE_TO_STRUCT_TOP {
                 tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
             } else {
                 tokenizer.state = TokenizerState::TOP_ELEMENT;
@@ -59,7 +54,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     } else if tokenizer.matches("new") {
         tokenizer.make_token(TokenTypes::New)
     } else if tokenizer.matches("while") &&
-        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd){
+        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
         tokenizer.make_token(TokenTypes::While)
     } else if tokenizer.matches("if") {
         tokenizer.make_token(TokenTypes::If)

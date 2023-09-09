@@ -1,5 +1,6 @@
 use std::{fs, path};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
 use anyhow::Error;
@@ -42,7 +43,7 @@ pub trait Readable {
     fn path(&self) -> String;
 }
 
-pub trait SourceSet {
+pub trait SourceSet: Debug {
     fn get_files(&self) -> Vec<Box<dyn Readable>>;
 
     fn relative(&self, other: &Box<dyn Readable>) -> String;
