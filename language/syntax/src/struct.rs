@@ -50,8 +50,6 @@ pub fn get_internal(name: String) -> Arc<StructData> {
     };
 }
 
-pub static ID: std::sync::Mutex<u64> = std::sync::Mutex::new(0);
-
 #[derive(Clone, Debug)]
 pub enum ChalkData {
     Trait(Ty<ChalkIr>, AdtDatum<ChalkIr>, TraitDatum<ChalkIr>),
@@ -91,7 +89,7 @@ impl ChalkData {
 #[derive(Clone)]
 pub struct StructData {
     pub modifiers: u8,
-    pub chalk_data: ChalkData,
+    pub chalk_data: Option<ChalkData>,
     pub id: u64,
     pub name: String,
     pub attributes: Vec<Attribute>,
@@ -144,14 +142,23 @@ impl PartialEq for FinalizedStruct {
 
 impl StructData {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
-        let mut id = ID.lock().unwrap();
-        *id += 1;
+        return Self {
+            attributes,
+            chalk_data: None,
+            id: 0,
+            modifiers,
+            name,
+            poisoned: Vec::new(),
+        };
+    }
+
+    pub fn set_chalk_data(&mut self) {
         let temp: &[GenericArg<ChalkIr>] = &[];
         let adt_id = AdtId(RawId {
-            index: *id as u32
+            index: self.id as u32
         });
         let tykind = TyKind::Adt(adt_id, Substitution::from_iter(ChalkIr,
-                                                         temp.into_iter())).intern(ChalkIr);
+                                                                 temp.into_iter())).intern(ChalkIr);
         let adt_data = AdtDatum {
             binders: Binders::empty(ChalkIr, AdtDatumBound {
                 variants: vec![],
@@ -165,13 +172,11 @@ impl StructData {
             },
             kind: AdtKind::Struct,
         };
-        if is_modifier(modifiers, Modifier::Trait) {
+        if is_modifier(self.modifiers, Modifier::Trait) {
             let trait_id = TraitId(RawId {
-                index: *id as u32
+                index: self.id as u32
             });
-            return Self {
-                attributes,
-                chalk_data: ChalkData::Trait(tykind, adt_data, TraitDatum {
+            self.chalk_data = Some(ChalkData::Trait(tykind, adt_data, TraitDatum {
                     id: trait_id,
                     binders: Binders::empty(ChalkIr, TraitDatumBound {
                         where_clauses: vec![],
@@ -186,28 +191,10 @@ impl StructData {
                     },
                     associated_ty_ids: vec![],
                     well_known: None,
-                }),
-                id: *id,
-                modifiers,
-                name,
-                poisoned: Vec::new(),
-            };
+                }))
         } else {
-            return Self {
-                attributes,
-                chalk_data: ChalkData::Struct(tykind, adt_data),
-                id: *id,
-                modifiers,
-                name,
-                poisoned: Vec::new(),
-            };
+            self.chalk_data = Some(ChalkData::Struct(tykind, adt_data));
         }
-    }
-
-    pub fn fix_id(&mut self) {
-        let mut id = ID.lock().unwrap();
-        *id += 1;
-        self.id = *id;
     }
 
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
@@ -264,8 +251,9 @@ impl TopElement for StructData {
     type Unfinalized = UnfinalizedStruct;
     type Finalized = FinalizedStruct;
 
-    fn id(&self) -> u64 {
-        return self.id;
+    fn set_id(&mut self, id: u64) {
+        self.id = id;
+        self.set_chalk_data();
     }
 
     fn poison(&mut self, error: ParsingError) {

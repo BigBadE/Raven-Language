@@ -30,7 +30,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
         tokens,
         syntax,
         file: name.clone(),
-        imports: ImportNameResolver::new(name),
+        imports: ImportNameResolver::new(name.clone()),
         handle,
     };
 

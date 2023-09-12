@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use std::task::Waker;
-use std::{mem, thread};
+use std::mem;
 use chalk_integration::interner::ChalkIr;
-use chalk_integration::RawId;
+use chalk_integration::{RawId, ty};
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
@@ -14,6 +14,8 @@ use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 
 use async_recursion::async_recursion;
+// Re-export main
+pub use data::Main;
 
 use crate::{Attribute, FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_getters::{AsyncGetter, GetterManager};
@@ -155,7 +157,7 @@ impl Syntax {
         }
         let second_ty = &second.inner_struct().data;
 
-        let first_ty = first.inner_struct().data.chalk_data.get_ty().clone();
+        let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
 
         let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
         let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
@@ -171,12 +173,11 @@ impl Syntax {
 
     // Adds the top element to the syntax
     pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
-        while adding.id() != u64::MAX && !syntax.lock().unwrap().structures.sorted.contains(unsafe { mem::transmute(adding) }) &&
-            syntax.lock().unwrap().structures.sorted.len() != (adding.id()-1) as usize {
-            thread::yield_now();
+        let mut locked = syntax.lock().unwrap();
+        unsafe {
+            Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.len() as u64);
         }
 
-        let mut locked = syntax.lock().unwrap();
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
         }
@@ -300,8 +301,6 @@ impl Syntax {
         return error;
     }
 }
-
-pub type Main<T> = unsafe extern "C" fn() -> T;
 
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.

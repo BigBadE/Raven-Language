@@ -3,14 +3,16 @@ extern crate core;
 
 use alloc::ffi::CString;
 use core::fmt::Debug;
-use std::{env, path, ptr};
+use std::{env, mem, path, ptr};
 use std::ffi::{c_char, c_int};
+use std::future::Future;
+use std::pin::Pin;
 use std::ptr::addr_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
-use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError};
+use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Main};
 use crate::arguments::Arguments;
 use include_dir::{Dir, DirEntry, File, include_dir};
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Handle};
 
 pub mod arguments;
 
@@ -44,13 +46,17 @@ fn main() {
 
     println!("Building project...");
     let runner = Builder::new_current_thread().thread_name("main").build().unwrap();
-    let value = runner.block_on(run::<AtomicPtr<RawRavenProject>>(&arguments));
+    let value = run::<AtomicPtr<RawRavenProject>>(runner.handle().clone(), &arguments);
+    println!("Built!");
     match value {
-        Ok(inner) => {
-            let raw_project = unsafe { ptr::read(inner.unwrap().load(Ordering::Relaxed)) };
-            println!("Processing project... ({:?})", raw_project);
-            let project = RavenProject::from(raw_project);
-            println!("{:?}", project);
+        Ok(inner) => match inner {
+            Some(inner) => {
+                let raw_project = unsafe { ptr::read(inner.load(Ordering::Relaxed)) };
+                println!("Processing project... ({:?})", raw_project);
+                let project = RavenProject::from(raw_project);
+                println!("{:?}", project);
+            },
+            None => println!("No project method found!")
         }
         Err(error) => for error in error {
             println!("{}", error)
@@ -136,11 +142,19 @@ impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
     }
 }
 
-async fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+fn run<T: Send + 'static>(handle: Handle, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+    let result = runner::runner::run_extern(
+        handle, "project::build", &arguments.runner_settings)?;
+    return Ok(result.map(|inner| unsafe { mem::transmute::<Main<()>, Main<T>>(inner)() }));
+
     unsafe {
-        let lib = libloading::Library::new("/path/to/liblibrary.so").unwrap();
-        let func: libloading::Symbol<unsafe extern fn(target: &'static str, settings: &RunnerSettings) -> u32> = lib.get(b"my_func").unwrap();
-        return runner::runner::run::<T>("build::project", &arguments.runner_settings).await;
+        let lib = libloading::Library::new("C:\\Raven\\Raven-Language\\target\\debug\\runner.dll").unwrap();
+        let func: libloading::Symbol<
+            unsafe extern fn(target: &'static str, settings: &RunnerSettings)
+                -> Result<Option<Main<T>>, Vec<ParsingError>>>
+            = lib.get(b"run_extern").unwrap();
+        let func = func("project::build", &arguments.runner_settings);
+        return Ok(func?.map(|inner| inner()));
     }
 }
 

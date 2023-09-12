@@ -5,14 +5,13 @@ use std::rc::Rc;
 use std::sync::Arc; use no_deadlocks::Mutex;
 
 use inkwell::context::Context;
-use inkwell::execution_engine::JitFunction;
 use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::{Compiler, Syntax};
+use syntax::syntax::{Compiler, Syntax, Main};
 
 use crate::compiler::CompilerImpl;
-use crate::type_getter::{CompilerTypeGetter, Main};
+use crate::type_getter::CompilerTypeGetter;
 
 pub mod internal;
 pub mod lifetimes;

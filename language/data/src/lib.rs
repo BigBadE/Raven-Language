@@ -4,6 +4,8 @@ use std::fmt::{Debug, Display, Formatter};
 use anyhow::Error;
 use std::{fs, path};
 
+pub type Main<T> = unsafe extern "C" fn() -> T;
+
 pub struct RunnerSettings {
     pub io_runtime: Runtime,
     pub cpu_runtime: Runtime,
