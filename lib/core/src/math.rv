@@ -1,5 +1,8 @@
 import numbers;
 
+// Defines an equality operator, which takes two arguments.
+// It has a priority of -1 (0 is addition/subtraction)
+// Types can implement this trait to implement the operator.
 #[priority(-1)]
 #[operation({}=={})]
 trait Equal<T> {

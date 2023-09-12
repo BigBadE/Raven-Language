@@ -1,10 +1,28 @@
-pub fn project() -> Test {
-    let test = new Test {
-        inner: 123,
+pub fn project() -> RavenProject {
+    return new RavenProject {
+        name: "test",
+        dependencies: [
+            new Dependency {
+                temp: 999,
+            },
+            new Dependency {
+                temp: 999,
+            },
+            new Dependency {
+                temp: 999,
+            },
+            new Dependency {
+                temp: 999,
+            }
+        ],
     };
-    return test;
 }
 
-pub struct Test {
-    pub inner: i64;
+pub struct RavenProject {
+    pub name: str;
+    pub dependencies: [Dependency];
+}
+
+pub struct Dependency {
+    pub temp: i64;
 }

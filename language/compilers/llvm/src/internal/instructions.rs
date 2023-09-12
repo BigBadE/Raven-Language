@@ -22,11 +22,14 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
                                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_return(Some(&returning));
     } else if name.starts_with("array::index_") {
+        let offset = get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value();
+        let offset = compiler.builder.build_int_add(offset, compiler.context.i64_type().const_int(1, false), "3");
+
         let gep;
         unsafe {
             gep = compiler.builder
                 .build_in_bounds_gep(params.get(0).unwrap().into_pointer_value(),
-                                     &[get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value()], "1");
+                                     &[offset], "1");
         }
         compiler.builder.build_return(Some(&compiler.builder.build_bitcast(gep, compiler.context.i64_type().ptr_type(AddressSpace::default()), "2")));
     } else {

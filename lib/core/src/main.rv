@@ -1,6 +1,4 @@
-import iter;
 import stdio;
-import math::Cast;
 
 #[extern]
 pub fn main() -> u64 {
@@ -12,3 +10,4 @@ pub fn main() -> u64 {
 fn test<T>(value: [T], index: u64) -> T {
     return value[index];
 }
+

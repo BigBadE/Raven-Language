@@ -374,7 +374,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                     gep = type_getter.compiler.builder
                         .build_gep(pointer_type.const_zero(),
                                    &[type_getter.compiler.context.i64_type()
-                                       .const_int(values.len() as u64, false)],
+                                       .const_int(values.len() as u64 + 1, false)],
                                    &id.to_string());
                 }
                 gep
@@ -400,7 +400,9 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                                         &id.to_string());
             *id += 1;
 
-            let mut i = 0;
+            type_getter.compiler.builder.build_store(malloc, type_getter.compiler.context.i64_type().const_int(values.len() as u64, false));
+            
+            let mut i = 1;
             for value in values {
                 let gep = unsafe {
                     type_getter.compiler.builder
