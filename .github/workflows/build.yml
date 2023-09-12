@@ -17,7 +17,7 @@ jobs:
       with:
         repository: llvm/llvm-project
     - name: LLVM Deps
-      run: apt-get install cmake-data
+      run: sudo apt-get install cmake-data
     - name: LLVM
       run: ./llvm/utils/docker/build_docker_image.sh --source debian10 --docker-repository clang-debian10 --docker-tag "staging" -p clang -i install-clang -i install-clang-resource-headers -- -DCMAKE_BUILD_TYPE=Release
     
@@ -27,6 +27,8 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
+    - name: Add Nightly
+      run: rustup toolchain install nightly
     - name: Build
       run: cargo +nightly build --verbose
     - name: Run tests
