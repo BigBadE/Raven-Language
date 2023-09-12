@@ -17,7 +17,7 @@ jobs:
       with:
         repository: llvm/llvm-project
     - name: LLVM
-    - run: ./llvm/utils/docker/build_docker_image.sh
+      run: ./llvm/utils/docker/build_docker_image.sh
     
   build:
     runs-on: debian-latest
