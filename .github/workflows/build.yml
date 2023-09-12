@@ -17,7 +17,7 @@ jobs:
       with:
         repository: llvm/llvm-project
     - name: LLVM Deps
-      run: sudo apt-get install cmake-data
+      run: sudo apt-get install cmake-data && sudo apt-get install cmake
     - name: LLVM
       run: ./llvm/utils/docker/build_docker_image.sh --source debian10 --docker-repository clang-debian10 --docker-tag "staging" -p clang -i install-clang -i install-clang-resource-headers -- -DCMAKE_BUILD_TYPE=Release
     
