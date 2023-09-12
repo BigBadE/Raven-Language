@@ -13,7 +13,8 @@ members = [
     "tools/ide-plugins/raven-language-server"
 ]
 
-exclude = [
+resolver = "2"
 
+exclude = [
     "crates/chalk"
 ]
