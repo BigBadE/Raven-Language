@@ -17,6 +17,7 @@ jobs:
       with:
         repository: llvm/llvm-project
     - name: LLVM
+      run: apt-get install cmake-data
       run: ./llvm/utils/docker/build_docker_image.sh --source debian10 --docker-repository clang-debian10 --docker-tag "staging" -p clang -i install-clang -i install-clang-resource-headers -- -DCMAKE_BUILD_TYPE=Release
     
   build:
@@ -26,6 +27,6 @@ jobs:
       with:
         submodules: true
     - name: Build
-      run: cargo build --verbose
+      run: cargo +nightly build --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo +nightly test --verbose
