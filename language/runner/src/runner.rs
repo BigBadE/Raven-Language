@@ -1,16 +1,21 @@
+use std::future::Future;
 use std::sync::{Arc, mpsc};
 use std::sync::mpsc::Sender;
 use anyhow::Error;
 use checker::output::TypesChecker;
 use parser::parse;
 use syntax::ParsingError;
-use syntax::syntax::Syntax;
-use crate::{get_compiler, RunnerSettings};
-
+use syntax::syntax::{Main, Syntax};
+use crate::get_compiler;
+use data::RunnerSettings;
 use no_deadlocks::Mutex;
 
+pub fn run_exterm(target: &'static str, settings: &RunnerSettings) -> impl Future<Output=Result<Option<Main<()>>, Vec<ParsingError>>> {
+    return run(target, settings);
+}
+
 pub async fn run<T: Send + 'static>(target: &'static str, settings: &RunnerSettings)
-    -> Result<Option<T>, Vec<ParsingError>> {
+    -> Result<Option<Main<T>>, Vec<ParsingError>> {
     let syntax = Syntax::new(Box::new(
         TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.include_references())));
     let syntax = Arc::new(Mutex::new(syntax));

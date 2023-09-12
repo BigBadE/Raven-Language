@@ -301,7 +301,9 @@ impl Syntax {
     }
 }
 
+pub type Main<T> = unsafe extern "C" fn() -> T;
+
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
-    fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<T>, Vec<ParsingError>>;
+    fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<Main<T>>, Vec<ParsingError>>;
 }

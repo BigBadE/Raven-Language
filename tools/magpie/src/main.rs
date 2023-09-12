@@ -7,8 +7,7 @@ use std::{env, path, ptr};
 use std::ffi::{c_char, c_int};
 use std::ptr::addr_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
-use runner::{FileSourceSet, Readable, RunnerSettings, SourceSet};
-use syntax::ParsingError;
+use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError};
 use crate::arguments::Arguments;
 use include_dir::{Dir, DirEntry, File, include_dir};
 use tokio::runtime::Builder;
@@ -138,7 +137,11 @@ impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
 }
 
 async fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    return runner::runner::run::<T>("build::project", &arguments.runner_settings).await;
+    unsafe {
+        let lib = libloading::Library::new("/path/to/liblibrary.so").unwrap();
+        let func: libloading::Symbol<unsafe extern fn(target: &'static str, settings: &RunnerSettings) -> u32> = lib.get(b"my_func").unwrap();
+        return runner::runner::run::<T>("build::project", &arguments.runner_settings).await;
+    }
 }
 
 #[derive(Debug)]

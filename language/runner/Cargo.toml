@@ -7,6 +7,7 @@ edition = "2021"
 syntax = { path = "../syntax" }
 parser = { path = "../parser" }
 checker = { path = "../checker" }
+data = { path = "../data" }
 
 # Compilers
 compiler-llvm = { path = "../compilers/llvm" }

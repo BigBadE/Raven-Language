@@ -12,7 +12,7 @@ fn main() {
 }
 
 async fn run(arguments: &Arguments) {
-    let compiler = runner::runner::run::<u64>("main::main", &arguments.runner_settings).await;
+    let compiler = unsafe { runner::runner::run::<u64>("main::main", &arguments.runner_settings).await.call() };
     match compiler {
         Err(errors) => {
             for error in errors {

@@ -30,6 +30,9 @@ pub mod r#struct;
 pub mod syntax;
 pub mod types;
 
+//Re-export ParsingError
+pub use data::ParsingError;
+
 // An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
 // for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.
 pub type ParsingFuture<T> = Pin<Box<dyn Future<Output=Result<T, ParsingError>> + Send + Sync>>;
@@ -136,50 +139,6 @@ pub trait ProcessManager: Send + Sync {
 
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }
-
-// An error somewhere in a source file, with exact location.
-#[derive(Clone, Debug)]
-pub struct ParsingError {
-    pub file: String,
-    pub start: (u32, u32),
-    pub start_offset: usize,
-    pub end: (u32, u32),
-    pub end_offset: usize,
-    pub message: String,
-}
-
-impl ParsingError {
-    // An empty error, used for places where errors are ignored
-    pub fn empty() -> Self {
-        return ParsingError {
-            file: String::new(),
-            start: (0, 0),
-            start_offset: 0,
-            end: (0, 0),
-            end_offset: 0,
-            message: "You shouldn't see this! Report this please!".to_string(),
-        };
-    }
-
-    pub fn new(file: String, start: (u32, u32), start_offset: usize, end: (u32, u32),
-               end_offset: usize, message: String) -> Self {
-        return Self {
-            file,
-            start,
-            start_offset,
-            end,
-            end_offset,
-            message,
-        };
-    }
-}
-
-impl Display for ParsingError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "Error at {} ({}:{}):\n{}", self.file, self.start.0, self.start.1, self.message);
-    }
-}
-
 
 #[derive(Debug, Clone)]
 pub struct CheckerVariableManager {

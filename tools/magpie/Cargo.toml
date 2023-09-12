@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 runner = { path = "../../language/runner" }
-syntax = { path = "../../language/syntax" }
+data = { path = "../../language/data" }
 
+libloading = "0.8.0"
 include_dir = "0.7.3"
 
 tokio = { version = "1.25.0", features = ["rt-multi-thread", "macros"] }

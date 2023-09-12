@@ -5,6 +5,7 @@ members = [
     "language/parser",
     "language/runner",
     "language/syntax",
+    "language/data",
 
     "language/compilers/llvm",
 

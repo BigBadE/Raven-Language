@@ -5,13 +5,14 @@ use std::rc::Rc;
 use std::sync::Arc; use no_deadlocks::Mutex;
 
 use inkwell::context::Context;
+use inkwell::execution_engine::JitFunction;
 use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Compiler, Syntax};
 
 use crate::compiler::CompilerImpl;
-use crate::type_getter::CompilerTypeGetter;
+use crate::type_getter::{CompilerTypeGetter, Main};
 
 pub mod internal;
 pub mod lifetimes;
@@ -40,7 +41,7 @@ impl LLVMCompiler {
 
 impl<T> Compiler<T> for LLVMCompiler {
     fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>)
-        -> Result<Option<T>, Vec<ParsingError>> {
+        -> Result<Option<Main<T>>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
@@ -52,7 +53,7 @@ impl<T> Compiler<T> for LLVMCompiler {
         return if locked.errors.is_empty() {
             match result {
                 Ok(function) => match function {
-                    Some(function) => Ok(Some(unsafe { function.call() })),
+                    Some(function) => Ok(Some(unsafe { function.as_raw() })),
                     None => Ok(None)
                 },
                 Err(error) => Err(error)

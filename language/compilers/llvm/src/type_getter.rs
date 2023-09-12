@@ -12,14 +12,12 @@ use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
 use syntax::{ParsingError, VariableManager};
 use syntax::code::FinalizedEffects;
 use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::Syntax;
+use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
 use crate::util::print_formatted;
-
-pub type Main<T> = unsafe extern "C" fn() -> T;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
