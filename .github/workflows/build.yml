@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-      - repository: llvm/llvm-project
+        repository: llvm/llvm-project
     - name: LLVM
     - run: ./llvm/utils/docker/build_docker_image.sh
     
