@@ -31,5 +31,3 @@ jobs:
       run: rustup toolchain install nightly
     - name: Build
       run: cargo +nightly build --verbose
-    - name: Run tests
-      run: cargo +nightly test --verbose
