@@ -11,7 +11,7 @@ env:
 
 jobs:
   llvm:
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
       with:
@@ -20,7 +20,7 @@ jobs:
       run: ./llvm/utils/docker/build_docker_image.sh
     
   build:
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - name: Build
