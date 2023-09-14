@@ -1,3 +1,5 @@
+use std::fmt::Display;
+use std::mem;
 use std::sync::{Arc, mpsc};
 use std::sync::mpsc::Sender;
 use anyhow::Error;
@@ -13,14 +15,11 @@ use tokio::runtime::Handle;
 #[no_mangle]
 pub fn run_extern(handle: Handle, target: &'static str, settings: &RunnerSettings)
                          -> Result<Option<Main<()>>, Vec<ParsingError>> {
-    println!("Name: {}", target);
-    let run = handle.block_on(run::<u64>(target, settings ));
-    println!("Got {}", unsafe { (run?.unwrap())() });
-    return Ok(None);
+    return unsafe { mem::transmute(handle.block_on(run::<u64>(target, settings))) };
 }
 
-pub async fn run<T: Send + 'static>(target: &'static str, settings: &RunnerSettings)
-                                    -> Result<Option<Main<T>>, Vec<ParsingError>> {
+pub async fn run<T: Display + Send + 'static>(target: &'static str, settings: &RunnerSettings)
+                                    -> Result<Option<Box<T>>, Vec<ParsingError>> {
     let syntax = Syntax::new(Box::new(
         TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.include_references())));
     let syntax = Arc::new(Mutex::new(syntax));
@@ -66,7 +65,7 @@ pub async fn run<T: Send + 'static>(target: &'static str, settings: &RunnerSetti
     return receiver.recv().unwrap();
 }
 
-pub async fn start<T>(target: &str, compiler: String, sender: Sender<Result<Option<Main<T>>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start<T: Display>(target: &str, compiler: String, sender: Sender<Result<Option<Box<T>>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();

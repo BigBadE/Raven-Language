@@ -147,7 +147,7 @@ impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
 fn run<T: Send + 'static>(handle: Handle, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     let result = runner::runner::run_extern(
         handle, "build::project", &arguments.runner_settings)?;
-    return Ok(result.map(|inner| unsafe { mem::transmute::<Main<()>, Main<T>>(inner)() }));
+    return Ok(result.map(|inner| unsafe { mem::transmute::<Box<()>, Box<T>inner)() }));
 
     unsafe {
         let lib = libloading::Library::new("C:\\Raven\\Raven-Language\\target\\debug\\runner.dll").unwrap();

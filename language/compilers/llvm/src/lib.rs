@@ -1,6 +1,7 @@
 #![feature(get_mut_unchecked, box_into_inner)]
 
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::rc::Rc;
 use std::sync::Arc; use no_deadlocks::Mutex;
 
@@ -8,7 +9,7 @@ use inkwell::context::Context;
 use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::{Compiler, Syntax, Main};
+use syntax::syntax::{Compiler, Syntax};
 
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
@@ -38,9 +39,9 @@ impl LLVMCompiler {
     }
 }
 
-impl<T> Compiler<T> for LLVMCompiler {
+impl<T: Display> Compiler<T> for LLVMCompiler {
     fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>)
-        -> Result<Option<Main<T>>, Vec<ParsingError>> {
+        -> Result<Option<Box<T>>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
@@ -52,7 +53,9 @@ impl<T> Compiler<T> for LLVMCompiler {
         return if locked.errors.is_empty() {
             match result {
                 Ok(function) => match function {
-                    Some(function) => Ok(Some(unsafe { function.as_raw() })),
+                    Some(function) => {
+                        Ok(Some(unsafe { Box::new(function.call()) }))
+                    },
                     None => Ok(None)
                 },
                 Err(error) => Err(error)
