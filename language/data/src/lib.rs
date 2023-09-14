@@ -1,4 +1,4 @@
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 use std::path::PathBuf;
 use std::fmt::{Debug, Display, Formatter};
 use anyhow::Error;
@@ -6,12 +6,35 @@ use std::{fs, path};
 
 pub type Main<T> = unsafe extern "C" fn() -> T;
 
+#[repr(C)]
 pub struct RunnerSettings {
-    pub io_runtime: Runtime,
-    pub cpu_runtime: Runtime,
     pub sources: Vec<Box<dyn SourceSet>>,
     pub debug: bool,
     pub compiler: String,
+}
+
+pub struct Arguments {
+    pub io_runtime: Runtime,
+    pub cpu_runtime: Runtime,
+    pub runner_settings: RunnerSettings,
+}
+
+impl Arguments {
+    pub fn build_args(single_threaded: bool, runner_settings: RunnerSettings) -> Arguments {
+        let (mut io_runtime, mut cpu_runtime) = if single_threaded {
+            (Builder::new_current_thread(), Builder::new_current_thread())
+        } else {
+            (Builder::new_multi_thread(), Builder::new_multi_thread())
+        };
+
+        return Arguments {
+            io_runtime: io_runtime.thread_name("io-runtime").build()
+                .expect("Failed to build I/O runtime"),
+            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
+                .expect("Failed to build CPU runtime"),
+            runner_settings,
+        };
+    }
 }
 
 impl RunnerSettings {

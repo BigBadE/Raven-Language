@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::mem;
 use std::rc::Rc;
 use std::sync::Arc; use no_deadlocks::Mutex;
 
@@ -39,9 +40,9 @@ impl LLVMCompiler {
     }
 }
 
-impl<T: Display> Compiler<T> for LLVMCompiler {
-    fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>)
-        -> Result<Option<Box<T>>, Vec<ParsingError>> {
+impl<T> Compiler<T> for LLVMCompiler {
+    fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>)
+        -> Result<Option<T>, Vec<ParsingError>> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
@@ -54,7 +55,7 @@ impl<T: Display> Compiler<T> for LLVMCompiler {
             match result {
                 Ok(function) => match function {
                     Some(function) => {
-                        Ok(Some(unsafe { Box::new(function.call()) }))
+                        Ok(Some(unsafe { function.call() }))
                     },
                     None => Ok(None)
                 },

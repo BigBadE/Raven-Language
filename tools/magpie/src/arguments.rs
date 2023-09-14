@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::env::Args;
 use std::path::PathBuf;
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 use data::{FileSourceSet, RunnerSettings, SourceSet};
 
 pub struct Arguments {
+    pub io_runtime: Runtime,
+    pub cpu_runtime: Runtime,
     pub runner_settings: RunnerSettings,
 }
 
@@ -20,8 +22,17 @@ impl Arguments {
 
         if arguments.len() == 0 {
             let runner_args = all_args.get_mut(&ArgumentTypes::Runner).unwrap();
+            let (mut io_runtime, mut cpu_runtime) = if runner_args.get("single-threaded").is_some() {
+                (Builder::new_current_thread(), Builder::new_current_thread())
+            } else {
+                (Builder::new_multi_thread(), Builder::new_multi_thread())
+            };
             return Self {
-                runner_settings: Self::parse_runner_settings(runner_args)
+                runner_settings: Self::parse_runner_settings(runner_args),
+                io_runtime: io_runtime.thread_name("io-runtime").build()
+                    .expect("Failed to build I/O runtime"),
+                cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
+                    .expect("Failed to build CPU runtime"),
             };
         }
 
@@ -63,31 +74,31 @@ impl Arguments {
         }
 
         let runner_args = all_args.get_mut(&ArgumentTypes::Runner).unwrap();
-        return Self {
-            runner_settings: Self::parse_runner_settings(runner_args)
-        };
-    }
-
-    fn parse_runner_settings(arguments: &HashMap<String, Vec<String>>) -> RunnerSettings {
-        let (mut io_runtime, mut cpu_runtime) = if arguments.get("single-threaded").is_some() {
+        let (mut io_runtime, mut cpu_runtime) = if runner_args.get("single-threaded").is_some() {
             (Builder::new_current_thread(), Builder::new_current_thread())
         } else {
             (Builder::new_multi_thread(), Builder::new_multi_thread())
         };
+        return Self {
+            runner_settings: Self::parse_runner_settings(runner_args),
+            io_runtime: io_runtime.thread_name("io-runtime").build()
+                .expect("Failed to build I/O runtime"),
+            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
+                .expect("Failed to build CPU runtime"),
+        };
+    }
+
+    fn parse_runner_settings(arguments: &HashMap<String, Vec<String>>) -> RunnerSettings {
         let sources: Vec<Box<dyn SourceSet>> = if let Some(found) = arguments.get("root") {
             let mut output: Vec<Box<dyn SourceSet>> = vec!();
             for value in found {
-                output.push(Box::new(FileSourceSet { root: PathBuf::from(value)}));
+                output.push(Box::new(FileSourceSet { root: PathBuf::from(value) }));
             }
             output
         } else {
             vec!()
         };
         return RunnerSettings {
-            io_runtime: io_runtime.thread_name("io-runtime").build()
-                .expect("Failed to build I/O runtime"),
-            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
-                .expect("Failed to build CPU runtime"),
             sources,
             debug: arguments.get("debug").is_some(),
             compiler: "llvm".to_string(),
@@ -98,5 +109,5 @@ impl Arguments {
 #[derive(Eq, PartialOrd, PartialEq, Hash)]
 enum ArgumentTypes {
     Runner,
-    Magpie
+    Magpie,
 }

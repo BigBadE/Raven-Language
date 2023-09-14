@@ -80,9 +80,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T>(&mut self, target: &str, functions: &HashMap<String, Arc<FinalizedFunction>>, 
+    pub fn compile<T>(&mut self, target: String, functions: &HashMap<String, Arc<FinalizedFunction>>,
                       _structures: &HashMap<String, Arc<FinalizedStruct>>)
                    -> Result<Option<JitFunction<'_, Main<T>>>, Vec<ParsingError>> {
+        let target = target.as_str();
         while !functions.contains_key(target) {
             //Waiting
             thread::yield_now();

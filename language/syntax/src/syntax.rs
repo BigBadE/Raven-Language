@@ -306,5 +306,5 @@ impl Syntax {
 
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
-    fn compile(&self, target: &str, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<Box<T>>, Vec<ParsingError>>;
+    fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Result<Option<T>, Vec<ParsingError>>;
 }

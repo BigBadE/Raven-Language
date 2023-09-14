@@ -2,16 +2,18 @@ extern crate alloc;
 extern crate core;
 
 use alloc::ffi::CString;
-use core::fmt::Debug;
-use std::{env, mem, path, ptr};
+use core::fmt::{Debug, Display};
+use std::{env, mem, path, ptr, slice};
 use std::ffi::{c_char, c_int};
 use std::future::Future;
+use std::mem::size_of;
 use std::pin::Pin;
 use std::ptr::addr_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Main};
 use crate::arguments::Arguments;
 use include_dir::{Dir, DirEntry, File, include_dir};
+use libloading::Symbol;
 use tokio::runtime::{Builder, Handle};
 
 pub mod arguments;
@@ -20,7 +22,6 @@ static LIBRARY: Dir = include_dir!("lib/core/src");
 static CORE: Dir = include_dir!("tools/magpie/lib/src");
 
 fn main() {
-    let base_arguments = Arguments::from_arguments(env::args());
     let build_path = env::current_dir().unwrap().join("build.rv");
 
     if !build_path.exists() {
@@ -28,42 +29,29 @@ fn main() {
         return;
     }
 
-    let arguments = Arguments {
-        runner_settings: RunnerSettings {
-            io_runtime: base_arguments.runner_settings.io_runtime,
-            cpu_runtime: base_arguments.runner_settings.cpu_runtime,
-            sources: vec!(Box::new(FileSourceSet {
-                root: build_path,
-            }), Box::new(InnerSourceSet {
-                set: &LIBRARY
-            }), Box::new(InnerSourceSet {
-                set: &CORE
-            })),
-            debug: false,
-            compiler: "llvm".to_string(),
-        },
+    let runner_settings = RunnerSettings {
+        sources: vec!(Box::new(FileSourceSet {
+            root: build_path,
+        }), Box::new(InnerSourceSet {
+            set: &LIBRARY
+        }), Box::new(InnerSourceSet {
+            set: &CORE
+        })),
+        debug: false,
+        compiler: "llvm".to_string(),
     };
 
     println!("Building project...");
-    let runner = Builder::new_current_thread().thread_name("main").build().unwrap();
-    let value = run::<u64>(runner.handle().clone(), &arguments);
-    println!("Built!");
-    match value {
+    let value = run::<RawRavenProject>(runner_settings);
+    let project = match value {
         Ok(inner) => match inner {
-            Some(inner) => {
-                /*
-                let raw_project = unsafe { ptr::read(inner.load(Ordering::Relaxed)) };
-                println!("Processing project... ({:?})", raw_project);
-                let project = RavenProject::from(raw_project);
-                println!("{:?}", project);*/
-                println!("{}", inner);
-            },
-            None => println!("No project method found!")
-        }
-        Err(error) => for error in error {
-            println!("{}", error)
-        }
-    }
+            Some(found) => RavenProject::from(found),
+            None => panic!("No project method in build file!")
+        },
+        Err(error) => panic!("{:?}", error)
+    };
+
+    println!("Name: {}", project.name);
 }
 
 #[derive(Debug)]
@@ -71,7 +59,7 @@ fn main() {
 pub struct RawRavenProject {
     type_id: c_int,
     pub name: AtomicPtr<c_char>,
-    pub dependencies: AtomicPtr<RawArray<RawDependency>>,
+    //pub dependencies: AtomicPtr<RawArray<RawDependency>>,
 }
 
 #[derive(Debug)]
@@ -94,7 +82,7 @@ pub struct RawDependency {
 #[derive(Debug)]
 pub struct RavenProject {
     pub name: String,
-    pub dependency: Vec<Dependency>,
+    //pub dependency: Vec<Dependency>,
 }
 
 #[derive(Debug)]
@@ -115,10 +103,17 @@ fn load_raw<T>(length: i64, pointer: *mut T) -> Vec<T> where T: Debug {
 impl From<RawRavenProject> for RavenProject {
     fn from(value: RawRavenProject) -> Self {
         unsafe {
+            println!("Last: {:x}", addr_of!(value.type_id) as u64);
+            let ptr = value.name.load(Ordering::Relaxed);
+            println!("Ptr: {:x}", ptr as u64);
+            println!("{:?}", slice::from_raw_parts(ptr, 1));
+        }
+        println!("Id: {}", value.type_id);
+        unsafe {
             return Self {
                 name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                dependency: Vec::from(ptr::read(value.dependencies.load(Ordering::Relaxed))).into_iter()
-                    .map(|inner| Dependency::from(inner)).collect::<Vec<_>>(),
+                //dependency: Vec::from(ptr::read(value.dependencies.load(Ordering::Relaxed))).into_iter()
+                //    .map(|inner| Dependency::from(inner)).collect::<Vec<_>>(),
             };
         }
     }
@@ -144,20 +139,21 @@ impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
     }
 }
 
-fn run<T: Send + 'static>(handle: Handle, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = runner::runner::run_extern(
-        handle, "build::project", &arguments.runner_settings)?;
-    return Ok(result.map(|inner| unsafe { mem::transmute::<Box<()>, Box<T>inner)() }));
-
+// Safety
+// This loads the runner DLL and runs it, getting the result.
+// Is this unsafe? No, if a malicious actor can edit DLLs, they already can run code
+// The external method should return a pointer, because if not sizing will cause issues.
+// It should also not return an async function or take an async handle, or the stack will get screwed.
+fn run<T: Send + 'static>(runner_settings: RunnerSettings) -> Result<Option<T>, Vec<ParsingError>> {
     unsafe {
         let lib = libloading::Library::new("C:\\Raven\\Raven-Language\\target\\debug\\runner.dll").unwrap();
-        let func: libloading::Symbol<
-            unsafe extern fn(target: &'static str, settings: &RunnerSettings)
-                -> Result<Option<Main<T>>, Vec<ParsingError>>>
+        let func: Symbol<extern fn(target: String, settings: RunnerSettings)
+                                   -> Result<Option<AtomicPtr<T>>, Vec<ParsingError>>>
             = lib.get(b"run_extern").unwrap();
-        let func = func("build::project", &arguments.runner_settings);
-        return Ok(func?.map(|inner| inner()));
-    }
+        let result = func("build::project".to_string(), runner_settings)?;
+        println!("Got result! {}", result.is_some());
+        return Ok(result.map(|inner| ptr::read(inner.load(Ordering::Relaxed))));
+    };
 }
 
 #[derive(Debug)]

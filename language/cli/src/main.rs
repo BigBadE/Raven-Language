@@ -1,18 +1,20 @@
 use std::env;
 use tokio::runtime::Builder;
-use crate::arguments::Arguments;
+use data::Arguments;
+use crate::arguments::from_arguments;
 
 pub mod arguments;
 
 fn main() {
-    let arguments = Arguments::from_arguments(env::args());
+    let arguments = from_arguments(env::args());
     println!("Compiling from source roots: {:?}", arguments.runner_settings.sources);
     let runner = Builder::new_current_thread().thread_name("main").build().unwrap();
-    runner.block_on(run(&arguments));
+    runner.block_on(run(arguments));
 }
 
-async fn run(arguments: &Arguments) {
-    let compiler = unsafe { runner::runner::run::<u64>("main::main", &arguments.runner_settings).await };
+async fn run(arguments: Arguments) {
+    let compiler = unsafe { runner::runner::run::<u64>(
+        "main::main", &arguments).await };
     match compiler {
         Err(errors) => {
             for error in errors {
@@ -21,7 +23,7 @@ async fn run(arguments: &Arguments) {
         },
         Ok(result) => {
             match result {
-                Some(result) => println!("Exit code: {}", unsafe { result() }),
+                Some(result) => println!("Exit code: {}", result),
                 None => println!("No main found!")
             }
         }

@@ -1,12 +1,9 @@
-#[extern]
-pub fn project() -> u64 {
-    return 0;
+pub fn project() -> RavenProject {
+    return new RavenProject {
+        name: "Test",
+    };
 }
 
 pub struct RavenProject {
     pub name: str;
-}
-
-pub struct Dependency {
-    pub temp: i64;
 }
