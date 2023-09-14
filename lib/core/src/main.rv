@@ -10,4 +10,3 @@ pub fn main() -> u64 {
 fn test<T>(value: [T], index: u64) -> T {
     return value[index];
 }
-

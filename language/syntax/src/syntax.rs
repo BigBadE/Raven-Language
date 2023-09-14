@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::task::Waker;
 use std::mem;
 use chalk_integration::interner::ChalkIr;
-use chalk_integration::{RawId, ty};
+use chalk_integration::RawId;
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
@@ -175,6 +175,8 @@ impl Syntax {
     pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
         let mut locked = syntax.lock().unwrap();
         unsafe {
+            //Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
+            //yet, so this is safe.
             Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.len() as u64);
         }
 
@@ -278,7 +280,7 @@ impl Syntax {
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {
-        let temp = match types {
+        let temp = match types.clone() {
             UnparsedType::Basic(name) =>
                 Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,
             UnparsedType::Generic(name, args) => {

@@ -46,15 +46,17 @@ fn main() {
 
     println!("Building project...");
     let runner = Builder::new_current_thread().thread_name("main").build().unwrap();
-    let value = run::<AtomicPtr<RawRavenProject>>(runner.handle().clone(), &arguments);
+    let value = run::<u64>(runner.handle().clone(), &arguments);
     println!("Built!");
     match value {
         Ok(inner) => match inner {
             Some(inner) => {
+                /*
                 let raw_project = unsafe { ptr::read(inner.load(Ordering::Relaxed)) };
                 println!("Processing project... ({:?})", raw_project);
                 let project = RavenProject::from(raw_project);
-                println!("{:?}", project);
+                println!("{:?}", project);*/
+                println!("{}", inner);
             },
             None => println!("No project method found!")
         }
@@ -144,7 +146,7 @@ impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
 
 fn run<T: Send + 'static>(handle: Handle, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     let result = runner::runner::run_extern(
-        handle, "project::build", &arguments.runner_settings)?;
+        handle, "build::project", &arguments.runner_settings)?;
     return Ok(result.map(|inner| unsafe { mem::transmute::<Main<()>, Main<T>>(inner)() }));
 
     unsafe {
@@ -153,7 +155,7 @@ fn run<T: Send + 'static>(handle: Handle, arguments: &Arguments) -> Result<Optio
             unsafe extern fn(target: &'static str, settings: &RunnerSettings)
                 -> Result<Option<Main<T>>, Vec<ParsingError>>>
             = lib.get(b"run_extern").unwrap();
-        let func = func("project::build", &arguments.runner_settings);
+        let func = func("build::project", &arguments.runner_settings);
         return Ok(func?.map(|inner| inner()));
     }
 }

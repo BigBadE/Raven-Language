@@ -13,7 +13,10 @@ use tokio::runtime::Handle;
 #[no_mangle]
 pub fn run_extern(handle: Handle, target: &'static str, settings: &RunnerSettings)
                          -> Result<Option<Main<()>>, Vec<ParsingError>> {
-    return handle.block_on(run(target, settings));
+    println!("Name: {}", target);
+    let run = handle.block_on(run::<u64>(target, settings ));
+    println!("Got {}", unsafe { (run?.unwrap())() });
+    return Ok(None);
 }
 
 pub async fn run<T: Send + 'static>(target: &'static str, settings: &RunnerSettings)

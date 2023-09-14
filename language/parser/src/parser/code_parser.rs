@@ -256,7 +256,6 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
         }
     }
 
-    //let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
     return Ok(Effects::CreateStruct(types.unwrap(), values));
 }
 

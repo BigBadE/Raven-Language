@@ -91,10 +91,11 @@ impl<'a> ParserUtils<'a> {
             generics.insert(generic, final_bounds);
         }
 
-        let target = implementor.base.await?.finalize(syntax.clone()).await;
-        let base = implementor.implementor.await?.finalize(syntax.clone()).await;
+        let target = implementor.base.await?;
+        let base = implementor.implementor.await?;
+        let target = target.finalize(syntax.clone()).await;
+        let base = base.finalize(syntax.clone()).await;
 
-        println!("Adding {} impl to {}", base, target);
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
 

@@ -1,5 +1,7 @@
 #![feature(get_mut_unchecked)]
 
+extern crate core;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use no_deadlocks::Mutex;

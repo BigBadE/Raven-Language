@@ -184,7 +184,7 @@ pub trait DataType<T: TopElement> {
 #[async_trait]
 pub trait TopElement where Self: Sized {
     type Unfinalized: DataType<Self>;
-    type Finalized;
+    type Finalized: Debug;
 
     // Element id
     fn set_id(&mut self, id: u64);

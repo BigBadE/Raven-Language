@@ -77,6 +77,7 @@ impl ProcessManager for TypesChecker {
                 return output
             },
             Err(error) => {
+                println!("Error: {}", error);
                 syntax.lock().unwrap().errors.push(error.clone());
                 FinalizedStruct {
                     generics: Default::default(),

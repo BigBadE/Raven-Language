@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
 use std::ops::DerefMut;
@@ -49,7 +49,6 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         if let Some(found) = getting.types.get(&name).cloned() {
             if !not_trait || !found.is_trait() {
                 self.finished = Some(found.clone());
-
                 return Some(Ok(found));
             }
         }
@@ -163,7 +162,7 @@ impl Future for AsyncTypesGetter<StructData> {
     }
 }
 
-impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq {
+impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
     type Output = Arc<T::Finalized>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

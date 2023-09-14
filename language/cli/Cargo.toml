@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 runner = { path = "../runner" }
+data = { path = "../data" }
 
 tokio = { version = "1.25.0", features = ["rt-multi-thread", "macros"] }

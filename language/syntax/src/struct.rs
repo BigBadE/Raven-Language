@@ -118,25 +118,25 @@ pub struct FinalizedStruct {
 
 impl Hash for FinalizedStruct {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.data.id.hash(state);
+        self.data.name.hash(state);
     }
 }
 
 impl Hash for StructData {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.id.to_be_bytes())
+        self.name.hash(state)
     }
 }
 
 impl PartialEq for StructData {
     fn eq(&self, other: &Self) -> bool {
-        return self.id == other.id;
+        return self.name == other.name;
     }
 }
 
 impl PartialEq for FinalizedStruct {
     fn eq(&self, other: &Self) -> bool {
-        return self.data.id == other.data.id;
+        return self.data.name == other.data.name;
     }
 }
 

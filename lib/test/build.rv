@@ -1,26 +1,10 @@
-pub fn project() -> RavenProject {
-    return new RavenProject {
-        name: "test",
-        dependencies: [
-            new Dependency {
-                temp: 999,
-            },
-            new Dependency {
-                temp: 999,
-            },
-            new Dependency {
-                temp: 999,
-            },
-            new Dependency {
-                temp: 999,
-            }
-        ],
-    };
+#[extern]
+pub fn project() -> u64 {
+    return 0;
 }
 
 pub struct RavenProject {
     pub name: str;
-    pub dependencies: [Dependency];
 }
 
 pub struct Dependency {

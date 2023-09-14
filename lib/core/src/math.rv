@@ -10,7 +10,7 @@ trait Equal<T> {
 }
 
 //Basic math operations, implemented internally by the compiler.
-pub internal impl<T: Number, E: Number> Equal for E {
+pub internal impl<T: Number, E: Number> Equal<T> for E {
     fn equal(self, other: T) -> bool {
 
     }

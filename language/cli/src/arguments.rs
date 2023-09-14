@@ -3,7 +3,7 @@ use std::{env, fs};
 use std::env::Args;
 use std::path::PathBuf;
 use tokio::runtime::Builder;
-use runner::{FileSourceSet, RunnerSettings, SourceSet};
+use data::{FileSourceSet, RunnerSettings, SourceSet};
 
 pub struct Arguments {
     pub runner_settings: RunnerSettings,
