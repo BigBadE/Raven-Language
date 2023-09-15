@@ -21,7 +21,7 @@ jobs:
       uses: robinraju/release-downloader@v1.8
       with: 
         repository: PLC-lang/llvm-package-windows
-        latest: true
+        tag: "v13.0.0"
         out-file-path: llvm
     - name: Extract 7z
       uses: DuckSoft/extract-7z-action@v1.0
