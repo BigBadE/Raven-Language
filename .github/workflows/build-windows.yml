@@ -17,7 +17,11 @@ jobs:
       with:
         submodules: true
     - name: Check LLVM
-      run: llvm-config --bindir
+      run: dir
+    - name: Go To Main
+      run: cd C:\
+    - name: Check Main
+      run: dir
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
