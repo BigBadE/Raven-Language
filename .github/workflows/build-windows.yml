@@ -30,20 +30,11 @@ jobs:
         pathTarget: llvm
     - name: Set LLVM Env Var
       shell: bash
-      run: |
-          echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
-    - name: Use the value
-      shell: bash
-      run: |
-          printf '%s\n' "$LLVM_SYS_130_PREFIX"
-    - name: set environment variables
-      uses: allenevans/set-env@v2.0.0
-      with:
-        LLVM_SYS_130_PREFIX: '${{github.workspace}}\llvm'
+      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
-      run: $env:LLVM_SYS_130_PREFIX = "${{github.workspace}}\llvm"; cargo +nightly build --verbose --bin magpie
+      run: cargo +nightly build --verbose --bin magpie
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3.1.3
       with:
