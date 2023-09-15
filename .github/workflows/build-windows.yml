@@ -30,6 +30,10 @@ jobs:
         pathTarget: llvm
     - name: Set LLVM Environmental Variable
       run: set LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm
+    - name: Check LLVM Dir
+      run: dir ${{github.workspace}}\llvm
+    - name: Check LLVM Bin
+      run: dir ${{github.workspace}}\llvm\bin
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
