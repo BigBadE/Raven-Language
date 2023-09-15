@@ -1,9 +1,13 @@
+import magpie;
+import array;
+
 pub fn project() -> RavenProject {
     return new RavenProject {
         name: "Test",
-    };
-}
+        dependencies: [
+            new Dependency {
 
-pub struct RavenProject {
-    pub name: str;
+            }
+        ],
+    };
 }

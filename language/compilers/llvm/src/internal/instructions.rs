@@ -1,10 +1,12 @@
 use inkwell::builder::Builder;
 use inkwell::{AddressSpace, IntPredicate};
-use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValueEnum, FunctionValue};
+use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use crate::compiler::CompilerImpl;
+use crate::internal::intrinsics::compile_llvm_intrinsics;
+use crate::type_getter::CompilerTypeGetter;
 
-pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, value: FunctionValue<'ctx>) {
+pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter, compiler: &CompilerImpl<'ctx>, name: &String, value: FunctionValue<'ctx>) {
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
@@ -32,6 +34,21 @@ pub fn compile_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, valu
                                      &[offset], "1");
         }
         compiler.builder.build_return(Some(&compiler.builder.build_bitcast(gep, compiler.context.i64_type().ptr_type(AddressSpace::default()), "2")));
+    } else if name.starts_with("array::empty") {
+        let size = unsafe {
+            type_getter.compiler.builder.build_gep(value.get_type().get_return_type().unwrap()
+                                                       .ptr_type(AddressSpace::default()).const_zero(),
+                                                   &[type_getter.compiler.context.i64_type()
+                                                       .const_int(1, false)], "0")
+        };
+
+        let malloc = compiler.builder.build_call(compiler.module.get_function("malloc")
+                                                                 .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                             &[BasicMetadataValueEnum::PointerValue(size)], "1")
+            .try_as_basic_value().unwrap_left().into_pointer_value();
+
+        compiler.builder.build_store(malloc, compiler.context.i64_type().const_zero());
+        compiler.builder.build_return(Some(&malloc.as_basic_value_enum()));
     } else {
         panic!("Unknown internal operation: {}", name)
     }

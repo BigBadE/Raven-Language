@@ -8,6 +8,7 @@ use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::operation_util::OperationGetter;
+use syntax::r#struct::VOID;
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
@@ -95,7 +96,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }.await?
             };
 
-            let calling = Box::new(values.remove(0));
+            let calling;
+            if values.len() > 0 {
+                calling = Box::new(values.remove(0));
+            } else {
+                calling = Box::new(Effects::NOP());
+            }
 
             verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
@@ -108,9 +114,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, external, syntax, variables, references).await?)
             }
 
-            let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, external, syntax, variables, references).await?;
-            let return_type = found.get_return(variables).unwrap();
-            finalized_effects.insert(0, found);
+            let return_type;
+            if let Effects::NOP() = *calling {
+                return_type = FinalizedTypes::Struct(VOID.clone());
+            } else {
+                let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, external, syntax, variables, references).await?;
+                return_type = found.get_return(variables).unwrap();
+                finalized_effects.insert(0, found);
+            }
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits, resolver.boxed_clone()).await {

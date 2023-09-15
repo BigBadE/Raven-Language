@@ -68,10 +68,10 @@ impl CodelessFinalizedFunction {
                            returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         if let Some(inner) = method.return_type.clone() {
             if let Some(mut returning) = returning {
-                //TODO remove this and get generic types working with explicit generics?
                 if let FinalizedTypes::GenericType(inner, _) = returning {
-                    returning = FinalizedTypes::clone(inner.deref());
+                        returning = FinalizedTypes::clone(inner.deref());
                 }
+
                 if let Some((old, other)) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                     if let FinalizedTypes::Generic(name, _) = old {
                         manager.mut_generics().insert(name, other);

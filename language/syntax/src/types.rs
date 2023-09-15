@@ -258,7 +258,7 @@ impl FinalizedTypes {
                 if let FinalizedTypes::Array(other) = other {
                     return inner.resolve_generic(other, syntax, bounds_error).await;
                 }
-                return Ok(None);
+                return inner.resolve_generic(other, syntax, bounds_error).await;
             }
             _ => {}
         }

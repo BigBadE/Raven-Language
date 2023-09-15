@@ -7,30 +7,14 @@ use std::sync::mpsc::Sender;
 
 use anyhow::Error;
 use no_deadlocks::Mutex;
-use tokio::runtime::Builder;
 
 use checker::output::TypesChecker;
-use data::{Arguments, RunnerSettings};
+use data::Arguments;
 use parser::parse;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 
 use crate::get_compiler;
-
-// Technically these types aren't C FFI-able, but Rust can understand them.
-#[no_mangle]
-pub extern fn run_extern(target: String, settings: RunnerSettings) -> Result<Option<AtomicPtr<()>>, Vec<ParsingError>> {
-    let project= Builder::new_current_thread().thread_name("Raven Main").build().unwrap()
-        .block_on(run::<AtomicPtr<RawRavenProject>>(target,
-                                                    &Arguments::build_args(false, settings)))?;
-    unsafe {
-        let project = ptr::read(project.unwrap().load(Ordering::Relaxed));
-        println!("Id: {}", project.type_id);
-        println!("Name: {}", CString::from_raw(project.name.load(Ordering::Relaxed)).to_str().unwrap().to_string());
-    }
-
-    return Ok(None);
-}
 
 #[derive(Debug)]
 #[repr(C, align(8))]
@@ -56,6 +40,7 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
             if !file.path().ends_with("rv") {
                 continue;
             }
+
             handles.push(
                 settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
                                                 source_set.relative(&file).clone(),

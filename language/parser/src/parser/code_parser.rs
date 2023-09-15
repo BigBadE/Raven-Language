@@ -75,11 +75,24 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             }
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => return Ok(None),
-            TokenTypes::Variable =>
-                if let TokenTypes::ParenOpen = parser_utils.tokens.get(parser_utils.index).unwrap().token_type {} else {
+            TokenTypes::Variable => {
+                let next = parser_utils.tokens.get(parser_utils.index).unwrap();
+                if let TokenTypes::ParenOpen = next.token_type {
+
+                } else if let TokenTypes::Operator = next.token_type {
+                    //Skip if a generic method is being called next to preserve the last effect.
+                    if next.to_string(parser_utils.buffer) == "<" &&
+                        token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
+                        continue
+                    } else {
+                        effect = Some(
+                            Effects::LoadVariable(token.to_string(parser_utils.buffer)))
+                    }
+                } else {
                     effect = Some(
                         Effects::LoadVariable(token.to_string(parser_utils.buffer)))
-                },
+                }
+            },
             TokenTypes::Return => {
                 expression_type = ExpressionType::Return
             },

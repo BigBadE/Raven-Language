@@ -9,6 +9,10 @@ pub impl<T> Array<T> for T {
     }
 }
 
+pub internal fn empty<T>() -> [T] {
+
+}
+
 #[operation({}[{}])]
 trait Index<T> {
     fn index(self, index: u64) -> T;

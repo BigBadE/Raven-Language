@@ -28,7 +28,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
         value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
     } else if is_modifier(function.data.modifiers, Modifier::Internal) {
         value = create_function_value(&function, type_getter, None);
-        compile_internal(&type_getter.compiler, &function.data.name, value);
+        compile_internal(&type_getter, &type_getter.compiler, &function.data.name, value);
     } else if is_modifier(function.data.modifiers, Modifier::Extern) {
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
