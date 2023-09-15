@@ -21,6 +21,7 @@ jobs:
       uses: robinraju/release-downloader@v1.8
       with: 
         repository: PLC-lang/llvm-package-windows
+        latest: true
         fileName: LLVM-13.0.0-win64.7z
         out-file-path: llvm
     - name: Extract 7z
