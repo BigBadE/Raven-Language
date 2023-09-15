@@ -16,12 +16,8 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - name: Go To Main
-      run: cd ../..
-    - name: Check Main
-      run: dir
     - name: Test2
-      run: dir "D:\a"
+      run: dir "D:\"
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
