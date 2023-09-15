@@ -37,7 +37,7 @@ jobs:
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
-      run: cargo +nightly build --verbose && export LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm
+      run: $env:LLVM_SYS_130_PREFIX = "D:\LLVM"; cargo +nightly build --verbose --bin magpie
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3.1.3
       with:
