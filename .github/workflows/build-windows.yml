@@ -28,8 +28,12 @@ jobs:
       with:
         pathSource: llvm/LLVM-13.0.0-win64.7z
         pathTarget: llvm
+    - name: Test1
+      run: dir ${{github.workspace}}
+    - name: Test2
+      run: dir llvm
     - name: Set LLVM Environmental Variable
-      run: set LLVM_SYS_130_PREFIX=llvm
+      run: set LLVM_SYS_130_PREFIX=${{github.workspace}}/llvm
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
