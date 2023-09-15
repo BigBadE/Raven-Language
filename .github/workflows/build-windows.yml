@@ -28,7 +28,6 @@ jobs:
       with:
         pathSource: llvm/LLVM-13.0.0-win64.7z
         pathTarget: llvm
-    - name: Set LLVM Environmental Variable
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
