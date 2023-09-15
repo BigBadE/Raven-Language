@@ -16,12 +16,12 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - name: Check LLVM
-      run: dir
     - name: Go To Main
-      run: cd C:\
+      run: cd ../..
     - name: Check Main
       run: dir
+    - name: Test2
+      run: dir "D:\a"
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
