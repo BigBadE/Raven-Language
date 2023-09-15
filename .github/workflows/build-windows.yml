@@ -23,7 +23,7 @@ jobs:
         fileName: LLVM-13.0.0-win64.7z
         out-file-path: llvm
     - name: Extract 7z
-      uses: DuckSoft/extract-7z-action@v1.0
+    - uses: DuckSoft/extract-7z-action@v1.0
       with:
         pathSource: llvm/LLVM-13.0.0-win64.7z
         pathTarget: llvm
