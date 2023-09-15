@@ -16,8 +16,10 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - name: Test2
-      run: dir "D:\"
+    - name: Download LLVM
+      run: wget https://github.com/PLC-lang/llvm-package-windows/releases/download/v13.0.0/LLVM-13.0.0-win64.7z
+    - name: Unzip LLVM
+      run: 7z x LLVM-13..0.0-win64.7z -o LLVM
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
