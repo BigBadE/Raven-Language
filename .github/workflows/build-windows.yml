@@ -17,15 +17,18 @@ jobs:
       with:
         submodules: true
     - name: Install LLVM
-      run: wget -P ${{ runner.temp }}/llvm https://github.com/PLC-lang/llvm-package-windows/releases/download/v13.0.0/LLVM-13.0.0-win64.7z
-      
+    - uses: robinraju/release-downloader@v1.8
+      with: 
+        repository: PLC-lang/llvm-package-windows
+        fileName: LLVM-13.0.0-win64.7z
+        out-file-path: llvm
     - name: Extract 7z
       uses: DuckSoft/extract-7z-action@v1.0
       with:
-        pathSource: ${{ runner.temp }}/llvm/LLVM-13.0.0-win64.7z
-        pathTarget: ${{ runner.temp }}/llvm
+        pathSource: llvm/LLVM-13.0.0-win64.7z
+        pathTarget: llvm
     - name: Set LLVM Environmental Variable
-      run: set LLVM_SYS_130_PREFIX=${{ runner.temp }}/llvm
+      run: set LLVM_SYS_130_PREFIX=llvm
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
