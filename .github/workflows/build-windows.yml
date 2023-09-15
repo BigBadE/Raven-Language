@@ -30,7 +30,7 @@ jobs:
         pathTarget: llvm
     - name: Set LLVM Env Var
       run: |
-          echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $env:GITHUB_ENV
     - name: Use the value
       run: |
           printf '%s\n' "$LLVM_SYS_130_PREFIX"
