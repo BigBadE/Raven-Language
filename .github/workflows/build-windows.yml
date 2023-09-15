@@ -29,7 +29,11 @@ jobs:
         pathSource: llvm/LLVM-13.0.0-win64.7z
         pathTarget: llvm
     - name: Set LLVM Env Var
-      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> "$GITHUB_ENV"
+      run: |
+          echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> "$GITHUB_ENV"
+    - name: Use the value
+      run: |
+          printf '%s\n' "$LLVM_SYS_130_PREFIX"
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
