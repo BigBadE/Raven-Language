@@ -2,21 +2,12 @@ extern crate alloc;
 extern crate core;
 
 use alloc::ffi::CString;
-use core::fmt::{Debug, Display};
-use std::{env, mem, path, ptr, slice};
+use core::fmt::Debug;
+use std::{env, path, ptr};
 use std::ffi::{c_char, c_int};
-use std::future::Future;
-use std::mem::size_of;
-use std::pin::Pin;
-use std::ptr::addr_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
-use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Main};
-use crate::arguments::Arguments;
+use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Arguments};
 use include_dir::{Dir, DirEntry, File, include_dir};
-use libloading::Symbol;
-use tokio::runtime::{Builder, Handle};
-
-pub mod arguments;
 
 static LIBRARY: Dir = include_dir!("lib/core/src");
 static CORE: Dir = include_dir!("tools/magpie/lib/src");
@@ -29,7 +20,7 @@ fn main() {
         return;
     }
 
-    let runner_settings = RunnerSettings {
+    let arguments = Arguments::build_args(false, RunnerSettings {
         sources: vec!(Box::new(FileSourceSet {
             root: build_path,
         }), Box::new(InnerSourceSet {
@@ -39,10 +30,10 @@ fn main() {
         })),
         debug: false,
         compiler: "llvm".to_string(),
-    };
+    });
 
     println!("Building project...");
-    let value = run::<RawRavenProject>(runner_settings);
+    let value = run::<RawRavenProject>(&arguments);
     let project = match value {
         Ok(inner) => match inner {
             Some(found) => RavenProject::from(found),
@@ -52,6 +43,7 @@ fn main() {
     };
 
     println!("Name: {}", project.name);
+    println!("Dependencies: {:?}", project.dependencies);
 }
 
 #[derive(Debug)]
@@ -59,12 +51,13 @@ fn main() {
 pub struct RawRavenProject {
     type_id: c_int,
     pub name: AtomicPtr<c_char>,
-    //pub dependencies: AtomicPtr<RawArray<RawDependency>>,
+    pub dependencies: AtomicPtr<RawArray<RawDependency>>,
 }
 
 #[derive(Debug)]
 pub struct RawArray<T> {
-    pub length: i64,
+    pub id: i64,
+    pub length: u64,
     pub pointer: *const T,
 }
 
@@ -82,7 +75,7 @@ pub struct RawDependency {
 #[derive(Debug)]
 pub struct RavenProject {
     pub name: String,
-    //pub dependency: Vec<Dependency>,
+    pub dependencies: Vec<Dependency>,
 }
 
 #[derive(Debug)]
@@ -90,8 +83,7 @@ pub struct Dependency {
     pub name: String,
 }
 
-fn load_raw<T>(length: i64, pointer: *mut T) -> Vec<T> where T: Debug {
-    println!("Pointer: {}", pointer as u64);
+fn load_raw<T>(length: u64, pointer: *mut T) -> Vec<T> where T: Debug {
     let mut output = Vec::new();
     let temp = unsafe { Box::from_raw(ptr::slice_from_raw_parts_mut(pointer, length as usize)) };
     for value in temp.into_vec() {
@@ -103,17 +95,10 @@ fn load_raw<T>(length: i64, pointer: *mut T) -> Vec<T> where T: Debug {
 impl From<RawRavenProject> for RavenProject {
     fn from(value: RawRavenProject) -> Self {
         unsafe {
-            println!("Last: {:x}", addr_of!(value.type_id) as u64);
-            let ptr = value.name.load(Ordering::Relaxed);
-            println!("Ptr: {:x}", ptr as u64);
-            println!("{:?}", slice::from_raw_parts(ptr, 1));
-        }
-        println!("Id: {}", value.type_id);
-        unsafe {
             return Self {
                 name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                //dependency: Vec::from(ptr::read(value.dependencies.load(Ordering::Relaxed))).into_iter()
-                //    .map(|inner| Dependency::from(inner)).collect::<Vec<_>>(),
+                dependencies: Vec::from(ptr::read(value.dependencies.load(Ordering::Relaxed))).into_iter()
+                    .map(|inner| Dependency::from(inner)).collect::<Vec<_>>(),
             };
         }
     }
@@ -131,29 +116,16 @@ impl From<RawDependency> for Dependency {
 
 impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
     fn from(value: RawArray<T>) -> Self {
-        unsafe {
-            let len = ptr::read(addr_of!(value.length));
-            println!("Loading raw {}", len);
-            return load_raw(len, value.pointer as *mut T);
-        }
+        let len = value.length;
+        println!("Loading raw {}", len);
+        return load_raw(len, value.pointer as *mut T);
     }
 }
 
-// Safety
-// This loads the runner DLL and runs it, getting the result.
-// Is this unsafe? No, if a malicious actor can edit DLLs, they already can run code
-// The external method should return a pointer, because if not sizing will cause issues.
-// It should also not return an async function or take an async handle, or the stack will get screwed.
-fn run<T: Send + 'static>(runner_settings: RunnerSettings) -> Result<Option<T>, Vec<ParsingError>> {
-    unsafe {
-        let lib = libloading::Library::new("D:\\RustProjects\\Raven-Language\\target\\debug\\runner.dll").unwrap();
-        let func: Symbol<extern fn(target: String, settings: RunnerSettings)
-                                   -> Result<Option<AtomicPtr<T>>, Vec<ParsingError>>>
-            = lib.get(b"run_extern").unwrap();
-        let result = func("build::project".to_string(), runner_settings)?;
-        println!("Got result! {}", result.is_some());
-        return Ok(result.map(|inner| ptr::read(inner.load(Ordering::Relaxed))));
-    };
+fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+    let result = arguments.cpu_runtime.block_on(
+        runner::runner::run::<AtomicPtr<T>>("build::project".to_string(), &arguments))?;
+    return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
 #[derive(Debug)]
