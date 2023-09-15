@@ -16,10 +16,15 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - name: Download LLVM
-      run: wget https://github.com/PLC-lang/llvm-package-windows/releases/download/v13.0.0/LLVM-13.0.0-win64.7z
-    - name: Unzip LLVM
-      run: 7z x LLVM-13..0.0-win64.7z -o LLVM
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        version: "13.0"
+        directory: ${{ runner.temp }}/llvm
+    - name: Move llvm-config
+      run: mv bin/win/llvm-config.exe ${{ runner.temp }}/llvm/bin
+    - name: Set LLVM Environmental Variable
+      run: set LLVM_SYS_130_PREFIX=${{ runner.temp }}/llvm
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
