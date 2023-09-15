@@ -146,7 +146,7 @@ impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
 // It should also not return an async function or take an async handle, or the stack will get screwed.
 fn run<T: Send + 'static>(runner_settings: RunnerSettings) -> Result<Option<T>, Vec<ParsingError>> {
     unsafe {
-        let lib = libloading::Library::new("C:\\Raven\\Raven-Language\\target\\debug\\runner.dll").unwrap();
+        let lib = libloading::Library::new("D:\\RustProjects\\Raven-Language\\target\\debug\\runner.dll").unwrap();
         let func: Symbol<extern fn(target: String, settings: RunnerSettings)
                                    -> Result<Option<AtomicPtr<T>>, Vec<ParsingError>>>
             = lib.get(b"run_extern").unwrap();

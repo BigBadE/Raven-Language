@@ -778,6 +778,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "magpie-wrapper"
+version = "0.1.0"
+dependencies = [
+ "magpie",
+]
+
+[[package]]
 name = "matchers"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

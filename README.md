@@ -19,11 +19,7 @@ Please download LLVM from https://github.com/PLC-lang/llvm-package-windows/relea
 
 C++ is also required to be installed somewhere on your system, for Windows get it from https://visualstudio.microsoft.com/vs/community/
 
-Nightly is required for building the compiler, you can set the proejct to nightly with ```rustup override set nightly```
-
-# Common Errors
-
-If you get an error building proc-macro, set your nightly to an earlier version (nightly-2023-05-02 works)
+Nightly is required for building the compiler, you can set the project to nightly with ```rustup override set nightly```
 
 # Running
 
