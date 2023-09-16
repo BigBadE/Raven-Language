@@ -1,8 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use chalk_integration::interner::ChalkIr;
-use chalk_integration::RawId;
 use chalk_ir::{AdtId, Binders, GenericArg, Substitution, TraitId, Ty, TyKind};
 use chalk_solve::rust_ir::{AdtDatum, AdtDatumBound, AdtFlags, AdtKind, TraitDatum, TraitDatumBound, TraitFlags};
 use no_deadlocks::Mutex;
@@ -14,6 +12,7 @@ use crate::code::{FinalizedMemberField, MemberField};
 use crate::{Attribute, ParsingError};
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
+use crate::chalk_interner::{ChalkIr, RawId};
 use crate::function::UnfinalizedFunction;
 use crate::types::{FinalizedTypes, Types};
 

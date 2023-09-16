@@ -1,8 +1,6 @@
-use std::{alloc, ptr};
-use std::alloc::Layout;
-use std::ffi::{c_char, c_int, CString};
+use std::ffi::{c_char, c_int};
 use std::sync::{Arc, mpsc};
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::AtomicPtr;
 use std::sync::mpsc::Sender;
 
 use anyhow::Error;

@@ -1,8 +1,6 @@
 #![feature(get_mut_unchecked, box_into_inner)]
 
 use std::collections::HashMap;
-use std::fmt::Display;
-use std::mem;
 use std::rc::Rc;
 use std::sync::Arc; use no_deadlocks::Mutex;
 

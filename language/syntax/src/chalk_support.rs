@@ -1,13 +1,12 @@
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use chalk_integration::interner::ChalkIr;
-use chalk_integration::RawId;
 use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variance, Variances};
 use chalk_solve::rust_ir::{AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum,
                            AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
                            FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum,
                            ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait};
 use chalk_solve::RustIrDatabase;
+use crate::chalk_interner::{ChalkIr, RawId};
 use crate::r#struct::ChalkData;
 use crate::syntax::Syntax;
 

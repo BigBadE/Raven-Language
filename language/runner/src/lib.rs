@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::sync::Arc;
 use compiler_llvm::LLVMCompiler;
 use syntax::function::FinalizedFunction;

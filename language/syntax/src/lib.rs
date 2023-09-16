@@ -6,7 +6,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use chalk_integration::interner::ChalkIr;
 use chalk_solve::rust_ir::ImplDatum;
 use no_deadlocks::Mutex;
 use indexmap::IndexMap;
@@ -22,6 +21,7 @@ use crate::types::{FinalizedTypes, Types};
 
 pub mod async_getters;
 pub mod async_util;
+pub mod chalk_interner;
 pub mod chalk_support;
 pub mod code;
 pub mod function;
@@ -32,6 +32,7 @@ pub mod types;
 
 //Re-export ParsingError
 pub use data::ParsingError;
+use crate::chalk_interner::ChalkIr;
 
 // An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
 // for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.
