@@ -4,5 +4,5 @@ pub struct RavenProject {
 }
 
 pub struct Dependency {
-
+    pub name: str;
 }

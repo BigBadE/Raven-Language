@@ -5,6 +5,7 @@ use alloc::ffi::CString;
 use core::fmt::Debug;
 use std::{env, path, ptr};
 use std::ffi::{c_char, c_int};
+use std::mem::size_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Arguments};
 use include_dir::{Dir, DirEntry, File, include_dir};
@@ -51,25 +52,17 @@ fn main() {
 pub struct RawRavenProject {
     type_id: c_int,
     pub name: AtomicPtr<c_char>,
-    pub dependencies: AtomicPtr<RawArray<RawDependency>>,
+    pub dependencies: AtomicPtr<RawArray>,
 }
 
 #[derive(Debug)]
-pub struct RawArray<T> {
-    pub id: i64,
-    pub length: u64,
-    pub pointer: *const T,
-}
-
-unsafe impl<T> Send for RawArray<T> {}
-
-unsafe impl<T> Sync for RawArray<T> {}
+pub struct RawArray {}
 
 #[repr(C, align(8))]
 #[derive(Debug)]
 pub struct RawDependency {
     type_id: c_int,
-    pub name: AtomicPtr<c_char>,
+    //pub name: AtomicPtr<c_char>,
 }
 
 #[derive(Debug)]
@@ -80,15 +73,18 @@ pub struct RavenProject {
 
 #[derive(Debug)]
 pub struct Dependency {
-    pub name: String,
+    //pub name: String,
 }
 
-fn load_raw<T>(length: u64, pointer: *mut T) -> Vec<T> where T: Debug {
+fn load_raw<T>(length: u64, pointer: *mut T) -> Vec<T> {
     let mut output = Vec::new();
+
+    println!("Output: {:?}", unsafe { ptr::read(pointer as *mut [u64; 20])});
     let temp = unsafe { Box::from_raw(ptr::slice_from_raw_parts_mut(pointer, length as usize)) };
     for value in temp.into_vec() {
         output.push(value);
     }
+    println!("Did it!");
     return output;
 }
 
@@ -97,8 +93,8 @@ impl From<RawRavenProject> for RavenProject {
         unsafe {
             return Self {
                 name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                dependencies: Vec::from(ptr::read(value.dependencies.load(Ordering::Relaxed))).into_iter()
-                    .map(|inner| Dependency::from(inner)).collect::<Vec<_>>(),
+                dependencies: load_array(value.dependencies).into_iter()
+                    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
             };
         }
     }
@@ -108,18 +104,16 @@ impl From<RawDependency> for Dependency {
     fn from(value: RawDependency) -> Self {
         unsafe {
             return Self {
-                name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string()
+                //name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string()
             };
         }
     }
 }
 
-impl<T> From<RawArray<T>> for Vec<T> where T: Debug {
-    fn from(value: RawArray<T>) -> Self {
-        let len = value.length;
-        println!("Loading raw {}", len);
-        return load_raw(len, value.pointer as *mut T);
-    }
+fn load_array<T>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
+    let ptr = ptr.load(Ordering::Relaxed);
+    let len = unsafe { ptr::read(ptr as *mut u64)};
+    return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
 }
 
 fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
