@@ -18,6 +18,16 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
+    - name: Install LLVM and Clang
+      # You may pin to the exact commit or the version.
+      # uses: KyleMayes/install-llvm-action@c135b3937686fd69c2651507aabc9925a8f9eee8
+      uses: KyleMayes/install-llvm-action@v1.8.3
+      with:
+        version: 1.13
+        directory: ${{github.workspace}}\llvm
+    - name: Add LLVM env var
+      shell: bash
+      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
