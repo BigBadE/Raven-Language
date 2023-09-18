@@ -6,7 +6,6 @@ use std::thread;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
-use inkwell::passes::{PassManager, PassManagerBuilder};
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use llvm_sys::bit_writer::LLVMWriteBitcodeToFile;
@@ -16,6 +15,7 @@ use syntax::code::FinalizedEffects;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
+use crate::c_str;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
@@ -122,10 +122,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                           &mut self.for_function(&function, function_type), &mut 0);
         }
 
-        let pass_manager = PassManager::create(&self.compiler.module);
+        //let pass_manager = PassManager::create(&self.compiler.module);
 
         unsafe {
-            LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str!("main.bc"));
+            LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
         }
 
         print_formatted(self.compiler.module.to_string());

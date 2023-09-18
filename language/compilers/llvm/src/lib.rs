@@ -64,3 +64,7 @@ impl<T> Compiler<T> for LLVMCompiler {
         }
     }
 }
+
+fn c_str(input: &str) -> *const i8 {
+    return (input.to_string() + "\0").as_ptr() as *const i8;
+}
