@@ -10,8 +10,12 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Arguments};
 use include_dir::{Dir, DirEntry, File, include_dir};
 
-static LIBRARY: Dir = include_dir!("lib/core/src");
-static CORE: Dir = include_dir!("tools/magpie/lib/src");
+static CORE: Dir = include_dir!("lib/core/src");
+static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
+static STD_WINDOWS: Dir = include_dir!("lib/std/windows");
+static STD_LINUX: Dir = include_dir!("lib/std/linux");
+static STD_MACOS: Dir = include_dir!("lib/std/macos");
+static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
 fn main() {
     let build_path = env::current_dir().unwrap().join("build.rv");
@@ -21,11 +25,11 @@ fn main() {
         return;
     }
 
-    let arguments = Arguments::build_args(false, RunnerSettings {
+    let mut arguments = Arguments::build_args(false, RunnerSettings {
         sources: vec!(Box::new(FileSourceSet {
             root: build_path,
         }), Box::new(InnerSourceSet {
-            set: &LIBRARY
+            set: &MAGPIE
         }), Box::new(InnerSourceSet {
             set: &CORE
         })),
@@ -43,8 +47,29 @@ fn main() {
         Err(error) => panic!("{:?}", error)
     };
 
-    println!("Name: {}", project.name);
-    println!("Dependencies: {:?}", project.dependencies);
+    let source = env::current_dir().unwrap().join("src");
+
+    if !source.exists() {
+        println!("Build file not found!");
+        return;
+    }
+
+    let platform_std = match env::consts::OS {
+        "windows" => &STD_WINDOWS,
+        "linux" => &STD_LINUX,
+        "macos" => &STD_MACOS,
+        _ => panic!("Unsupported platform {}!", env::consts::OS)
+    };
+
+    arguments.runner_settings.sources = vec!(Box::new(FileSourceSet {
+        root: source,
+    }), Box::new(InnerSourceSet {
+        set: &STD_UNIVERSAL
+    }), Box::new(InnerSourceSet {
+        set: platform_std
+    }), Box::new(InnerSourceSet {
+        set: &CORE
+    }));
 }
 
 #[derive(Debug)]
@@ -68,7 +93,7 @@ pub struct RawDependency {
 #[derive(Debug)]
 pub struct RavenProject {
     pub name: String,
-    pub dependencies: Vec<Dependency>,
+    //pub dependencies: Vec<Dependency>,
 }
 
 #[derive(Debug)]
@@ -79,12 +104,11 @@ pub struct Dependency {
 fn load_raw<T>(length: u64, pointer: *mut T) -> Vec<T> {
     let mut output = Vec::new();
 
-    println!("Output: {:?}", unsafe { ptr::read(pointer as *mut [u64; 20])});
     let temp = unsafe { Box::from_raw(ptr::slice_from_raw_parts_mut(pointer, length as usize)) };
     for value in temp.into_vec() {
         output.push(value);
     }
-    println!("Did it!");
+
     return output;
 }
 
@@ -93,8 +117,8 @@ impl From<RawRavenProject> for RavenProject {
         unsafe {
             return Self {
                 name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                dependencies: load_array(value.dependencies).into_iter()
-                    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
+                //dependencies: load_array(value.dependencies).into_iter()
+                //    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
             };
         }
     }
@@ -112,7 +136,7 @@ impl From<RawDependency> for Dependency {
 
 fn load_array<T>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
     let ptr = ptr.load(Ordering::Relaxed);
-    let len = unsafe { ptr::read(ptr as *mut u64)};
+    let len = unsafe { ptr::read(ptr as *mut u64) };
     return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
 }
 

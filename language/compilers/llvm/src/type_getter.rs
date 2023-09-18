@@ -6,8 +6,10 @@ use std::thread;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
+use inkwell::passes::{PassManager, PassManagerBuilder};
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
+use llvm_sys::bit_writer::LLVMWriteBitcodeToFile;
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
 use syntax::{ParsingError, VariableManager};
 use syntax::code::FinalizedEffects;
@@ -118,6 +120,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             };
             compile_block(&function.code, function_type,
                           &mut self.for_function(&function, function_type), &mut 0);
+        }
+
+        let pass_manager = PassManager::create(&self.compiler.module);
+
+        unsafe {
+            LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str!("main.bc"));
         }
 
         print_formatted(self.compiler.module.to_string());
