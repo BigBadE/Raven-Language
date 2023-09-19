@@ -36,14 +36,14 @@ jobs:
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
-      run: cargo +nightly build --verbose --bin magpie
+      run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
-      run: cargo +nightly build --verbose --bin magpie-wrapper
+      run: cargo +nightly build --verbose --release --bin magpie-wrapper
     - name: Upload Raven
       uses: actions/upload-artifact@v3.1.3
       with:
         # Artifact name
-        name: Raven-windows # optional, default is artifact
+        name: Raven-windows.exe # optional, default is artifact
         # A file, directory or wildcard pattern that describes what to upload
         path: target/debug/magpie.exe
         # The desired behavior if no files are found using the provided path.
@@ -55,7 +55,7 @@ jobs:
       uses: actions/upload-artifact@v3.1.3
       with:
         # Artifact name
-        name: Magpie-wrapper-windows # optional, default is artifact
+        name: Magpie-wrapper-windows.exe # optional, default is artifact
         # A file, directory or wildcard pattern that describes what to upload
         path: target/debug/magpie-wrapper.exe
         # The desired behavior if no files are found using the provided path.

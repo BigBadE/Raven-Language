@@ -21,9 +21,9 @@ jobs:
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Build
-      run: cargo +nightly build --verbose --bin magpie
+      run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
-      run: cargo +nightly build --verbose --bin magpie-wrapper
+      run: cargo +nightly build --verbose --release --bin magpie-wrapper
     - name: Upload Raven
       uses: actions/upload-artifact@v3.1.3
       with:
