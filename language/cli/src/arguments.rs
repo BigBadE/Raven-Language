@@ -60,7 +60,7 @@ pub fn from_arguments(mut arguments: Args) -> Arguments {
             test => panic!("Unknown test {}", test)
         }
     }
-    return Arguments::build_args(arguments.get("single-threaded").is_some(),
+    return Arguments::build_args(runner_args.get("single-threaded").is_some(),
                                  parse_runner_settings(runner_args));
 }
 

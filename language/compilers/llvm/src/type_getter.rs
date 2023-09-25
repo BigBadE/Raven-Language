@@ -125,7 +125,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         //let pass_manager = PassManager::create(&self.compiler.module);
 
         unsafe {
-            LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
+            //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
         }
 
         print_formatted(self.compiler.module.to_string());

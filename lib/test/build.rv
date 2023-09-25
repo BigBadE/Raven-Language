@@ -3,6 +3,6 @@ import array;
 
 pub fn project() -> RavenProject {
     return new RavenProject {
-        name: "Test"
+        name: "Test",
     };
 }

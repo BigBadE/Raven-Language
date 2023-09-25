@@ -40,7 +40,7 @@ jobs:
         # Artifact name
         name: Raven-macos # optional, default is artifact
         # A file, directory or wildcard pattern that describes what to upload
-        path: target/debug/magpie
+        path: target/release/magpie
         # The desired behavior if no files are found using the provided path.
         if-no-files-found: error # optional, default is warn
         # Duration after which artifact will expire in days. 0 means using default retention.

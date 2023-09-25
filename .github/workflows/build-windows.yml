@@ -45,7 +45,7 @@ jobs:
         # Artifact name
         name: Raven-windows.exe # optional, default is artifact
         # A file, directory or wildcard pattern that describes what to upload
-        path: target/debug/magpie.exe
+        path: target/release/magpie.exe
         # The desired behavior if no files are found using the provided path.
         if-no-files-found: error # optional, default is warn
         # Duration after which artifact will expire in days. 0 means using default retention.
@@ -57,7 +57,7 @@ jobs:
         # Artifact name
         name: Magpie-wrapper-windows.exe # optional, default is artifact
         # A file, directory or wildcard pattern that describes what to upload
-        path: target/debug/magpie-wrapper.exe
+        path: target/release/magpie-wrapper.exe
         # The desired behavior if no files are found using the provided path.
         if-no-files-found: error # optional, default is warn
         # Duration after which artifact will expire in days. 0 means using default retention.
