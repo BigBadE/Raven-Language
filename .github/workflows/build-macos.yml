@@ -3,8 +3,8 @@ name: Rust
 # Currently doesn't work, no clue where the LLVM install for MacOS is.
 # Probably need to compile the whole thing.
 on:
-  # schedule:
-  #  - cron: "0 0 * * *"
+   schedule:
+    - cron: "0 0 * * *"
   # push:
   #  branches: [ "master" ]
   #pull_request:
@@ -15,6 +15,7 @@ env:
 
 jobs:
   build:
+    if: ${{ false }} # Skips the workflow, because it's broken right now.
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
