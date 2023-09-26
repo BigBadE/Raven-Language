@@ -11,7 +11,7 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     let mut lines = Vec::new();
     let mut types = ExpressionType::Line;
     while let Some(expression) =
-        parse_line(parser_utils, false, false)? {
+        parse_line(parser_utils, ParseState::None)? {
         if expression.expression_type != ExpressionType::Line {
             types = expression.expression_type;
         }
@@ -21,7 +21,15 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     return Ok((types, CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string())));
 }
 
-pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: bool)
+#[derive(PartialEq)]
+pub enum ParseState {
+    None,
+    ControlVariable,
+    Argument,
+    InOperator
+}
+
+pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                   -> Result<Option<Expression>, ParsingError> {
     let mut effect: Option<Effects> = None;
     let mut expression_type = ExpressionType::Line;
@@ -36,7 +44,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     TokenTypes::Variable | TokenTypes::CallingType => {
                         let mut effects = Vec::new();
                         if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
-                            while let Some(expression) = parse_line(parser_utils, false, false)? {
+                            while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
                                 effects.push(expression.effect);
                                 if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type
                                     == TokenTypes::ArgumentEnd {} else {
@@ -51,7 +59,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                         effect = Some(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
                                                           name.clone(), effects, None));
                     }
-                    _ => if let Some(expression) = parse_line(parser_utils, break_at_body, true)? {
+                    _ => if let Some(expression) = parse_line(parser_utils, ParseState::Argument)? {
                         effect = Some(expression.effect);
                     } else {
                         effect = None;
@@ -59,26 +67,47 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                 }
             }
             TokenTypes::Float => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected float!")));
+                }
                 effect = Some(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap()))
             }
             TokenTypes::Integer => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected integer!")));
+                }
                 effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
             }
             TokenTypes::True => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected boolean!")));
+                }
                 effect = Some(Effects::Bool(true))
             }
             TokenTypes::False => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected boolean!")));
+                }
                 effect = Some(Effects::Bool(false))
             }
             TokenTypes::StringStart => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected string!")));
+                }
                 effect = Some(parse_string(parser_utils)?)
             }
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
-            TokenTypes::CodeEnd | TokenTypes::BlockEnd => return Ok(None),
+            TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(),
+                                                format!("Unexpected code end! Dropped {:?}", effect.unwrap())));
+                }
+                return Ok(None)
+            },
             TokenTypes::Variable => {
                 let next = parser_utils.tokens.get(parser_utils.index).unwrap();
                 if let TokenTypes::ParenOpen = next.token_type {
-
+                    //Skip because ParenOpen handles this.
                 } else if let TokenTypes::Operator = next.token_type {
                     //Skip if a generic method is being called next to preserve the last effect.
                     if next.to_string(parser_utils.buffer) == "<" &&
@@ -89,6 +118,10 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                             Effects::LoadVariable(token.to_string(parser_utils.buffer)))
                     }
                 } else {
+                    if effect.is_some() {
+                        return Err(token.make_error(parser_utils.file.clone(),
+                                                    format!("Unexpected value! Drops {:?}", effect.unwrap())));
+                    }
                     effect = Some(
                         Effects::LoadVariable(token.to_string(parser_utils.buffer)))
                 }
@@ -96,29 +129,52 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
             TokenTypes::Return => {
                 expression_type = ExpressionType::Return
             },
-            TokenTypes::New => effect = Some(parse_new(parser_utils)?),
-            TokenTypes::BlockStart => if break_at_body {
+            TokenTypes::New => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected new!")));
+                }
+                effect = Some(parse_new(parser_utils)?);
+            },
+            TokenTypes::BlockStart => if ParseState::ControlVariable == state {
                 break;
             } else {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected block!")));
+                }
+
                 let (returning, body) = parse_code(parser_utils)?;
                 if expression_type == ExpressionType::Line {
                     expression_type = returning;
                 }
-                effect = Some(Effects::CodeBody(body))
+                effect = Some(Effects::CodeBody(body));
             },
-            TokenTypes::Let => return Ok(Some(Expression::new(expression_type, parse_let(parser_utils)?))),
+            TokenTypes::Let => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected let!")));
+                }
+                return Ok(Some(Expression::new(expression_type, parse_let(parser_utils)?)))
+            },
             TokenTypes::If => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected if!")));
+                }
+
                 let expression = parse_if(parser_utils)?;
                 if expression_type == ExpressionType::Line {
                     expression_type = expression.expression_type;
                 }
                 return Ok(Some(Expression::new(expression_type, expression.effect)));
             }
-            TokenTypes::For => return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?))),
+            TokenTypes::For => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected for!")));
+                }
+                return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)))
+            },
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
                 if effect.is_some() && other != TokenTypes::Operator && other != TokenTypes::Equals {
-                    let value = parse_line(parser_utils, false, false)?;
+                    let value = parse_line(parser_utils, ParseState::None)?;
                     if let Some(value) = value {
                         effect = Some(Effects::Set(Box::new(effect.unwrap()), Box::new(value.effect)));
                     } else {
@@ -138,10 +194,14 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     effect = Some(parse_generic_method(effect, parser_utils)?);
                 } else {
                     let operator = parse_operator(effect, parser_utils)?;
-                    return Ok(Some(Expression::new(expression_type, operator)));
+                    if ParseState::InOperator != state {
+                        return Ok(Some(Expression::new(expression_type, operator)));
+                    } else {
+                        effect = Some(operator);
+                    }
                 }
             }
-            TokenTypes::ArgumentEnd => if !deep {
+            TokenTypes::ArgumentEnd => if ParseState::Argument != state {
                 break;
             },
             TokenTypes::CallingType => {
@@ -151,6 +211,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, break_at_body: bool, deep: boo
                     token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ') {
                     //Ignored, ParenOpen or Operator handles this
                 } else {
+                    if effect.is_none() {
+                        return Err(token.make_error(parser_utils.file.clone(), format!("Extra period!")));
+                    }
                     effect = Some(Effects::Load(Box::new(effect.unwrap()), token.to_string(parser_utils.buffer)))
                 }
             },
@@ -206,7 +269,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     parser_utils.index += 1;
     let mut effects = Vec::new();
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
-        while let Some(expression) = parse_line(parser_utils, false, false)? {
+        while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
             effects.push(expression.effect);
             if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type
                 == TokenTypes::ArgumentEnd {} else {
@@ -237,7 +300,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
         parser_utils.index += 2;
     }
 
-    return match parse_line(parser_utils, false, false)? {
+    return match parse_line(parser_utils, ParseState::None)? {
         Some(line) => Ok(Effects::CreateVariable(name, Box::new(line.effect))),
         None => Err(parser_utils.tokens.get(parser_utils.index).unwrap()
             .make_error(parser_utils.file.clone(), "Expected value, found void!".to_string()))
@@ -283,7 +346,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
             TokenTypes::Colon | TokenTypes::ArgumentEnd => {
                 let effect = if let TokenTypes::Colon = token.token_type {
                     let token = token.clone();
-                    match parse_line(parser_utils, false, false)? {
+                    match parse_line(parser_utils, ParseState::None)? {
                         Some(inner) => inner.effect,
                         None => return Err(token.make_error(parser_utils.file.clone(), format!("Expected effect!")))
                     }

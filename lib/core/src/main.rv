@@ -1,12 +1,16 @@
 import stdio;
+import iter;
 
 #[extern]
 pub fn main() -> u64 {
-    let value = ["1", "2", "3", "4", "5"];
-    printf(test(value, 4));
-    return 0;
-}
-
-fn test<T>(value: [T], index: u64) -> T {
-    return value[index];
+    let first = new NumberIter {
+        current: 0,
+        end: 1,
+    };
+    let second = new NumberIter {
+        current: 2,
+        end: 3,
+    };
+    let value = [first, second];
+    return value[1].second;
 }
