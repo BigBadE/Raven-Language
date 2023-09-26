@@ -6,11 +6,7 @@ Raven's goal is to allow one codebase to run on every platform, without having t
 
 Currently, Raven mainly targets desktop applications, but web, mobile, and JVM targets are planned.
 
-# Checking Out
-
-Raven-Language is a main repository containing some subrepositories, they must be cloned as well.
-
-Running the ```git submodule update --init --recursive --remote``` command will pull all the submodules for you.
+# !!! DO NOT DOWNLOAD RAVEN ANYWHERE WITH A SPACE IN THE PATH. EX: "C:/Program Files/Raven". IT WILL NOT WORK. I CANNOT FIX IT !!!
 
 # Building
 
