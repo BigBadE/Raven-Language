@@ -87,13 +87,13 @@ pub struct RawArray {}
 #[derive(Debug)]
 pub struct RawDependency {
     type_id: c_int,
-    //pub name: AtomicPtr<c_char>,
+    pub name: AtomicPtr<c_char>,
 }
 
 #[derive(Debug)]
 pub struct RavenProject {
     pub name: String,
-    //pub dependencies: Vec<Dependency>,
+    pub dependencies: Vec<Dependency>,
 }
 
 #[derive(Debug)]
@@ -117,8 +117,8 @@ impl From<RawRavenProject> for RavenProject {
         unsafe {
             return Self {
                 name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                //dependencies: load_array(value.dependencies).into_iter()
-                //    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
+                dependencies: load_array(value.dependencies).into_iter()
+                    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
             };
         }
     }

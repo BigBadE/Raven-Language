@@ -11,6 +11,7 @@ Currently, Raven mainly targets desktop applications, but web, mobile, and JVM t
 Raven-Language is a main repository containing some subrepositories, they must be cloned as well.
 
 Running the ```git submodule update --init --recursive --remote``` command will pull all the submodules for you.
+
 # Building
 
 Requires LLVM set with the environmental variable LLVM_SYS_130_PREFIX = (path to folder with bin)
