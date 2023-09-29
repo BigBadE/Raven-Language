@@ -47,10 +47,11 @@ fn main() {
         Err(error) => panic!("{:?}", error)
     };
 
+    println!("{:?}", project.dependencies);
     let source = env::current_dir().unwrap().join("src");
 
     if !source.exists() {
-        println!("Build file not found!");
+        println!("Source not found!");
         return;
     }
 
@@ -87,7 +88,7 @@ pub struct RawArray {}
 #[derive(Debug)]
 pub struct RawDependency {
     type_id: c_int,
-    pub name: AtomicPtr<c_char>,
+    pub name: c_int,
 }
 
 #[derive(Debug)]
@@ -101,12 +102,14 @@ pub struct Dependency {
     //pub name: String,
 }
 
-fn load_raw<T>(length: u64, pointer: *mut T) -> Vec<T> {
+fn load_raw<T: Debug>(length: u64, pointer: *mut T) -> Vec<T> {
     let mut output = Vec::new();
+    let offset = size_of::<T>() as u64;
+    let mut pointer = pointer;
 
-    let temp = unsafe { Box::from_raw(ptr::slice_from_raw_parts_mut(pointer, length as usize)) };
-    for value in temp.into_vec() {
-        output.push(value);
+    for _ in 0..length {
+        output.push(unsafe { ptr::read(pointer) });
+        pointer = (pointer as u64 + offset) as *mut T;
     }
 
     return output;
@@ -134,9 +137,10 @@ impl From<RawDependency> for Dependency {
     }
 }
 
-fn load_array<T>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
+fn load_array<T: Debug>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
     let ptr = ptr.load(Ordering::Relaxed);
     let len = unsafe { ptr::read(ptr as *mut u64) };
+    println!("{:?}", unsafe { ptr::read(ptr as *mut [u64; 5])});
     return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
 }
 

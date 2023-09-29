@@ -50,7 +50,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         }
         Effects::Operation(operation, mut values) => {
             let error = ParsingError::new(String::new(), (0, 0), 0,
-                                          (0, 0), 0, format!("Failed to find operation {}", operation));
+                                          (0, 0), 0, format!("Failed to find operation {} with {:?}", operation, values));
             let mut outer_operation = None;
             if values.len() > 0 {
                 let mut last = values.last().unwrap();
@@ -373,7 +373,6 @@ pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<Finalize
         let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() && !returning.as_ref().unwrap().of_type(
             &function.fields.get(i).unwrap().field.field_type, syntax) {
-            println!("{} != {}", returning.as_ref().unwrap(), function.fields.get(i).unwrap().field.field_type);
             return Ok(false);
         }
     }

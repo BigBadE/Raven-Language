@@ -9,9 +9,22 @@ trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
+#[priority(-1)]
+#[operation({}+{})]
+trait Add<T, E, C> {
+    fn add(self, other: E) -> C;
+}
+
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number, E: Number> Equal<T> for E {
     fn equal(self, other: T) -> bool {
 
     }
 }
+
+//Basic math operations, implemented internally by the compiler.
+/*pub internal impl<T: Number> Add<T, T, T> for T {
+    fn add(self, other: T) -> T {
+
+    }
+}*/

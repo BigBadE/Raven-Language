@@ -12,5 +12,5 @@ pub fn main() -> u64 {
         end: 3,
     };
     let value = [first, second];
-    return value[1].second;
+    return value[1].end;
 }

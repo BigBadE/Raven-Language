@@ -3,9 +3,11 @@ use syntax::ParsingError;
 
 use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
-use crate::tokens::tokens::Token;
 
 pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
+    if parser_utils.file == "build" {
+        println!("Start parsing");
+    }
     let mut operation = String::new();
     let mut effects = Vec::new();
 
@@ -79,5 +81,8 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
         parser_utils.index -= 1;
     }
 
+    if parser_utils.file == "build" {
+        println!("End parsing: {}, {:?}", operation, effects);
+    }
     return Ok(Effects::Operation(operation, effects));
 }
