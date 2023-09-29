@@ -4,13 +4,13 @@ import array;
 pub fn project() -> RavenProject {
     return new RavenProject {
         name: "Test",
-        dependencies: [
+        /*dependencies: [
             new Dependency {
                 name: 1,
             },
             new Dependency {
                 name: 2,
             }
-        ],
+        ],*/
     };
 }

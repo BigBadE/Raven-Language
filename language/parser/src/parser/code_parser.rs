@@ -36,9 +36,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap().clone();
 
-        if parser_utils.file == "build" {
-            println!("Normal {:?} ({})", token.token_type, token.to_string(parser_utils.buffer));
-        }
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::ParenOpen => {
@@ -338,14 +335,8 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
 fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects)>, ParsingError> {
     let mut values = Vec::new();
     let mut name = String::new();
-    if parser_utils.file == "build" {
-        println!("Inner {}", parser_utils.file);
-    }
     loop {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
-        if parser_utils.file == "build" {
-            println!("Got {:?} ({})", token.token_type, token.to_string(parser_utils.buffer));
-        }
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => name = token.to_string(parser_utils.buffer),
@@ -361,18 +352,13 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
                 };
                 values.push((name, effect));
                 name = String::new();
-                if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::BlockEnd {
-                    break;
-                }
             }
             TokenTypes::BlockEnd => break,
-            TokenTypes::InvalidCharacters => {}
+            TokenTypes::InvalidCharacters => {},
+            TokenTypes::Comment => {},
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
 
-    if parser_utils.file == "build" {
-        println!("Ending {}", parser_utils.file);
-    }
     return Ok(values);
 }

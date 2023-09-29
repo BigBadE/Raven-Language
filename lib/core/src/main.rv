@@ -1,8 +1,7 @@
 import stdio;
 import iter;
 
-#[extern]
-pub fn main() -> u64 {
+pub fn test() -> u64 {
     let first = new NumberIter {
         current: 0,
         end: 1,
@@ -12,5 +11,5 @@ pub fn main() -> u64 {
         end: 3,
     };
     let value = [first, second];
-    return value[1].end;
+    return value[0].end;
 }

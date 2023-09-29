@@ -1,0 +1,5 @@
+import stdio;
+
+fn main() {
+    printf("Test");
+}

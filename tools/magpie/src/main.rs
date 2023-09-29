@@ -7,8 +7,10 @@ use std::{env, path, ptr};
 use std::ffi::{c_char, c_int};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
-use data::{FileSourceSet, Readable, RunnerSettings, SourceSet, ParsingError, Arguments};
+
 use include_dir::{Dir, DirEntry, File, include_dir};
+
+use data::{Arguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
 static CORE: Dir = include_dir!("lib/core/src");
 static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
@@ -18,6 +20,26 @@ static STD_MACOS: Dir = include_dir!("lib/std/macos");
 static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
 fn main() {
+    let args = env::args().collect::<Vec<_>>();
+
+    if args.len() == 2 {
+        let target = env::current_dir().unwrap().join(args[1].clone());
+        let mut arguments = Arguments::build_args(false, RunnerSettings {
+            sources: vec!(),
+            debug: false,
+            compiler: "llvm".to_string(),
+        });
+
+        println!("Building and running {}...", target.to_str().unwrap());
+        build::<RawRavenProject>(format!("{}::main", args[1].clone().replace(".rs", "")),
+                                 &mut arguments, vec!(Box::new(FileSourceSet {
+            root: target,
+        })));
+
+    } else if args.len() > 2 {
+        panic!("Unknown extra arguments!");
+    }
+
     let build_path = env::current_dir().unwrap().join("build.rv");
 
     if !build_path.exists() {
@@ -26,35 +48,33 @@ fn main() {
     }
 
     let mut arguments = Arguments::build_args(false, RunnerSettings {
-        sources: vec!(Box::new(FileSourceSet {
-            root: build_path,
-        }), Box::new(InnerSourceSet {
-            set: &MAGPIE
-        }), Box::new(InnerSourceSet {
-            set: &CORE
-        })),
+        sources: vec!(),
         debug: false,
         compiler: "llvm".to_string(),
     });
 
     println!("Building project...");
-    let value = run::<RawRavenProject>(&arguments);
-    let project = match value {
-        Ok(inner) => match inner {
-            Some(found) => RavenProject::from(found),
-            None => panic!("No project method in build file!")
-        },
-        Err(error) => panic!("{:?}", error)
+    let _project = match build::<RawRavenProject>("build::project".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+        root: build_path,
+    }), Box::new(InnerSourceSet {
+        set: &MAGPIE
+    }))) {
+        Some(found) => RavenProject::from(found),
+        None => panic!("No project method in build file!")
     };
 
-    println!("{:?}", project.dependencies);
     let source = env::current_dir().unwrap().join("src");
 
     if !source.exists() {
-        println!("Source not found!");
-        return;
+        panic!("Source folder (src) not found!");
     }
 
+    build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+        root: source
+    })));
+}
+
+pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>) -> Option<T> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
         "linux" => &STD_LINUX,
@@ -62,15 +82,23 @@ fn main() {
         _ => panic!("Unsupported platform {}!", env::consts::OS)
     };
 
-    arguments.runner_settings.sources = vec!(Box::new(FileSourceSet {
-        root: source,
-    }), Box::new(InnerSourceSet {
+    source.push(Box::new(InnerSourceSet {
         set: &STD_UNIVERSAL
-    }), Box::new(InnerSourceSet {
+    }));
+    source.push(Box::new(InnerSourceSet {
         set: platform_std
-    }), Box::new(InnerSourceSet {
+    }));
+    source.push(Box::new(InnerSourceSet {
         set: &CORE
     }));
+
+    arguments.runner_settings.sources = source;
+
+    let value = run::<T>(target, &arguments);
+    match value {
+        Ok(inner) => return inner,
+        Err(error) => panic!("{:?}", error),
+    }
 }
 
 #[derive(Debug)]
@@ -78,7 +106,7 @@ fn main() {
 pub struct RawRavenProject {
     type_id: c_int,
     pub name: AtomicPtr<c_char>,
-    pub dependencies: AtomicPtr<RawArray>,
+    //pub dependencies: AtomicPtr<RawArray>,
 }
 
 #[derive(Debug)]
@@ -94,7 +122,7 @@ pub struct RawDependency {
 #[derive(Debug)]
 pub struct RavenProject {
     pub name: String,
-    pub dependencies: Vec<Dependency>,
+    //pub dependencies: Vec<Dependency>,
 }
 
 #[derive(Debug)]
@@ -120,8 +148,8 @@ impl From<RawRavenProject> for RavenProject {
         unsafe {
             return Self {
                 name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                dependencies: load_array(value.dependencies).into_iter()
-                    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
+                //dependencies: load_array(value.dependencies).into_iter()
+                //    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
             };
         }
     }
@@ -140,13 +168,13 @@ impl From<RawDependency> for Dependency {
 fn load_array<T: Debug>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
     let ptr = ptr.load(Ordering::Relaxed);
     let len = unsafe { ptr::read(ptr as *mut u64) };
-    println!("{:?}", unsafe { ptr::read(ptr as *mut [u64; 5])});
+    println!("{:?}", unsafe { ptr::read(ptr as *mut [u64; 5]) });
     return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
 }
 
-fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     let result = arguments.cpu_runtime.block_on(
-        runner::runner::run::<AtomicPtr<T>>("build::project".to_string(), &arguments))?;
+        runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 

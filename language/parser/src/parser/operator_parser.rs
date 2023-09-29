@@ -5,9 +5,6 @@ use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
 
 pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
-    if parser_utils.file == "build" {
-        println!("Start parsing");
-    }
     let mut operation = String::new();
     let mut effects = Vec::new();
 
@@ -26,13 +23,14 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
         parser_utils.index += 1;
     }
 
-    let (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
+    let (mut index, mut tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
     let mut right = match parse_line(parser_utils, ParseState::InOperator) {
         Ok(inner) => inner.map(|inner| inner.effect),
         Err(_) => None
     };
     if right.is_some() {
         while parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
+            (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             if let Some(found) = next {
                 if let Effects::NOP() = &found {
@@ -52,6 +50,8 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
 
         if let Some(inner) = &right {
             if let Effects::NOP() = inner {
+                parser_utils.index = index;
+                parser_utils.tokens.truncate(tokens);
                 return Ok(Effects::Operation(operation, effects));
             } else {
                 operation += "{}";
@@ -77,12 +77,11 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
         effects.push(found);
     }
 
-    if TokenTypes::LineEnd == parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type {
+    let mut last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
+    while TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last || TokenTypes::ArgumentEnd == last {
         parser_utils.index -= 1;
+        last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
     }
 
-    if parser_utils.file == "build" {
-        println!("End parsing: {}, {:?}", operation, effects);
-    }
     return Ok(Effects::Operation(operation, effects));
 }

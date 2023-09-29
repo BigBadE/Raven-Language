@@ -224,25 +224,11 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             for struct_field in &loading_from
                 .get_return(type_getter)
                 .unwrap().inner_struct().fields {
-                println!("{} vs {}", struct_field.field.name, field);
                 if &struct_field.field.name != field {
                     offset += 1;
                 } else {
                     break;
                 }
-            }
-
-            let ptr_ty = from.into_pointer_value().get_type();
-            let pointee_ty = ptr_ty.get_element_type();
-
-            if !pointee_ty.is_struct_type() {
-                println!("Error 1!");
-            }
-
-            let struct_ty = pointee_ty.into_struct_type();
-
-            if offset >= struct_ty.count_fields() {
-                println!("Error 2: {} vs {} ({:?})", offset, struct_ty.count_fields(), struct_ty);
             }
 
             let gep = type_getter.compiler.builder.build_struct_gep(from.into_pointer_value(), offset, &id.to_string()).unwrap();
