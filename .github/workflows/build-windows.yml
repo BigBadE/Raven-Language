@@ -13,6 +13,7 @@ env:
 
 jobs:
   build:
+    permissions: write
     runs-on: windows-latest
     steps:
     - name: Checkout repo
