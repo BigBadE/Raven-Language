@@ -30,12 +30,12 @@ jobs:
       with:
           upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
           asset_path: target/release/magpie
-          asset_name: Magpie-ubuntu
+          asset_name: Magpie-linux
           overwrite: true
     - name: Release Magpie Wrapper
       uses: shogo82148/actions-upload-release-asset@v1
       with:
           upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
           asset_path: target/release/magpie-wrapper
-          asset_name: Magpie-wrapper-ubuntu
+          asset_name: Magpie-wrapper-linux
           overwrite: true
