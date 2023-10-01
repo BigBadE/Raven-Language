@@ -136,7 +136,7 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
                         TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
                         _ => panic!("Unexpected generic state!")
                     };
-                    tokenizer.make_token(TokenTypes::GenericEnd)
+                    tokenizer.make_token(TokenTypes::GenericsEnd)
                 } else {
                     tokenizer.make_token(TokenTypes::GenericBoundEnd)
                 }

@@ -5,17 +5,11 @@ use json::JsonValue;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue};
 
-static URL: &'static str = "https://api.github.com/repos/BigBadE/Raven-Language/actions/artifacts";
-static TOKEN: &'static str = "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";
+static URL: &'static str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
 
 fn main() {
     println!("Checking version...");
-    // Add headers to the HTTP request
-    let mut headers = HeaderMap::new();
-    headers.insert("Authorization", HeaderValue::from_str(
-        format!("Bearer {}", TOKEN).as_str()).unwrap());
-    let client = Client::builder().user_agent("Magpie Updater")
-        .default_headers(headers).build().unwrap();
+    let client = Client::builder().user_agent("Magpie Updater").build().unwrap();
     // Get the artifacts
     let body = client.get(URL).send().unwrap().text().unwrap();
     let parsed = json::parse(body.as_str()).unwrap();
@@ -27,8 +21,8 @@ fn main() {
 
     // Find the latest artifacts
     let mut highest: Option<&JsonValue> = None;
-    for artifact in parsed["artifacts"].members() {
-        if artifact["name"].as_str().unwrap() != format!("Raven-{}", env::consts::OS) {
+    for artifact in parsed.members() {
+        if artifact["name"].as_str().unwrap() != format!("Magpie-{}{}", env::consts::OS, env::consts::EXE_SUFFIX) {
             continue
         }
         if let Some(found) = &highest {
@@ -51,11 +45,8 @@ fn main() {
     // If latest is not already downloaded, download it.
     if !running.exists() {
         println!("Downloading new Magpie version...");
-        let download = highest["archive_download_url"].as_str().unwrap();
-        zip_extract::extract(Cursor::new(client.get(download).send().unwrap().bytes().unwrap()),
-                             &env::temp_dir(), false).unwrap();
-        let target = env::temp_dir().join(format!("magpie.{}", env::consts::EXE_EXTENSION));
-        fs::rename(target, running.clone()).unwrap();
+        let download = highest["browser_download_url"].as_str().unwrap();
+        fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
     Command::new(running).stdout(stdout()).stdin(Stdio::inherit())

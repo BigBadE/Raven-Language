@@ -79,10 +79,16 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
                     broke = true;
                 }
 
-                let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
+                if let FinalizedEffects::NOP() = &line.effect {
+                    if !broke {
+                        type_getter.compiler.builder.build_return(None);
+                    }
+                } else {
+                    let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
 
-                if !broke {
-                    type_getter.compiler.builder.build_return(Some(&returned));
+                    if !broke {
+                        type_getter.compiler.builder.build_return(Some(&returned));
+                    }
                 }
                 broke = true;
             }
@@ -135,7 +141,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
 pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function: FunctionValue<'ctx>,
                             effect: &FinalizedEffects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
-        FinalizedEffects::NOP() => panic!("Tried to compile a NOP!"),
+        FinalizedEffects::NOP() => panic!("Tried to compile a NOP! For {}", function.get_name().to_str().unwrap()),
         FinalizedEffects::CreateVariable(name, inner, types) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));
@@ -361,7 +367,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 }
                 gep
             } else {
-                let alloc = type_getter.compiler.builder.build_alloca(type_getter.compiler.context.i64_type(),  &id.to_string());
+                let alloc = type_getter.compiler.builder.build_alloca(type_getter.compiler.context.i64_type(), &id.to_string());
                 *id += 1;
                 type_getter.compiler.builder.build_store(alloc, type_getter.compiler.context
                     .i64_type().const_int(0, false).as_basic_value_enum());
@@ -383,7 +389,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             *id += 1;
 
             type_getter.compiler.builder.build_store(malloc, type_getter.compiler.context.i64_type().const_int(values.len() as u64, false));
-            
+
             let mut i = 1;
             for value in values {
                 let gep = unsafe {
