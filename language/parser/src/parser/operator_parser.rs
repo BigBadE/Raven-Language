@@ -1,7 +1,7 @@
 use syntax::code::Effects;
 use syntax::ParsingError;
 
-use crate::parser::code_parser::parse_line;
+use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
 
 pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
@@ -23,10 +23,15 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
         parser_utils.index += 1;
     }
 
-    let mut right = parse_line(parser_utils, true, false)?.map(|inner| inner.effect);
+    let (mut index, mut tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
+    let mut right = match parse_line(parser_utils, ParseState::InOperator) {
+        Ok(inner) => inner.map(|inner| inner.effect),
+        Err(_) => None
+    };
     if right.is_some() {
         while parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
-            let next = parse_line(parser_utils, true, false)?.map(|inner| inner.effect);
+            (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
+            let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             if let Some(found) = next {
                 if let Effects::NOP() = &found {
                     break
@@ -45,11 +50,16 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
 
         if let Some(inner) = &right {
             if let Effects::NOP() = inner {
+                parser_utils.index = index;
+                parser_utils.tokens.truncate(tokens);
                 return Ok(Effects::Operation(operation, effects));
             } else {
                 operation += "{}";
             }
         }
+    } else {
+        parser_utils.index = index;
+        parser_utils.tokens.truncate(tokens);
     }
 
     let mut last_token;
@@ -65,6 +75,12 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
 
     if let Some(found) = right {
         effects.push(found);
+    }
+
+    let mut last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
+    while TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last || TokenTypes::ArgumentEnd == last {
+        parser_utils.index -= 1;
+        last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
     }
 
     return Ok(Effects::Operation(operation, effects));

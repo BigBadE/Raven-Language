@@ -176,7 +176,8 @@ impl Syntax {
         unsafe {
             //Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
             //yet, so this is safe.
-            Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.len() as u64);
+            Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.iter().position(|found| &found.name == adding.name())
+                .unwrap_or(locked.structures.sorted.len()) as u64);
         }
 
         for poison in adding.errors() {
@@ -277,7 +278,7 @@ impl Syntax {
     }
 
     #[async_recursion]
-    pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
+    pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, mut error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
             UnparsedType::Basic(name) =>

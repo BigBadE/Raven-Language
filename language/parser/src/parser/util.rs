@@ -148,7 +148,8 @@ impl<'a> ParserUtils<'a> {
             }
         };
 
-        Syntax::add(syntax, ParsingError::empty(), &adding.data);
+        Syntax::add(syntax, ParsingError::new(file, (0, 0), 0, (0, 0), 0,
+                                              format!("Duplicate function {}", adding.data.name)), &adding.data);
         return adding;
     }
 }

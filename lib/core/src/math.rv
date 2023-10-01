@@ -9,9 +9,61 @@ trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
+#[priority(1)]
+#[operation({}+{})]
+trait Add<E, C> {
+    fn add(self, other: E) -> C;
+}
+
+#[priority(1)]
+#[operation({}-{})]
+trait Subtract<E, C> {
+    fn subtract(self, other: E) -> C;
+}
+
+#[priority(2)]
+#[operation({}*{})]
+trait Multiply<E, C> {
+    fn multiply(self, other: E) -> C;
+}
+
+#[priority(2)]
+#[operation({}/{})]
+trait Divide<E, C> {
+    fn divide(self, other: E) -> C;
+}
+
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number, E: Number> Equal<T> for E {
     fn equal(self, other: T) -> bool {
+
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Add<T, T> for T {
+    fn add(self, other: T) -> T {
+
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Subtract<T, T> for T {
+    fn subtract(self, other: T) -> T {
+
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Multiply<T, T> for T {
+    fn multiply(self, other: T) -> T {
+
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Divide<T, T> for T {
+    fn divide(self, other: T) -> T {
 
     }
 }

@@ -111,7 +111,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.state = TokenizerState::TOP_ELEMENT;
             tokenizer.handle_invalid()
         },
-        TokenTypes::GenericEnd => {
+        TokenTypes::GenericsEnd => {
             if !tokenizer.matches("(") {
                 tokenizer.handle_invalid()
             } else {
@@ -174,7 +174,7 @@ pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
         TokenTypes::StructStart | TokenTypes::TraitStart | TokenTypes::For =>
             parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
-        TokenTypes::Identifier | TokenTypes::GenericEnd => if tokenizer.matches("<") {
+        TokenTypes::Identifier | TokenTypes::GenericsEnd => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GENERIC_TO_STRUCT;
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("{") {
@@ -195,7 +195,7 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
         } else {
             tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')
         },
-        TokenTypes::GenericEnd => if tokenizer.matches("for") {
+        TokenTypes::GenericsEnd => if tokenizer.matches("for") {
             tokenizer.state = TokenizerState::STRUCTURE;
             tokenizer.make_token(TokenTypes::For)
         } else {
@@ -317,7 +317,7 @@ mod tests {
                 input.push(TokenTypes::GenericBound);
             }
         }
-        input.push(TokenTypes::GenericEnd);
+        input.push(TokenTypes::GenericsEnd);
     }
 
     fn add_arguments(arguments: u8, first_is_self: bool, input: &mut Vec<TokenTypes>) {

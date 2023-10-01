@@ -1,12 +1,12 @@
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::ParsingError;
-use crate::parser::code_parser::{parse_code, parse_line};
+use crate::parser::code_parser::{parse_code, parse_line, ParseState};
 
 use crate::{ParserUtils, TokenTypes};
 
 pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingError> {
-    let effect = parse_line(parser_utils, true, false)?;
+    let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
         return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
             .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
@@ -24,7 +24,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     while parser_utils.tokens.get(parser_utils.index).unwrap().token_type == TokenTypes::Else {
         if parser_utils.tokens.get(parser_utils.index+1).unwrap().token_type == TokenTypes::If {
             parser_utils.index += 2;
-            let effect = parse_line(parser_utils, true, false)?;
+            let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
             if effect.is_none() {
                 return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
                     .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
@@ -71,7 +71,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     }
     parser_utils.index += 1;
     let name = name.to_string(parser_utils.buffer);
-    let effect = parse_line(parser_utils, true, false)?;
+    let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
         return Err(parser_utils.tokens.get(parser_utils.index).unwrap().make_error(
             parser_utils.file.clone(), "Expected iterator, found void".to_string()));

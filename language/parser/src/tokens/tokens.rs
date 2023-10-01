@@ -135,5 +135,6 @@ pub enum TokenTypes {
     True = 64,
     False = 65,
     AttributeStart = 66,
-    GenericBoundEnd = 67
+    GenericBoundEnd = 67,
+    GenericsEnd = 68,
 }

@@ -165,7 +165,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
-            _ => panic!("How'd you get here? {} - {:?}", parser_utils.file, token.token_type)
+            _ => panic!("How'd you get here? {} - {:?} ({})", parser_utils.file, token.token_type, state)
         }
     }
 
@@ -207,9 +207,10 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Unparse
                 let name = token.to_string(parser_utils.buffer);
                 current.push(UnparsedType::Basic(name));
             }
-            TokenTypes::GenericEnd => {
+            TokenTypes::GenericsEnd => {
                 break;
-            }
+            },
+            TokenTypes::GenericEnd => {},
             _ => {
                 panic!("Unexpected type!");
             }
@@ -247,7 +248,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                     name = name[1..].to_string();
                 }
                 let name = name.trim().to_string();
-                let unparsed = if let Some(inner) = parse_bounds(name, parser_utils) {
+                let unparsed = if let Some(inner) = parse_bounds(name.clone(), parser_utils) {
                     inner
                 } else {
                     break;
@@ -258,10 +259,15 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                                                    .make_error(parser_utils.file.clone(), format!("Bounds error!")),
                                                parser_utils.imports.boxed_clone(), unparsed));
             }
-            _ => {
-                parser_utils.index -= 1;
+            TokenTypes::GenericsEnd => {
+                if !name.is_empty() {
+                    parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
+                    generics.insert(name.clone(), bounds);
+                }
+
                 break;
             }
+            _ => panic!("Unknown token type {:?} - {}", token.token_type, parser_utils.file)
         }
     }
 }
@@ -289,7 +295,7 @@ pub fn parse_bounds(mut name: String, parser_utils: &mut ParserUtils) -> Option<
             TokenTypes::GenericBoundEnd => {
                 break
             },
-            TokenTypes::GenericEnd => {
+            TokenTypes::GenericEnd | TokenTypes::GenericsEnd => {
                 parser_utils.index -= 1;
                 break
             }

@@ -26,7 +26,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     }
 
     fn trait_datum(&self, trait_id: chalk_ir::TraitId<ChalkIr>) -> Arc<TraitDatum<ChalkIr>> {
-        let found = self.structures.sorted.get(trait_id.0.index as usize - 1).unwrap();
+        let found = self.structures.sorted.get(trait_id.0.index as usize).unwrap();
         assert_eq!(found.id as u32, trait_id.0.index);
         if let ChalkData::Trait(_, _, inner) = found.chalk_data.as_ref().unwrap().clone() {
             return Arc::new(inner);
@@ -35,7 +35,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     }
 
     fn adt_datum(&self, adt_id: AdtId<ChalkIr>) -> Arc<AdtDatum<ChalkIr>> {
-        let found = self.structures.sorted.get(adt_id.0.index as usize - 1).unwrap();
+        let found = self.structures.sorted.get(adt_id.0.index as usize).unwrap();
         assert_eq!(found.id as u32, adt_id.0.index);
         return Arc::new(found.chalk_data.as_ref().unwrap().get_adt().clone());
     }

@@ -1,7 +1,9 @@
 pub struct RavenProject {
     pub name: str;
+    //pub dependencies: [Dependency];
 }
 
+/*
 pub struct Dependency {
-    pub name: str;
-}
+    pub name: u64;
+}*/
