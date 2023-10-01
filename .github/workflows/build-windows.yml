@@ -66,14 +66,14 @@ jobs:
     - name: Release Raven
       uses: shogo82148/actions-upload-release-asset@v1
       with:
-          upload_url: /repos/BigBadE/Raven-Language/releases/123226271/
+          upload_url: https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/
           asset_path: Magpie-windows.exe
           asset_name: Magpie-windows.exe
           overwrite: true
     - name: Release Magpie Wrapper
       uses: shogo82148/actions-upload-release-asset@v1
       with:
-          upload_url: /repos/BigBadE/Raven-Language/releases/123226271/
+          upload_url: https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/
           asset_path: Magpie-wrapper-windows.exe
           asset_name: Magpie-wrapper-windows.exe
           overwrite: true
