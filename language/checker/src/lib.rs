@@ -4,7 +4,10 @@ extern crate core;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+#[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
 use indexmap::IndexMap;
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::types::{FinalizedTypes, Types};

@@ -43,6 +43,13 @@ fn main() {
 
     // If latest is not already downloaded, download it.
     if !running.exists() {
+        println!("Deleting old Magpie versions...");
+        for file in fs::read_dir(env::temp_dir()).unwrap() {
+            let file = file.unwrap();
+            if file.file_name().to_str().unwrap().starts_with("magpie-") {
+                fs::remove_file(file.path()).unwrap();
+            }
+        }
         println!("Downloading new Magpie version...");
         let download = highest["browser_download_url"].as_str().unwrap();
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();

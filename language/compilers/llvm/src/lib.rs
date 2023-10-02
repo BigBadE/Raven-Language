@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::{Arc, RwLock}; #[cfg(debug_assertions)]
+use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
 
 use inkwell::context::Context;
 use syntax::function::FinalizedFunction;
@@ -22,14 +25,14 @@ pub mod type_getter;
 pub mod util;
 
 pub struct LLVMCompiler {
-    compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>,
-    struct_compiling: Arc<HashMap<String, Arc<FinalizedStruct>>>,
+    compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
     context: Context
 }
 
 impl LLVMCompiler {
-    pub fn new(compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>,
-               struct_compiling: Arc<HashMap<String, Arc<FinalizedStruct>>>) -> Self {
+    pub fn new(compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+               struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> Self {
         return Self {
             compiling,
             struct_compiling,

@@ -102,6 +102,12 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
     }
 }
 
+fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+    let result = arguments.cpu_runtime.block_on(
+        runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
+    return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
+}
+
 #[derive(Debug)]
 #[repr(C, align(8))]
 pub struct RawRavenProject {
@@ -171,12 +177,6 @@ fn load_array<T: Debug>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
     let len = unsafe { ptr::read(ptr as *mut u64) };
     println!("{:?}", unsafe { ptr::read(ptr as *mut [u64; 5]) });
     return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
-}
-
-fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = arguments.cpu_runtime.block_on(
-        runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
-    return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
 #[derive(Debug)]
