@@ -239,7 +239,6 @@ impl TopElement for FunctionData {
         let name = current.data.name.clone();
         let (output, code) = process_manager.verify_func(current, &syntax).await;
         let output = process_manager.verify_code(output, code, resolver, &syntax).await;
-        //SAFETY: compiling is only accessed from here and in the compiler, and neither is dropped
         syntax.lock().unwrap().compiling.write().unwrap().insert(name, Arc::new(output));
     }
 

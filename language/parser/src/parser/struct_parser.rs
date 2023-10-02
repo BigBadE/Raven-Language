@@ -29,10 +29,6 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
         match token.token_type {
             TokenTypes::Identifier => {
                 name = token.to_string(parser_utils.buffer);
-                if !is_modifier(modifiers, Modifier::Internal) || is_modifier(modifiers, Modifier::Trait) {
-                    name = parser_utils.file.clone() + "::" + name.as_str();
-                }
-
                 parser_utils.imports.parent = Some(name.clone());
             }
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
@@ -120,8 +116,8 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                         for _ in 0..depth {
                             found += "[";
                         }
-                        
-                        found += format!("{}::{}", parser_utils.file.clone(), temp_name).as_str();
+
+                        found += &temp_name;
                         
                         for _ in 0..depth {
                             found += "]";
