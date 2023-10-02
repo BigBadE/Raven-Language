@@ -31,7 +31,7 @@ fn main() {
         });
 
         println!("Building and running {}...", target.to_str().unwrap());
-        build::<RawRavenProject>(format!("{}::main", args[1].clone().replace(".rs", "")),
+        build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rs", "")),
                                  &mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
         })));
