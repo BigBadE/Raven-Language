@@ -49,6 +49,6 @@ fn main() {
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
-    Command::new(running).stdout(stdout()).stdin(Stdio::inherit())
+    Command::new(running).args(env::args()).stdout(stdout()).stdin(Stdio::inherit())
         .stderr(stderr()).output().unwrap();
 }

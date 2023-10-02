@@ -37,7 +37,7 @@ fn main() {
         })));
 
     } else if args.len() > 2 {
-        panic!("Unknown extra arguments!");
+        panic!("Unknown extra arguments! {:?}", args);
     }
 
     let build_path = env::current_dir().unwrap().join("build.rv");

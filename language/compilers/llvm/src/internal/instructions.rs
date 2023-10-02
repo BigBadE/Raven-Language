@@ -1,39 +1,64 @@
 use inkwell::builder::Builder;
 use inkwell::{AddressSpace, IntPredicate};
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use crate::compiler::CompilerImpl;
 use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
 
-pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter, compiler: &CompilerImpl<'ctx>, name: &String, value: FunctionValue<'ctx>) {
+pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: &CompilerImpl<'ctx>, name: &String, value: FunctionValue<'ctx>) {
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
-    //Trunc to go u64 -> u8
     if name.starts_with("numbers::cast_") {
         build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
         return;
     } else if name.starts_with("math::add_u") || name.starts_with("math::add_i") {
-        /*let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
-                                                                 .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
-                                                             &[BasicMetadataValueEnum::PointerValue(size)], "0").try_as_basic_value().unwrap_left().into_pointer_value();*/
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type);
 
-        let returning = compiler.builder.build_int_add(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+        let returning = compiler.builder.build_int_add(compiler.builder.build_load(pointer_type, "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-        compiler.builder.build_return(Some(&returning));
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::subtract_u") || name.starts_with("math::subtract_i") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type);
         let returning = compiler.builder.build_int_sub(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-        compiler.builder.build_return(Some(&returning));
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::multiply_u") || name.starts_with("math::multiply_i") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type);
         let returning = compiler.builder.build_int_mul(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-        compiler.builder.build_return(Some(&returning));
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::divide_u") || name.starts_with("math::divide_i") {
-        let returning = compiler.builder.build_int_signed_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                                                       compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-        compiler.builder.build_return(Some(&returning));
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type);
+        let returning = if name.starts_with("math::divide_u") {
+            compiler.builder.build_int_unsigned_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                  compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
+        } else {
+            compiler.builder.build_int_signed_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                                  compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
+        };
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
+    } else if name.starts_with("math::remainder_u") || name.starts_with("math::remainder_i") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type);
+        let returning = if name.starts_with("math::remainder_u") {
+            compiler.builder.build_int_unsigned_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                    compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
+        } else {
+            compiler.builder.build_int_signed_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+                                                  compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
+        };
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::equal_") {
         let returning = compiler.builder
             .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
@@ -68,6 +93,18 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter, compiler: &Compi
     } else {
         panic!("Unknown internal operation: {}", name)
     }
+}
+
+fn malloc_type<'a>(type_getter: &CompilerTypeGetter<'a>, pointer_type: PointerValue<'a>) -> PointerValue<'a> {
+    let size = unsafe {type_getter.compiler.builder.build_gep(pointer_type.get_type().const_zero(),
+                                                              &[type_getter.compiler.context.i64_type().const_int(1, false)], "2")
+    };
+
+    let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
+                                                             .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                         &[BasicMetadataValueEnum::PointerValue(size)], "0").try_as_basic_value().unwrap_left().into_pointer_value();
+    let malloc = type_getter.compiler.builder.build_bitcast(malloc.as_basic_value_enum(), pointer_type.as_basic_value_enum().get_type(), "1");
+    return malloc.into_pointer_value();
 }
 
 fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
