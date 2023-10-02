@@ -1,9 +1,8 @@
 use std::{env, fs};
-use std::io::{Cursor, stderr, stdout};
+use std::io::{stderr, stdout};
 use std::process::{Command, Stdio};
 use json::JsonValue;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue};
 
 static URL: &'static str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
 
@@ -49,6 +48,6 @@ fn main() {
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
-    Command::new(running).args(env::args()).stdout(stdout()).stdin(Stdio::inherit())
+    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>()).stdout(stdout()).stdin(Stdio::inherit())
         .stderr(stderr()).output().unwrap();
 }

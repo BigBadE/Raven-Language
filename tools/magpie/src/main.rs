@@ -35,7 +35,7 @@ fn main() {
                                  &mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
         })));
-
+        return;
     } else if args.len() > 2 {
         panic!("Unknown extra arguments! {:?}", args);
     }
@@ -53,15 +53,15 @@ fn main() {
         compiler: "llvm".to_string(),
     });
 
-    println!("Building project...");
-    let _project = match build::<RawRavenProject>("build::project".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+    println!("Setting up build...");
+    /*let _project = match build::<RawRavenProject>("build::project".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
         root: build_path,
     }), Box::new(InnerSourceSet {
         set: &MAGPIE
     }))) {
         Some(found) => RavenProject::from(found),
         None => panic!("No project method in build file!")
-    };
+    };*/
 
     let source = env::current_dir().unwrap().join("src");
 
@@ -69,6 +69,7 @@ fn main() {
         panic!("Source folder (src) not found!");
     }
 
+    println!("Building and running project...");
     build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
         root: source
     })));
