@@ -1,11 +1,11 @@
 import stdio;
 
 fn main() {
-    //print_test("Two");
+    print_test("Two");
 }
 
 fn print_test(test: Test) {
-    test.print_self();
+    //test.print_self();
 }
 
 pub trait Test {
