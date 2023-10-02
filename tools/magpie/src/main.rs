@@ -30,8 +30,8 @@ fn main() {
             compiler: "llvm".to_string(),
         });
 
-        println!("Building and running {}...", target.to_str().unwrap());
-        build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rs", "")),
+        println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
+        build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
                                  &mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
         })));
