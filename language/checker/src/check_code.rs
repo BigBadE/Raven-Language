@@ -190,14 +190,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 } else {
                     let mut output = None;
                     while output.is_none() && !syntax.lock().unwrap().finished_impls() {
-                        output = check(syntax, &resolver, &method, &return_type).await?;
+                        output = find_trait_implementation(syntax, &resolver, &method, &return_type).await?;
                         thread::yield_now();
                     }
 
                     if let Some(value) = output {
                         value
                     } else {
-                        if let Some(value) = check(syntax, &resolver, &method, &return_type).await? {
+                        if let Some(value) = find_trait_implementation(syntax, &resolver, &method, &return_type).await? {
                             value
                         } else {
                             return Err(placeholder_error(format!("Unknown method {}", method)));
@@ -297,12 +297,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     return Ok(output);
 }
 
-async fn check(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
-               method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
+async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
+                                   method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                              import.clone(), resolver.boxed_clone()).await {
+                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone()).await {
             let value = value.finalize(syntax.clone()).await;
+            //println!("{} and {}", return_type, value);
             if let Some(value) = syntax.lock().unwrap().get_implementation(
                 &return_type,
                 &value.inner_struct().data) {

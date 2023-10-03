@@ -198,6 +198,7 @@ impl Syntax {
             if !manager.sorted.contains(adding) {
                 manager.sorted.push(Arc::clone(adding));
             }
+
             manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 

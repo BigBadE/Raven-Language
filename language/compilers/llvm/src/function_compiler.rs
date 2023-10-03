@@ -401,12 +401,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 };
                 i += 1;
                 *id += 1;
-                let mut effect = compile_effect(type_getter, function, value, id).unwrap();
-                if effect.is_pointer_value() {
-                    effect = type_getter.compiler.builder.build_load(effect.into_pointer_value(), &id.to_string());
-                    *id += 1;
-                }
-
+                let effect = compile_effect(type_getter, function, value, id).unwrap();
                 type_getter.compiler.builder.build_store(gep, effect);
             }
 
