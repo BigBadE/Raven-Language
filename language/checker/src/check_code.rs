@@ -6,7 +6,7 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
-use syntax::{Attribute, CheckerVariableManager, ParsingError};
+use syntax::{Attribute, CheckerVariableManager, is_modifier, Modifier, ParsingError};
 use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
@@ -183,6 +183,21 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let method = if let Some(found) = calling {
                 let found = verify_effect(process_manager, resolver.boxed_clone(), *found, external, syntax, variables, references).await?;
                 let return_type = found.get_return(variables).unwrap();
+
+                if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
+                    finalized_effects.insert(0, found);
+                    let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
+                                                      format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?
+                    let method = AsyncDataGetter::new(syntax.clone(), method).await;
+                    
+                    if !check_args(&method, &finalized_effects, syntax, variables)? {
+                        return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
+                                                             method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
+                                                             effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
+                    }
+                    
+                    return Ok(FinalizedEffects::VirtualCall(method, finalized_effects));
+                }
                 finalized_effects.insert(0, found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
@@ -303,7 +318,6 @@ async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<d
         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                               import.split("::").last().unwrap().to_string(), resolver.boxed_clone()).await {
             let value = value.finalize(syntax.clone()).await;
-            //println!("{} and {}", return_type, value);
             if let Some(value) = syntax.lock().unwrap().get_implementation(
                 &return_type,
                 &value.inner_struct().data) {
@@ -324,9 +338,9 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 
 //The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
-                      effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                      variables: &mut CheckerVariableManager,
-                      returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
+                          effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+                          variables: &mut CheckerVariableManager,
+                          returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
 

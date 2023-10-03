@@ -9,7 +9,7 @@ use async_recursion::async_recursion;
 use crate::{Attribute, CheckerVariableManager, DisplayIndented, ParsingError, ProcessManager, to_modifiers, VariableManager};
 use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
-use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
+use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, StructData, U64};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
 
@@ -172,6 +172,10 @@ pub enum FinalizedEffects {
     UInt(u64),
     Bool(bool),
     String(String),
+    //Calls a virtual method
+    VirtualCall(Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    //Downcasts a structure into its trait
+    Downcast(Box<FinalizedEffects>, FinalizedTypes),
     //Internally used by low-level verifier
     HeapStore(Box<FinalizedEffects>),
     //Allocates space
@@ -189,6 +193,10 @@ impl FinalizedEffects {
             FinalizedEffects::CodeBody(_) => None,
             FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
             FinalizedEffects::MethodCall(_, function, _) =>
+                function.return_type.as_ref().map(|inner| {
+                    FinalizedTypes::Reference(Box::new(inner.clone()))
+                }),
+            FinalizedEffects::VirtualCall(function, _) =>
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),
@@ -225,7 +233,8 @@ impl FinalizedEffects {
             },
             FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!"),
             FinalizedEffects::CreateArray(types, _) =>
-                types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner)))
+                types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner))),
+            FinalizedEffects::Downcast(_, target) => Some(target.clone())
         };
         return temp;
     }

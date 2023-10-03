@@ -168,6 +168,9 @@ impl FinalizedTypes {
                     if found == other_struct {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
+                        if is_modifier(self.inner_struct().data.modifiers, Modifier::Trait) {
+                            return found == other_struct;
+                        }
                         //Only check for implementations if being compared against a trait.
                         while !syntax.lock().unwrap().finished_impls() {
                             if syntax.lock().unwrap().solve(self, &other) {
