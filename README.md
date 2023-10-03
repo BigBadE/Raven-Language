@@ -20,6 +20,6 @@ Nightly is required for building the compiler, you can set the project to nightl
 
 # Running
 
-```cargo run --bin cli -- "--root lib/test/src"```
+```cargo run --bin cli -- "--root lib/core/src"```
 
 That command will build and run Raven's CLI with the following options
