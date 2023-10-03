@@ -3,7 +3,10 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use chalk_ir::{AdtId, Binders, GenericArg, Substitution, TraitId, Ty, TyKind};
 use chalk_solve::rust_ir::{AdtDatum, AdtDatumBound, AdtFlags, AdtKind, TraitDatum, TraitDatumBound, TraitFlags};
+#[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 use async_trait::async_trait;
@@ -305,11 +308,7 @@ impl TopElement for StructData {
 
             let function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
 
-            //SAFETY: compiling is only accessed from here and in the compiler, and neither is dropped
-            //until after both finish.
-            unsafe {
-                Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling)
-            }.insert(function.data.name.clone(), Arc::new(function));
+            syntax.lock().unwrap().compiling.write().unwrap().insert(function.data.name.clone(), Arc::new(function));
         }
     }
 

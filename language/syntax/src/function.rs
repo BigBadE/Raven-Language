@@ -3,7 +3,10 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::thread;
+#[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
@@ -141,14 +144,11 @@ fn placeholder_error(error: String) -> ParsingError {
 
 async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>,
                         degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
-    while !syntax.lock().unwrap().compiling.contains_key(&original.data.name) {
+    while !syntax.lock().unwrap().compiling.read().unwrap().contains_key(&original.data.name) {
         thread::yield_now();
     }
 
-    let code = {
-        let locked = syntax.lock().unwrap();
-        locked.compiling.get(&original.data.name).unwrap().code.clone()
-    };
+    let code = syntax.lock().unwrap().compiling.read().unwrap().get(&original.data.name).unwrap().code.clone();
 
     let mut variables = CheckerVariableManager::for_function(degenericed_method.deref());
     let code = match code.degeneric(&manager, &mut variables, &syntax).await {
@@ -159,8 +159,7 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
     let output = CodelessFinalizedFunction::clone(degenericed_method.deref())
         .add_code(code);
 
-    unsafe { Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling) }
-        .insert(output.data.name.clone(), Arc::new(output));
+    syntax.lock().unwrap().compiling.write().unwrap().insert(output.data.name.clone(), Arc::new(output));
 }
 
 #[derive(Clone, Debug)]
@@ -240,11 +239,7 @@ impl TopElement for FunctionData {
         let name = current.data.name.clone();
         let (output, code) = process_manager.verify_func(current, &syntax).await;
         let output = process_manager.verify_code(output, code, resolver, &syntax).await;
-        //SAFETY: compiling is only accessed from here and in the compiler, and neither is dropped
-        //until after both finish.
-        unsafe {
-            Arc::get_mut_unchecked(&mut syntax.lock().unwrap().compiling)
-        }.insert(name, Arc::new(output));
+        syntax.lock().unwrap().compiling.write().unwrap().insert(name, Arc::new(output));
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {

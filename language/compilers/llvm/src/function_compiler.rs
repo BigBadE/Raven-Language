@@ -6,7 +6,7 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
-use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::types::{AnyTypeEnum, BasicType, BasicTypeEnum};
 
 use syntax::{Attribute, is_modifier, Modifier};
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedMemberField};
@@ -182,13 +182,15 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                                              pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
                 final_arguments.push(From::from(pointer));
 
-                add_args(&mut final_arguments, type_getter, function, arguments, true, &calling_function.fields, id);
+                add_args(&mut final_arguments, type_getter, function, arguments, true,
+                         Attribute::find_attribute("llvm_intrinsic", &calling_function.data.attributes).is_some(), id);
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(), &(*id - 1).to_string());
                 Some(pointer.as_basic_value_enum())
             } else {
-                add_args(&mut final_arguments, type_getter, function, arguments, false, &calling_function.fields, id);
+                add_args(&mut final_arguments, type_getter, function, arguments, false,
+                         Attribute::find_attribute("llvm_intrinsic", &calling_function.data.attributes).is_some(), id);
 
                 let call = type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
                                                                    &id.to_string()).try_as_basic_value().left();
@@ -421,12 +423,22 @@ fn store_and_load<'ctx, T: BasicType<'ctx>>(type_getter: &mut CompilerTypeGetter
 }
 
 fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
-                      function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, _fields: &Vec<FinalizedMemberField>, id: &mut u64) {
+                      function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, intrinsic: bool, id: &mut u64) {
     for i in offset as usize..arguments.len() {
         let argument = arguments.get(i).unwrap();
         let value = compile_effect(type_getter, function, argument, id).unwrap();
 
-        final_arguments.push(From::from(value));
+        /*
+        if intrinsic && value.is_pointer_value() {
+            let pointer = value.into_pointer_value();
+            let inner = pointer.get_type().get_element_type();
+            if inner.is_float_type() || inner.is_int_type() {
+                final_arguments.push(From::from(type_getter.compiler.builder.build_load(pointer, &id.to_string())));
+                *id += 1;
+            }
+        } else {*/
+            final_arguments.push(From::from(value));
+        //}
     }
 }
 

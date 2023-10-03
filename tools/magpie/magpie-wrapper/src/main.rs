@@ -1,9 +1,8 @@
 use std::{env, fs};
-use std::io::{Cursor, stderr, stdout};
+use std::io::{stderr, stdout};
 use std::process::{Command, Stdio};
 use json::JsonValue;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue};
 
 static URL: &'static str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
 
@@ -44,11 +43,18 @@ fn main() {
 
     // If latest is not already downloaded, download it.
     if !running.exists() {
+        println!("Deleting old Magpie versions...");
+        for file in fs::read_dir(env::temp_dir()).unwrap() {
+            let file = file.unwrap();
+            if file.file_name().to_str().unwrap().starts_with("magpie-") {
+                fs::remove_file(file.path()).unwrap();
+            }
+        }
         println!("Downloading new Magpie version...");
         let download = highest["browser_download_url"].as_str().unwrap();
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
-    Command::new(running).stdout(stdout()).stdin(Stdio::inherit())
+    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>()).stdout(stdout()).stdin(Stdio::inherit())
         .stderr(stderr()).output().unwrap();
 }

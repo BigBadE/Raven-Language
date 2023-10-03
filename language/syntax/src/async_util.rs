@@ -6,7 +6,10 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc};
 use std::task::{Context, Poll, Waker};
+#[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
 
 use crate::{ParsingError, TopElement};
 use crate::function::{display_parenless, FunctionData};

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::task::Waker;
 use std::mem;
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
@@ -9,7 +9,10 @@ use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
 use chalk_solve::Solver;
 use chalk_solve::ext::GoalExt;
 use indexmap::IndexMap;
+#[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
 
 use async_recursion::async_recursion;
 // Re-export main
@@ -26,9 +29,9 @@ use crate::types::FinalizedTypes;
 /// The entire program's syntax, including libraries.
 pub struct Syntax {
     // The compiling functions
-    pub compiling: Arc<HashMap<String, Arc<FinalizedFunction>>>,
+    pub compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
     // The compiling structs
-    pub strut_compiling: Arc<HashMap<String, Arc<FinalizedStruct>>>,
+    pub strut_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
     // All structures in the program
@@ -49,8 +52,8 @@ pub struct Syntax {
 impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
-            compiling: Arc::new(HashMap::new()),
-            strut_compiling: Arc::new(HashMap::new()),
+            compiling: Arc::new(RwLock::new(HashMap::new())),
+            strut_compiling: Arc::new(RwLock::new(HashMap::new())),
             errors: Vec::new(),
             structures: AsyncGetter::with_sorted(
                 vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),

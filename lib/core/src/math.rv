@@ -33,6 +33,12 @@ trait Divide<E, C> {
     fn divide(self, other: E) -> C;
 }
 
+#[priority(2)]
+#[operation({}%{})]
+trait Remainder<E, C> {
+    fn remainder(self, other: E) -> C;
+}
+
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number, E: Number> Equal<T> for E {
     fn equal(self, other: T) -> bool {
@@ -64,6 +70,13 @@ pub internal impl<T: Number> Multiply<T, T> for T {
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number> Divide<T, T> for T {
     fn divide(self, other: T) -> T {
+
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Remainder<T, T> for T {
+    fn remainder(self, other: T) -> T {
 
     }
 }

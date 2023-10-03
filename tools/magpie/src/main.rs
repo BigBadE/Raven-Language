@@ -30,14 +30,14 @@ fn main() {
             compiler: "llvm".to_string(),
         });
 
-        println!("Building and running {}...", target.to_str().unwrap());
-        build::<RawRavenProject>(format!("{}::main", args[1].clone().replace(".rs", "")),
+        println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
+        build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
                                  &mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
         })));
-
+        return;
     } else if args.len() > 2 {
-        panic!("Unknown extra arguments!");
+        panic!("Unknown extra arguments! {:?}", args);
     }
 
     let build_path = env::current_dir().unwrap().join("build.rv");
@@ -53,15 +53,15 @@ fn main() {
         compiler: "llvm".to_string(),
     });
 
-    println!("Building project...");
-    let _project = match build::<RawRavenProject>("build::project".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+    println!("Setting up build...");
+    /*let _project = match build::<RawRavenProject>("build::project".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
         root: build_path,
     }), Box::new(InnerSourceSet {
         set: &MAGPIE
     }))) {
         Some(found) => RavenProject::from(found),
         None => panic!("No project method in build file!")
-    };
+    };*/
 
     let source = env::current_dir().unwrap().join("src");
 
@@ -69,6 +69,7 @@ fn main() {
         panic!("Source folder (src) not found!");
     }
 
+    println!("Building and running project...");
     build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
         root: source
     })));
@@ -99,6 +100,12 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
         Ok(inner) => return inner,
         Err(error) => panic!("{:?}", error),
     }
+}
+
+fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+    let result = arguments.cpu_runtime.block_on(
+        runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
+    return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
 #[derive(Debug)]
@@ -170,12 +177,6 @@ fn load_array<T: Debug>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
     let len = unsafe { ptr::read(ptr as *mut u64) };
     println!("{:?}", unsafe { ptr::read(ptr as *mut [u64; 5]) });
     return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
-}
-
-fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = arguments.cpu_runtime.block_on(
-        runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
-    return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
 #[derive(Debug)]

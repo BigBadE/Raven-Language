@@ -20,6 +20,7 @@ Nightly is required for building the compiler, you can set the project to nightl
 
 # Running
 
-```cargo run --bin cli -- "--root lib/core/src"```
+Run this in the lib/test folder (or whatever Raven project in the repository you want to run)
+```cargo run --bin magpie```
 
 That command will build and run Raven's CLI with the following options

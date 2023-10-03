@@ -1,21 +1,24 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
-use std::sync::Arc; use no_deadlocks::Mutex;
+use std::sync::{Arc, RwLock};
+#[cfg(debug_assertions)]
+use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
+
 use std::thread;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use llvm_sys::bit_writer::LLVMWriteBitcodeToFile;
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
 use syntax::{ParsingError, VariableManager};
 use syntax::code::FinalizedEffects;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
-use crate::c_str;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
@@ -82,16 +85,16 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T>(&mut self, target: String, functions: &HashMap<String, Arc<FinalizedFunction>>,
-                      _structures: &HashMap<String, Arc<FinalizedStruct>>)
+    pub fn compile<T>(&mut self, target: String, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+                      _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>)
                    -> Result<Option<JitFunction<'_, Main<T>>>, Vec<ParsingError>> {
         let target = target.as_str();
-        while !functions.contains_key(target) {
+        while !functions.read().unwrap().contains_key(target) {
             //Waiting
             thread::yield_now();
         }
 
-        let function = match functions.get(target) {
+        let function = match functions.read().unwrap().get(target) {
             Some(found) => found,
             None => return Ok(None)
         }.clone();
@@ -110,16 +113,20 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 }
                 continue
             }
-            let function = if let Some(found) = functions.get(&function.data.name) {
-                found
-            } else {
-                unsafe {
-                    Rc::get_mut_unchecked(&mut self.compiling)
-                }.push((function_type, function));
-                continue
-            };
-            compile_block(&function.code, function_type,
-                          &mut self.for_function(&function, function_type), &mut 0);
+            let finalized_function;
+            {
+                let reading = functions.read().unwrap();
+                finalized_function = if let Some(found) = reading.get(&function.data.name) {
+                    found.clone()
+                } else {
+                    unsafe {
+                        Rc::get_mut_unchecked(&mut self.compiling)
+                    }.push((function_type, function));
+                    continue
+                };
+            }
+            compile_block(&finalized_function.code, function_type,
+                          &mut self.for_function(&finalized_function, function_type), &mut 0);
         }
 
         //let pass_manager = PassManager::create(&self.compiler.module);
