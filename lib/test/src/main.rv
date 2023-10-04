@@ -2,7 +2,7 @@ import main::Test;
 import stdio;
 
 fn main() {
-    //print_test("Test");
+    print_test("Test");
 }
 
 fn print_test(test: Test) {

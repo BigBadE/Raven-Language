@@ -264,6 +264,12 @@ impl FinalizedEffects {
                 let manager: Box<dyn ProcessManager> = process_manager.cloned();
                 *method = CodelessFinalizedFunction::degeneric(method.clone(), manager, effects, syntax, variables, None).await?;
             }
+            // Virtual calls can't be generic
+            FinalizedEffects::VirtualCall(_, effects) => {
+                for effect in &mut *effects {
+                    effect.degeneric(process_manager, variables, syntax).await?;
+                }
+            }
             FinalizedEffects::Set(setting, value) => {
                 setting.degeneric(process_manager, variables, syntax).await?;
                 value.degeneric(process_manager, variables, syntax).await?;
@@ -296,7 +302,8 @@ impl FinalizedEffects {
             FinalizedEffects::HeapAllocate(other) =>
                 other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
             FinalizedEffects::PointerLoad(loading) => loading.degeneric(process_manager, variables, syntax).await?,
-            FinalizedEffects::StackStore(storing) => storing.degeneric(process_manager, variables, syntax).await?
+            FinalizedEffects::StackStore(storing) => storing.degeneric(process_manager, variables, syntax).await?,
+            FinalizedEffects::Downcast(_, _) => {}
         }
         return Ok(());
     }

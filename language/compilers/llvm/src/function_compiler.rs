@@ -407,6 +407,12 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
             Some(malloc.as_basic_value_enum())
         }
+        FinalizedEffects::VirtualCall(method, args) => {
+            panic!("Test")
+        }
+        FinalizedEffects::Downcast(base, target) => {
+            panic!("Test 2")
+        }
     };
 }
 

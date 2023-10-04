@@ -187,13 +187,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
                     finalized_effects.insert(0, found);
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
-                                                      format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?
+                                                      format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
                     
-                    if !check_args(&method, &finalized_effects, syntax, variables)? {
+                    if !check_args(&method, &mut finalized_effects, syntax, variables)? {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
-                                                             effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
+                                                             finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
                     }
                     
                     return Ok(FinalizedEffects::VirtualCall(method, finalized_effects));
@@ -338,7 +338,7 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 
 //The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
-                          effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+                          mut effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                           variables: &mut CheckerVariableManager,
                           returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
@@ -355,7 +355,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &effects, syntax, variables)? {
+    if !check_args(&method, &mut effects, syntax, variables)? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -372,16 +372,16 @@ pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
-pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                              storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
                              -> Result<Option<FinalizedEffects>, ParsingError> {
-    if check_args(&operation, &values, syntax, variables)? {
+    if check_args(&operation, values, syntax, variables)? {
         return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
     }
     return Ok(None);
 }
 
-pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                   variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);
@@ -389,9 +389,17 @@ pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &Vec<Finalize
 
     for i in 0..function.fields.len() {
         let returning = args.get(i).unwrap().get_return(variables);
-        if returning.is_some() && !returning.as_ref().unwrap().of_type(
-            &function.fields.get(i).unwrap().field.field_type, syntax) {
-            return Ok(false);
+        if returning.is_some() {
+            let inner = returning.as_ref().unwrap();
+            let other = &function.fields.get(i).unwrap().field.field_type;
+            if !inner.of_type(other, syntax) {
+                return Ok(false);
+            }
+            if inner != other {
+                //Handle downcasting
+                let temp = args.remove(i);
+                args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone()));
+            }
         }
     }
 
