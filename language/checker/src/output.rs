@@ -85,7 +85,7 @@ impl ProcessManager for TypesChecker {
                 FinalizedStruct {
                     generics: Default::default(),
                     fields: vec![],
-                    data: Arc::new(StructData::new(Vec::new(), 0, String::new())),
+                    data: Arc::new(StructData::new(Vec::new(), Vec::new(), 0, String::new())),
                 }
             }
         }

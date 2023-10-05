@@ -190,13 +190,15 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
                     
-                    if !check_args(&method, &mut finalized_effects, syntax, variables)? {
+                    if !check_args(&method, &mut finalized_effects, syntax, variables).await? {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                              finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
                     }
-                    
-                    return Ok(FinalizedEffects::VirtualCall(method, finalized_effects));
+
+                    let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
+
+                    return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
                 finalized_effects.insert(0, found);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
@@ -355,7 +357,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &mut effects, syntax, variables)? {
+    if !check_args(&method, &mut effects, syntax, variables).await? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -375,13 +377,13 @@ pub fn placeholder_error(message: String) -> ParsingError {
 pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                              storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
                              -> Result<Option<FinalizedEffects>, ParsingError> {
-    if check_args(&operation, values, syntax, variables)? {
+    if check_args(&operation, values, syntax, variables).await? {
         return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
     }
     return Ok(None);
 }
 
-pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                   variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);
@@ -395,9 +397,18 @@ pub fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<Fina
             if !inner.of_type(other, syntax) {
                 return Ok(false);
             }
+
             if inner != other {
                 //Handle downcasting
                 let temp = args.remove(i);
+                let funcs = Syntax::get_implementation(&syntax.lock().unwrap(),
+                                                       &temp.get_return(variables).unwrap(), &other.inner_struct().data).unwrap();
+
+                //Make sure every function is finished adding
+                for func in funcs {
+                    AsyncDataGetter::new(syntax.clone(), func).await;
+                }
+
                 args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone()));
             }
         }

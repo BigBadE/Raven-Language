@@ -9,7 +9,7 @@ use async_recursion::async_recursion;
 use crate::{Attribute, CheckerVariableManager, DisplayIndented, ParsingError, ProcessManager, to_modifiers, VariableManager};
 use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
-use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, StructData, U64};
+use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
 
@@ -173,7 +173,7 @@ pub enum FinalizedEffects {
     Bool(bool),
     String(String),
     //Calls a virtual method
-    VirtualCall(Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     //Downcasts a structure into its trait
     Downcast(Box<FinalizedEffects>, FinalizedTypes),
     //Internally used by low-level verifier
@@ -196,7 +196,7 @@ impl FinalizedEffects {
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),
-            FinalizedEffects::VirtualCall(function, _) =>
+            FinalizedEffects::VirtualCall(_, function, _) =>
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),
@@ -265,7 +265,7 @@ impl FinalizedEffects {
                 *method = CodelessFinalizedFunction::degeneric(method.clone(), manager, effects, syntax, variables, None).await?;
             }
             // Virtual calls can't be generic
-            FinalizedEffects::VirtualCall(_, effects) => {
+            FinalizedEffects::VirtualCall(_, _, effects) => {
                 for effect in &mut *effects {
                     effect.degeneric(process_manager, variables, syntax).await?;
                 }

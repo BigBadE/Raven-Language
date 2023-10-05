@@ -16,23 +16,23 @@ use crate::{Attribute, ParsingError};
 use crate::async_getters::AsyncGetter;
 use crate::async_util::NameResolver;
 use crate::chalk_interner::{ChalkIr, RawId};
-use crate::function::UnfinalizedFunction;
+use crate::function::{FunctionData, UnfinalizedFunction};
 use crate::types::{FinalizedTypes, Types};
 
 lazy_static! {
-pub static ref I64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i64".to_string())));
-pub static ref I32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i32".to_string())));
-pub static ref I16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i16".to_string())));
-pub static ref I8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "i8".to_string())));
-pub static ref F64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "f64".to_string())));
-pub static ref F32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "f32".to_string())));
-pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u64".to_string())));
-pub static ref U32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u32".to_string())));
-pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u16".to_string())));
-pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "u8".to_string())));
-pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "bool".to_string())));
-pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "str".to_string())));
-pub static ref VOID: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::new(Vec::new(), Modifier::Internal as u8, "()".to_string())));
+pub static ref I64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i64".to_string())));
+pub static ref I32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i32".to_string())));
+pub static ref I16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i16".to_string())));
+pub static ref I8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i8".to_string())));
+pub static ref F64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("f64".to_string())));
+pub static ref F32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("f32".to_string())));
+pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u64".to_string())));
+pub static ref U32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u32".to_string())));
+pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u16".to_string())));
+pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u8".to_string())));
+pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("bool".to_string())));
+pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("str".to_string())));
+pub static ref VOID: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("()".to_string())));
 }
 
 pub fn get_internal(name: String) -> Arc<StructData> {
@@ -96,6 +96,7 @@ pub struct StructData {
     pub id: u64,
     pub name: String,
     pub attributes: Vec<Attribute>,
+    pub functions: Vec<Arc<FunctionData>>,
     pub poisoned: Vec<ParsingError>,
 }
 
@@ -144,13 +145,26 @@ impl PartialEq for FinalizedStruct {
 }
 
 impl StructData {
-    pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
+    pub fn empty(name: String) -> Self {
+        return Self {
+            attributes: Vec::new(),
+            chalk_data: None,
+            id: 0,
+            modifiers: Modifier::Internal as u8,
+            name,
+            functions: Vec::new(),
+            poisoned: Vec::new()
+        };
+    }
+
+    pub fn new(attributes: Vec<Attribute>, functions: Vec<Arc<FunctionData>>, modifiers: u8, name: String) -> Self {
         return Self {
             attributes,
             chalk_data: None,
             id: 0,
             modifiers,
             name,
+            functions,
             poisoned: Vec::new(),
         };
     }
@@ -201,7 +215,7 @@ impl StructData {
     }
 
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
-        let mut output = Self::new(Vec::new(), 0, name);
+        let mut output = Self::new(Vec::new(), Vec::new(), 0, name);
         output.poisoned = vec!(error);
         return output;
     }
