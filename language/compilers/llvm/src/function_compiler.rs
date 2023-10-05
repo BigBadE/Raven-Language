@@ -438,6 +438,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             };
             *id += 1;
             let pointer = type_getter.get_function(method).get_type().ptr_type(AddressSpace::default());
+
             let offset = type_getter.compiler.builder.build_bitcast(offset, pointer, &id.to_string()).into_pointer_value();
             *id += 2;
             type_getter.compiler.builder.build_call(CallableValue::try_from(offset).unwrap(),
@@ -457,6 +458,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 let base = compile_effect(type_getter, function, base, id).unwrap();
                 let table = unsafe { Rc::get_mut_unchecked(&mut table) }
                     .get_vtable(type_getter, &found, &target.inner_struct().data);
+                *id += 1;
 
                 let structure = type_getter.compiler.context.struct_type(
                     &[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
@@ -467,7 +469,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 };
                 *id += 1;
 
-                let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
+                let malloc = type_getter.compiler.builder.build_call(
+                    type_getter.compiler.module.get_function("malloc")
                                                                          .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
                                                                      &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string())
                     .try_as_basic_value().unwrap_left().into_pointer_value();
@@ -480,7 +483,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
                 let offset = type_getter.compiler.builder.build_struct_gep(malloc, 1, &id.to_string()).unwrap();
                 *id += 1;
-                type_getter.compiler.builder.build_store(offset, base);
+                type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum());
 
                 Some(malloc.as_basic_value_enum())
             }
