@@ -6,7 +6,12 @@ fn main() {
 }
 
 fn print_test(test: Test) {
-    test.print_self();
+    test_internal(test);
+    //test.print_self();
+}
+
+internal fn test_internal(test: Test) {
+
 }
 
 pub trait Test {
@@ -15,6 +20,6 @@ pub trait Test {
 
 impl Test for str {
     pub fn print_self(self) {
-        printf(self);
+        printf("Test!");
     }
 }
