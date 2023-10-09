@@ -118,7 +118,7 @@ impl Syntax {
     pub fn get_implementation(&self, first: &FinalizedTypes, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
         for implementation in &self.implementations {
             if &implementation.target.inner_struct().data == second &&
-                self.solve(&first, &implementation.base) {
+                (first.eq(&implementation.base) || self.solve(&first, &implementation.base)) {
                 return Some(implementation.functions.clone());
             }
         }
@@ -282,7 +282,7 @@ impl Syntax {
     }
 
     #[async_recursion]
-    pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, mut error: ParsingError, resolver: Box<dyn NameResolver>,
+    pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
             UnparsedType::Basic(name) =>

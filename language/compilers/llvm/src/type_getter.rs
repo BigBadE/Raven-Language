@@ -14,7 +14,7 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::{ParsingError, VariableManager};
+use syntax::{is_modifier, Modifier, ParsingError, VariableManager};
 use syntax::code::FinalizedEffects;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Main, Syntax};
@@ -23,9 +23,11 @@ use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
 use crate::util::print_formatted;
+use crate::vtable_manager::VTableManager;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
+    pub vtable: Rc<VTableManager<'ctx>>,
     pub compiler: Rc<CompilerImpl<'ctx>>,
     pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
@@ -36,8 +38,9 @@ pub struct CompilerTypeGetter<'ctx> {
 impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn new(compiler: Rc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
         return Self {
-            compiler,
             syntax,
+            vtable: Rc::new(VTableManager::new()),
+            compiler,
             compiling: Rc::new(Vec::new()),
             blocks: HashMap::new(),
             current_block: None,
@@ -55,6 +58,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         }
         return Self {
             syntax: self.syntax.clone(),
+            vtable: self.vtable.clone(),
             compiler: self.compiler.clone(),
             compiling: self.compiling.clone(),
             blocks: self.blocks.clone(),

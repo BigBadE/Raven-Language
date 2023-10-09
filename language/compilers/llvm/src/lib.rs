@@ -23,6 +23,7 @@ pub mod compiler;
 pub mod function_compiler;
 pub mod type_getter;
 pub mod util;
+pub mod vtable_manager;
 
 pub struct LLVMCompiler {
     compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,

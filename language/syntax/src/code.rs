@@ -172,6 +172,10 @@ pub enum FinalizedEffects {
     UInt(u64),
     Bool(bool),
     String(String),
+    //Calls a virtual method
+    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    //Downcasts a structure into its trait
+    Downcast(Box<FinalizedEffects>, FinalizedTypes),
     //Internally used by low-level verifier
     HeapStore(Box<FinalizedEffects>),
     //Allocates space
@@ -189,6 +193,10 @@ impl FinalizedEffects {
             FinalizedEffects::CodeBody(_) => None,
             FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
             FinalizedEffects::MethodCall(_, function, _) =>
+                function.return_type.as_ref().map(|inner| {
+                    FinalizedTypes::Reference(Box::new(inner.clone()))
+                }),
+            FinalizedEffects::VirtualCall(_, function, _) =>
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),
@@ -225,7 +233,8 @@ impl FinalizedEffects {
             },
             FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!"),
             FinalizedEffects::CreateArray(types, _) =>
-                types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner)))
+                types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner))),
+            FinalizedEffects::Downcast(_, target) => Some(target.clone())
         };
         return temp;
     }
@@ -254,6 +263,12 @@ impl FinalizedEffects {
                 }
                 let manager: Box<dyn ProcessManager> = process_manager.cloned();
                 *method = CodelessFinalizedFunction::degeneric(method.clone(), manager, effects, syntax, variables, None).await?;
+            }
+            // Virtual calls can't be generic
+            FinalizedEffects::VirtualCall(_, _, effects) => {
+                for effect in &mut *effects {
+                    effect.degeneric(process_manager, variables, syntax).await?;
+                }
             }
             FinalizedEffects::Set(setting, value) => {
                 setting.degeneric(process_manager, variables, syntax).await?;
@@ -287,7 +302,8 @@ impl FinalizedEffects {
             FinalizedEffects::HeapAllocate(other) =>
                 other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
             FinalizedEffects::PointerLoad(loading) => loading.degeneric(process_manager, variables, syntax).await?,
-            FinalizedEffects::StackStore(storing) => storing.degeneric(process_manager, variables, syntax).await?
+            FinalizedEffects::StackStore(storing) => storing.degeneric(process_manager, variables, syntax).await?,
+            FinalizedEffects::Downcast(_, _) => {}
         }
         return Ok(());
     }
