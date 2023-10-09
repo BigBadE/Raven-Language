@@ -425,21 +425,24 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             for i in 1..args.len() {
                 compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, function, &args[i], id).unwrap()));
             }
-            let offset = unsafe {
-                type_getter.compiler.builder
-                    .build_gep(table.into_pointer_value(),
-                               &[type_getter.compiler.context.i64_type().const_int(1, false)],
-                               &id.to_string())
-            };
-            *id += 1;
-            let offset = unsafe {
-                type_getter.compiler.builder.build_gep(offset,
-                                                       &[type_getter.compiler.context.i64_type().const_int(*func_offset as u64, false)], &id.to_string())
-            };
-            *id += 1;
-            let pointer = type_getter.get_function(method).get_type().ptr_type(AddressSpace::default());
+            let mut struct_type = Vec::new();
+            for i in 0..=*func_offset {
+                struct_type.push(type_getter.get_function(method).get_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
+            }
 
-            let offset = type_getter.compiler.builder.build_bitcast(offset, pointer, &id.to_string()).into_pointer_value();
+            let table = type_getter.compiler.builder.build_bitcast(table.into_pointer_value(),
+                                                                   type_getter.compiler.context.struct_type(&[
+                                                                       type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                                                                       type_getter.compiler.context.struct_type(struct_type.as_slice(), false).ptr_type(AddressSpace::default()).as_basic_type_enum()
+                                                                   ], false).ptr_type(AddressSpace::default()), &id.to_string());
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_struct_gep(table.into_pointer_value(), 1, &id.to_string()).unwrap();
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_load(offset, &id.to_string());
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_struct_gep(offset.into_pointer_value(), *func_offset as u32, &id.to_string()).unwrap();
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_load(offset, &id.to_string()).into_pointer_value();
             *id += 2;
             type_getter.compiler.builder.build_call(CallableValue::try_from(offset).unwrap(),
                                                                compiled_args.into_boxed_slice().deref(), &(*id - 1).to_string())
@@ -464,7 +467,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                     &[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
                 let size = unsafe {
                     type_getter.compiler.builder.build_gep(structure.ptr_type(AddressSpace::default()).const_zero(),
-                    & [type_getter.compiler.context.i64_type().const_int(0, false)],
+                    &[type_getter.compiler.context.i64_type().const_int(1, false)],
                     &id.to_string())
                 };
                 *id += 1;

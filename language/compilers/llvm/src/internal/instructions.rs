@@ -90,15 +90,6 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
 
         compiler.builder.build_store(malloc, compiler.context.i64_type().const_zero());
         compiler.builder.build_return(Some(&malloc.as_basic_value_enum()));
-    } else if name.starts_with("main::test_internal") {
-        let calling = compiler.module.get_global("str_vtable").unwrap().as_pointer_value();
-        let calling = compiler.builder.build_bitcast(calling,
-                                                     compile_llvm_intrinsics("printf", type_getter).get_type().ptr_type(AddressSpace::default()).ptr_type(AddressSpace::default()), "2");
-        println!("Found {}", calling.get_type());
-        let calling = compiler.builder.build_load(calling.into_pointer_value(), "4");
-        compiler.builder.build_call(CallableValue::try_from(calling.into_pointer_value()).unwrap(),
-        &[From::from(compiler.context.const_string("Testing".as_bytes(), true))], "1");
-        compiler.builder.build_return(None);
     } else {
         panic!("Unknown internal operation: {}", name)
     }
