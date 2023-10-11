@@ -60,10 +60,13 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::equal_") {
+        let malloc = malloc_type(type_getter,
+                                 type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero());
         let returning = compiler.builder
             .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-        compiler.builder.build_return(Some(&returning));
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("array::index_") {
         let offset = get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value();
         let offset = compiler.builder.build_int_add(offset, compiler.context.i64_type().const_int(1, false), "3");

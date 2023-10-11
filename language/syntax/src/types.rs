@@ -168,8 +168,8 @@ impl FinalizedTypes {
                     if found == other_struct {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
-                        if is_modifier(self.inner_struct().data.modifiers, Modifier::Trait) {
-                            return found == other_struct;
+                        if is_modifier(self.inner_struct().data.modifiers, Modifier::Trait) && found == other_struct {
+                            return true;
                         }
                         //Only check for implementations if being compared against a trait.
                         while !syntax.lock().unwrap().finished_impls() {
@@ -246,11 +246,9 @@ impl FinalizedTypes {
     pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,
                                  bounds_error: ParsingError) -> Result<Option<(FinalizedTypes, FinalizedTypes)>, ParsingError> {
         match self {
-            FinalizedTypes::Generic(_name, bounds) => {
-                println!("Bounds: {:?}", bounds);
+            FinalizedTypes::Generic(name, bounds) => {
                 for bound in bounds {
                     if !other.of_type(bound, syntax) {
-                        println!("{} isn't {}", other, bound);
                         return Err(bounds_error);
                     }
                 }

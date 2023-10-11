@@ -206,6 +206,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     effect = Some(parse_generic_method(effect, parser_utils)?);
                 } else {
                     let operator = parse_operator(effect, parser_utils, &state)?;
+                    println!("Ended operator parsing at {:?}", parser_utils.tokens[parser_utils.index].token_type);
                     if ParseState::InOperator == state || ParseState::ControlOperator == state {
                         return Ok(Some(Expression::new(expression_type, operator)));
                     } else {

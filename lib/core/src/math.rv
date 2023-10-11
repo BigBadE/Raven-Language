@@ -60,7 +60,7 @@ pub internal impl<T: Number, E: Number> Equal<T> for E {
 
 pub impl<T, E: Equal<T>> NotEqual<T> for T {
     fn not_equal(self, other: E) -> bool {
-        return other == self;
+        return !(other == self);
     }
 }
 

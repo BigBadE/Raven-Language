@@ -99,11 +99,12 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
     return create_while(effect.unwrap().effect, body, parser_utils.imports.last_id-1);
 }
 
-fn create_while(effect: Effects, body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
+fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
     let mut top = Vec::new();
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect),
                                                                         body.label.clone(), id.to_string() + "end")));
+    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string())));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
 
     return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));

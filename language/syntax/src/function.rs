@@ -75,7 +75,6 @@ impl CodelessFinalizedFunction {
                         returning = FinalizedTypes::clone(inner.deref());
                 }
 
-                println!("1");
                 if let Some((old, other)) = inner.resolve_generic(&returning, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                     if let FinalizedTypes::Generic(name, _) = old {
                         manager.mut_generics().insert(name, other);
@@ -88,8 +87,6 @@ impl CodelessFinalizedFunction {
 
         for i in 0..method.fields.len() {
             let effect = effects.get(i).unwrap().get_return(variables).unwrap();
-            println!("2: {:?} vs {:?}", method.fields.get(i).unwrap().field.field_type, effect);
-            println!("{:?}", manager.generics());
             if let Some((old, other)) = method.fields.get(i).unwrap().field.field_type.resolve_generic(
                 &effect, syntax, placeholder_error("Invalid bounds!".to_string())).await? {
                 if let FinalizedTypes::Generic(name, _) = old {
@@ -112,22 +109,17 @@ impl CodelessFinalizedFunction {
             method_data.name = name.clone();
             new_method.data = Arc::new(method_data);
             for field in &mut new_method.fields {
-                println!("3");
                 field.field.field_type.degeneric(&manager.generics(), syntax,
                                                  placeholder_error("No generic!".to_string()),
                                                  placeholder_error("Invalid bounds!".to_string())).await?;
-                println!("Done");
             }
 
             if let Some(returning) = &mut new_method.return_type {
-
-                println!("4");
                 returning.degeneric(&manager.generics(), syntax,
                                     placeholder_error("No generic!".to_string()),
                                     placeholder_error("Invalid bounds!".to_string())).await?;
             }
 
-            println!("Done 2");
             let original = method;
             let new_method = Arc::new(new_method);
             let mut locked = syntax.lock().unwrap();
