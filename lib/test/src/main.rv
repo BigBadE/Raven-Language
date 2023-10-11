@@ -2,27 +2,10 @@ import main::Test;
 import stdio;
 
 fn main() {
-    print_test("Test 123");
-}
-
-fn print_test(test: Test) {
-    test.print_self();
-    test.print_second();
-}
-
-pub trait Test {
-    pub fn print_self(self);
-
-    pub fn print_second(self);
-}
-
-impl Test for str {
-    pub fn print_self(self) {
-        printf(self);
+    let i = 0;
+    while i == 5 {
+        printf("Test");
+        i = i + 1;
     }
-
-    pub fn print_second(self) {
-        printf("Second!");
-        printf(self);
-    }
+    printf("Done!");
 }

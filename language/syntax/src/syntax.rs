@@ -157,6 +157,10 @@ impl Syntax {
         if let Some(inner) = self.generic_check(second, first) {
             return inner;
         }
+        if let Some(inner) = self.generic_check(first, second) {
+            return inner;
+        }
+
         let second_ty = &second.inner_struct().data;
 
         let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();

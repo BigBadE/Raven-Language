@@ -247,8 +247,10 @@ impl FinalizedTypes {
                                  bounds_error: ParsingError) -> Result<Option<(FinalizedTypes, FinalizedTypes)>, ParsingError> {
         match self {
             FinalizedTypes::Generic(_name, bounds) => {
+                println!("Bounds: {:?}", bounds);
                 for bound in bounds {
                     if !other.of_type(bound, syntax) {
+                        println!("{} isn't {}", other, bound);
                         return Err(bounds_error);
                     }
                 }
@@ -361,6 +363,16 @@ impl FinalizedTypes {
             FinalizedTypes::GenericType(_, _) => panic!("Generics should never be named")
         };
     }
+
+    pub fn name_safe(&self) -> Option<String> {
+        return match self {
+            FinalizedTypes::Struct(structs) => Some(structs.data.name.clone()),
+            FinalizedTypes::Reference(structs) => structs.name_safe(),
+            FinalizedTypes::Array(inner) => inner.name_safe().map(|inner| format!("[{}]", inner)),
+            FinalizedTypes::Generic(_, _) => None,
+            FinalizedTypes::GenericType(_, _) => None
+        };
+    }
 }
 
 impl Display for Types {
@@ -393,6 +405,7 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name() == other.name();
+        return self.name_safe().map(|inner| other.name_safe()
+            .map(|other| inner == other).unwrap_or(false)).unwrap_or(false);
     }
 }

@@ -209,6 +209,7 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.state = TokenizerState::STRUCTURE;
             tokenizer.make_token(TokenTypes::For)
         } else {
+            println!("Invalid!");
             tokenizer.state = TokenizerState::TOP_ELEMENT;
             tokenizer.last.to_string(tokenizer.buffer);
             tokenizer.handle_invalid()

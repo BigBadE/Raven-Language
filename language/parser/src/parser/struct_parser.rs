@@ -159,7 +159,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
-            _ => panic!("How'd you get here? {} - {:?} ({})", parser_utils.file, token.token_type, state)
+            _ => panic!("How'd you get here? {} - {:?} ({}, {})", parser_utils.file, token.token_type, state, token.to_string(parser_utils.buffer))
         }
     }
 

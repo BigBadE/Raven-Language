@@ -21,7 +21,7 @@ impl<'a> Tokenizer<'a> {
         return Tokenizer {
             state: TokenizerState::TOP_ELEMENT,
             bracket_depth: 0,
-            generic_depth: 0,
+            generic_depth: 1,
             index: 0,
             line: 1,
             line_index: 0,

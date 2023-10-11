@@ -9,6 +9,18 @@ trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
+#[priority(-1)]
+#[operation({}!={})]
+trait NotEqual<T> {
+    fn not_equal(self, other: T) -> bool;
+}
+
+#[priority(4)]
+#[operation(!{})]
+trait Not<T> {
+    fn not(self) -> T;
+}
+
 #[priority(1)]
 #[operation({}+{})]
 trait Add<E, C> {
@@ -42,6 +54,18 @@ trait Remainder<E, C> {
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number, E: Number> Equal<T> for E {
     fn equal(self, other: T) -> bool {
+
+    }
+}
+
+pub impl<T, E: Equal<T>> NotEqual<T> for T {
+    fn not_equal(self, other: E) -> bool {
+        return other == self;
+    }
+}
+
+pub internal impl<T: Number> Not<T> for T {
+    fn not(self) -> T {
 
     }
 }

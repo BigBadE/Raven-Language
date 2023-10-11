@@ -82,6 +82,33 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
                                body, parser_utils.imports.last_id - 2);
 }
 
+pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
+    let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
+    if effect.is_none() {
+        return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
+    }
+
+    if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type != TokenTypes::BlockStart {
+        return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+    }
+
+    let (mut _returning, body) = parse_code(parser_utils)?;
+    parser_utils.imports.last_id += 1;
+    return create_while(effect.unwrap().effect, body, parser_utils.imports.last_id-1);
+}
+
+fn create_while(effect: Effects, body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
+    let mut top = Vec::new();
+
+    top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect),
+                                                                        body.label.clone(), id.to_string() + "end")));
+    top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
+
+    return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
+}
+
 fn create_if(effect: Effects, body: CodeBody,
                    mut else_ifs: Vec<(Effects, CodeBody)>,
                    else_body: Option<CodeBody>, mut id: u32) -> Result<Effects, ParsingError> {

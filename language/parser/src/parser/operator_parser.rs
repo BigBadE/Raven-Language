@@ -4,7 +4,7 @@ use syntax::ParsingError;
 use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
 
-pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
+pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, state: &ParseState) -> Result<Effects, ParsingError> {
     let mut operation = String::new();
     let mut effects = Vec::new();
 
@@ -24,10 +24,14 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
     }
 
     let (mut index, mut tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
-    let mut right = match parse_line(parser_utils, ParseState::InOperator) {
+    let mut right = match parse_line(parser_utils, match state {
+        ParseState::ControlVariable | ParseState::ControlOperator => ParseState::ControlOperator,
+        _ => ParseState::InOperator
+    }) {
         Ok(inner) => inner.map(|inner| inner.effect),
         Err(_) => None
     };
+
     if right.is_some() {
         while parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
@@ -78,7 +82,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils) -> 
     }
 
     let mut last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
-    while TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last || TokenTypes::ArgumentEnd == last {
+    while TokenTypes::BlockStart == last || TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last || TokenTypes::ArgumentEnd == last {
         parser_utils.index -= 1;
         last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
     }
