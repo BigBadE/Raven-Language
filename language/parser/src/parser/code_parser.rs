@@ -21,7 +21,7 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     return Ok((types, CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string())));
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum ParseState {
     None,
     ControlVariable,
@@ -60,8 +60,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                         effect = Some(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
                                                           name.clone(), effects, None));
                     }
-                    _ => if let Some(expression) = parse_line(parser_utils, ParseState::Argument)? {
-                        effect = Some(expression.effect);
+                    _ => if let Some(expression) = parse_line(parser_utils, state.clone())? {
+                        effect = Some(Effects::Paren(Box::new(expression.effect)));
                     } else {
                         effect = None;
                     }
@@ -206,7 +206,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     effect = Some(parse_generic_method(effect, parser_utils)?);
                 } else {
                     let operator = parse_operator(effect, parser_utils, &state)?;
-                    println!("Ended operator parsing at {:?}", parser_utils.tokens[parser_utils.index].token_type);
                     if ParseState::InOperator == state || ParseState::ControlOperator == state {
                         return Ok(Some(Expression::new(expression_type, operator)));
                     } else {

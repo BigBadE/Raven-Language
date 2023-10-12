@@ -116,6 +116,8 @@ impl Display for Field {
 #[derive(Clone, Debug)]
 pub enum Effects {
     NOP(),
+    //An effect wrapped in parenthesis, just a wrapper around the effect.
+    Paren(Box<Effects>),
     //Creates a variable
     CreateVariable(String, Box<Effects>),
     //Label of jumping to body

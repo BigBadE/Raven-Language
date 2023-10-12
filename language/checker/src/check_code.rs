@@ -42,6 +42,7 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects, external: bool,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
     let output = match effect {
+        Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, external, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
             FinalizedEffects::CodeBody(verify_code(process_manager, &resolver, body, external,
                                                    syntax, &mut variables.clone(), references).await?),
@@ -76,6 +77,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
             }
 
+            let temp = operation.clone();
             let operation = if let Some(found) = outer_operation {
                 let top = values.pop().unwrap();
                 if let Effects::CreateArray(mut inner) = top {
@@ -372,15 +374,6 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
 
 pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
-}
-
-pub async fn check_operation(operation: Arc<CodelessFinalizedFunction>, values: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                             storing: Option<Box<FinalizedEffects>>, variables: &mut CheckerVariableManager)
-                             -> Result<Option<FinalizedEffects>, ParsingError> {
-    if check_args(&operation, values, syntax, variables).await? {
-        return Ok(Some(FinalizedEffects::MethodCall(storing, operation, values.clone())));
-    }
-    return Ok(None);
 }
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,

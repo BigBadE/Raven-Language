@@ -64,8 +64,8 @@ pub impl<T, E: Equal<T>> NotEqual<T> for T {
     }
 }
 
-pub internal impl<T: Number> Not<T> for T {
-    fn not(self) -> T {
+pub internal impl Not<bool> for bool {
+    fn not(self) -> bool {
 
     }
 }

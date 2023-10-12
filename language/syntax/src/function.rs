@@ -97,7 +97,8 @@ impl CodelessFinalizedFunction {
             }
         }
 
-        let name = format!("{}_{}", method.data.name.split("_").next().unwrap(), display_parenless(
+        println!("Generics for {}: {:?}", method.data.name, method.generics);
+        let name = format!("{}${}", method.data.name.split("$").next().unwrap(), display_parenless(
             &manager.generics().values().collect(), "_"));
         if syntax.lock().unwrap().functions.types.contains_key(&name) {
             let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
