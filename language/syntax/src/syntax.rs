@@ -19,9 +19,9 @@ use async_recursion::async_recursion;
 pub use data::Main;
 
 use crate::{Attribute, FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
-use crate::async_getters::{AsyncGetter, GetterManager};
+use crate::top_element_manager::{TopElementManager, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
-use crate::chalk_interner::{ChalkIr, RawId};
+use crate::chalk_interner::ChalkIr;
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
 use crate::types::FinalizedTypes;
@@ -38,9 +38,9 @@ pub struct Syntax {
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
     // All structures in the program
-    pub structures: AsyncGetter<StructData>,
+    pub structures: TopElementManager<StructData>,
     // All functions in the program
-    pub functions: AsyncGetter<FunctionData>,
+    pub functions: TopElementManager<FunctionData>,
     // All implementations in the program
     pub implementations: Vec<FinishedTraitImplementor>,
     // The parsing state
@@ -61,8 +61,8 @@ impl Syntax {
             compiling: Arc::new(RwLock::new(HashMap::new())),
             strut_compiling: Arc::new(RwLock::new(HashMap::new())),
             errors: Vec::new(),
-            functions: AsyncGetter::new(),
-            structures: AsyncGetter::with_sorted(
+            functions: TopElementManager::new(),
+            structures: TopElementManager::with_sorted(
                 vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),
                      F64.data.clone(), F32.data.clone(), U64.data.clone(), U32.data.clone(), U16.data.clone(), U8.data.clone(),
                 BOOL.data.clone(), STR.data.clone())),
@@ -105,7 +105,7 @@ impl Syntax {
     pub fn make_impldatum(generics: &IndexMap<String, Vec<FinalizedTypes>>,
                           first: &FinalizedTypes, second: &FinalizedTypes) -> ImplDatum<ChalkIr> {
         let vec_generics = generics.keys().collect::<Vec<_>>();
-        let first = first.to_trait(&vec_generics);
+        let first = first.to_chalk_trait(&vec_generics);
         let mut binders: Vec<VariableKind<ChalkIr>> = Vec::new();
         // We resolve generics ourselves, but Chalk needs to know about them.
         for _value in generics.values() {
@@ -128,7 +128,8 @@ impl Syntax {
     pub fn get_implementation(&self, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
         for implementation in &self.implementations {
             if &implementation.target.inner_struct().data == implementor_struct &&
-                (implementing_trait.eq(&implementation.base) || self.solve(&implementing_trait, &implementation.base)) {
+                (implementing_trait.eq(&implementation.base) ||
+                    self.solve(&implementing_trait, &implementation.base)) {
                 return Some(implementation.functions.clone());
             }
         }
@@ -136,29 +137,33 @@ impl Syntax {
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
-    fn recursive_generic_solve(&self, checking: &FinalizedTypes, first: &FinalizedTypes) -> Option<bool> {
-        return match checking {
+    fn solve_nonstruct_types(&self, target_type: &FinalizedTypes, checking: &FinalizedTypes) -> Option<bool> {
+        return match target_type {
             FinalizedTypes::Generic(_, bounds) => {
+                // If a single bound fails, than the type isn't of the generic type.
                 for bound in bounds {
-                    if !self.solve(first, bound) {
+                    if !self.solve(checking, bound) {
                         return Some(false);
                     }
                 }
                 Some(true)
             },
             FinalizedTypes::Array(inner) => {
-                let mut first = first;
-                if let FinalizedTypes::Reference(other) = first {
-                    first = other;
+                let mut checking = checking;
+                // Unwrap references because references don't matter for type checking.
+                if let FinalizedTypes::Reference(inner_type) = checking {
+                    checking = inner_type;
                 }
-                if let FinalizedTypes::Array(other) = first {
-                    self.recursive_generic_solve(inner, other)
+                if let FinalizedTypes::Array(other) = checking {
+                    // Check the inner type if both are generics
+                    self.solve_nonstruct_types(inner, other)
                 } else {
                     Some(false)
                 }
             },
             FinalizedTypes::Reference(inner) => {
-                self.recursive_generic_solve(inner, first)
+                // References are unwrapped and the inner is checked.
+                self.solve_nonstruct_types(inner, checking)
             }
             _ => None
         }
@@ -166,26 +171,30 @@ impl Syntax {
 
     /// Solves if the first type is the second type, either if they are equal or if it is within the
     /// bounds or has an implementation for it.
+    /// May not be correct if the syntax isn't finished parsing implementations, check Syntax::finished_impls.
     pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
-        if let Some(inner) = self.recursive_generic_solve(second, first) {
+        // Check to make sure the type is a basic structure, Chalk can't handle any other types.
+        if let Some(inner) = self.solve_nonstruct_types(second, first) {
             return inner;
         }
-        if let Some(inner) = self.recursive_generic_solve(first, second) {
+        if let Some(inner) = self.solve_nonstruct_types(first, second) {
             return inner;
         }
 
         let second_ty = &second.inner_struct().data;
-
         let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
 
         let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
+        // Construct a goal asking if the first type is implemented by the second type.
         let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
             WhereClause::Implemented(TraitRef {
-                trait_id: TraitId(RawId { index: second_ty.id as u32 }),
+                trait_id: TraitId(second_ty.id as u32),
                 substitution: Substitution::from_iter(ChalkIr, elements.into_iter())
             })
         )));
 
+        // Tell Chalk to solve it, ignoring any overflows.
+        // TODO add a cache for speed?
         return RecursiveSolver::new(30, 3000, None)
             .solve(self, &goal.into_closed_goal(ChalkIr)).is_some();
     }
@@ -204,6 +213,7 @@ impl Syntax {
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
         }
+
         // Checks if a type with the same name is already in the async manager.
         if let Some(mut old) = T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned() {
             if adding.errors().is_empty() && adding.errors().is_empty() {
@@ -264,7 +274,7 @@ impl Syntax {
         }
     }
 
-    // Adds a poisoned type, which means it errored and shouldn't be checked for completeness.
+    /// Adds a poisoned type, which means it errored and shouldn't be checked for completeness.
     pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {
         for poison in element.errors() {
             self.errors.push(poison.clone());
@@ -283,23 +293,27 @@ impl Syntax {
         }
     }
 
-    // Asynchronously gets a function, or returns the error if that function isn't found.
+    /// Asynchronously gets a function, or returns the error if that function isn't found.
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                               getting: String, name_resolver: Box<dyn NameResolver>,
                               not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
-        return AsyncTypesGetter::new_func(syntax, error, getting, name_resolver, not_trait).await;
+        return AsyncTypesGetter::new(syntax, error, getting, name_resolver, not_trait).await;
     }
 
-    // Asynchronously gets a struct, or returns the error if that struct isn't found.
+    /// Asynchronously gets a struct, or returns the error if that struct isn't found.
     #[async_recursion]
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                             getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
+        // Handles arrays by removing the brackets and getting the inner type
         if getting.as_bytes()[0] == b'[' {
             return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[1..getting.len() - 1].to_string(),
                                                              name_resolver).await?)));
         }
+
+        // Checks if the type is a generic type
         if let Some(found) = name_resolver.generic(&getting) {
             let mut bounds = Vec::new();
+            // Get all the generic's bounds.
             for bound in found {
                 bounds.push(Self::parse_type(syntax.clone(), error.clone(),
                                              name_resolver.boxed_clone(), bound).await?);
@@ -308,10 +322,10 @@ impl Syntax {
             return Ok(Types::Generic(getting, bounds));
         }
 
-        return Ok(Types::Struct(AsyncTypesGetter::new_struct(syntax, error, getting, name_resolver).await?));
+        return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
     }
 
-    // Parses an UnparsedType into a Types
+    /// Parses an UnparsedType into a Types
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {

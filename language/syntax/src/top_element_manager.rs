@@ -14,9 +14,9 @@ pub struct GetterManager {
     pub impl_waiters: Vec<Waker>
 }
 
-/// Generic async type manager, holds the types and the wakers requiring those types.
-/// Wakers are used to allow tasks to wait for a type to be parsed and added
-pub struct AsyncGetter<T> where T: TopElement {
+/// top element manager, holds the top elements and the wakers requiring those elements.
+/// Wakers are used to allow tasks to wait for an element to be parsed and added
+pub struct TopElementManager<T> where T: TopElement {
     //Types and their data, added immediately after parsing
     pub types: HashMap<String, Arc<T>>,
     //A list of data sorted by the data's ID. Guaranteed to be in ID order.
@@ -27,7 +27,7 @@ pub struct AsyncGetter<T> where T: TopElement {
     pub wakers: HashMap<String, Vec<Waker>>,
 }
 
-impl<T> AsyncGetter<T> where T: TopElement {
+impl<T> TopElementManager<T> where T: TopElement {
     pub fn new() -> Self {
         return Self {
             types: HashMap::new(),

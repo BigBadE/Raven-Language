@@ -13,9 +13,9 @@ use async_trait::async_trait;
 use crate::{DataType, is_modifier, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
 use crate::code::{FinalizedMemberField, MemberField};
 use crate::{Attribute, ParsingError};
-use crate::async_getters::AsyncGetter;
+use crate::top_element_manager::TopElementManager;
 use crate::async_util::NameResolver;
-use crate::chalk_interner::{ChalkIr, RawId};
+use crate::chalk_interner::ChalkIr;
 use crate::function::{FunctionData, UnfinalizedFunction};
 use crate::types::{FinalizedTypes, Types};
 
@@ -171,9 +171,7 @@ impl StructData {
 
     pub fn set_chalk_data(&mut self) {
         let temp: &[GenericArg<ChalkIr>] = &[];
-        let adt_id = AdtId(RawId {
-            index: self.id as u32
-        });
+        let adt_id = AdtId(self.id as u32);
         let tykind = TyKind::Adt(adt_id, Substitution::from_iter(ChalkIr,
                                                                  temp.into_iter())).intern(ChalkIr);
         let adt_data = AdtDatum {
@@ -190,9 +188,7 @@ impl StructData {
             kind: AdtKind::Struct,
         };
         if is_modifier(self.modifiers, Modifier::Trait) {
-            let trait_id = TraitId(RawId {
-                index: self.id as u32
-            });
+            let trait_id = TraitId(self.id as u32);
             self.chalk_data = Some(ChalkData::Trait(tykind, adt_data, TraitDatum {
                     id: trait_id,
                     binders: Binders::empty(ChalkIr, TraitDatumBound {
@@ -326,7 +322,7 @@ impl TopElement for StructData {
         }
     }
 
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self> {
+    fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {
         return &mut syntax.structures;
     }
 }

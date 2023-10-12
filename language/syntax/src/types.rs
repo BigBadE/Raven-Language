@@ -1,3 +1,4 @@
+/// Contains all the code for interacting with types in Raven.
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -18,6 +19,8 @@ use crate::code::FinalizedMemberField;
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 
+/// A type is assigned to every value at compilation-time in Raven because it's statically typed.
+/// For example, "test" is a Struct called str, which is an internal type.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Types {
     //A basic struct
@@ -32,6 +35,7 @@ pub enum Types {
     Array(Box<Types>),
 }
 
+///A type with a reference to the finalized structure instead of the data.
 #[derive(Clone, Debug, Eq, Hash)]
 pub enum FinalizedTypes {
     //A basic struct
@@ -47,6 +51,7 @@ pub enum FinalizedTypes {
 }
 
 impl Types {
+    /// Returns the name of the type.
     pub fn name(&self) -> String {
         return match self {
             Types::Struct(structs) => structs.name.clone(),
@@ -57,19 +62,25 @@ impl Types {
         };
     }
 
+    /// Finalized the type by waiting for the FinalizedStruct to be avalible.
     #[async_recursion]
     pub async fn finalize(&self, syntax: Arc<Mutex<Syntax>>) -> FinalizedTypes {
         return match self {
-            Types::Struct(structs) => FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
-            Types::Reference(structs) => FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
+            Types::Struct(structs) =>
+                FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
+            Types::Reference(structs) =>
+                FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
             Types::Array(inner) => FinalizedTypes::Array(Box::new(inner.finalize(syntax).await)),
-            Types::Generic(name, bounds) => FinalizedTypes::Generic(name.clone(),
-                                                                    Self::finalize_all(syntax, bounds).await),
-            Types::GenericType(base, bounds) => FinalizedTypes::GenericType(Box::new(base.finalize(syntax.clone()).await),
-                                                                            Self::finalize_all(syntax, bounds).await)
+            Types::Generic(name, bounds) =>
+                FinalizedTypes::Generic(name.clone(),
+                                        Self::finalize_all(syntax, bounds).await),
+            Types::GenericType(base, bounds) =>
+                FinalizedTypes::GenericType(Box::new(base.finalize(syntax.clone()).await),
+                                            Self::finalize_all(syntax, bounds).await)
         };
     }
 
+    /// Finalizes a list of types.
     async fn finalize_all(syntax: Arc<Mutex<Syntax>>, types: &Vec<Types>) -> Vec<FinalizedTypes> {
         let mut output = Vec::new();
         for found in types {
@@ -88,6 +99,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Gets the fields of the type. Useful for creating a new struct or getting data from a field of a struct.
     pub fn get_fields(&self) -> &Vec<FinalizedMemberField> {
         return match self {
             FinalizedTypes::Struct(inner) => &inner.fields,
@@ -96,7 +108,8 @@ impl FinalizedTypes {
         };
     }
 
-    pub fn to_trait(&self, binders: &Vec<&String>) -> TraitDatum<ChalkIr> {
+    /// Assumes the type is a trait and returns its inner Chalk Trait data.
+    pub fn to_chalk_trait(&self, binders: &Vec<&String>) -> TraitDatum<ChalkIr> {
         if let FinalizedTypes::Struct(inner) = self {
             if let ChalkData::Trait(_, _, traits) = inner.data.chalk_data.as_ref().unwrap() {
                 return traits.clone();
@@ -104,22 +117,25 @@ impl FinalizedTypes {
                 panic!("Expected trait, found struct!");
             }
         } else if let FinalizedTypes::GenericType(base, _) = self {
-            return base.to_trait(binders);
+            return base.to_chalk_trait(binders);
         } else if let FinalizedTypes::Reference(inner) = self {
-            return inner.to_trait(binders);
+            return inner.to_chalk_trait(binders);
         } else {
             panic!("Expected trait, found {:?}", self);
         }
     }
 
+    /// Converts the type into its Chalk version.
+    /// Binders are Chalk's name for the generics.
     pub fn to_chalk_type(&self, binders: &Vec<&String>) -> Ty<ChalkIr> {
         return match self {
             FinalizedTypes::Struct(structure) => match &structure.data.chalk_data.as_ref().unwrap() {
                 ChalkData::Struct(types, _) => types.clone(),
-                ChalkData::Trait(traits, _, _) => traits.clone()
+                ChalkData::Trait(types, _, _) => types.clone()
             },
             FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
-            FinalizedTypes::Array(inner) => TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
+            FinalizedTypes::Array(inner) =>
+                TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
             FinalizedTypes::Generic(name, _bounds) => {
                 let index = binders.iter().position(|found| *found == name).unwrap();
                 TyKind::BoundVar(BoundVar {
@@ -133,16 +149,18 @@ impl FinalizedTypes {
                     for arg in bounds {
                         generic_args.push(GenericArgData::Ty(arg.to_chalk_type(binders)).intern(ChalkIr));
                     }
+                    // Returns the structure with the correct substitutions from bounds for generic types.
                     return TyKind::Adt(id,
                                        Substitution::from_iter(ChalkIr, generic_args))
                         .intern(ChalkIr);
                 } else {
-                    panic!()
+                    unreachable!()
                 }
             }
         };
     }
 
+    /// Assumes the type is a struct and returns that struct.
     pub fn inner_struct(&self) -> &Arc<FinalizedStruct> {
         return match self {
             FinalizedTypes::Struct(structure) => structure,
@@ -152,38 +170,32 @@ impl FinalizedTypes {
         };
     }
 
-    pub fn is_primitive(&self) -> bool {
-        return match self {
-            FinalizedTypes::Struct(structure) => is_modifier(structure.data.modifiers, Modifier::Internal) &&
-                !is_modifier(structure.data.modifiers, Modifier::Extern),
-            FinalizedTypes::Reference(_) => false,
-            _ => panic!("Tried to primitive check a generic!")
-        };
-    }
-
+    /// Checks if the type is of the other type, following Raven's type rules.
+    /// May block until all implementations are finished parsing, must not be called from
+    /// implementation parsing to prevent deadlocking.
     pub fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
-        let output = match self {
+        return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
                     if found == other_struct {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
-                        if is_modifier(self.inner_struct().data.modifiers, Modifier::Trait) && found == other_struct {
-                            return true;
-                        }
-                        //Only check for implementations if being compared against a trait.
+                        // Only check for implementations if being compared against a trait.
+                        // Wait for the implementation to finish.
                         while !syntax.lock().unwrap().finished_impls() {
                             if syntax.lock().unwrap().solve(self, &other) {
                                 return true;
                             }
                             thread::yield_now();
                         }
+                        // Now all impls are parsed so solve is correct.
                         return syntax.lock().unwrap().solve(self, &other);
                     } else {
                         false
                     }
                 }
                 FinalizedTypes::Generic(_, bounds) => {
+                    // If any bounds fail, the type isn't of the generic.
                     for bound in bounds {
                         if !self.of_type(bound, syntax) {
                             return false;
@@ -191,13 +203,18 @@ impl FinalizedTypes {
                     }
                     true
                 }
+                // For structures vs generic types, just check the base.
                 FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax),
+                // References are ignored for type checking.
                 FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
                 FinalizedTypes::Array(_) => false
             },
             FinalizedTypes::Array(inner) => match other {
+                // Check the inner type.
                 FinalizedTypes::Array(other) => inner.of_type(other, syntax),
+                // References are ignored for type checking.
                 FinalizedTypes::Reference(other) => self.of_type(other, syntax),
+                // Only arrays can equal arrays
                 _ => false
             },
             FinalizedTypes::GenericType(base, _generics) => match other {
@@ -210,6 +227,7 @@ impl FinalizedTypes {
                     todo!()
                 }
                 FinalizedTypes::Generic(_, bounds) => {
+                    // Check each bound, if any are violated it's not of the generic type.
                     for bound in bounds {
                         if !self.of_type(bound, syntax) {
                             return false;
@@ -217,15 +235,19 @@ impl FinalizedTypes {
                     }
                     true
                 }
+                // Against structures just check the base.
                 FinalizedTypes::Struct(_) => {
                     base.of_type(other, syntax)
                 }
+                // References are ignored for type checking.
                 FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
                 FinalizedTypes::Array(_) => false
             }
+            // References are ignored for type checking.
             FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax),
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
+                    // For two generics to be the same, each bound must match at least one other bound.
                     'outer: for bound in bounds {
                         for other_bound in other_bounds {
                             if other_bound.of_type(bound, syntax) {
@@ -236,17 +258,20 @@ impl FinalizedTypes {
                     }
                     true
                 }
+                // Flip it, because every other type handles generics already, no need to repeat the code.
                 _ => other.of_type(self, syntax)
             }
         };
-        return output;
     }
 
+    /// Compares one type against another type to try and solidify any generic types.
+    /// Errors if the other type isn't of this type.
     #[async_recursion]
-    pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,
-                                 bounds_error: ParsingError) -> Result<Option<(FinalizedTypes, FinalizedTypes)>, ParsingError> {
+    pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>, bounds_error: ParsingError)
+        -> Result<Option<(FinalizedTypes, FinalizedTypes)>, ParsingError> {
         match self {
             FinalizedTypes::Generic(_name, bounds) => {
+                // Check for bound errors.
                 for bound in bounds {
                     if !other.of_type(bound, syntax) {
                         return Err(bounds_error);
@@ -254,29 +279,35 @@ impl FinalizedTypes {
                 }
                 return Ok(Some((self.clone(), other.clone())));
             }
+            // Ignore references.
             FinalizedTypes::Reference(inner) => {
-                if let FinalizedTypes::Reference(other) = other {
-                    return inner.resolve_generic(other, syntax, bounds_error).await;
-                }
                 return inner.resolve_generic(other, syntax, bounds_error).await;
             }
             FinalizedTypes::Array(inner) => {
+                let mut other = other;
+                // Ignore references.
+                if let FinalizedTypes::Reference(inner) = other {
+                    other = inner;
+                }
+                // Check on the inner type.
                 if let FinalizedTypes::Array(other) = other {
                     return inner.resolve_generic(other, syntax, bounds_error).await;
                 }
-                return inner.resolve_generic(other, syntax, bounds_error).await;
+                return Err(bounds_error);
             }
             _ => {}
         }
         return Ok(None);
     }
 
+    /// Degenerics the type by replacing all generics with their solidified value.
     #[async_recursion]
     pub async fn degeneric(&mut self, generics: &HashMap<String, FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>,
                            none_error: ParsingError, bounds_error: ParsingError) -> Result<(), ParsingError> {
         return match self {
             FinalizedTypes::Generic(name, bounds) => {
                 if let Some(found) = generics.get(name) {
+                    // This should never trip, but it's a sanity check.
                     for bound in bounds {
                         if !found.of_type(bound, syntax) {
                             return Err(bounds_error);
@@ -299,8 +330,10 @@ impl FinalizedTypes {
         };
     }
 
+    /// Flattens GenericTypes into a Structure, degenericing them.
     #[async_recursion]
     pub async fn flatten(&mut self, generics: &mut Vec<FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedTypes, ParsingError> {
+        // Flatten the arguments to this generic type.
         for generic in &mut *generics {
             if let FinalizedTypes::GenericType(base, bounds) = generic {
                 *generic = base.flatten(bounds, syntax).await?;
@@ -309,9 +342,11 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(found) => {
                 if generics.is_empty() {
+                    // If there are no bounds, we're good.
                     return Ok(self.clone());
                 }
                 let name = format!("{}<{}>", found.data.name, display_parenless(generics, "_"));
+                // If this type has already been flattened with these args, return that.
                 if syntax.lock().unwrap().structures.types.contains_key(&name) {
                     let data;
                     {
@@ -320,6 +355,7 @@ impl FinalizedTypes {
                     }
                     Ok(FinalizedTypes::Struct(AsyncDataGetter::new(syntax.clone(), data).await))
                 } else {
+                    // Clone the type and add the new type to the structures.
                     let mut other = StructData::clone(&found.data);
                     other.name = name.clone();
                     let arc_other;
@@ -330,9 +366,11 @@ impl FinalizedTypes {
                         locked.structures.types.insert(name, arc_other.clone());
                         locked.structures.sorted.push(arc_other.clone());
                     }
+                    // Get the FinalizedStruct and degeneric it.
                     let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), arc_other.clone()).await.deref());
                     data.degeneric(generics, syntax).await?;
                     let data = Arc::new(data);
+                    // Add the flattened type to the
                     let mut locked = syntax.lock().unwrap();
                     if let Some(wakers) = locked.structures.wakers.remove(&data.data.name) {
                         for waker in wakers {

@@ -34,7 +34,7 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
                                    linkage: Option<Linkage>) -> FunctionValue<'ctx> {
     let mut params = Vec::new();
 
-    for param in &function.fields {
+    for param in &function.arguments {
         params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }
 

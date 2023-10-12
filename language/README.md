@@ -12,6 +12,10 @@
 - Async/Asynchronous: Code that runs at the same time as other code, which is generally faster but needs special considerations to prevent bugs. See Arc and Mutex on the Rust docs for more info on how we stop multithreading bugs.
 - Finalization: The process of linking methods and structures, and verifying that all types are correct.
 - Linking: The process of attaching a name to the associated data. Can either be internal (for example, finding the code of the function called "main" from the name) or external (for example, calling a method in the C library like printf).
+- Generics: Types that aren't "solid" and instead can be any type within the given bounds. These are "solidified" into their actual types.
+- Compilation-time: Something that happens during compilation:
+- Runtime: Something that happens when the program runs
+- Constant: Something that is computed at compilation time, for example generics are constant types because the compiler degenerics them at compiler-time. 
 
 # Compilation
 

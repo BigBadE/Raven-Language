@@ -26,7 +26,7 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
         if let ExpressionType::Return = line.expression_type {
             if external {
                 //Load if the function is external
-                let effect = FinalizedEffects::PointerLoad(Box::new(body.pop().unwrap().effect));
+                let effect = FinalizedEffects::ReferenceLoad(Box::new(body.pop().unwrap().effect));
                 body.push(FinalizedExpression::new(ExpressionType::Return, effect));
             }
             return Ok(FinalizedCodeBody::new(body, code.label.clone(), true));
@@ -193,7 +193,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     
                     if !check_args(&method, &mut finalized_effects, syntax, variables).await? {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
-                                                             method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
+                                                             method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                              finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
                     }
 
@@ -360,7 +360,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
 
     if !check_args(&method, &mut effects, syntax, variables).await? {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
-                                             method.fields.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
+                                             method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
 
@@ -377,15 +377,15 @@ pub fn placeholder_error(message: String) -> ParsingError {
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                         variables: &mut SimpleVariableManager) -> Result<bool, ParsingError> {
-    if function.fields.len() != args.len() {
+    if function.arguments.len() != args.len() {
         return Ok(false);
     }
 
-    for i in 0..function.fields.len() {
+    for i in 0..function.arguments.len() {
         let returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() {
             let inner = returning.as_ref().unwrap();
-            let other = &function.fields.get(i).unwrap().field.field_type;
+            let other = &function.arguments.get(i).unwrap().field.field_type;
             if !inner.of_type(other, syntax) {
                 return Ok(false);
             }

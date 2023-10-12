@@ -38,7 +38,7 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
 
     let codeless = CodelessFinalizedFunction {
         generics: finalize_generics(syntax, function.generics).await?,
-        fields,
+        arguments: fields,
         return_type,
         data: function.data.clone(),
     };

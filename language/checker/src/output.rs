@@ -48,7 +48,7 @@ impl ProcessManager for TypesChecker {
                 syntax.lock().unwrap().errors.push(error.clone());
                 (CodelessFinalizedFunction {
                     generics: Default::default(),
-                    fields: vec![],
+                    arguments: vec![],
                     return_type: None,
                     data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
                 }, CodeBody::new(Vec::new(), String::new()))

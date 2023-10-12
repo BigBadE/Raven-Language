@@ -24,14 +24,14 @@ use std::sync::Mutex;
 use indexmap::IndexMap;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
-use crate::async_getters::AsyncGetter;
+use crate::top_element_manager::TopElementManager;
 use crate::async_util::NameResolver;
 use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
 
-pub mod async_getters;
+pub mod top_element_manager;
 pub mod async_util;
 pub mod chalk_interner;
 pub mod chalk_support;
@@ -158,7 +158,7 @@ impl SimpleVariableManager {
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
         let mut variable_manager = SimpleVariableManager { variables: HashMap::new() };
 
-        for field in &codeless.fields {
+        for field in &codeless.arguments {
             variable_manager.variables.insert(field.field.name.clone(),
                                               field.field.field_type.clone());
         }
@@ -214,7 +214,7 @@ pub trait TopElement where Self: Sized {
     async fn verify(current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
 
     // Gets the getter for that type on the syntax
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
+    fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self>;
 }
 
 // An impl block for a type

@@ -320,7 +320,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 Some(output)
             }
         }
-        FinalizedEffects::PointerLoad(inner) => {
+        FinalizedEffects::ReferenceLoad(inner) => {
             let inner = compile_effect(type_getter, function, inner, id).unwrap();
             let output = type_getter.compiler.builder.build_load(inner.into_pointer_value(), &id.to_string());
             *id += 1;
