@@ -16,8 +16,11 @@ use crate::function::{display_parenless, FunctionData};
 use crate::r#struct::StructData;
 use crate::syntax::Syntax;
 
-pub(crate) struct AsyncTypesGetter<T: TopElement> {
+/// A future that asynchronously gets a type from its respective AsyncGetter.
+/// Will never deadlock because types are added to the AsyncGetter before being finalized.
+pub struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
+
     pub error: ParsingError,
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>,
@@ -28,15 +31,6 @@ pub(crate) struct AsyncTypesGetter<T: TopElement> {
 pub struct AsyncDataGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub getting: Arc<T>
-}
-
-impl<T: TopElement> AsyncDataGetter<T> {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
-        return AsyncDataGetter {
-            syntax,
-            getting
-        }
-    }
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
@@ -162,6 +156,15 @@ impl Future for AsyncTypesGetter<StructData> {
         }
 
         return Poll::Pending;
+    }
+}
+
+impl<T: TopElement> AsyncDataGetter<T> {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
+        return AsyncDataGetter {
+            syntax,
+            getting
+        }
     }
 }
 

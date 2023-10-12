@@ -246,7 +246,7 @@ impl FinalizedTypes {
     pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,
                                  bounds_error: ParsingError) -> Result<Option<(FinalizedTypes, FinalizedTypes)>, ParsingError> {
         match self {
-            FinalizedTypes::Generic(name, bounds) => {
+            FinalizedTypes::Generic(_name, bounds) => {
                 for bound in bounds {
                     if !other.of_type(bound, syntax) {
                         return Err(bounds_error);

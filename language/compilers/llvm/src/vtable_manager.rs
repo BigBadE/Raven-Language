@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use inkwell::AddressSpace;
-use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValue, GlobalValue};
 use syntax::r#struct::StructData;
 use syntax::types::FinalizedTypes;
@@ -25,8 +24,8 @@ impl<'ctx> VTableManager<'ctx> {
         }
         let mut values = Vec::new();
         {
-            let mut locked = type_getter.syntax.clone();
-            let mut locked = locked.lock().unwrap();
+            let locked = type_getter.syntax.clone();
+            let locked = locked.lock().unwrap();
             for found in locked.get_implementation(structure, target).unwrap() {
                 let func = type_getter.get_function(locked.functions.data.get(&found).unwrap());
                 values.push(func.as_global_value().as_basic_value_enum());

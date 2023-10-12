@@ -26,11 +26,14 @@ use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
 use crate::types::FinalizedTypes;
 
-/// The entire program's syntax, including libraries.
+/// The entire program's syntax. Contains all the data passed to every step of the program.
+/// This structure is usually in a mutex lock, which prevents multiple functions from reading/writing
+/// to it at the same time.
+/// This is done so that the whole compiler can safely run multithreaded.
 pub struct Syntax {
-    // The compiling functions
+    // The compiling functions, accessed from the compiler.
     pub compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
-    // The compiling structs
+    // The compiling structs, accessed from the compiler..
     pub strut_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
@@ -40,26 +43,29 @@ pub struct Syntax {
     pub functions: AsyncGetter<FunctionData>,
     // All implementations in the program
     pub implementations: Vec<FinishedTraitImplementor>,
-    // Stores the async parsing state
+    // The parsing state
     pub async_manager: GetterManager,
-    // All operations without namespaces, for example {}+{} or {}/{}
+    // All operations, for example Add or Multiply.
     pub operations: HashMap<String, Arc<StructData>>,
+    // Wakers waiting for a specific operation to be finished parsing. Will never deadlock
+    // because types are added before they're finalized.
     pub operation_wakers: HashMap<String, Vec<Waker>>,
     // Manages the next steps of compilation after parsing
     pub process_manager: Box<dyn ProcessManager>,
 }
 
 impl Syntax {
+    /// Constructs a new syntax with internal types.
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
             compiling: Arc::new(RwLock::new(HashMap::new())),
             strut_compiling: Arc::new(RwLock::new(HashMap::new())),
             errors: Vec::new(),
+            functions: AsyncGetter::new(),
             structures: AsyncGetter::with_sorted(
                 vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),
                      F64.data.clone(), F32.data.clone(), U64.data.clone(), U32.data.clone(), U16.data.clone(), U8.data.clone(),
                 BOOL.data.clone(), STR.data.clone())),
-            functions: AsyncGetter::new(),
             implementations: Vec::new(),
             async_manager: GetterManager::default(),
             operations: HashMap::new(),
@@ -68,11 +74,12 @@ impl Syntax {
         };
     }
 
+    /// Checks if the implementations are finished parsing.
     pub fn finished_impls(&self) -> bool {
         return self.async_manager.finished && self.async_manager.parsing_impls == 0;
     }
 
-    // Sets the syntax to be finished
+    /// Sets the syntax to be finished, calling all wakers so non-existent functions can be detected.
     pub fn finish(&mut self) {
         if self.async_manager.finished {
             panic!("Tried to finish already-finished syntax!")
@@ -93,12 +100,14 @@ impl Syntax {
         self.functions.wakers.clear();
     }
 
+    /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used
+    /// in the solve method, which calls on the Chalk library.
     pub fn make_impldatum(generics: &IndexMap<String, Vec<FinalizedTypes>>,
                           first: &FinalizedTypes, second: &FinalizedTypes) -> ImplDatum<ChalkIr> {
         let vec_generics = generics.keys().collect::<Vec<_>>();
         let first = first.to_trait(&vec_generics);
         let mut binders: Vec<VariableKind<ChalkIr>> = Vec::new();
-        //TODO figure out where this is used.
+        // We resolve generics ourselves, but Chalk needs to know about them.
         for _value in generics.values() {
             binders.push(VariableKind::Ty(TyVariableKind::General));
         }
@@ -115,17 +124,19 @@ impl Syntax {
         }
     }
 
-    pub fn get_implementation(&self, first: &FinalizedTypes, second: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
+    /// Finds an implementation for the given trait.
+    pub fn get_implementation(&self, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
         for implementation in &self.implementations {
-            if &implementation.target.inner_struct().data == second &&
-                (first.eq(&implementation.base) || self.solve(&first, &implementation.base)) {
+            if &implementation.target.inner_struct().data == implementor_struct &&
+                (implementing_trait.eq(&implementation.base) || self.solve(&implementing_trait, &implementation.base)) {
                 return Some(implementation.functions.clone());
             }
         }
         return None;
     }
 
-    fn generic_check(&self, checking: &FinalizedTypes, first: &FinalizedTypes) -> Option<bool> {
+    /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
+    fn recursive_generic_solve(&self, checking: &FinalizedTypes, first: &FinalizedTypes) -> Option<bool> {
         return match checking {
             FinalizedTypes::Generic(_, bounds) => {
                 for bound in bounds {
@@ -141,23 +152,25 @@ impl Syntax {
                     first = other;
                 }
                 if let FinalizedTypes::Array(other) = first {
-                    self.generic_check(inner, other)
+                    self.recursive_generic_solve(inner, other)
                 } else {
                     Some(false)
                 }
             },
             FinalizedTypes::Reference(inner) => {
-                self.generic_check(inner, first)
+                self.recursive_generic_solve(inner, first)
             }
             _ => None
         }
     }
 
+    /// Solves if the first type is the second type, either if they are equal or if it is within the
+    /// bounds or has an implementation for it.
     pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
-        if let Some(inner) = self.generic_check(second, first) {
+        if let Some(inner) = self.recursive_generic_solve(second, first) {
             return inner;
         }
-        if let Some(inner) = self.generic_check(first, second) {
+        if let Some(inner) = self.recursive_generic_solve(first, second) {
             return inner;
         }
 
@@ -177,28 +190,32 @@ impl Syntax {
             .solve(self, &goal.into_closed_goal(ChalkIr)).is_some();
     }
 
-    // Adds the top element to the syntax
+    /// Adds the element to the syntax
     pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
         let mut locked = syntax.lock().unwrap();
         unsafe {
-            //Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
-            //yet, so this is safe.
+            // Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
+            // yet, so this is safe.
             Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.iter().position(|found| &found.name == adding.name())
                 .unwrap_or(locked.structures.sorted.len()) as u64);
         }
 
+        // Add any poisons to the syntax errors list.
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
         }
+        // Checks if a type with the same name is already in the async manager.
         if let Some(mut old) = T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned() {
             if adding.errors().is_empty() && adding.errors().is_empty() {
+                // Add a duplication error to the original type.
                 locked.errors.push(dupe_error.clone());
                 unsafe { Arc::get_mut_unchecked(&mut old) }.poison(dupe_error.clone());
             } else {
-                //Ignored if one is poisoned
+                // Ignored if one is poisoned
             }
         } else {
             let manager = T::get_manager(locked.deref_mut());
+            // Don't want to add duplicates of internal types.
             if !manager.sorted.contains(adding) {
                 manager.sorted.push(Arc::clone(adding));
             }
@@ -208,10 +225,12 @@ impl Syntax {
 
         let name = adding.name().clone();
         if adding.is_operator() {
+            //Downcasts the generic type to be a StructData.
             //Only traits can be operators. This will break if something else is.
-            //These is no better way to do this because Rust.
+            //These is no better way to do this because Rust doesn't allow downcasting generics.
             let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
+            // Gets the name of the operation, or errors if there isn't one.
             let name = match Attribute::find_attribute("operation", &adding.attributes).unwrap() {
                 Attribute::String(_, name) => name.replace("{+}", "{}").clone(),
                 _ => {
@@ -222,9 +241,12 @@ impl Syntax {
                 }
             };
 
+            // Checks if there is a duplicate of that operation.
             if locked.operations.contains_key(&name) {
                 locked.errors.push(dupe_error);
             }
+
+            // Wakes every waker waiting for that operation.
             if let Some(wakers) = locked.operation_wakers.get(&name) {
                 for waker in wakers {
                     waker.wake_by_ref();
@@ -234,6 +256,7 @@ impl Syntax {
             locked.operations.insert(name, adding);
         }
 
+        // Wakes every waker waiting for that type.
         if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
             for waker in wakers {
                 waker.wake();
@@ -241,6 +264,7 @@ impl Syntax {
         }
     }
 
+    // Adds a poisoned type, which means it errored and shouldn't be checked for completeness.
     pub fn add_poison<T: TopElement>(&mut self, element: Arc<T>) {
         for poison in element.errors() {
             self.errors.push(poison.clone());
@@ -259,12 +283,14 @@ impl Syntax {
         }
     }
 
+    // Asynchronously gets a function, or returns the error if that function isn't found.
     pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                               getting: String, name_resolver: Box<dyn NameResolver>,
                               not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
         return AsyncTypesGetter::new_func(syntax, error, getting, name_resolver, not_trait).await;
     }
 
+    // Asynchronously gets a struct, or returns the error if that struct isn't found.
     #[async_recursion]
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
                             getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
@@ -285,6 +311,7 @@ impl Syntax {
         return Ok(Types::Struct(AsyncTypesGetter::new_struct(syntax, error, getting, name_resolver).await?));
     }
 
+    // Parses an UnparsedType into a Types
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
                             types: UnparsedType) -> Result<Types, ParsingError> {

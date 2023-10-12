@@ -6,7 +6,7 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
-use syntax::{Attribute, CheckerVariableManager, is_modifier, Modifier, ParsingError};
+use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError};
 use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
@@ -16,7 +16,7 @@ use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
 pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody, external: bool,
-                         syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<FinalizedCodeBody, ParsingError> {
+                         syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedCodeBody, ParsingError> {
     let mut body = Vec::new();
     for line in code.expressions {
         body.push(FinalizedExpression::new(line.expression_type,
@@ -40,7 +40,7 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 #[allow(unreachable_code)]
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects, external: bool,
-                       syntax: &Arc<Mutex<Syntax>>, variables: &mut CheckerVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
+                       syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
     let output = match effect {
         Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, external, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
@@ -77,7 +77,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
             }
 
-            let temp = operation.clone();
             let operation = if let Some(found) = outer_operation {
                 let top = values.pop().unwrap();
                 if let Effects::CreateArray(mut inner) = top {
@@ -343,7 +342,7 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 //The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                           mut effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                          variables: &mut CheckerVariableManager,
+                          variables: &mut SimpleVariableManager,
                           returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
@@ -377,7 +376,7 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                  variables: &mut CheckerVariableManager) -> Result<bool, ParsingError> {
+                        variables: &mut SimpleVariableManager) -> Result<bool, ParsingError> {
     if function.fields.len() != args.len() {
         return Ok(false);
     }

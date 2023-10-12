@@ -14,8 +14,7 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::{is_modifier, Modifier, ParsingError, VariableManager};
-use syntax::code::FinalizedEffects;
+use syntax::{ParsingError, VariableManager};
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
@@ -135,9 +134,9 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
 
         //let pass_manager = PassManager::create(&self.compiler.module);
 
-        unsafe {
+        //unsafe {
             //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
-        }
+        //}
 
         print_formatted(self.compiler.module.to_string());
         return Ok(self.get_target(target));
@@ -162,9 +161,5 @@ impl Debug for CompilerTypeGetter<'_> {
 impl VariableManager for CompilerTypeGetter<'_> {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
         return self.variables.get(name).map(|found| found.0.clone());
-    }
-
-    fn get_const_variable(&self, _name: &String) -> Option<FinalizedEffects> {
-        panic!("Unexpected const variable call!");
     }
 }

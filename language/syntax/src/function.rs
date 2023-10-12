@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::{Attribute, DisplayIndented, ParsingError, TopElement, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture, DataType, CheckerVariableManager};
+use crate::{Attribute, ParsingError, TopElement, Types, ProcessManager, Syntax, AsyncGetter, is_modifier, Modifier, ParsingFuture, DataType, SimpleVariableManager};
 use crate::async_util::{AsyncDataGetter, NameResolver};
 use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
@@ -39,18 +39,12 @@ impl DataType<FunctionData> for UnfinalizedFunction {
 }
 
 /// If the code is required to finalize the function, then recursion will deadlock
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CodelessFinalizedFunction {
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
     pub fields: Vec<FinalizedMemberField>,
     pub return_type: Option<FinalizedTypes>,
     pub data: Arc<FunctionData>,
-}
-
-impl Debug for CodelessFinalizedFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}{}", self.data.name, debug_parenless(&self.fields, ", "));
-    }
 }
 
 impl CodelessFinalizedFunction {
@@ -67,7 +61,7 @@ impl CodelessFinalizedFunction {
     //The VariableManager here is for effects
     pub async fn degeneric(method: Arc<CodelessFinalizedFunction>, mut manager: Box<dyn ProcessManager>,
                            effects: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                           variables: &CheckerVariableManager,
+                           variables: &SimpleVariableManager,
                            returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         if let Some(inner) = method.return_type.clone() {
             if let Some(mut returning) = returning {
@@ -152,7 +146,7 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
 
     let code = syntax.lock().unwrap().compiling.read().unwrap().get(&original.data.name).unwrap().code.clone();
 
-    let mut variables = CheckerVariableManager::for_function(degenericed_method.deref());
+    let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
     let code = match code.degeneric(&manager, &mut variables, &syntax).await {
         Ok(inner) => inner,
         Err(error) => panic!("Error degenericing code: {}", error)
@@ -280,24 +274,13 @@ impl FinalizedCodeBody {
         };
     }
 
-    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut CheckerVariableManager, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedCodeBody, ParsingError> {
+    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut SimpleVariableManager, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
             expression.effect.degeneric(process_manager, variables, syntax).await?;
         }
 
         return Ok(self);
     }
-}
-
-pub fn display_joined<T>(input: &Vec<T>) -> String where T: Display {
-    if input.is_empty() {
-        return String::new();
-    }
-    let mut output = String::new();
-    for element in input {
-        output += &*format!("{} ", element);
-    }
-    return output[..output.len() - 1].to_string();
 }
 
 pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {
@@ -311,17 +294,6 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
     }
 
     return format!("({})", (&output[..output.len() - deliminator.len()]).to_string());
-}
-
-pub fn display_indented<T>(f: &mut Formatter<'_>, input: &Vec<T>, space: &str, deliminator: &str)
-                           -> std::fmt::Result where T: DisplayIndented {
-    write!(f, "(")?;
-    for element in input {
-        element.format(space, f)?;
-        write!(f, "{}", deliminator)?;
-    }
-
-    return write!(f, ")");
 }
 
 pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {

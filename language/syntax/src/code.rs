@@ -6,9 +6,9 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 use async_recursion::async_recursion;
 
-use crate::{Attribute, CheckerVariableManager, DisplayIndented, ParsingError, ProcessManager, to_modifiers, VariableManager};
+use crate::{Attribute, SimpleVariableManager, ParsingError, ProcessManager, VariableManager};
 use crate::async_util::UnparsedType;
-use crate::function::{CodeBody, display_joined, FinalizedCodeBody, CodelessFinalizedFunction};
+use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
 use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
@@ -65,18 +65,6 @@ impl MemberField {
             attributes,
             field,
         };
-    }
-}
-
-impl Display for MemberField {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return DisplayIndented::format(self, "", f);
-    }
-}
-
-impl DisplayIndented for MemberField {
-    fn format(&self, indent: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "{}{} {}", indent, display_joined(&to_modifiers(self.modifiers)), self.field);
     }
 }
 
@@ -242,7 +230,7 @@ impl FinalizedEffects {
     }
 
     #[async_recursion]
-    pub async fn degeneric(&mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut CheckerVariableManager, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+    pub async fn degeneric(&mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut SimpleVariableManager, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {
             FinalizedEffects::NOP() => {}
             FinalizedEffects::CreateVariable(_, first, other) => {

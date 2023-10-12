@@ -3,9 +3,15 @@
 - Checker: Verifies all borrows, generics, method calls, returns, etc...
 - CLI: Command Line Interface for using Raven
 - Compilers: The compilers Raven uses
+- Data: Settings data used by every package. Seperated to prevent dependency loops.
 - Parser: Raven's Lexer and Parser
 - Runner: Handles running compilation with the given arguments
 - Syntax: Contains the structures for the language's syntax
+
+# Terms
+- Async/Asynchronous: Code that runs at the same time as other code, which is generally faster but needs special considerations to prevent bugs. See Arc and Mutex on the Rust docs for more info on how we stop multithreading bugs.
+- Finalization: The process of linking methods and structures, and verifying that all types are correct.
+- Linking: The process of attaching a name to the associated data. Can either be internal (for example, finding the code of the function called "main" from the name) or external (for example, calling a method in the C library like printf).
 
 # Compilation
 
