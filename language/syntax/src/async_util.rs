@@ -41,6 +41,8 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         // Add the prefix to the name, if any.
         let name = if prefix.is_empty() {
             self.getting.clone()
+        } else if prefix.ends_with(&self.getting) {
+            prefix
         } else {
             prefix + "::" + &*self.getting.clone()
         };
@@ -99,13 +101,6 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
             return Poll::Ready(output);
         }
 
-        // Check if a structure within the parent type with that name exists.
-        let parent = self.name_resolver.parent().clone();
-        if let Some(output) = self.get_types(&mut locked,
-                                             parent, cx.waker().clone(), not_trait) {
-            return Poll::Ready(output);
-        }
-
         // Check each import if the structure is in those files.
         for import in self.name_resolver.imports().clone() {
             if let Some(output) = self.get_types(&mut locked,
@@ -116,7 +111,8 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
         // If the async manager is finished, return an error.
         if locked.async_manager.finished {
-            println!("Error {}", self.error);
+            println!("Error for {} from {:?}: {}", self.getting, T::get_manager(locked.deref_mut())
+                .types.keys(), self.error);
             return Poll::Ready(Err(self.error.clone()));
         }
 
@@ -180,8 +176,6 @@ impl Display for UnparsedType {
 /// A name resolver gives the async utils generic access to data used by later compilation steps.
 pub trait NameResolver: Send + Sync {
     fn imports(&self) -> &Vec<String>;
-
-    fn parent(&self) -> &String;
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
 

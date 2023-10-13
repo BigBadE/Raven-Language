@@ -322,7 +322,45 @@ impl Syntax {
             return Ok(Types::Generic(getting, bounds));
         }
 
+        if getting.contains("<") {
+            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &name_resolver).await?.1.remove(0));
+        }
         return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
+    }
+
+    #[async_recursion]
+    async fn parse_bounds(input: &[u8], syntax: &Arc<Mutex<Syntax>>, error: &ParsingError,
+                          name_resolver: &Box<dyn NameResolver>) -> Result<(usize, Vec<Types>), ParsingError> {
+        let mut last = 0;
+        let mut found = Vec::new();
+        let mut i = 0;
+        while i < input.len() {
+            match input[i] {
+                b'<' => {
+                    let first = String::from_utf8_lossy(&input[last..i]);
+                    let (size, bounds) =
+                        Self::parse_bounds(&input[i+1..], syntax, error, name_resolver).await?;
+                    let first = Self::get_struct(syntax.clone(), error.clone(),
+                                                first.to_string(), name_resolver.boxed_clone()).await?;
+                    found.push(Types::GenericType(Box::new(first), bounds));
+                    i += size;
+                },
+                b',' => {
+                    let getting = String::from_utf8_lossy(&input[last..i]);
+                    found.push(Self::get_struct(syntax.clone(), error.clone(),
+                                                getting.to_string(), name_resolver.boxed_clone()).await?);
+                    last = i;
+                },
+                b'>' => return Ok((i, found)),
+                _ => {}
+            }
+            i += 1;
+        }
+
+        let end = String::from_utf8_lossy(&input[last..]);
+        found.push(Self::get_struct(syntax.clone(), error.clone(),
+                                    end.to_string(), name_resolver.boxed_clone()).await?);
+        return Ok((input.len(), found));
     }
 
     /// Parses an UnparsedType into a Types

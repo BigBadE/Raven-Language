@@ -64,10 +64,6 @@ impl NameResolver for ImportNameResolver {
         return &self.imports;
     }
 
-    fn parent(&self) -> &String {
-        return self.parent.as_ref().unwrap();
-    }
-
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>> {
         return self.generics.get(name).map(|types| types.clone());
     }
