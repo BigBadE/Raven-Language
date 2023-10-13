@@ -70,6 +70,7 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
     let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Trait) {
         get_internal(name)
     } else {
+        let name = format!("{}::{}", parser_utils.file, name);
         Arc::new(StructData::new(attributes, functions.iter().map(|inner| inner.data.clone()).collect::<Vec<_>>(), modifiers, name))
     };
 

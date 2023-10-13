@@ -1,12 +1,7 @@
-import iter::NumberIter;
 import stdio;
 
 fn main() {
-    let iter = new NumberIter {
-        current: 0,
-        end: 5,
-    };
-    for i in iter {
+    for i in 0..5 {
         printf("Loop!");
     }
     printf("Done!");

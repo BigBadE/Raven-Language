@@ -42,8 +42,6 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
     return Ok(FinalizedCodeBody::new(body, code.label.clone(), false));
 }
 
-//IntelliJ seems to think the operation loop is unreachable for some reason.
-#[allow(unreachable_code)]
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
@@ -177,7 +175,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 check_method(process_manager, method,
                              finalized_effects, syntax, variables, returning).await?
             } else {
-                panic!("Screwed up trait! {}", traits);
+                panic!("Screwed up trait! {} for {:?}", traits, resolver.imports());
             }
         }
         Effects::MethodCall(calling, method, effects, returning) => {

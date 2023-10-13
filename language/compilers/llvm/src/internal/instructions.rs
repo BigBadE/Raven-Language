@@ -13,7 +13,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     if name.starts_with("numbers::cast$") {
         build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
         return;
-    } else if name.starts_with("math::add$u") || name.starts_with("math::add$i") {
+    } else if name.starts_with("math::add$") || name.starts_with("math::add$i") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type);
 
@@ -21,24 +21,24 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::subtract$u") || name.starts_with("math::subtract$i") {
+    } else if name.starts_with("math::subtract$") || name.starts_with("math::subtract$i") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type);
         let returning = compiler.builder.build_int_sub(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::multiply$u") || name.starts_with("math::multiply$i") {
+    } else if name.starts_with("math::multiply$") || name.starts_with("math::multiply$i") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type);
         let returning = compiler.builder.build_int_mul(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::divide$u") || name.starts_with("math::divide$i") {
+    } else if name.starts_with("math::divide$") || name.starts_with("math::divide$i") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type);
-        let returning = if name.starts_with("math::divide$u") {
+        let returning = if name.starts_with("math::divide$") {
             compiler.builder.build_int_unsigned_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
         } else {
@@ -47,10 +47,10 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         };
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::remainder$u") || name.starts_with("math::remainder$i") {
+    } else if name.starts_with("math::remainder$") || name.starts_with("math::remainder$i") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type);
-        let returning = if name.starts_with("math::remainder$u") {
+        let returning = if name.starts_with("math::remainder$") {
             compiler.builder.build_int_unsigned_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                     compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
         } else {

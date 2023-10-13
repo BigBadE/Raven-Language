@@ -28,10 +28,6 @@ impl NameResolver for EmptyNameResolver {
         return &EMPTY;
     }
 
-    fn parent(&self) -> &String {
-        panic!("Should not be called after finalizing!")
-    }
-
     fn generic(&self, _name: &String) -> Option<Vec<UnparsedType>> {
         panic!("Should not be called after finalizing!")
     }
