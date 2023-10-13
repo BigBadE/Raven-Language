@@ -23,15 +23,16 @@ use crate::syntax::Syntax;
 /// For example, "test" is a Struct called str, which is an internal type.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Types {
-    //A basic struct
+    // A basic struct
     Struct(Arc<StructData>),
-    //A type with generic types
+    // A type with generic types. For example, List<T> is GenericType with a base struct (List) and bounds T.
+    // This List<T> will be degeneric'd into a type (for example, List<String>) then solidified.
     GenericType(Box<Types>, Vec<Types>),
-    //A reference to a type
+    // A reference to a type
     Reference(Box<Types>),
-    //A generic with bounds
+    // A generic with bounds
     Generic(String, Vec<Types>),
-    //An array
+    // An array
     Array(Box<Types>),
 }
 
@@ -333,7 +334,7 @@ impl FinalizedTypes {
     /// Flattens GenericTypes into a Structure, degenericing them.
     #[async_recursion]
     pub async fn flatten(&mut self, generics: &mut Vec<FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>) -> Result<FinalizedTypes, ParsingError> {
-        // Flatten the arguments to this generic type.
+        // Flatten the arguments to this GenericType.
         for generic in &mut *generics {
             if let FinalizedTypes::GenericType(base, bounds) = generic {
                 *generic = base.flatten(bounds, syntax).await?;

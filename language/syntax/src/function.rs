@@ -283,6 +283,7 @@ impl FinalizedFunction {
 }
 
 /// A body of code, each body must have a label for jump effects to jump to.
+/// ! Each nested CodeBody MUST have a jump or return or else the compiler will error !
 #[derive(Clone, Default, Debug)]
 pub struct CodeBody {
     pub label: String,

@@ -4,7 +4,7 @@ use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
-use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError};
+use syntax::{SimpleVariableManager, is_modifier, Modifier, ParsingError};
 use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
 use syntax::syntax::Syntax;
@@ -67,12 +67,8 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
 
-    let mut code = verify_code(process_manager, &resolver, code, codeless.data.attributes.iter()
-        .any(|inner| if let Attribute::Basic(inner) = inner {
-            inner == "extern"
-        } else {
-            false
-        }), syntax, &mut variable_manager, include_refs).await?;
+    let mut code = verify_code(process_manager, &resolver, code, syntax,
+                               &mut variable_manager, include_refs, true).await?;
 
     if !code.returns {
         if codeless.return_type.is_none() {

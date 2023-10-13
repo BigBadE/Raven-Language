@@ -72,7 +72,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::EOF => return,
             _ => panic!("How'd you get here? {}: {:?} index {} ({:?})", parser_utils.file, token.token_type, parser_utils.index,
                         parser_utils.tokens[parser_utils.index-6..parser_utils.index-1].iter()
-                            .map(|token| token.to_string(parser_utils.buffer)).collect::<Vec<_>>())
+                            .map(|token| format!("{} ({:?})", token.to_string(parser_utils.buffer), token.token_type)).collect::<Vec<_>>())
         }
     }
 }

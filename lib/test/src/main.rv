@@ -1,11 +1,13 @@
-import main::Test;
+import iter::NumberIter;
 import stdio;
 
 fn main() {
-    let i = 0;
-    while i != 5 {
+    let iter = new NumberIter {
+        current: 0,
+        end: 5,
+    };
+    for i in iter {
         printf("Loop!");
-        i = i + 1;
     }
     printf("Done!");
 }

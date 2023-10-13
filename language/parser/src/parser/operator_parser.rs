@@ -15,7 +15,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
 
     parser_utils.index -= 1;
     while let Some(token) = parser_utils.tokens.get(parser_utils.index) {
-        if token.token_type == TokenTypes::Operator || token.token_type == TokenTypes::Equals {
+        if token.token_type == TokenTypes::Operator || token.token_type == TokenTypes::Equals || token.token_type == TokenTypes::Period {
             operation += token.to_string(parser_utils.buffer).as_str();
         } else {
             break

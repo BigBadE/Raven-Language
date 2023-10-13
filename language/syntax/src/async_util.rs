@@ -99,6 +99,13 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
             return Poll::Ready(output);
         }
 
+        // Check if a structure within the parent type with that name exists.
+        let parent = self.name_resolver.parent().clone();
+        if let Some(output) = self.get_types(&mut locked,
+                                             parent, cx.waker().clone(), not_trait) {
+            return Poll::Ready(output);
+        }
+
         // Check each import if the structure is in those files.
         for import in self.name_resolver.imports().clone() {
             if let Some(output) = self.get_types(&mut locked,
@@ -109,6 +116,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
         // If the async manager is finished, return an error.
         if locked.async_manager.finished {
+            println!("Error {}", self.error);
             return Poll::Ready(Err(self.error.clone()));
         }
 
