@@ -68,4 +68,3 @@ fn main() {
 It's important to note how the design of the compiler reflects a lot of the goals of the language:
 - Each module is separate, with only the syntax to unify them, allowing multiple compilers to work with the same language.
 - The compiler is multi-threaded and job-based (where each async task is a single "job", and the async library (tokio in this case) manages which jobs are running). This is why the program has "waiters", which allow jobs to wait for other jobs to happen (for example, verifying "main" requires waiting for "printf" to be verified)
-- 
