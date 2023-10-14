@@ -24,9 +24,19 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
 #[derive(PartialEq, Clone)]
 pub enum ParseState {
     None,
+    // Used when inside the variable of a control statement.
+    // Ex:
+    // if value == 2 {
+    // value == 2 would be parsed as a ControlVariable
     ControlVariable,
+    // When inside the arguments of a function.
+    // Ex:
+    // printf("String");
+    // "String" would be parsed as a argument.
     Argument,
+    // When inside of an operator, such as 1 + 2
     InOperator,
+    // When inside both an operator and control variable.
     ControlOperator
 }
 
