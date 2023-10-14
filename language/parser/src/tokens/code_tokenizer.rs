@@ -51,6 +51,9 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
         tokenizer.for_loop = true;
         tokenizer.make_token(TokenTypes::For)
+    } else if tokenizer.matches("while") &&
+        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
+        tokenizer.make_token(TokenTypes::While)
     } else if tokenizer.matches("new") {
         tokenizer.make_token(TokenTypes::New)
     } else if tokenizer.matches("if") {
