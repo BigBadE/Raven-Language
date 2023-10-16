@@ -2,30 +2,36 @@ use std::convert::Infallible;
 use std::ops::{ControlFlow, FromResidual, Try};
 use syntax::ParsingError;
 
+/// A token is a single string of characters in the file.
+/// For example, keywords, variables, etc... are a single token.
 #[derive(Clone, Debug)]
 pub struct Token {
     pub token_type: TokenTypes,
     pub start: (u32, u32),
     pub start_offset: usize,
     pub end: (u32, u32),
-    pub end_offset: usize
+    pub end_offset: usize,
+    pub code_data: Option<TokenCodeData>
 }
 
 impl Token {
-    pub fn new(token_type: TokenTypes, start: (u32, u32), start_offset: usize, end: (u32, u32), end_offset: usize) -> Self {
+    pub fn new(token_type: TokenTypes, code_data: Option<TokenCodeData>, start: (u32, u32), start_offset: usize, end: (u32, u32), end_offset: usize) -> Self {
         return Self {
             token_type,
             start,
             start_offset,
             end,
-            end_offset
+            end_offset,
+            code_data
         }
     }
 
+    /// Creates an error for this part of the file.
     pub fn make_error(&self, file: String, error: String) -> ParsingError {
         return ParsingError::new(file, self.start, self.start_offset, self.end, self.end_offset, error);
     }
 
+    /// Turns the token into the string it points to.
     pub fn to_string(&self, buffer: &[u8]) -> String {
         let mut start = self.start_offset;
         let mut end = self.end_offset-1;
@@ -41,6 +47,7 @@ impl Token {
     }
 }
 
+/// This allows for Tokens to be used in the Result type.
 impl Try for Token {
     type Output = Token;
     type Residual = Token;
@@ -54,18 +61,31 @@ impl Try for Token {
     }
 }
 
+/// Required for Try
 impl FromResidual<Token> for Token {
     fn from_residual(residual: Token) -> Self {
         return residual;
     }
 }
 
+/// Required for Try
 impl FromResidual<Result<Infallible, Token>> for Token {
     fn from_residual(residual: Result<Infallible, Token>) -> Token {
         return residual.err().unwrap();
     }
 }
 
+/// Data about the current code block
+#[derive(Clone, Debug)]
+pub struct TokenCodeData {
+    pub start_line: u32,
+    pub end_line: u32
+}
+
+/// The different types of tokens.
+/// The numerical value assigned is arbitrary and used
+/// for deriving functions like equals
+/// and some IDEs require a numerical id for each token.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenTypes {
     Start = 0,

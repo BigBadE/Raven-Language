@@ -2,12 +2,14 @@ use syntax::MODIFIERS;
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
 
-pub fn parse_ident(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]) -> Token {
+/// Parses to one of the provided end characters
+pub fn parse_to_character(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]) -> Token {
     while !end.contains(&tokenizer.next_included()?) {}
     tokenizer.index -= 1;
     return tokenizer.make_token(token_type);
 }
 
+/// Parses the value of an attribute
 pub fn parse_attribute_val(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> Token {
     let mut depth = 1;
     let mut last;
@@ -26,6 +28,7 @@ pub fn parse_attribute_val(tokenizer: &mut Tokenizer, token_type: TokenTypes) ->
     return tokenizer.make_token(token_type);
 }
 
+/// Parses until a non-acceptable token for a variable
 pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> Token {
     loop {
         if tokenizer.index == tokenizer.len {
@@ -42,6 +45,7 @@ pub fn parse_acceptable(tokenizer: &mut Tokenizer, token_type: TokenTypes) -> To
     }
 }
 
+/// Parses numbers
 pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
     let mut float = false;
 
@@ -75,6 +79,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
     }
 }
 
+/// Parses any modifiers.
 pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
     for modifier in MODIFIERS {
         if tokenizer.matches(format!("{}", modifier).as_str()) {
@@ -84,7 +89,8 @@ pub fn parse_modifier(tokenizer: &mut Tokenizer) -> Option<Token> {
     return None;
 }
 
-pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
+/// Parses a string.
+pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
     loop {
         if tokenizer.len == tokenizer.index {
             return tokenizer.make_token(TokenTypes::EOF);
@@ -110,16 +116,17 @@ pub fn next_string(tokenizer: &mut Tokenizer) -> Token {
     }
 }
 
+/// Parses a generic type, only for generics in a function/impl and not for types which currently are tokenized in the parser.
 pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
         TokenTypes::GenericsStart | TokenTypes::GenericEnd => {
-            parse_ident(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
+            parse_to_character(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
         }
         //              T       : Test       <             Other   <             Second  >               >               ,          E       : Yep
         //GenericsStart Generic GenericBound GenericsStart Generic GenericsStart Generic GenericBoundEnd GenericBoundEnd GenericEnd Generic GenericBound
         TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericBoundEnd =>
             if tokenizer.matches(":") || tokenizer.matches("+") {
-                parse_ident(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
+                parse_to_character(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
             } else if tokenizer.matches("<") {
                 tokenizer.generic_depth += 1;
                 tokenizer.make_token(TokenTypes::GenericsStart)
@@ -128,13 +135,15 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
             } else if tokenizer.matches(">") {
                 tokenizer.generic_depth -= 1;
                 if tokenizer.generic_depth == 0 {
+                    // The generics are done, break of out the generic state
                     tokenizer.state = match tokenizer.state {
                         TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
-                        TokenizerState::GENERIC_TO_FUNC_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
+                        TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
                         TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
                         TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
                         _ => panic!("Unexpected generic state!")
                     };
+                    // Reset the generic depth variable in the tokenizer
                     tokenizer.generic_depth = 1;
                     tokenizer.make_token(TokenTypes::GenericsEnd)
                 } else {
@@ -145,35 +154,4 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
             },
         token_type => panic!("How'd you get here? {:?}", token_type)
     };
-}
-
-#[cfg(test)]
-pub fn check_types(types: &[TokenTypes], testing: &str, state: u64) {
-    let mut tokenizer = Tokenizer::new(testing.as_bytes());
-    tokenizer.state = state;
-    let mut tokens: Vec<Token> = Vec::new();
-    loop {
-        let token = tokenizer.next();
-        match token.token_type.clone() {
-            TokenTypes::InvalidCharacters => assert!(false, "Failed at state {:?} (last: {:?}):\n{}\n from {:?}", tokenizer.state, tokens.last().unwrap().token_type,
-                                                     String::from_utf8_lossy(&tokenizer.buffer[tokens.last().unwrap().end.1 as usize..tokenizer.index as usize]),
-                                                     &tokens[tokens.len() - 5.min(tokens.len())..tokens.len() - 1]),
-            TokenTypes::CodeStart | TokenTypes::EOF => {
-                tokens.push(token);
-                break;
-            }
-            _ => tokens.push(token)
-        }
-    }
-    for i in 0..types.len().max(tokens.len()) {
-        if i > types.len() {
-            assert!(false, "Hit end of types!");
-        } else if i > tokens.len() {
-            assert!(false, "Hit end of tokens!");
-        }
-        println!("{:?} vs {:?} (\"{}\")", types[i], tokens.get(i).as_ref().unwrap().token_type,
-                 String::from_utf8_lossy(&tokenizer.buffer[tokens.get(i).as_ref().unwrap().start.1 as usize..
-                     tokens.get(i).as_ref().unwrap().end.1 as usize]));
-        assert_eq!(types[i], tokens.get(i).as_ref().unwrap().token_type);
-    }
 }
