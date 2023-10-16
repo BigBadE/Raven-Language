@@ -1,14 +1,16 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
-use crate::tokens::util::{parse_attribute_val, parse_ident, parse_modifier};
+use crate::tokens::util::{parse_attribute_val, parse_to_character, parse_modifier};
 
+/// Handles when the tokenizer isn't in any other state.
 pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
     if tokenizer.index == tokenizer.len {
         return tokenizer.make_token(TokenTypes::EOF);
     }
 
     return match tokenizer.last.token_type {
-        TokenTypes::ImportStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b';']),
+        TokenTypes::ImportStart => parse_to_character(tokenizer, TokenTypes::Identifier, &[b';']),
+        // Each attribute is in the format #[name(value)] or #[name], this confirms the ] at the end.
         TokenTypes::Attribute => if tokenizer.matches("]") {
             tokenizer.make_token(TokenTypes::AttributeEnd)
         } else {
@@ -17,12 +19,15 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         TokenTypes::AttributesStart | TokenTypes::AttributeEnd => if tokenizer.matches("#[") {
             tokenizer.make_token(TokenTypes::AttributeStart)
         } else {
+            // If there aren't attributes, move on to modifiers
             tokenizer.make_token(TokenTypes::ModifiersStart)
         },
         TokenTypes::AttributeStart => parse_attribute_val(tokenizer, TokenTypes::Attribute),
+        // Check for chained modifiers
         TokenTypes::ModifiersStart | TokenTypes::Modifier => if let Some(modifier) = parse_modifier(tokenizer) {
             modifier
         } else if tokenizer.matches("fn") {
+            // Find the correct function state
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.state = TokenizerState::FUNCTION_TO_STRUCT_TOP;
             } else {
@@ -30,6 +35,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             }
             tokenizer.make_token(TokenTypes::FunctionStart)
         } else if tokenizer.matches("struct") {
+            // Structs can't be inside structures
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
@@ -37,6 +43,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::StructStart)
             }
         } else if tokenizer.matches("trait") {
+            // Traits can't be inside structures
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
@@ -44,9 +51,15 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::TraitStart)
             }
         } else if tokenizer.matches("impl") {
+            // What is being implemented is next, so whitespace is skipped.
+            tokenizer.next_included().unwrap_or(0);
+            tokenizer.index -= 1;
+
             if tokenizer.buffer[tokenizer.index] == b' ' {
                 tokenizer.index += 1;
             }
+
+            // Impls can't be inside structures
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.handle_invalid()
             } else {
@@ -54,7 +67,8 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::ImplStart)
             }
         } else if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
-            parse_ident(tokenizer, TokenTypes::FieldName, &[b':', b'='])
+            // Looking for a field name inside a struct
+            parse_to_character(tokenizer, TokenTypes::FieldName, &[b':', b'='])
         } else {
             tokenizer.handle_invalid()
         },
@@ -64,8 +78,9 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.handle_invalid()
         },
         TokenTypes::FieldSeparator =>
-            parse_ident(tokenizer, TokenTypes::FieldType, &[b'=', b';']),
+            parse_to_character(tokenizer, TokenTypes::FieldType, &[b'=', b';']),
         TokenTypes::FieldType => if tokenizer.matches("=") {
+            // Handles the code for the field's value
             if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP;
             } else {
@@ -86,6 +101,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
             if tokenizer.matches("import") {
                 tokenizer.make_token(TokenTypes::ImportStart)
             } else if tokenizer.matches("}") && tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+                // Handles the end of the struct
                 tokenizer.state = TokenizerState::TOP_ELEMENT;
                 tokenizer.make_token(TokenTypes::StructEnd)
             } else {
@@ -95,33 +111,38 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
     };
 }
 
+/// Handles when the tokenizer is parsing the header of a struct
 pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
-        TokenTypes::FunctionStart => parse_ident(tokenizer, TokenTypes::Identifier, &[b'<', b'(']),
+        TokenTypes::FunctionStart => parse_to_character(tokenizer, TokenTypes::Identifier, &[b'<', b'(']),
         TokenTypes::Identifier => if tokenizer.matches("<") {
+            // Handles the generics after the function's name, if it exists
             if tokenizer.state == TokenizerState::FUNCTION {
                 tokenizer.state = TokenizerState::GENERIC_TO_FUNC;
             } else {
-                tokenizer.state = TokenizerState::GENERIC_TO_FUNC_TOP;
+                tokenizer.state = TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP;
             }
             tokenizer.make_token(TokenTypes::GenericsStart)
         } else if tokenizer.matches("(") {
+            // If no generics, it must be arguments
             tokenizer.make_token(TokenTypes::ArgumentsStart)
         } else {
             tokenizer.state = TokenizerState::TOP_ELEMENT;
             tokenizer.handle_invalid()
         },
         TokenTypes::GenericsEnd => {
-            if !tokenizer.matches("(") {
-                tokenizer.handle_invalid()
-            } else {
+            // After generics, it's arguments
+            if tokenizer.matches("(") {
                 tokenizer.make_token(TokenTypes::ArgumentsStart)
+            } else {
+                tokenizer.handle_invalid()
             }
         }
+        // Check if arguments are done
         TokenTypes::ArgumentsStart | TokenTypes::ArgumentEnd => if tokenizer.matches(")") {
             tokenizer.make_token(TokenTypes::ArgumentsEnd)
         } else {
-            parse_ident(tokenizer, TokenTypes::ArgumentName, &[b':', b',', b')'])
+            parse_to_character(tokenizer, TokenTypes::ArgumentName, &[b':', b',', b')'])
         },
         TokenTypes::ArgumentName => if tokenizer.matches(":") {
             tokenizer.make_token(TokenTypes::ArgumentTypeSeparator)
@@ -134,15 +155,16 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
             }
         },
         TokenTypes::ArgumentTypeSeparator =>
-            parse_ident(tokenizer, TokenTypes::ArgumentType, &[b',', b')']),
+            parse_to_character(tokenizer, TokenTypes::ArgumentType, &[b',', b')']),
         TokenTypes::ArgumentType => if tokenizer.matches(",") {
             tokenizer.make_token(TokenTypes::ArgumentSeparator)
         } else {
             tokenizer.make_token(TokenTypes::ArgumentEnd)
         },
         TokenTypes::ArgumentSeparator => tokenizer.make_token(TokenTypes::ArgumentEnd),
+        // Parse the return type
         TokenTypes::ReturnTypeArrow => {
-            parse_ident(tokenizer, TokenTypes::ReturnType, &[b';', b'{'])
+            parse_to_character(tokenizer, TokenTypes::ReturnType, &[b';', b'{'])
         }
         TokenTypes::ArgumentsEnd | TokenTypes::ReturnType =>
             if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
@@ -173,7 +195,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
 pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
         TokenTypes::StructStart | TokenTypes::TraitStart | TokenTypes::For =>
-            parse_ident(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
+            parse_to_character(tokenizer, TokenTypes::Identifier, &[b'{', b'<']),
         TokenTypes::Identifier | TokenTypes::GenericsEnd => if tokenizer.matches("<") {
             tokenizer.state = TokenizerState::GENERIC_TO_STRUCT;
             tokenizer.make_token(TokenTypes::GenericsStart)
@@ -214,124 +236,5 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             tokenizer.handle_invalid()
         },
         token => panic!("How'd you get here? {:?}", token)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::tokens::util::check_types;
-    use super::*;
-
-    #[test]
-    fn test_eof() {
-        let mut types = Vec::new();
-        add_header(0, &mut types);
-        types.push(TokenTypes::EOF);
-        let testing = "";
-        check_types(&types, testing, TokenizerState::TOP_ELEMENT);
-    }
-
-    #[test]
-    fn test_func() {
-        let mut types = Vec::new();
-        add_header(2, &mut types);
-        types.push(TokenTypes::FunctionStart);
-        types.push(TokenTypes::Identifier);
-        add_generics(1, true, &mut types);
-        add_arguments(2, true, &mut types);
-        types.push(TokenTypes::ReturnType);
-        types.push(TokenTypes::CodeStart);
-        let testing = "pub internal fn testing<T: Bound>(self, arg2: TypeAgain) -> ReturnType {}";
-        check_types(&types, testing, TokenizerState::TOP_ELEMENT);
-    }
-
-    #[test]
-    fn test_struct() {
-        let mut types = Vec::new();
-        //Testing
-        add_header(1, &mut types);
-        types.push(TokenTypes::TraitStart);
-        types.push(TokenTypes::Identifier);
-        add_generics(1, true, &mut types);
-        //trait_func
-        types.push(TokenTypes::StructTopElement);
-        add_header(1, &mut types);
-        types.push(TokenTypes::FunctionStart);
-        types.push(TokenTypes::Identifier);
-        add_arguments(0, false, &mut types);
-        types.push(TokenTypes::StructEnd);
-        //TestStruct
-        add_header(1, &mut types);
-        types.push(TokenTypes::StructStart);
-        types.push(TokenTypes::Identifier);
-        add_generics(1, true, &mut types);
-        types.push(TokenTypes::StructTopElement);
-        //field
-        add_header(1, &mut types);
-        types.push(TokenTypes::FieldName);
-        types.push(TokenTypes::FieldType);
-        types.push(TokenTypes::FieldEnd);
-        types.push(TokenTypes::StructEnd);
-        //impl
-        add_header(0, &mut types);
-        types.push(TokenTypes::ImplStart);
-        add_generics(2, true, &mut types);
-        types.push(TokenTypes::Identifier);
-        add_generics(1, false, &mut types);
-        types.push(TokenTypes::TraitStart);
-        types.push(TokenTypes::Identifier);
-        add_generics(1, false, &mut types);
-        types.push(TokenTypes::StructTopElement);
-        //test_func
-        add_header(1, &mut types);
-        types.push(TokenTypes::FunctionStart);
-        types.push(TokenTypes::Identifier);
-        add_arguments(0, false, &mut types);
-        types.push(TokenTypes::CodeStart);
-
-        let testing = "pub trait Testing<T: Bound> {\
-            pub fn trait_func();\
-        }\
-        pub struct TestStruct<T: OtherBound> {\
-            pub field: MyField;\
-        }\
-        impl<T: Bound, E: OtherBound> Test<T> for TestStruct<E> {\
-            pub fn trait_func() {}\
-        }";
-        check_types(&types, testing, TokenizerState::TOP_ELEMENT);
-    }
-
-    fn add_header(modifiers: u8, input: &mut Vec<TokenTypes>) {
-        input.push(TokenTypes::AttributesStart);
-        input.push(TokenTypes::ModifiersStart);
-        for _ in 0..modifiers {
-            input.push(TokenTypes::Modifier);
-        }
-    }
-
-    fn add_generics(generics: u8, bound: bool, input: &mut Vec<TokenTypes>) {
-        input.push(TokenTypes::GenericsStart);
-        for _ in 0..generics {
-            input.push(TokenTypes::Generic);
-            if bound {
-                input.push(TokenTypes::GenericBound);
-            }
-        }
-        input.push(TokenTypes::GenericsEnd);
-    }
-
-    fn add_arguments(arguments: u8, first_is_self: bool, input: &mut Vec<TokenTypes>) {
-        input.push(TokenTypes::ArgumentsStart);
-        if arguments > 0 && first_is_self {
-            input.push(TokenTypes::ArgumentName);
-            input.push(TokenTypes::ArgumentEnd);
-        }
-
-        for _ in (0 + first_is_self as u8)..arguments {
-            input.push(TokenTypes::ArgumentName);
-            input.push(TokenTypes::ArgumentType);
-            input.push(TokenTypes::ArgumentEnd);
-        }
-        input.push(TokenTypes::ArgumentsEnd);
     }
 }

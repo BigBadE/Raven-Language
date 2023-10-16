@@ -2,11 +2,12 @@ use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::ParsingError;
 use syntax::async_util::UnparsedType;
-use crate::parser::control_parser::{parse_for, parse_if};
+use crate::parser::control_parser::{parse_for, parse_if, parse_while};
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 
+/// Parsers a block of code into its return type (if all code paths lead to a single type, or else a line) and the code body.
 pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, CodeBody), ParsingError> {
     let mut lines = Vec::new();
     let mut types = ExpressionType::Line;
@@ -21,12 +22,23 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     return Ok((types, CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string())));
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum ParseState {
     None,
+    // Used when inside the variable of a control statement.
+    // Ex:
+    // if value == 2 {
+    // value == 2 would be parsed as a ControlVariable
     ControlVariable,
+    // When inside the arguments of a function.
+    // Ex:
+    // printf("String");
+    // "String" would be parsed as a argument.
     Argument,
-    InOperator
+    // When inside of an operator, such as 1 + 2
+    InOperator,
+    // When inside both an operator and control variable.
+    ControlOperator
 }
 
 pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
@@ -59,8 +71,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                         effect = Some(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
                                                           name.clone(), effects, None));
                     }
-                    _ => if let Some(expression) = parse_line(parser_utils, ParseState::Argument)? {
-                        effect = Some(expression.effect);
+                    _ => if let Some(expression) = parse_line(parser_utils, state.clone())? {
+                        effect = Some(Effects::Paren(Box::new(expression.effect)));
                     } else {
                         effect = None;
                     }
@@ -74,7 +86,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             }
             TokenTypes::Integer => {
                 if effect.is_some() {
-                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected integer!")));
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected integer! Dropped {:?}", effect.unwrap())));
                 }
                 effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
             }
@@ -135,7 +147,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 }
                 effect = Some(parse_new(parser_utils)?);
             },
-            TokenTypes::BlockStart => if ParseState::ControlVariable == state {
+            TokenTypes::BlockStart => if ParseState::ControlVariable == state || ParseState::ControlOperator == state {
                 break;
             } else {
                 if effect.is_some() {
@@ -171,6 +183,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 }
                 return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)))
             },
+            TokenTypes::While => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected for!")));
+                }
+                return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)))
+            },
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
                 if effect.is_some() && other != TokenTypes::Operator && other != TokenTypes::Equals {
@@ -182,7 +200,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     }
                     break;
                 } else {
-                    return Ok(Some(Expression::new(expression_type, parse_operator(effect, parser_utils)?)));
+                    let operator = parse_operator(effect, parser_utils, &state)?;
+                    if ParseState::InOperator == state || ParseState::ControlOperator == state {
+                        return Ok(Some(Expression::new(expression_type, operator)));
+                    } else {
+                        effect = Some(operator);
+                    }
                 }
             }
             TokenTypes::Operator => {
@@ -193,8 +216,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     last.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
                     effect = Some(parse_generic_method(effect, parser_utils)?);
                 } else {
-                    let operator = parse_operator(effect, parser_utils)?;
-                    if ParseState::InOperator == state {
+                    let operator = parse_operator(effect, parser_utils, &state)?;
+                    if ParseState::InOperator == state || ParseState::ControlOperator == state {
                         return Ok(Some(Expression::new(expression_type, operator)));
                     } else {
                         effect = Some(operator);

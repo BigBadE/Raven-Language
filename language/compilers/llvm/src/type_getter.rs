@@ -14,8 +14,7 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::{ParsingError, VariableManager};
-use syntax::code::FinalizedEffects;
+use syntax::VariableManager;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
@@ -23,9 +22,11 @@ use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
 use crate::util::print_formatted;
+use crate::vtable_manager::VTableManager;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
+    pub vtable: Rc<VTableManager<'ctx>>,
     pub compiler: Rc<CompilerImpl<'ctx>>,
     pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
@@ -36,8 +37,9 @@ pub struct CompilerTypeGetter<'ctx> {
 impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn new(compiler: Rc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
         return Self {
-            compiler,
             syntax,
+            vtable: Rc::new(VTableManager::new()),
+            compiler,
             compiling: Rc::new(Vec::new()),
             blocks: HashMap::new(),
             current_block: None,
@@ -55,6 +57,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         }
         return Self {
             syntax: self.syntax.clone(),
+            vtable: self.vtable.clone(),
             compiler: self.compiler.clone(),
             compiling: self.compiling.clone(),
             blocks: self.blocks.clone(),
@@ -85,32 +88,29 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T>(&mut self, target: String, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    pub fn compile<T>(&mut self, target: String, syntax: &Arc<Mutex<Syntax>>, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
                       _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>)
-                   -> Result<Option<JitFunction<'_, Main<T>>>, Vec<ParsingError>> {
+                      -> Option<JitFunction<'_, Main<T>>> {
         let target = target.as_str();
-        while !functions.read().unwrap().contains_key(target) {
+        while !functions.read().unwrap().contains_key(target) && !syntax.lock().unwrap().async_manager.finished {
             //Waiting
             thread::yield_now();
         }
 
         let function = match functions.read().unwrap().get(target) {
             Some(found) => found,
-            None => return Ok(None)
+            None => return None
         }.clone();
 
         instance_function(Arc::new(function.to_codeless()), self);
 
-        let mut errors = Vec::new();
         while !self.compiling.is_empty() {
             let (function_type, function) = unsafe {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
 
             if !function.data.poisoned.is_empty() {
-                for error in &function.data.poisoned {
-                    errors.push(error.clone());
-                }
+                // The checker handles the poisoned functions
                 continue
             }
             let finalized_function;
@@ -131,12 +131,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
 
         //let pass_manager = PassManager::create(&self.compiler.module);
 
-        unsafe {
+        //unsafe {
             //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
-        }
+        //}
 
         print_formatted(self.compiler.module.to_string());
-        return Ok(self.get_target(target));
+        return self.get_target(target);
     }
 
     fn get_target<T>(&self, target: &str) -> Option<JitFunction<'_, Main<T>>> {
@@ -158,9 +158,5 @@ impl Debug for CompilerTypeGetter<'_> {
 impl VariableManager for CompilerTypeGetter<'_> {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
         return self.variables.get(name).map(|found| found.0.clone());
-    }
-
-    fn get_const_variable(&self, _name: &String) -> Option<FinalizedEffects> {
-        panic!("Unexpected const variable call!");
     }
 }

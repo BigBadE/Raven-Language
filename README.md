@@ -4,23 +4,20 @@ Raven is an experimental language bringing modern features to every platform.
 
 Raven's goal is to allow one codebase to run on every platform, without having to sacrifice speed or usability.
 
-Currently, Raven mainly targets desktop applications, but web, mobile, and JVM targets are planned.
+Currently, Raven targets desktop applications, but web, mobile, and JVM targets are planned.
 
-# !!! DO NOT DOWNLOAD RAVEN ANYWHERE WITH A SPACE IN THE PATH. EX: "C:/Program Files/Raven". IT WILL NOT WORK. I CANNOT FIX IT !!!
+# Installing
 
-# Building
+For help on installing Raven, look at the [first chapter of the Raven book](docs/raven/1_installation.md)
 
-Requires LLVM set with the environmental variable LLVM_SYS_130_PREFIX = (path to folder with bin)
+# Contributing
 
-Please download LLVM from https://github.com/PLC-lang/llvm-package-windows/releases/tag/v13.0.0
+If your interested in contributing, look at [the current Raven projects](projects.md).
+More information can be found in the [building.md file](docs/building.md)
 
-C++ is also required to be installed somewhere on your system, for Windows get it from https://visualstudio.microsoft.com/vs/community/
+Please read the [contributing guidelines](contributing.md) before contributing.
 
-Nightly is required for building the compiler, you can set the project to nightly with ```rustup override set nightly```
+# Documentation
+For the documentation on the Raven language, look at the [Raven book in the raven folder](raven/raven.md)
 
-# Running
-
-Run this in the lib/test folder (or whatever Raven project in the repository you want to run)
-```cargo run --bin magpie```
-
-That command will build and run Raven's CLI with the following options
+For crate-level, file-level, and function-level documentation over the Raven internals, look at the source itself in the language folder. You can also find a helpful document going over internals in [language/README.md](language/README.md)

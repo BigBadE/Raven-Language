@@ -72,12 +72,13 @@ impl<'a> ParserUtils<'a> {
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {},
                     Err(error) => {
-                        println!("Error: {}", error);
+                        println!("Error: {}", error.to_string());
                         syntax.lock().unwrap().errors.push(error);
                     }
                 };
             },
             Err(error) => {
+                println!("Error: {:?}", error);
                 syntax.lock().unwrap().errors.push(error);
             }
         }

@@ -1,15 +1,16 @@
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
-use inkwell::types::{AnyTypeEnum, BasicType, BasicTypeEnum};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue, FunctionValue};
+use inkwell::types::{BasicType, BasicTypeEnum};
 
 use syntax::{Attribute, is_modifier, Modifier};
-use syntax::code::{ExpressionType, FinalizedEffects, FinalizedMemberField};
+use syntax::code::{ExpressionType, FinalizedEffects};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::types::FinalizedTypes;
 
@@ -43,12 +44,18 @@ pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTy
         FinalizedTypes::Reference(inner) => type_getter.get_type(inner),
         FinalizedTypes::Array(inner) => type_getter.get_type(inner),
         _ => {
-            let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
-            for field in &types.inner_struct().fields {
-                fields.push(type_getter.get_type(&field.field.field_type));
-            }
+            if is_modifier(types.inner_struct().data.modifiers, Modifier::Trait) {
+                type_getter.compiler.context.struct_type(&[
+                    type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                    type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum()], false).as_basic_type_enum()
+            } else {
+                let mut fields = vec!(type_getter.compiler.context.i64_type().as_basic_type_enum());
+                for field in &types.inner_struct().fields {
+                    fields.push(type_getter.get_type(&field.field.field_type));
+                }
 
-            type_getter.compiler.context.struct_type(fields.as_slice(), true).as_basic_type_enum()
+                type_getter.compiler.context.struct_type(fields.as_slice(), true).as_basic_type_enum()
+            }
         }
     };
 }
@@ -182,15 +189,13 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                                              pointer.as_ref().unwrap(), id).unwrap().into_pointer_value();
                 final_arguments.push(From::from(pointer));
 
-                add_args(&mut final_arguments, type_getter, function, arguments, true,
-                         Attribute::find_attribute("llvm_intrinsic", &calling_function.data.attributes).is_some(), id);
+                add_args(&mut final_arguments, type_getter, function, arguments, true, id);
 
                 *id += 1;
                 type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(), &(*id - 1).to_string());
                 Some(pointer.as_basic_value_enum())
             } else {
-                add_args(&mut final_arguments, type_getter, function, arguments, false,
-                         Attribute::find_attribute("llvm_intrinsic", &calling_function.data.attributes).is_some(), id);
+                add_args(&mut final_arguments, type_getter, function, arguments, false, id);
 
                 let call = type_getter.compiler.builder.build_call(calling, final_arguments.as_slice(),
                                                                    &id.to_string()).try_as_basic_value().left();
@@ -315,7 +320,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 Some(output)
             }
         }
-        FinalizedEffects::PointerLoad(inner) => {
+        FinalizedEffects::ReferenceLoad(inner) => {
             let inner = compile_effect(type_getter, function, inner, id).unwrap();
             let output = type_getter.compiler.builder.build_load(inner.into_pointer_value(), &id.to_string());
             *id += 1;
@@ -401,16 +406,88 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 };
                 i += 1;
                 *id += 1;
-                let mut effect = compile_effect(type_getter, function, value, id).unwrap();
-                if effect.is_pointer_value() {
-                    effect = type_getter.compiler.builder.build_load(effect.into_pointer_value(), &id.to_string());
-                    *id += 1;
-                }
-
+                let effect = compile_effect(type_getter, function, value, id).unwrap();
                 type_getter.compiler.builder.build_store(gep, effect);
             }
 
             Some(malloc.as_basic_value_enum())
+        }
+        FinalizedEffects::VirtualCall(func_offset, method, args) => {
+            let table = compile_effect(type_getter, function, &args[0], id).unwrap();
+
+            let mut compiled_args = Vec::new();
+            let calling = compile_effect(type_getter, function, &args[0], id).unwrap();
+            let calling = type_getter.compiler.builder.build_load(calling.into_pointer_value(), &id.to_string());
+            compiled_args.push(BasicMetadataValueEnum::from(calling));
+            *id += 1;
+            for i in 1..args.len() {
+                compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, function, &args[i], id).unwrap()));
+            }
+            let mut struct_type = Vec::new();
+            for _ in 0..=*func_offset {
+                struct_type.push(type_getter.get_function(method).get_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
+            }
+
+            let table = type_getter.compiler.builder.build_bitcast(table.into_pointer_value(),
+                                                                   type_getter.compiler.context.struct_type(&[
+                                                                       type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                                                                       type_getter.compiler.context.struct_type(struct_type.as_slice(), false).ptr_type(AddressSpace::default()).as_basic_type_enum()
+                                                                   ], false).ptr_type(AddressSpace::default()), &id.to_string());
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_struct_gep(table.into_pointer_value(), 1, &id.to_string()).unwrap();
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_load(offset, &id.to_string());
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_struct_gep(offset.into_pointer_value(), *func_offset as u32, &id.to_string()).unwrap();
+            *id += 1;
+            let offset = type_getter.compiler.builder.build_load(offset, &id.to_string()).into_pointer_value();
+            *id += 2;
+            type_getter.compiler.builder.build_call(CallableValue::try_from(offset).unwrap(),
+                                                               compiled_args.into_boxed_slice().deref(), &(*id - 1).to_string())
+                .try_as_basic_value().left()
+        }
+        FinalizedEffects::Downcast(base, target) => {
+            let found = base.get_return(type_getter).unwrap();
+            if is_modifier(found.inner_struct().data.modifiers, Modifier::Trait) {
+                if !target.eq(&found) {
+                    panic!("Downcasting to a trait that doesn't match! Not implemented yet!")
+                } else {
+                    compile_effect(type_getter, function, base, id)
+                }
+            } else {
+                let mut table = type_getter.vtable.clone();
+                let base = compile_effect(type_getter, function, base, id).unwrap();
+                let table = unsafe { Rc::get_mut_unchecked(&mut table) }
+                    .get_vtable(type_getter, &found, &target.inner_struct().data);
+                *id += 1;
+
+                let structure = type_getter.compiler.context.struct_type(
+                    &[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
+                let size = unsafe {
+                    type_getter.compiler.builder.build_gep(structure.ptr_type(AddressSpace::default()).const_zero(),
+                    &[type_getter.compiler.context.i64_type().const_int(1, false)],
+                    &id.to_string())
+                };
+                *id += 1;
+
+                let malloc = type_getter.compiler.builder.build_call(
+                    type_getter.compiler.module.get_function("malloc")
+                                                                         .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                                     &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string())
+                    .try_as_basic_value().unwrap_left().into_pointer_value();
+                *id += 1;
+                let malloc = type_getter.compiler.builder
+                    .build_bitcast(malloc, structure.ptr_type(AddressSpace::default()),
+                                   &id.to_string()).into_pointer_value();
+                *id += 1;
+                type_getter.compiler.builder.build_store(malloc, base);
+
+                let offset = type_getter.compiler.builder.build_struct_gep(malloc, 1, &id.to_string()).unwrap();
+                *id += 1;
+                type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum());
+
+                Some(malloc.as_basic_value_enum())
+            }
         }
     };
 }
@@ -423,22 +500,12 @@ fn store_and_load<'ctx, T: BasicType<'ctx>>(type_getter: &mut CompilerTypeGetter
 }
 
 fn add_args<'ctx, 'a>(final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>, type_getter: &mut CompilerTypeGetter<'ctx>,
-                      function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, intrinsic: bool, id: &mut u64) {
+                      function: FunctionValue<'ctx>, arguments: &'a Vec<FinalizedEffects>, offset: bool, id: &mut u64) {
     for i in offset as usize..arguments.len() {
         let argument = arguments.get(i).unwrap();
         let value = compile_effect(type_getter, function, argument, id).unwrap();
 
-        /*
-        if intrinsic && value.is_pointer_value() {
-            let pointer = value.into_pointer_value();
-            let inner = pointer.get_type().get_element_type();
-            if inner.is_float_type() || inner.is_int_type() {
-                final_arguments.push(From::from(type_getter.compiler.builder.build_load(pointer, &id.to_string())));
-                *id += 1;
-            }
-        } else {*/
-            final_arguments.push(From::from(value));
-        //}
+        final_arguments.push(From::from(value));
     }
 }
 

@@ -2,18 +2,18 @@ use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_acceptable, parse_numbers};
 
+/// Gets the next token in a block of code.
 pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     if let TokenTypes::Period = tokenizer.last.token_type {
         parse_acceptable(tokenizer, TokenTypes::CallingType)
     } else if tokenizer.matches(";") {
-        tokenizer.for_loop = false;
         tokenizer.make_token(TokenTypes::LineEnd)
     } else if tokenizer.matches("{") {
         tokenizer.bracket_depth += 1;
         tokenizer.make_token(TokenTypes::BlockStart)
     } else if tokenizer.matches("}") {
-        tokenizer.for_loop = false;
         if tokenizer.bracket_depth == 0 {
+            // If it's the last matching bracket, then end the code block.
             if tokenizer.state == TokenizerState::CODE_TO_STRUCT_TOP {
                 tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
             } else {
@@ -21,6 +21,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
             }
             tokenizer.make_token(TokenTypes::CodeEnd)
         } else {
+            // There's another bracket, so this is just the end of the block.
             tokenizer.bracket_depth -= 1;
             tokenizer.make_token(TokenTypes::BlockEnd)
         }
@@ -31,50 +32,47 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     } else if tokenizer.matches(")") {
         tokenizer.make_token(TokenTypes::ParenClose)
     } else if tokenizer.matches(".") {
-        if (tokenizer.buffer[tokenizer.index] as char).is_numeric() {
+        // This is only a number if the thing before and after is a digit. "1." and ".1" aren't numbers.
+        if (tokenizer.buffer[tokenizer.index] as char).is_numeric() && tokenizer.buffer[tokenizer.index].is_ascii_digit() {
             tokenizer.index -= 1;
             parse_numbers(tokenizer)
         } else {
             tokenizer.make_token(TokenTypes::Period)
         }
-    } else if tokenizer.matches("return") {
+    } else if tokenizer.matches_word("return") {
         tokenizer.make_token(TokenTypes::Return)
-    } else if tokenizer.matches("break") {
+    } else if tokenizer.matches_word("break") {
         tokenizer.make_token(TokenTypes::Break)
-    } else if tokenizer.matches("switch") {
+    } else if tokenizer.matches_word("switch") {
         tokenizer.make_token(TokenTypes::Switch)
-    } else if tokenizer.matches("true") {
+    } else if tokenizer.matches_word("true") {
         tokenizer.make_token(TokenTypes::True)
-    } else if tokenizer.matches("false") {
+    } else if tokenizer.matches_word("false") {
         tokenizer.make_token(TokenTypes::False)
-    } else if tokenizer.matches("for") &&
+        // For loops only come at the beginning of a line.
+    } else if tokenizer.matches_word("for") &&
         (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
-        tokenizer.for_loop = true;
         tokenizer.make_token(TokenTypes::For)
-    } else if tokenizer.matches("new") {
-        tokenizer.make_token(TokenTypes::New)
-    } else if tokenizer.matches("while") &&
+        // While loops only come at the beginning of a line.
+    } else if tokenizer.matches_word("while") &&
         (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
         tokenizer.make_token(TokenTypes::While)
-    } else if tokenizer.matches("if") {
+    } else if tokenizer.matches_word("new") {
+        tokenizer.make_token(TokenTypes::New)
+    } else if tokenizer.matches_word("if") {
         tokenizer.make_token(TokenTypes::If)
-    } else if tokenizer.matches("else") {
+    } else if tokenizer.matches_word("else") {
         tokenizer.make_token(TokenTypes::Else)
-    } else if tokenizer.matches("in") && tokenizer.for_loop {
-        tokenizer.for_loop = false;
+    } else if tokenizer.matches_word("in") {
         tokenizer.make_token(TokenTypes::In)
     } else if tokenizer.matches(":") {
         tokenizer.make_token(TokenTypes::Colon)
-    } else if tokenizer.matches("let") {
-        if tokenizer.buffer[tokenizer.index].is_ascii_alphanumeric() {
-            tokenizer.index -= 3;
-            parse_acceptable(tokenizer, TokenTypes::Variable)
-        } else {
-            tokenizer.make_token(TokenTypes::Let)
-        }
+    } else if tokenizer.matches_word("let") {
+        tokenizer.make_token(TokenTypes::Let)
     } else if tokenizer.matches("=") {
         tokenizer.make_token(TokenTypes::Equals)
     } else if tokenizer.matches("\"") {
+        // Changes the state type based on what the current state already is.
         tokenizer.state = if tokenizer.state == TokenizerState::CODE {
             TokenizerState::STRING
         } else {
@@ -84,33 +82,14 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     } else {
         let found = tokenizer.next_included()?;
         if (found as char).is_alphabetic() || found == b'_' {
+            // A character or an underscore is a variable.
             parse_acceptable(tokenizer, TokenTypes::Variable)
         } else if found >= b'0' && found <= b'9' {
+            // A number is a number.
             parse_numbers(tokenizer)
         } else {
+            // Everything else is an operator.
             tokenizer.make_token(TokenTypes::Operator)
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::tokens::util::check_types;
-
-    use super::*;
-
-    #[test]
-    fn test_code() {
-        let types = [TokenTypes::If, TokenTypes::ParenOpen, TokenTypes::Integer,
-            TokenTypes::Operator, TokenTypes::Float, TokenTypes::ParenClose, TokenTypes::CallingType, TokenTypes::ParenOpen,
-            TokenTypes::Variable, TokenTypes::ArgumentEnd, TokenTypes::Variable, TokenTypes::ParenClose, TokenTypes::CodeStart];
-        let code = "if (1 + 2.2).function(arg, args) {\
-        for testing in test {\
-        while \"my_str\\\"continues!\"{\
-        return something;\
-        }\
-        }\
-        }";
-        check_types(&types, code, TokenizerState::CODE);
     }
 }

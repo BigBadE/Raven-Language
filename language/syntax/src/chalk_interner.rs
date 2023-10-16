@@ -16,44 +16,12 @@ use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-pub type Identifier = String;
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RawId {
-    pub index: u32,
-}
-
-impl Debug for RawId {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "#{}", self.index)
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ChalkFnAbi {
-    Rust,
-    C,
-}
-
-impl Debug for ChalkFnAbi {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            fmt,
-            "{}",
-            match self {
-                ChalkFnAbi::Rust => "\"rust\"",
-                ChalkFnAbi::C => "\"c\"",
-            },
-        )
-    }
-}
-
-/// The default "interner" and the only interner used by chalk
-/// itself. In this interner, no interning actually occurs.
+/// Contains a bunch of types and functions for Chalk to interact with the Raven types.
 #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct ChalkIr;
 
 impl Interner for ChalkIr {
+    /// All of these are copied from ChalkIr from the Chalk repository.
     type InternedType = Arc<TyData<ChalkIr>>;
     type InternedLifetime = LifetimeData<ChalkIr>;
     type InternedConst = Arc<ConstData<ChalkIr>>;
@@ -69,11 +37,12 @@ impl Interner for ChalkIr {
     type InternedCanonicalVarKinds = Vec<CanonicalVarKind<ChalkIr>>;
     type InternedConstraints = Vec<InEnvironment<Constraint<ChalkIr>>>;
     type InternedVariances = Vec<Variance>;
-    type DefId = RawId;
-    type InternedAdtId = RawId;
-    type Identifier = Identifier;
-    type FnAbi = ChalkFnAbi;
+    type DefId = u32;
+    type InternedAdtId = u32;
+    type Identifier = String;
+    type FnAbi = ();
 
+    /// Unused debug functions.
     fn debug_adt_id(_type_kind_id: AdtId<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
         unreachable!()
     }
@@ -170,11 +139,13 @@ impl Interner for ChalkIr {
         unreachable!()
     }
 
+    /// Copied from Chalk's interner.
     fn intern_ty(self, kind: TyKind<ChalkIr>) -> Arc<TyData<ChalkIr>> {
         let flags = kind.compute_flags(self);
         Arc::new(TyData { kind, flags })
     }
 
+    /// Nothing is actually interned so the type is just returned
     fn ty_data(self, ty: &Arc<TyData<ChalkIr>>) -> &TyData<Self> {
         ty
     }

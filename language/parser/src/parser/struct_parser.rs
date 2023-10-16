@@ -70,7 +70,8 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
     let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Trait) {
         get_internal(name)
     } else {
-        Arc::new(StructData::new(attributes, modifiers, name))
+        let name = format!("{}::{}", parser_utils.file, name);
+        Arc::new(StructData::new(attributes, functions.iter().map(|inner| inner.data.clone()).collect::<Vec<_>>(), modifiers, name))
     };
 
     return Ok(UnfinalizedStruct {
@@ -153,15 +154,13 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
             },
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
-                let function =
-                    ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
-                functions.push(function);
+                functions.push(function?);
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
-            _ => panic!("How'd you get here? {} - {:?} ({})", parser_utils.file, token.token_type, state)
+            _ => panic!("How'd you get here? {} - {:?} ({}, {})", parser_utils.file, token.token_type, state, token.to_string(parser_utils.buffer))
         }
     }
 

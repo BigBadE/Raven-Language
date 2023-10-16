@@ -1,19 +1,5 @@
 import stdio;
 
 fn main() {
-    print_test("Two");
-}
-
-fn print_test(test: Test) {
-    //test.print_self();
-}
-
-pub trait Test {
-    pub fn print_self(self);
-}
-
-impl Test for str {
-    pub fn print_self(self) {
-        printf(self);
-    }
+    printf("Test!");
 }

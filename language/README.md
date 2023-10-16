@@ -3,9 +3,19 @@
 - Checker: Verifies all borrows, generics, method calls, returns, etc...
 - CLI: Command Line Interface for using Raven
 - Compilers: The compilers Raven uses
+- Data: Settings data used by every package. Seperated to prevent dependency loops.
 - Parser: Raven's Lexer and Parser
 - Runner: Handles running compilation with the given arguments
 - Syntax: Contains the structures for the language's syntax
+
+# Terms
+- Async/Asynchronous: Code that runs at the same time as other code, which is generally faster but needs special considerations to prevent bugs. See Arc and Mutex on the Rust docs for more info on how we stop multithreading bugs.
+- Finalization: The process of linking methods and structures, and verifying that all types are correct.
+- Linking: The process of attaching a name to the associated data. Can either be internal (for example, finding the code of the function called "main" from the name) or external (for example, calling a method in the C library like printf).
+- Generics: Types that aren't "solid" and instead can be any type within the given bounds. These are "solidified" into their actual types.
+- Compilation-time: Something that happens during compilation:
+- Runtime: Something that happens when the program runs
+- Constant: Something that is computed at compilation time, for example generics are constant types because the compiler degenerics them at compiler-time. 
 
 # Compilation
 
@@ -58,4 +68,3 @@ fn main() {
 It's important to note how the design of the compiler reflects a lot of the goals of the language:
 - Each module is separate, with only the syntax to unify them, allowing multiple compilers to work with the same language.
 - The compiler is multi-threaded and job-based (where each async task is a single "job", and the async library (tokio in this case) manages which jobs are running). This is why the program has "waiters", which allow jobs to wait for other jobs to happen (for example, verifying "main" requires waiting for "printf" to be verified)
-- 

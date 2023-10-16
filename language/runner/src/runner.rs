@@ -1,6 +1,4 @@
-use std::ffi::{c_char, c_int};
 use std::sync::{Arc, mpsc};
-use std::sync::atomic::AtomicPtr;
 use std::sync::mpsc::Sender;
 
 use anyhow::Error;
@@ -16,13 +14,6 @@ use syntax::ParsingError;
 use syntax::syntax::Syntax;
 
 use crate::get_compiler;
-
-#[derive(Debug)]
-#[repr(C, align(8))]
-pub struct RawRavenProject {
-    type_id: c_int,
-    pub name: AtomicPtr<c_char>,
-}
 
 pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
                                     -> Result<Option<T>, Vec<ParsingError>> {
@@ -62,13 +53,6 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    if !errors.is_empty() {
-        for error in errors {
-            println!("Error: {}", error)
-        }
-        return Err(Vec::new());
-    }
-
     return receiver.recv().unwrap();
 }
 
@@ -81,5 +65,10 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Op
     }
 
     let returning = code_compiler.compile(target, &syntax);
-    sender.send(returning).unwrap();
+    let errors = &syntax.lock().unwrap().errors;
+    if errors.is_empty() {
+        sender.send(Ok(returning)).unwrap();
+    } else {
+        sender.send(Err(errors.clone())).unwrap();
+    }
 }

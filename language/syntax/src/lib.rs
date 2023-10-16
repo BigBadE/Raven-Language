@@ -1,6 +1,16 @@
 #![feature(box_into_inner)]
 #![feature(get_mut_unchecked)]
 
+/// A file containing various structures used throughout the language:
+/// - Modifiers: modifiers on structures, traits, and functions. Like public, internal, etc...
+///     - Modifier helper functions for compressing to/from and checking modifier lists in u8 form
+/// - Attributes: Data attached to objects like functions or structs in #[attribute(value)] form.
+///     - Attribute helper functions for checking if attributes exist and getting values
+/// - Process Manager trait used for passing parsed data to later compilation steps
+/// - Variable Manager and a simple implementation for keeping track of the variables when parsing a function
+/// - Data Type trait used a simple wrapper to access the static data (see FunctionData or StructData) of an object with data
+/// - Top Element trait used to allow generic access to function and struct types
+/// - Trait implementors struct for storing implementor data
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
@@ -14,15 +24,14 @@ use std::sync::Mutex;
 use indexmap::IndexMap;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
-use crate::async_getters::AsyncGetter;
+use crate::top_element_manager::TopElementManager;
 use crate::async_util::NameResolver;
-use crate::code::FinalizedEffects;
 use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
 use crate::types::{FinalizedTypes, Types};
 
-pub mod async_getters;
+pub mod top_element_manager;
 pub mod async_util;
 pub mod chalk_interner;
 pub mod chalk_support;
@@ -97,10 +106,6 @@ pub fn to_modifiers(from: u8) -> Vec<Modifier> {
     return modifiers;
 }
 
-pub trait DisplayIndented {
-    fn format(&self, parsing: &str, f: &mut Formatter<'_>) -> std::fmt::Result;
-}
-
 // A simple attribute over structures or functions, potentially used later in the process
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Attribute {
@@ -145,16 +150,15 @@ pub trait ProcessManager: Send + Sync {
 }
 
 #[derive(Debug, Clone)]
-pub struct CheckerVariableManager {
-    pub variables: HashMap<String, FinalizedTypes>,
-    pub variable_instructions: HashMap<String, FinalizedEffects>,
+pub struct SimpleVariableManager {
+    pub variables: HashMap<String, FinalizedTypes>
 }
 
-impl CheckerVariableManager {
+impl SimpleVariableManager {
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
-        let mut variable_manager = CheckerVariableManager { variables: HashMap::new(), variable_instructions: HashMap::new() };
+        let mut variable_manager = SimpleVariableManager { variables: HashMap::new() };
 
-        for field in &codeless.fields {
+        for field in &codeless.arguments {
             variable_manager.variables.insert(field.field.name.clone(),
                                               field.field.field_type.clone());
         }
@@ -163,20 +167,15 @@ impl CheckerVariableManager {
     }
 }
 
-impl VariableManager for CheckerVariableManager {
+impl VariableManager for SimpleVariableManager {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
         return self.variables.get(name).map(|inner| inner.clone());
-    }
-
-    fn get_const_variable(&self, name: &String) -> Option<FinalizedEffects> {
-        return self.variable_instructions.get(name).map(|inner| inner.clone());
     }
 }
 
 // A variable manager used for getting return types from effects
 pub trait VariableManager: Debug {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes>;
-    fn get_const_variable(&self, name: &String) -> Option<FinalizedEffects>;
 }
 
 pub trait DataType<T: TopElement> {
@@ -188,7 +187,7 @@ pub trait DataType<T: TopElement> {
 #[async_trait]
 pub trait TopElement where Self: Sized {
     type Unfinalized: DataType<Self>;
-    type Finalized: Debug;
+    type Finalized;
 
     // Element id
     fn set_id(&mut self, id: u64);
@@ -212,10 +211,10 @@ pub trait TopElement where Self: Sized {
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
     // Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
-    async fn verify(mut current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
+    async fn verify(current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
 
     // Gets the getter for that type on the syntax
-    fn get_manager(syntax: &mut Syntax) -> &mut AsyncGetter<Self>;
+    fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self>;
 }
 
 // An impl block for a type

@@ -10,6 +10,7 @@ use crate::ParsingError;
 use crate::r#struct::StructData;
 use crate::syntax::Syntax;
 
+/// An asynchronous getter for operations given the operation.
 pub struct OperationGetter {
     pub syntax: Arc<Mutex<Syntax>>,
     pub operation: String,
