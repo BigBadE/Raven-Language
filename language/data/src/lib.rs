@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::fmt::{Debug, Display, Formatter};
 use anyhow::Error;
 use std::{fs, path};
+use colored::Colorize;
 
 pub type Main<T> = unsafe extern "C" fn() -> T;
 
@@ -110,8 +111,11 @@ fn read_recursive(base: PathBuf, output: &mut Vec<Box<dyn Readable>>) -> Result<
 // An error somewhere in a source file, with exact location.
 #[derive(Clone, Debug)]
 pub struct ParsingError {
+    // Name of the file this error is in
     pub file: String,
+    // The line number and index from that line
     pub start: (u32, u32),
+    //
     pub start_offset: usize,
     pub end: (u32, u32),
     pub end_offset: usize,
@@ -141,6 +145,31 @@ impl ParsingError {
             end_offset,
             message,
         };
+    }
+
+    pub fn print(&self, sources: &Vec<Box<dyn SourceSet>>) {
+        let mut file = None;
+        'outer: for source in sources {
+            for readable in source.get_files() {
+                if source.relative(&readable) == self.file {
+                    file = Some(readable);
+                    break 'outer
+                }
+            }
+        }
+
+        if file.is_none() {
+            panic!("Missing file {}", self.file);
+        }
+        let file = file.unwrap();
+        let contents = file.read();
+        let line = contents.split("\n").nth(self.start.0 as usize - 1).unwrap();
+        println!("{}", self.message.bright_red());
+        println!("{}", format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red());
+        println!("{} {}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan());
+        println!("{} {} {}", self.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
+        println!("{} {} {}{}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan(), " ".repeat(self.start.1 as usize),
+                 "^".repeat(self.end_offset-self.start_offset).bright_red());
     }
 }
 

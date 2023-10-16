@@ -44,7 +44,6 @@ impl<'a> ParserUtils<'a> {
         let structure = match structure {
             Ok(adding) => adding,
             Err(error) => {
-                println!("Error: {}", error);
                 UnfinalizedStruct {
                     generics: Default::default(),
                     fields: Vec::new(),
@@ -72,7 +71,6 @@ impl<'a> ParserUtils<'a> {
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {},
                     Err(error) => {
-                        println!("Error: {}", error.to_string());
                         syntax.lock().unwrap().errors.push(error);
                     }
                 };
@@ -141,7 +139,6 @@ impl<'a> ParserUtils<'a> {
         let adding = match function {
             Ok(adding) => adding,
             Err(error) => {
-                println!("Error: {}", error);
                 UnfinalizedFunction {
                     generics: Default::default(),
                     fields: Vec::new(),

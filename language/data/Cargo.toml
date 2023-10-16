@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.27.0", features = [ "rt-multi-thread" ] }
 anyhow = "1.0.75"
+colored = "2.0.4"
