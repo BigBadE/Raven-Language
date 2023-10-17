@@ -1,5 +1,6 @@
 import stdio;
 
 fn main() {
+    let i = 0;
     printf("Test!");
 }

@@ -54,13 +54,14 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
         tokenizer.make_token(TokenTypes::For)
         // While loops only come at the beginning of a line.
-    } else if tokenizer.matches_word("while") &&
-        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
+    } else if tokenizer.matches_word("while") {
         tokenizer.make_token(TokenTypes::While)
     } else if tokenizer.matches_word("new") {
         tokenizer.make_token(TokenTypes::New)
     } else if tokenizer.matches_word("if") {
         tokenizer.make_token(TokenTypes::If)
+    } else if tokenizer.matches_word("do") {
+        tokenizer.make_token(TokenTypes::Do)
     } else if tokenizer.matches_word("else") {
         tokenizer.make_token(TokenTypes::Else)
     } else if tokenizer.matches_word("in") {

@@ -2,7 +2,7 @@ use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::ParsingError;
 use syntax::async_util::UnparsedType;
-use crate::parser::control_parser::{parse_for, parse_if, parse_while};
+use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_while};
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
@@ -81,7 +81,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     _ => if let Some(expression) = parse_line(parser_utils, state.clone())? {
                         effect = Some(Effects::Paren(Box::new(expression.effect)));
                     } else {
-                        effect = None;
+                        //effect = None;
                         panic!("Unknown code path - report this!");
                     }
                 }
@@ -199,6 +199,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected for! Did you forget a semicolon?")));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)))
+            },
+            TokenTypes::Do => {
+                if effect.is_some() {
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected for! Did you forget a semicolon?")));
+                }
+                return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)))
             },
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();

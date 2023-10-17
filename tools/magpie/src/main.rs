@@ -74,7 +74,7 @@ fn main() {
     match build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
         root: source
     }))) {
-        _ => return
+        _ => {}
     }
 }
 
@@ -103,7 +103,7 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
     return match value {
         Ok(inner) => Ok(inner),
         Err(errors) => {
-            println!();
+            println!("Errors:");
             for error in errors {
                 error.print(&arguments.runner_settings.sources);
             }

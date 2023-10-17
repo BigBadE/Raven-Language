@@ -120,9 +120,48 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
             .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
     }
 
-    let (mut _returning, body) = parse_code(parser_utils)?;
+    let (_returning, body) = parse_code(parser_utils)?;
     parser_utils.imports.last_id += 1;
     return create_while(effect.unwrap().effect, body, parser_utils.imports.last_id-1);
+}
+
+
+pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
+    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
+        return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+    }
+    parser_utils.index += 1;
+
+    let (_returning, body) = parse_code(parser_utils)?;
+
+    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::While {
+        return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected while!".to_string()));
+    }
+
+    parser_utils.index += 1;
+
+    let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
+    if effect.is_none() {
+        return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
+            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
+    }
+
+    parser_utils.imports.last_id += 2;
+    return create_do_while(effect.unwrap().effect, body, parser_utils.imports.last_id-2);
+}
+
+fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
+    let mut top = Vec::new();
+
+    let label = body.label.clone();
+    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id+1).to_string())));
+    top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
+    top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect),
+                                                                        label, id.to_string() + "end")));
+
+    return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
 }
 
 fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
