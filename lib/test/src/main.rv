@@ -2,5 +2,8 @@ import stdio;
 
 fn main() {
     let i = 0;
-    printf("Test!");
+    do {
+        printf("Test!");
+        i = i + 1;
+    } while i != 1;
 }

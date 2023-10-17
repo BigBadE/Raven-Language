@@ -148,15 +148,15 @@ pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, Parsing
             .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
     }
 
-    parser_utils.imports.last_id += 2;
-    return create_do_while(effect.unwrap().effect, body, parser_utils.imports.last_id-2);
+    parser_utils.imports.last_id += 1;
+    return create_do_while(effect.unwrap().effect, body, parser_utils.imports.last_id-1);
 }
 
 fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
     let mut top = Vec::new();
 
     let label = body.label.clone();
-    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id+1).to_string())));
+    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id-1).to_string() + "end")));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect),
                                                                         label, id.to_string() + "end")));
