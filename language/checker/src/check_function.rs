@@ -1,3 +1,4 @@
+use std::mem;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
@@ -5,8 +6,9 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::{SimpleVariableManager, is_modifier, Modifier, ParsingError};
-use syntax::async_util::NameResolver;
+use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
+use syntax::r#struct::VOID;
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use crate::finalize_generics;
@@ -62,7 +64,8 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
-        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
+        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(),
+                                                                   Some(FinalizedTypes::Struct(VOID.clone())))));
     }
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
@@ -70,7 +73,38 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
     let mut code = verify_code(process_manager, &resolver, code, syntax,
                                &mut variable_manager, include_refs, true).await?;
 
-    if !code.returns {
+    if let Some(found) = &mut code.returns {
+        if codeless.return_type.is_none() {
+            return Err(placeholder_error(format!("Function {} returns {} instead of void!", codeless.data.name, found)));
+        }
+        let other = codeless.return_type.clone().unwrap();
+        if *found == other {
+            // Nothing else
+        } else if found.of_type(&other, syntax) && other.name_safe().is_some() {
+            //Handle downcasting
+            let funcs = Syntax::get_implementation(&syntax.lock().unwrap(),
+                                                   &found,
+                                                   &other.inner_struct().data).unwrap();
+
+            //Make sure every function is finished adding
+            for func in funcs {
+                AsyncDataGetter::new(syntax.clone(), func).await;
+            }
+
+            for expression in &mut code.expressions {
+                if expression.expression_type == ExpressionType::Return {
+                    // Swap has to be done here to get the effect.
+                    let mut temp = FinalizedEffects::NOP();
+                    mem::swap(&mut temp, &mut expression.effect);
+                    println!("Replacing with downcast of {:?}", temp);
+                    expression.effect = FinalizedEffects::Downcast(
+                        Box::new(temp), other.clone());
+                }
+            }
+        } else {
+            return Err(placeholder_error(format!("Function {} returns a {} instead of a {}", codeless.data.name, found, other)))
+        }
+    } else {
         if codeless.return_type.is_none() {
             code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
