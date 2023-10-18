@@ -116,7 +116,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 Rc::get_mut_unchecked(&mut self.compiling)
             }.remove(0);
 
-            if !function.data.poisoned.is_empty() {
+            if !function.data.poisoned.is_empty() || function.data.name.is_empty() {
                 // The checker handles the poisoned functions
                 continue
             }
