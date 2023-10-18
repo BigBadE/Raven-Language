@@ -97,10 +97,17 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             thread::yield_now();
         }
 
-        let function = match functions.read().unwrap().get(target) {
-            Some(found) => found,
-            None => return None
-        }.clone();
+        // Check that it exists
+        if !syntax.lock().unwrap().functions.types.contains_key(target) {
+            return None;
+        }
+
+        while !functions.read().unwrap().contains_key(target) {
+            //Waiting
+            thread::yield_now();
+        }
+
+        let function = functions.read().unwrap().get(target).unwrap().clone();
 
         instance_function(Arc::new(function.to_codeless()), self);
 
@@ -113,6 +120,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 // The checker handles the poisoned functions
                 continue
             }
+
             let finalized_function;
             {
                 let reading = functions.read().unwrap();

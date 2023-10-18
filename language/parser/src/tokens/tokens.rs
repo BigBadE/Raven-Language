@@ -6,11 +6,17 @@ use syntax::ParsingError;
 /// For example, keywords, variables, etc... are a single token.
 #[derive(Clone, Debug)]
 pub struct Token {
+    // The type of the token
     pub token_type: TokenTypes,
+    // The starting line and index in that line of the token.
     pub start: (u32, u32),
+    // The offset to the start of the token
     pub start_offset: usize,
+    // The ending line and index in that line of the token.
     pub end: (u32, u32),
+    // The offset to the end of the token
     pub end_offset: usize,
+    // Data about the code block around this token
     pub code_data: Option<TokenCodeData>
 }
 
@@ -157,4 +163,5 @@ pub enum TokenTypes {
     AttributeStart = 66,
     GenericBoundEnd = 67,
     GenericsEnd = 68,
+    Do = 69
 }

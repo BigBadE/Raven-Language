@@ -192,6 +192,8 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     };
 }
 
+/// Finds the next token in the struct header. This only handles generics, implemented types,
+/// structure name, and the start of the code.
 pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
         TokenTypes::StructStart | TokenTypes::TraitStart | TokenTypes::For =>
@@ -209,6 +211,8 @@ pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     }
 }
 
+/// Gets the next token of the implementation.
+/// This ends at the "for" keyword.
 pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
     match &tokenizer.last.token_type {
         TokenTypes::ImplStart => if tokenizer.matches("<") {

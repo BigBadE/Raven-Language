@@ -4,7 +4,7 @@ use crate::tokens::util::{parse_acceptable, parse_numbers};
 
 /// Gets the next token in a block of code.
 pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
-    if let TokenTypes::Period = tokenizer.last.token_type {
+    if let TokenTypes::Period = tokenizer.last.token_type && tokenizer.buffer[tokenizer.index].is_ascii_alphabetic() {
         parse_acceptable(tokenizer, TokenTypes::CallingType)
     } else if tokenizer.matches(";") {
         tokenizer.make_token(TokenTypes::LineEnd)
@@ -33,7 +33,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         tokenizer.make_token(TokenTypes::ParenClose)
     } else if tokenizer.matches(".") {
         // This is only a number if the thing before and after is a digit. "1." and ".1" aren't numbers.
-        if (tokenizer.buffer[tokenizer.index] as char).is_numeric() && tokenizer.buffer[tokenizer.index].is_ascii_digit() {
+        if tokenizer.buffer[tokenizer.index].is_ascii_digit() && tokenizer.buffer[tokenizer.index - 2].is_ascii_digit() {
             tokenizer.index -= 1;
             parse_numbers(tokenizer)
         } else {
@@ -50,17 +50,17 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     } else if tokenizer.matches_word("false") {
         tokenizer.make_token(TokenTypes::False)
         // For loops only come at the beginning of a line.
-    } else if tokenizer.matches_word("for") &&
-        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
+    } else if tokenizer.matches_word("for") {
         tokenizer.make_token(TokenTypes::For)
         // While loops only come at the beginning of a line.
-    } else if tokenizer.matches_word("while") &&
-        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
+    } else if tokenizer.matches_word("while") {
         tokenizer.make_token(TokenTypes::While)
     } else if tokenizer.matches_word("new") {
         tokenizer.make_token(TokenTypes::New)
     } else if tokenizer.matches_word("if") {
         tokenizer.make_token(TokenTypes::If)
+    } else if tokenizer.matches_word("do") {
+        tokenizer.make_token(TokenTypes::Do)
     } else if tokenizer.matches_word("else") {
         tokenizer.make_token(TokenTypes::Else)
     } else if tokenizer.matches_word("in") {

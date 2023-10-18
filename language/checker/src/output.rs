@@ -44,7 +44,6 @@ impl ProcessManager for TypesChecker {
         return match verify_function(function, syntax, self.include_refs).await {
             Ok(output) => output,
             Err(error) => {
-                println!("Error: {}", error);
                 syntax.lock().unwrap().errors.push(error.clone());
                 (CodelessFinalizedFunction {
                     generics: Default::default(),
@@ -61,7 +60,6 @@ impl ProcessManager for TypesChecker {
         return match verify_function_code(self, resolver, code, function, syntax, self.include_refs).await {
             Ok(output) => output,
             Err(error) => {
-                println!("Error: {}", error);
                 syntax.lock().unwrap().errors.push(error.clone());
                 FinalizedFunction {
                     generics: Default::default(),
@@ -80,7 +78,6 @@ impl ProcessManager for TypesChecker {
                 return output
             },
             Err(error) => {
-                println!("Error: {}", error);
                 syntax.lock().unwrap().errors.push(error.clone());
                 FinalizedStruct {
                     generics: Default::default(),

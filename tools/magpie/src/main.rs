@@ -31,11 +31,12 @@ fn main() {
         });
 
         println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
-        build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
+        match build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
                                  &mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
-        })));
-        return;
+        }))) {
+            _ => return
+        }
     } else if args.len() > 2 {
         panic!("Unknown extra arguments! {:?}", args);
     }
@@ -70,12 +71,15 @@ fn main() {
     }
 
     println!("Building and running project...");
-    build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+    match build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
         root: source
-    })));
+    }))) {
+        _ => {}
+    }
 }
 
-pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>) -> Option<T> {
+pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>)
+    -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
         "linux" => &STD_LINUX,
@@ -96,9 +100,15 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
     arguments.runner_settings.sources = source;
 
     let value = run::<T>(target, &arguments);
-    match value {
-        Ok(inner) => return inner,
-        Err(error) => panic!("{:?}", error),
+    return match value {
+        Ok(inner) => Ok(inner),
+        Err(errors) => {
+            println!("Errors:");
+            for error in errors {
+                error.print(&arguments.runner_settings.sources);
+            }
+            Err(())
+        },
     }
 }
 

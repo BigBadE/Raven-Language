@@ -126,10 +126,11 @@ impl Syntax {
 
     /// Finds an implementation for the given trait.
     pub fn get_implementation(&self, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
-        for implementation in &self.implementations {
+
+        for implementation in &self.implementations { //u64 and T: numbers::Number
             if &implementation.target.inner_struct().data == implementor_struct &&
                 (implementing_trait.eq(&implementation.base) ||
-                    self.solve(&implementing_trait, &implementation.base)) {
+                    self.solve(&implementation.base, &implementing_trait)) {
                 return Some(implementation.functions.clone());
             }
         }
