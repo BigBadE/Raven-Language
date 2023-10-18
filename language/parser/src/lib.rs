@@ -1,4 +1,5 @@
 #![feature(try_trait_v2, get_mut_unchecked)]
+#![feature(let_chains)]
 extern crate core;
 
 use std::collections::HashMap;
