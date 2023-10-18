@@ -159,7 +159,7 @@ impl ParsingError {
         }
 
         if file.is_none() {
-            panic!("Missing file {}", self.file);
+            panic!("Missing file: {}", self.message);
         }
         let file = file.unwrap();
         let contents = file.read();

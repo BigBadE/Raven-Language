@@ -28,6 +28,9 @@ pub struct FunctionData {
 
 impl FunctionData {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
+        if name.is_empty() {
+            println!("Got you!");
+        }
         return Self {
             attributes,
             modifiers,
@@ -152,21 +155,34 @@ impl CodelessFinalizedFunction {
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
             if let Some(mut returning) = returning {
-                while let FinalizedTypes::GenericType(inner, _) = returning {
+                if let FinalizedTypes::GenericType(inner, _) = returning {
                     returning = FinalizedTypes::clone(inner.deref());
                 }
 
-                inner.resolve_generic(&returning, syntax, manager.mut_generics(),
-                                          placeholder_error("Invalid bounds!".to_string())).await?
+                if let Some((old, other)) =
+                    inner.resolve_generic(&returning, syntax,
+                                          placeholder_error("Invalid bounds!".to_string())).await? {
+                    if let FinalizedTypes::Generic(name, _) = old {
+                        manager.mut_generics().insert(name, other);
+                    } else {
+                        panic!("resolve_generic should never return any type other than the generic to replace!");
+                    }
+                }
             }
         }
 
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
             let effect = arguments.get(i).unwrap().get_return(variables).unwrap();
-            method.arguments.get(i).unwrap()
-                .field.field_type.resolve_generic(&effect, syntax, manager.mut_generics(),
-                placeholder_error("Invalid bounds!".to_string())).await?
+            if let Some((old, other)) = method.arguments.get(i).unwrap()
+                .field.field_type.resolve_generic(&effect, syntax,
+                placeholder_error("Invalid bounds!".to_string())).await? {
+                if let FinalizedTypes::Generic(name, _) = old {
+                    manager.mut_generics().insert(name, other);
+                } else {
+                    panic!("resolve_generic should never return any type other than the generic to replace!");
+                }
+            }
         }
 
         // Now all the generic types have been resolved, it's time to replace them with
@@ -198,7 +214,6 @@ impl CodelessFinalizedFunction {
                 returning.degeneric(&manager.generics(), syntax,
                                     placeholder_error("No generic!".to_string()),
                                     placeholder_error("Invalid bounds!".to_string())).await?;
-                println!("Degeneric'd to {}", returning);
             }
 
             // Add the new degenericed static data to the locked function.
@@ -283,7 +298,7 @@ pub struct CodeBody {
 pub struct FinalizedCodeBody {
     pub label: String,
     pub expressions: Vec<FinalizedExpression>,
-    pub returns: Option<FinalizedTypes>,
+    pub returns: bool,
 }
 
 impl CodeBody {
@@ -296,7 +311,7 @@ impl CodeBody {
 }
 
 impl FinalizedCodeBody {
-    pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: Option<FinalizedTypes>) -> Self {
+    pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: bool) -> Self {
         return Self {
             label,
             expressions,

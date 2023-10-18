@@ -56,13 +56,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
         let character = tokenizer.buffer[tokenizer.index] as char;
         if character == '.' {
             if float {
-                // If there's two periods in a row it's not a float, return the integer.
-                return if tokenizer.buffer[tokenizer.index - 1] == b'.' {
-                    tokenizer.index -= 1;
-                    tokenizer.make_token(TokenTypes::Integer)
-                } else {
-                    tokenizer.make_token(TokenTypes::Float)
-                }
+                return tokenizer.make_token(TokenTypes::Float);
             } else {
                 float = true;
             }
