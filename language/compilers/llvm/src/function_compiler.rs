@@ -114,7 +114,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
 
                             compile_effect(type_getter, function, &line.effect, id);
 
-                            if body.returns.is_none() {
+                            if !body.returns {
                                 let label = body.label.clone() + "end";
                                 let temp = if let Some(block) = type_getter.blocks.get(&label) {
                                     type_getter.compiler.builder.position_at_end(block.clone());
