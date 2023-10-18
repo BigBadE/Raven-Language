@@ -28,6 +28,9 @@ pub struct FunctionData {
 
 impl FunctionData {
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
+        if name.is_empty() {
+            println!("Got you!");
+        }
         return Self {
             attributes,
             modifiers,
