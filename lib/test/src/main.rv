@@ -1,5 +1,8 @@
 import stdio;
 
 fn main() {
-    printf("Test!");
+    while 0 == 0 {
+
+    }
+        printf("Test!");
 }

@@ -25,17 +25,17 @@ jobs:
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
       run: cargo +nightly build --verbose --release --bin magpie-wrapper
-    - name: Release Raven
-      uses: shogo82148/actions-upload-release-asset@v1
-      with:
-          upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
-          asset_path: target/release/magpie
-          asset_name: Magpie-linux
-          overwrite: true
-    - name: Release Magpie Wrapper
-      uses: shogo82148/actions-upload-release-asset@v1
-      with:
-          upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
-          asset_path: target/release/magpie-wrapper
-          asset_name: Magpie-wrapper-linux
-          overwrite: true
+    #- name: Release Raven
+    #  uses: shogo82148/actions-upload-release-asset@v1
+    #  with:
+    #      upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
+    #      asset_path: target/release/magpie
+    #      asset_name: Magpie-linux
+    #      overwrite: true
+    #- name: Release Magpie Wrapper
+    #  uses: shogo82148/actions-upload-release-asset@v1
+    #  with:
+    #      upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
+    #      asset_path: target/release/magpie-wrapper
+    #      asset_name: Magpie-wrapper-linux
+    #      overwrite: true
