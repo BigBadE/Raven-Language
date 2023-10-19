@@ -76,7 +76,7 @@ trait Remainder<E, C> {
 }
 
 #[priority(1)]
-#[operation({}+={})]
+#[operation({}%={})]
 trait RemainderAndAssign<E, C> {
     fn remainder_assign(self, other: E) -> C;
 }
