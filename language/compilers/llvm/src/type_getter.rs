@@ -97,6 +97,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             thread::yield_now();
         }
 
+        println!("Main exists!");
         // Check that it exists
         if !syntax.lock().unwrap().functions.types.contains_key(target) {
             return None;
@@ -107,6 +108,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             thread::yield_now();
         }
 
+        println!("Got main!");
         let function = functions.read().unwrap().get(target).unwrap().clone();
 
         instance_function(Arc::new(function.to_codeless()), self);
@@ -121,6 +123,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 continue
             }
 
+            println!("Compiling {}", function.data.name);
             let finalized_function;
             {
                 let reading = functions.read().unwrap();
