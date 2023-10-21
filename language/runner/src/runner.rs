@@ -51,6 +51,13 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
         }
     }
 
+    if !errors.is_empty() {
+        for error in errors {
+            println!("Error: {}", error);
+        }
+        panic!("Error detected!");
+    }
+
     syntax.lock().unwrap().finish();
 
     return receiver.recv().unwrap();
