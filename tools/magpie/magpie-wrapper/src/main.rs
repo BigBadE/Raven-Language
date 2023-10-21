@@ -55,6 +55,7 @@ fn main() {
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
-    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>()).stdout(stdout()).stdin(Stdio::inherit())
-        .stderr(stderr()).output().unwrap();
+    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>())
+        .stdout(Stdio::inherit()).stdin(Stdio::inherit()).stderr(Stdio::inherit())
+        .output().unwrap();
 }
