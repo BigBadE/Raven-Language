@@ -21,6 +21,7 @@ mod test {
 
     fn test_recursive(dir: &'static Dir) {
         for file in dir.entries() {
+            println!("Starting entry!");
             if let Some(found) = file.as_file() {
                 println!("Starting with {}", found.path().to_str().unwrap());
                 let mut arguments = Arguments::build_args(false, RunnerSettings {
@@ -48,6 +49,7 @@ mod test {
                 test_recursive(file.as_dir().unwrap());
                 println!("Done recursing!")
             }
+            println!("Done with entry!");
         }
         println!("Done!");
     }
