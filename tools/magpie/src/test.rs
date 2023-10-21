@@ -16,11 +16,13 @@ mod test {
     #[test]
     pub fn test_magpie() {
         test_recursive(&TESTS);
+        println!("Finished test!");
     }
 
     fn test_recursive(dir: &'static Dir) {
         for file in dir.entries() {
             if let Some(found) = file.as_file() {
+                println!("Starting with {}", found.path().to_str().unwrap());
                 let mut arguments = Arguments::build_args(false, RunnerSettings {
                     sources: vec!(),
                     debug: false,
@@ -34,16 +36,20 @@ mod test {
                 }))) {
                     Ok(inner) => match inner {
                         Some(found) => if !found {
-                            panic!("Failed test {}!", path)
+                            assert!(false, "Failed test {}!", path)
                         },
-                        None => panic!("Failed to find method test in test {}", path)
+                        None => assert!(false, "Failed to find method test in test {}", path)
                     },
-                    Err(()) => panic!("Failed to compile test {}!", path)
+                    Err(()) => assert!(false, "Failed to compile test {}!", path)
                 }
+                println!("Passed {}", path);
             } else {
+                println!("Recursing!");
                 test_recursive(file.as_dir().unwrap());
+                println!("Done recursing!")
             }
         }
+        println!("Done!");
     }
 }
 

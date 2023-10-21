@@ -24,7 +24,7 @@ jobs:
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Test
-      run: cargo +nightly test --verbose --release --bin magpie -- --nocapture
+      run: cargo +nightly test --verbose --bin magpie -- --nocapture
     - name: Build Wrapper
       run: cargo +nightly build --verbose --release --bin magpie-wrapper
     - name: Release Raven

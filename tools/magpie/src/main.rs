@@ -101,6 +101,7 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
     arguments.runner_settings.sources = source;
 
     let value = run::<T>(target, &arguments);
+    println!("Loaded inner value");
     return match value {
         Ok(inner) => Ok(inner),
         Err(errors) => {
@@ -116,6 +117,7 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
 fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     let result = arguments.cpu_runtime.block_on(
         runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
+    println!("Loading!");
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 

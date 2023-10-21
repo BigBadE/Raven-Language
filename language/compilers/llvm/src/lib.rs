@@ -50,6 +50,7 @@ impl<T> Compiler<T> for LLVMCompiler {
         let result = binding.compile(target, syntax, &self.compiling,
                                      &self.struct_compiling);
 
+        println!("Ready to call!");
         return result.map(|inner| unsafe { inner.call() });
     }
 }

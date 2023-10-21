@@ -60,7 +60,9 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    return receiver.recv().unwrap();
+    let output = receiver.recv().unwrap();
+    println!("Got output!");
+    return output;
 }
 
 pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Option<T>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
@@ -71,8 +73,10 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Op
                                      locked.strut_compiling.clone(), compiler);
     }
 
+    println!("Compiling!");
     let returning = code_compiler.compile(target, &syntax);
     let errors = &syntax.lock().unwrap().errors;
+
     if errors.is_empty() {
         sender.send(Ok(returning)).unwrap();
     } else {
