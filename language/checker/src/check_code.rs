@@ -152,7 +152,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             match locked.get_implementation(&return_type, data) {
                                 Some(inner) => inner,
                                 None => return Err(
-                                    placeholder_error(format!("{} doesn't implement {}", return_type, inner)))
+                                    placeholder_error(format!("{} doesn't implement {}:\n{}", return_type, inner,
+                                                              locked.implementations.iter().map(|inner|
+                                                                  format!("{} impls {}", inner.target, inner.base)).collect::<Vec<_>>().join("\n"))))
                             }
                         }
                     };
