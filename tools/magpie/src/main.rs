@@ -13,6 +13,7 @@ use include_dir::{Dir, DirEntry, File, include_dir};
 use data::{Arguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
 mod test;
+
 static CORE: Dir = include_dir!("lib/core/src");
 static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
 static STD_WINDOWS: Dir = include_dir!("lib/std/windows");

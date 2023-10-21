@@ -1,5 +1,4 @@
 use std::{env, fs};
-use std::io::{stderr, stdout};
 use std::process::{Command, Stdio};
 use json::JsonValue;
 use reqwest::blocking::Client;
@@ -55,6 +54,7 @@ fn main() {
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
-    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>()).stdout(stdout()).stdin(Stdio::inherit())
-        .stderr(stderr()).output().unwrap();
+    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>())
+        .stdout(Stdio::inherit()).stdin(Stdio::inherit()).stderr(Stdio::inherit())
+        .output().unwrap();
 }

@@ -1,0 +1,4 @@
+fn test() -> bool {
+    let testing = true;
+    return testing;
+}

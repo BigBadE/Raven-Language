@@ -1,4 +1,5 @@
-use std::ops::Deref;
+#![allow(non_snake_case)]
+
 use jni::objects::{JClass, JString};
 use jni::JNIEnv;
 use jni::sys::{jint, jlong, jstring};

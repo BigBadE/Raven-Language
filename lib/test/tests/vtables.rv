@@ -1,0 +1,17 @@
+fn test() -> bool {
+    return test_number(3) == 3;
+}
+
+fn test_number(test: Test) -> u64 {
+    return test.to_number();
+}
+
+trait Test {
+    fn to_number(self) -> u64;
+}
+
+impl Test for u64 {
+    fn to_string(self) -> u64 {
+        return self;
+    }
+}
