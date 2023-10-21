@@ -18,6 +18,7 @@ pub mod parser;
 pub mod tokens;
 
 pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, file: String) {
+    println!("Parsing {}", name);
     let mut tokenizer = Tokenizer::new(file.as_bytes());
     let mut tokens = Vec::new();
     loop {
@@ -38,6 +39,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
     };
 
     parse_top(&mut parser_utils);
+    println!("Done parsing {}", name);
 }
 
 #[derive(Clone)]
