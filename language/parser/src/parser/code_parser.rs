@@ -274,11 +274,16 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
 }
 
+///Parses tokens from the Raven code into a string
 fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
-    let mut string = String::new();
-    loop {
+    let mut string = String::new(); //the string from the Raven code
+
+    loop { //loop through the tokens until a StringEnd is reached
+
+        //get the next token
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
+
         match token.token_type {
             TokenTypes::StringEnd => {
                 // End of string, must have a null character at the end
@@ -288,10 +293,41 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
             }
             TokenTypes::StringEscape => {
                 // Escape token
+
+                // get the text from the Raven file starting at the last token up to the current escape character
                 let found = token.to_string(parser_utils.buffer);
-                string += &found[0..found.len() - 1];
+
+                // add the text to the string, because this text is part of the string in the Raven Code
+                // end at -2 because the last character is the \, which should not be in the string
+                string += &found[0..found.len() - 2];
+
+                // match the character after the \ to see what type of escape character it is
+                match parser_utils.buffer[token.end_offset - 1] {
+                    b'n' => {
+                       string += "\n";
+                    }
+                    b't' => {
+                        string += "\t";
+                    }
+                    b'r' => {
+                        string += "\r";
+                    }
+                    b'\\' => {
+                        string += "\\";
+                    }
+                    b'\'' => {
+                        string += "\'";
+                    }
+                    b'\"' => {
+                        string += "\"";
+                    }
+                    _ => {
+                        // not a supported character
+                        panic!("Unexpected escape character: {}", parser_utils.buffer[token.end_offset - 1] as char)
+                    }
+                }
             }
-            TokenTypes::StringStart => {}
+            TokenTypes::StringStart => {} //the first token is always a StringStart, so skip this
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
