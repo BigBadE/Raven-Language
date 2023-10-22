@@ -20,9 +20,9 @@ mod test {
     }
 
     fn test_recursive(dir: &'static Dir) {
-        for file in dir.entries() {
+        for entry in dir.entries() {
             println!("Starting entry!");
-            match file {
+            match entry {
                 DirEntry::File(file) => {
                     println!("Starting with {}", file.path().to_str().unwrap());
                     let mut arguments = Arguments::build_args(false, RunnerSettings {
@@ -33,7 +33,7 @@ mod test {
 
                     let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
                     let path = format!("{}::test", &path[0..path.len() - 3]);
-                    /*match build::<bool>(path.clone(), &mut arguments, vec!(Box::new(InnerFileSourceSet {
+                    match build::<bool>(path.clone(), &mut arguments, vec!(Box::new(InnerFileSourceSet {
                         set: file
                     }))) {
                         Ok(inner) => match inner {
@@ -43,7 +43,7 @@ mod test {
                             None => assert!(false, "Failed to find method test in test {}", path)
                         },
                         Err(()) => assert!(false, "Failed to compile test {}!", path)
-                    }*/
+                    }
                     println!("Passed test");
                 }
                 DirEntry::Dir(dir) => {

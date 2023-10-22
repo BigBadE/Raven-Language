@@ -15,6 +15,7 @@ use crate::output::TypesChecker;
 
 pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
+    println!("1 - {}", function.data.name);
     let mut fields = Vec::new();
     for argument in &mut function.fields {
         let field = argument.await?;
@@ -62,6 +63,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
+        println!("2 - {}", codeless.data.name);
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
@@ -79,5 +81,6 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         }
     }
 
+    println!("2 - {}", codeless.data.name);
     return Ok(codeless.clone().add_code(code));
 }
