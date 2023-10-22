@@ -257,14 +257,14 @@ impl Syntax {
                 locked.errors.push(dupe_error);
             }
 
+            locked.operations.insert(name.clone(), adding);
+
             // Wakes every waker waiting for that operation.
             if let Some(wakers) = locked.operation_wakers.get(&name) {
                 for waker in wakers {
                     waker.wake_by_ref();
                 }
             }
-
-            locked.operations.insert(name, adding);
         }
 
         // Wakes every waker waiting for that type.

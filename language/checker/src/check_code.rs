@@ -110,10 +110,11 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 calling = Box::new(Effects::NOP());
             }
 
-            verify_effect(process_manager, resolver,
+            let temp = verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
                                                       String::new(), values, None),
-                          syntax, variables, references).await?
+                          syntax, variables, references).await?;
+            temp
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
