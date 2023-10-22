@@ -63,6 +63,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
+        println!("2 - {}", codeless.data.name);
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
