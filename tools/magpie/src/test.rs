@@ -6,7 +6,7 @@ use crate::FileWrapper;
 #[cfg(test)]
 mod test {
     use std::path;
-    use include_dir::{Dir, include_dir};
+    use include_dir::{Dir, DirEntry, include_dir};
     use data::{Arguments, RunnerSettings};
     use crate::build;
     use crate::test::InnerFileSourceSet;
@@ -22,38 +22,42 @@ mod test {
     fn test_recursive(dir: &'static Dir) {
         for file in dir.entries() {
             println!("Starting entry!");
-            if let Some(found) = file.as_file() {
-                println!("Starting with {}", found.path().to_str().unwrap());
-                let mut arguments = Arguments::build_args(false, RunnerSettings {
-                    sources: vec!(),
-                    debug: false,
-                    compiler: "llvm".to_string(),
-                });
+            println!("Done!");
+            match file {
+                DirEntry::File(file) => {
+                    println!("Starting with {}", file.path().to_str().unwrap());
+                    let mut arguments = Arguments::build_args(false, RunnerSettings {
+                        sources: vec!(),
+                        debug: false,
+                        compiler: "llvm".to_string(),
+                    });
 
-                let path = found.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
-                let path = format!("{}::test", &path[0..path.len()-3]);
-                match build::<bool>(path.clone(), &mut arguments, vec!(Box::new(InnerFileSourceSet {
-                    set: found
-                }))) {
-                    Ok(inner) => match inner {
-                        Some(found) => if !found {
-                            assert!(false, "Failed test {}!", path)
+                    let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
+                    let path = format!("{}::test", &path[0..path.len() - 3]);
+                    match build::<bool>(path.clone(), &mut arguments, vec!(Box::new(InnerFileSourceSet {
+                        set: file
+                    }))) {
+                        Ok(inner) => match inner {
+                            Some(found) => if !found {
+                                assert!(false, "Failed test {}!", path)
+                            },
+                            None => assert!(false, "Failed to find method test in test {}", path)
                         },
-                        None => assert!(false, "Failed to find method test in test {}", path)
-                    },
-                    Err(()) => assert!(false, "Failed to compile test {}!", path)
+                        Err(()) => assert!(false, "Failed to compile test {}!", path)
+                    }
+                    println!("Passed {}", path);
                 }
-                println!("Passed {}", path);
-            } else {
-                println!("Recursing!");
-                test_recursive(file.as_dir().unwrap());
-                println!("Done recursing!")
+                DirEntry::Dir(dir) => {
+                    println!("Recursing!");
+                    test_recursive(dir);
+                    println!("Done recursing!")
+                }
             }
             println!("Done with entry!");
         }
-        println!("Done!");
     }
 }
+
 
 #[derive(Debug)]
 pub struct InnerFileSourceSet {
