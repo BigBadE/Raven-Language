@@ -11,7 +11,11 @@ pub struct GetterManager {
     //How many impls are still being parsed, which is done async and not tied to finished
     pub parsing_impls: u32,
     //Impl waiters, which are woken whenever an impl finishes parsing.
-    pub impl_waiters: Vec<Waker>
+    pub impl_waiters: Vec<Waker>,
+
+    pub target: String,
+    pub found_target: bool,
+    pub target_waker: Option<Waker>
 }
 
 /// top element manager, holds the top elements and the wakers requiring those elements.

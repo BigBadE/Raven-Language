@@ -7,20 +7,21 @@ use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 
-use std::thread;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
 use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
+use checker::EmptyNameResolver;
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::VariableManager;
+use syntax::{ParsingError, VariableManager};
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
+use crate::main_future::MainFuture;
 use crate::util::print_formatted;
 use crate::vtable_manager::VTableManager;
 
@@ -32,6 +33,14 @@ pub struct CompilerTypeGetter<'ctx> {
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
     pub current_block: Option<BasicBlock<'ctx>>,
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
+}
+
+unsafe impl Sync for CompilerTypeGetter<'_> {
+
+}
+
+unsafe impl Send for CompilerTypeGetter<'_> {
+
 }
 
 impl<'ctx> CompilerTypeGetter<'ctx> {
@@ -88,26 +97,20 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn compile<T>(&mut self, target: String, syntax: &Arc<Mutex<Syntax>>, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    pub async fn compile<T>(&mut self, target: String, syntax: &Arc<Mutex<Syntax>>, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
                       _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>)
                       -> Option<JitFunction<'_, Main<T>>> {
+        match Syntax::get_function(syntax.clone(), ParsingError::empty(), target.clone(),
+                             Box::new(EmptyNameResolver {}), false).await {
+            Ok(_) => {},
+            Err(_) => return None
+        };
+
         let target = target.as_str();
-        while !functions.read().unwrap().contains_key(target) && !syntax.lock().unwrap().async_manager.finished {
-            //Waiting
-            thread::yield_now();
-        }
 
-        // Check that it exists
-        if !syntax.lock().unwrap().functions.types.contains_key(target) {
-            return None;
-        }
-
-        while !functions.read().unwrap().contains_key(target) {
-            //Waiting
-            thread::yield_now();
-        }
-
-        let function = functions.read().unwrap().get(target).unwrap().clone();
+        println!("Main exists!");
+        let function = MainFuture { syntax: syntax.clone() }.await;
+        println!("Got main!");
 
         instance_function(Arc::new(function.to_codeless()), self);
 
@@ -121,6 +124,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 continue
             }
 
+            println!("Compiling {}", function.data.name);
             let finalized_function;
             {
                 let reading = functions.read().unwrap();

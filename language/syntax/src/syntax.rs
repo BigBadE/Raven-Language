@@ -15,6 +15,7 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 
 use async_recursion::async_recursion;
+use async_trait::async_trait;
 // Re-export main
 pub use data::Main;
 
@@ -256,14 +257,14 @@ impl Syntax {
                 locked.errors.push(dupe_error);
             }
 
+            locked.operations.insert(name.clone(), adding);
+
             // Wakes every waker waiting for that operation.
             if let Some(wakers) = locked.operation_wakers.get(&name) {
                 for waker in wakers {
                     waker.wake_by_ref();
                 }
             }
-
-            locked.operations.insert(name, adding);
         }
 
         // Wakes every waker waiting for that type.
@@ -391,7 +392,8 @@ impl Syntax {
     }
 }
 
+#[async_trait]
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
-    fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
+    async fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
 }

@@ -110,10 +110,11 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 calling = Box::new(Effects::NOP());
             }
 
-            verify_effect(process_manager, resolver,
+            let temp = verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
                                                       String::new(), values, None),
-                          syntax, variables, references).await?
+                          syntax, variables, references).await?;
+            temp
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
@@ -152,7 +153,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             match locked.get_implementation(&return_type, data) {
                                 Some(inner) => inner,
                                 None => return Err(
-                                    placeholder_error(format!("{} doesn't implement {}", return_type, inner)))
+                                    placeholder_error(format!("{} doesn't implement {}:\n{}", return_type, inner,
+                                                              locked.implementations.iter().map(|inner|
+                                                                  format!("{} impls {}", inner.target, inner.base)).collect::<Vec<_>>().join("\n"))))
                             }
                         }
                     };

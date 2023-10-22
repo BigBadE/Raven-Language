@@ -134,7 +134,7 @@ impl<'a> Tokenizer<'a> {
                 return false;
             }
         }
-        return if self.buffer[self.index] == b' ' {
+        return if !self.buffer[self.index].is_ascii_alphabetic() {
             true
         } else {
             self.load(&state);

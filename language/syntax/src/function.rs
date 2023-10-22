@@ -89,8 +89,16 @@ impl TopElement for FunctionData {
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
         // Finalize the code and combine it with the codeless finalized function.
         let finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
+        let finalized_function = Arc::new(finalized_function);
+        let locked = syntax.lock().unwrap();
+
         // Add the finalized code to the compiling list.
-        syntax.lock().unwrap().compiling.write().unwrap().insert(name, Arc::new(finalized_function));
+        locked.compiling.write().unwrap().insert(name, finalized_function.clone());
+        if finalized_function.data.name == locked.async_manager.target {
+            if let Some(found) = locked.async_manager.target_waker.as_ref() {
+                found.wake_by_ref();
+            }
+        }
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {
