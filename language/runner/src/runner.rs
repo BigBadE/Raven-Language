@@ -17,8 +17,10 @@ use crate::get_compiler;
 
 pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
                                     -> Result<Option<T>, Vec<ParsingError>> {
-    let syntax = Syntax::new(Box::new(
+    let mut syntax = Syntax::new(Box::new(
         TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.runner_settings.include_references())));
+    syntax.async_manager.target = target.clone();
+
     let syntax = Arc::new(Mutex::new(syntax));
 
     let (sender, receiver) = mpsc::channel();
@@ -74,7 +76,7 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Op
     }
 
     println!("Compiling!");
-    let returning = code_compiler.compile(target, &syntax);
+    let returning = code_compiler.compile(target, &syntax).await;
     let errors = &syntax.lock().unwrap().errors;
 
     if errors.is_empty() {

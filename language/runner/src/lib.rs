@@ -9,7 +9,7 @@ pub mod runner;
 
 pub fn get_compiler<T>(compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
                        struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
-                       name: String) -> Box<dyn Compiler<T>> {
+                       name: String) -> Box<dyn Compiler<T> + Send + Sync> {
     return Box::new(match name.to_lowercase().as_str() {
         "llvm" => LLVMCompiler::new(compiling, struct_compiling),
         _ => panic!("Unknown compilers {}", name)

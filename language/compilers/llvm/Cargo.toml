@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 syntax = { path = "../../syntax" }
+checker = { path = "../../checker" }
 
 async-trait = { version = "0.1.69", path = "../../../crates/async-trait" }
 

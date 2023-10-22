@@ -15,6 +15,7 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 
 use async_recursion::async_recursion;
+use async_trait::async_trait;
 // Re-export main
 pub use data::Main;
 
@@ -391,7 +392,8 @@ impl Syntax {
     }
 }
 
+#[async_trait]
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
-    fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
+    async fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
 }
