@@ -15,6 +15,7 @@ use crate::output::TypesChecker;
 
 pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
+    println!("1 - {}", function.data.name);
     let mut fields = Vec::new();
     for argument in &mut function.fields {
         let field = argument.await?;
@@ -79,5 +80,6 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         }
     }
 
+    println!("2 - {}", codeless.data.name);
     return Ok(codeless.clone().add_code(code));
 }
