@@ -16,7 +16,7 @@ mod test {
     #[test]
     pub fn test_magpie() {
         test_recursive(&TESTS);
-        println!("Finished test!!!");
+        println!("Finished test!");
     }
 
     fn test_recursive(dir: &'static Dir) {
