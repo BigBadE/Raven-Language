@@ -71,7 +71,10 @@ impl<'a> ParserUtils<'a> {
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {},
                     Err(error) => {
-                        syntax.lock().unwrap().errors.push(error);
+                        let mut locked = syntax.lock().unwrap();
+                        locked.async_manager.parsing_impls -= 1;
+                        println!("Error: {:?}", error);
+                        locked.errors.push(error);
                     }
                 };
             },
@@ -119,6 +122,7 @@ impl<'a> ParserUtils<'a> {
             let mut locked = syntax.lock().unwrap();
             locked.implementations.push(output);
 
+            println!("Finished impl {}", target);
             locked.async_manager.parsing_impls -= 1;
             for waker in &locked.async_manager.impl_waiters {
                 waker.wake_by_ref();
