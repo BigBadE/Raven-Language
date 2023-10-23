@@ -120,9 +120,9 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
+            println!("Finished impl {}", output.target);
             locked.implementations.push(output);
 
-            println!("Finished impl {}", target);
             locked.async_manager.parsing_impls -= 1;
             for waker in &locked.async_manager.impl_waiters {
                 waker.wake_by_ref();
