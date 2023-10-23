@@ -3,10 +3,5 @@ import stdio;
 fn main() {
     printf("Start!");
 
-    let i = 0;
-    while i != 5 {
-        i += 1;
-    }
-
     printf("Stop!");
 }

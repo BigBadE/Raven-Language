@@ -66,7 +66,6 @@ impl<'a> ParserUtils<'a> {
                                  resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         match implementor {
             Ok(implementor) => {
-                println!("Starting implementor");
 
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {},
@@ -97,18 +96,17 @@ impl<'a> ParserUtils<'a> {
             }
             generics.insert(generic, final_bounds);
         }
-        println!("Got generics");
 
         let target = implementor.base.await?;
         let base = implementor.implementor.await?;
 
-        println!("Got base/target");
+        println!("Finalizing {} and {}", target, base);
         let target = target.finalize(syntax.clone()).await;
+        println!("Almost finalized {} and {}", target, base);
         let base = base.finalize(syntax.clone()).await;
 
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
-        println!("Made impl");
         let mut functions = Vec::new();
         for function in &implementor.functions {
             functions.push(function.data.clone());
@@ -125,7 +123,7 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
-            println!("Finished impl {} ({} left)", output.target, locked.async_manager.parsing_impls-1);
+            println!("Finalized {} and {} ({} left)", output.target, output.base, locked.async_manager.parsing_impls);
             locked.implementations.push(output);
 
             locked.async_manager.parsing_impls -= 1;

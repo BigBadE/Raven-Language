@@ -110,7 +110,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 calling = Box::new(Effects::NOP());
             }
 
-            println!("Trying {}", operation.name);
             let temp = verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
                                                       String::new(), values, None),
@@ -139,7 +138,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
                     let data = &data.inner_struct().data;
-                    let mut i = 0;
                     while !syntax.lock().unwrap().finished_impls() {
                         {
                             let locked = syntax.lock().unwrap();

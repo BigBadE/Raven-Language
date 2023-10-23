@@ -29,5 +29,6 @@ pub async fn verify_struct(_process_manager: &TypesChecker, structure: Unfinaliz
         fields: finalized_fields,
         data: structure.data,
     };
+
     return Ok(output);
 }

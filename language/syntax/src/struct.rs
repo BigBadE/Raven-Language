@@ -301,9 +301,12 @@ impl TopElement for StructData {
         {
             let mut locked = syntax.lock().unwrap();
             if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
+                println!("        Waking for {}", data.name);
                 for waker in wakers {
                     waker.wake();
                 }
+            } else {
+                println!("        None found for {}", data.name);
             }
 
             locked.structures.data.insert(data, structure.clone());

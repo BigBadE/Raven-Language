@@ -63,7 +63,6 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
     syntax.lock().unwrap().finish();
 
     let output = receiver.recv().unwrap();
-    println!("Got output!");
     return output;
 }
 
@@ -75,7 +74,6 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Op
                                      locked.strut_compiling.clone(), compiler);
     }
 
-    println!("Compiling!");
     let returning = code_compiler.compile(target, &syntax).await;
     let errors = &syntax.lock().unwrap().errors;
 

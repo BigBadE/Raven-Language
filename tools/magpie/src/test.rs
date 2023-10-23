@@ -16,15 +16,12 @@ mod test {
     #[test]
     pub fn test_magpie() {
         test_recursive(&TESTS);
-        println!("Finished test!");
     }
 
     fn test_recursive(dir: &'static Dir) {
         for entry in dir.entries() {
-            println!("Starting entry!");
             match entry {
                 DirEntry::File(file) => {
-                    println!("Starting with {}", file.path().to_str().unwrap());
                     let mut arguments = Arguments::build_args(false, RunnerSettings {
                         sources: vec!(),
                         debug: false,
@@ -44,17 +41,12 @@ mod test {
                         },
                         Err(()) => assert!(false, "Failed to compile test {}!", path)
                     }
-                    println!("Passed test");
                 }
                 DirEntry::Dir(dir) => {
-                    println!("Recursing!");
                     test_recursive(dir);
-                    println!("Done recursing!")
                 }
             }
-            println!("Done with entry!");
         }
-        println!("Done!");
     }
 }
 

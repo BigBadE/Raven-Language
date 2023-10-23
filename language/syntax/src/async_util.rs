@@ -65,6 +65,28 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 
         return None;
     }
+
+    fn clean_up(&self, syntax: &mut Syntax, imports: &Vec<String>) {
+        let manager = T::get_manager(syntax);
+        if let Some(found) = manager.wakers.remove(&self.getting) {
+            for waker in found {
+                waker.wake();
+            }
+        }
+
+        for import in imports {
+            let import = if import.ends_with(&self.getting) {
+                import.clone()
+            } else {
+                format!("{}::{}", import, self.getting)
+            };
+            if let Some(found) = manager.wakers.remove(&import) {
+                for waker in found {
+                    waker.wake();
+                }
+            }
+        }
+    }
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
@@ -98,6 +120,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         // Check if an element directly referenced with that name exists.
         if let Some(output) = self.get_types(&mut locked,
                                              String::new(), cx.waker().clone(), not_trait) {
+            self.clean_up(&mut locked, self.name_resolver.imports());
             return Poll::Ready(output);
         }
 
@@ -105,6 +128,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         for import in self.name_resolver.imports().clone() {
             if let Some(output) = self.get_types(&mut locked,
                                                  import, cx.waker().clone(), not_trait) {
+                self.clean_up(&mut locked, self.name_resolver.imports());
                 return Poll::Ready(output);
             }
         }
@@ -143,12 +167,9 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         }
 
         // The finalized element doesn't exist, sleep.
-        if let Some(wakers) = manager.wakers.get_mut(self.getting.name()) {
-            wakers.push(cx.waker().clone());
-        } else {
-            manager.wakers.insert(self.getting.name().clone(), vec!(cx.waker().clone()));
-        }
+        manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
+        println!("        Sleeping for {}", self.getting.name());
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
     }

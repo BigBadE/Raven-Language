@@ -11,12 +11,11 @@ pub struct NumberIter {
 
 impl Iter<u64> for NumberIter {
     pub fn next(self) -> u64 {
-        self.current = self.current + 1;
-        return self.current - 1;
+        return self.current;
     }
 
     pub fn has_next(self) -> bool {
-        return self.current != self.end;
+        return false;
     }
 }
 
