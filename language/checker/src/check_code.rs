@@ -110,6 +110,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 calling = Box::new(Effects::NOP());
             }
 
+            println!("Trying {}", operation.name);
             let temp = verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
                                                       String::new(), values, None),
@@ -121,6 +122,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             for effect in effects {
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables, references).await?)
             }
+            println!("Finished effects for {}", method);
 
             let return_type;
             if let Effects::NOP() = *calling {
@@ -130,6 +132,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 return_type = found.get_return(variables).unwrap();
                 finalized_effects.insert(0, found);
             }
+            println!("Finished return type for {}", method);
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits.clone(), resolver.boxed_clone()).await {
@@ -138,6 +141,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
                     let data = &data.inner_struct().data;
+                    println!("Checking impls for {}", method);
                     while !syntax.lock().unwrap().finished_impls() {
                         {
                             let locked = syntax.lock().unwrap();
@@ -146,6 +150,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         thread::yield_now();
                     }
 
+                    println!("Last ditch getting impl for {}", method);
                     let result = match result {
                         Some(inner) => inner,
                         None => {
@@ -175,6 +180,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                            resolver, inner).await?.finalize(syntax.clone()).await),
                     None => None
                 };
+                println!("Checking method for {}", method.data.name);
                 check_method(process_manager, method,
                              finalized_effects, syntax, variables, returning).await?
             } else {
