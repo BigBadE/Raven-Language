@@ -66,6 +66,7 @@ impl<'a> ParserUtils<'a> {
                                  resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         match implementor {
             Ok(implementor) => {
+                println!("Starting implementor");
                 syntax.lock().unwrap().async_manager.parsing_impls += 1;
 
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
@@ -120,7 +121,7 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
-            println!("Finished impl {}", output.target);
+            println!("Finished impl {} ({} left)", output.target, locked.async_manager.parsing_impls-1);
             locked.implementations.push(output);
 
             locked.async_manager.parsing_impls -= 1;
