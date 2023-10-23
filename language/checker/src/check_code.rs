@@ -141,8 +141,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
                     let data = &data.inner_struct().data;
-                    println!("Checking impls for {}", method);
+                    println!("Checking impls for {} ({} left)", method, syntax.lock().unwrap().async_manager.parsing_impls);
+                    let mut i = 0;
                     while !syntax.lock().unwrap().finished_impls() {
+                        i += 1;
+                        if i == 10000 {
+                            println!("{} left!", syntax.lock().unwrap().async_manager.parsing_impls)
+                        }
                         {
                             let locked = syntax.lock().unwrap();
                             result = locked.get_implementation(&return_type, data);
