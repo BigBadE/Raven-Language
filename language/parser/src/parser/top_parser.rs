@@ -61,7 +61,11 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ImplStart => {
                 let implementor = parse_implementor(parser_utils,
                                                     attributes, modifiers);
-                let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
+                let process_manager = {
+                    let mut locked = parser_utils.syntax.lock().unwrap();
+                    locked.async_manager.parsing_impls += 1;
+                    locked.process_manager.cloned()
+                };
                 parser_utils.handle.spawn(
                         ParserUtils::add_implementor(parser_utils.syntax.clone(), implementor,
                         parser_utils.imports.boxed_clone(), process_manager));
