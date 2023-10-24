@@ -3,7 +3,7 @@ use std::sync::Arc;
 use inkwell::module::Linkage;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
-use syntax::function::{CodelessFinalizedFunction, display};
+use syntax::function::CodelessFinalizedFunction;
 use syntax::types::FinalizedTypes;
 use crate::type_getter::CompilerTypeGetter;
 
@@ -34,7 +34,6 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
                                    linkage: Option<Linkage>) -> FunctionValue<'ctx> {
     let mut params = Vec::new();
 
-    println!("{}{}", function.data.name, display(&function.arguments.iter().map(|inner| &inner.field.field_type).collect::<Vec<_>>(), ", "));
     for param in &function.arguments {
         params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }

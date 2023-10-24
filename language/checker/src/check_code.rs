@@ -131,6 +131,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.insert(0, found);
             }
 
+            println!("Found return type {}", return_type);
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits.clone(), resolver.boxed_clone()).await {
                 let mut output = None;
@@ -138,16 +139,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
                     if return_type.of_type(&data, None) {
-                        if method.is_empty() {
-                            let found = AsyncDataGetter::new(syntax.clone(),
-                                                             data.inner_struct().data.functions[0].clone()).await;
-                            match check_method(process_manager, found, finalized_effects, syntax, variables, None).await? {
-                                FinalizedEffects::MethodCall(_, calling, args) =>
-                                    return Ok(FinalizedEffects::VirtualCall(0, calling,
-                                                                            args)),
-                                _ => panic!("This code path should be impossible!")
-                            };
-                        }
                         let mut i = 0;
                         for found in &data.inner_struct().data.functions {
                             if found.name == method {
@@ -158,7 +149,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             i += 1;
                         }
 
-                        return Err(placeholder_error(format!("Unknown method {} in {}", method, data)));
+                        if !method.is_empty() {
+                            return Err(placeholder_error(
+                                format!("Unknown method {} in {}", method, data)));
+                        }
                     }
 
                     let data = &data.inner_struct().data;
@@ -176,10 +170,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             let locked = syntax.lock().unwrap();
                             match locked.get_implementation(&return_type, data) {
                                 Some(inner) => inner,
-                                None => return Err(
-                                    placeholder_error(format!("{} doesn't implement {}:\n{}", return_type, inner,
-                                                              locked.implementations.iter().map(|inner|
-                                                                  format!("{} impls {}", inner.target, inner.base)).collect::<Vec<_>>().join("\n"))))
+                                None => {
+                                    return Err(
+                                        placeholder_error(format!("Nothing implements {} for {} and {} ({} and {})\n{}", inner, return_type, data.name,
+                                                                  locked.async_manager.finished, locked.async_manager.parsing_impls,
+                                        locked.implementations.iter().map(|inner| format!("{} and {}", inner.base, inner.target)).collect::<Vec<_>>().join("\n"))))
+                                }
                             }
                         }
                     };

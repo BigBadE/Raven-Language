@@ -1,0 +1,13 @@
+fn test() -> bool {
+    return 0.trait_test();
+}
+
+trait Test {
+    fn trait_test() -> bool;
+}
+
+impl Test for u64 {
+    pub fn trait_test() -> bool {
+        return true;
+    }
+}
