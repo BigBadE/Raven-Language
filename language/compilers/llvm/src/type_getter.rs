@@ -22,6 +22,7 @@ use crate::compiler::CompilerImpl;
 use crate::function_compiler::{compile_block, instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
 use crate::main_future::MainFuture;
+use crate::util::print_formatted;
 use crate::vtable_manager::VTableManager;
 
 pub struct CompilerTypeGetter<'ctx> {
@@ -143,7 +144,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
         //}
 
-        //print_formatted(self.compiler.module.to_string());
+        print_formatted(self.compiler.module.to_string());
         return self.get_target(target);
     }
 

@@ -1,11 +1,9 @@
 use std::sync::Arc;
 use indexmap::IndexMap;
 
-use tokio::runtime::Handle;
-
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
 use syntax::{DataType, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement, TraitImplementor};
-use syntax::async_util::{NameResolver, UnparsedType};
+use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -25,7 +23,7 @@ pub struct ParserUtils<'a> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub file: String,
     pub imports: ImportNameResolver,
-    pub handle: Handle,
+    pub handle: Arc<Mutex<HandleWrapper>>,
 }
 
 impl<'a> ParserUtils<'a> {
@@ -40,7 +38,7 @@ impl<'a> ParserUtils<'a> {
             name, Box::new(self.imports.clone())));
     }
 
-    pub fn add_struct(&self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
+    pub fn add_struct(&mut self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
         let structure = match structure {
             Ok(adding) => adding,
             Err(error) => {
@@ -58,7 +56,7 @@ impl<'a> ParserUtils<'a> {
                                   structure.data());
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
-        self.handle.spawn(StructData::verify(structure, self.syntax.clone(),
+        self.handle.lock().unwrap().spawn(StructData::verify(structure, self.syntax.clone(),
                                              Box::new(self.imports.clone()), process_manager));
     }
 
@@ -100,9 +98,7 @@ impl<'a> ParserUtils<'a> {
         let target = implementor.base.await?;
         let base = implementor.implementor.await?;
 
-        println!("Finalizing {} and {}", target, base);
         let target = target.finalize(syntax.clone()).await;
-        println!("Almost finalized {} and {}", target, base);
         let base = base.finalize(syntax.clone()).await;
 
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
@@ -123,7 +119,6 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
-            println!("Finalized {} and {} ({} left)", output.target, output.base, locked.async_manager.parsing_impls);
             locked.implementations.push(output);
 
             locked.async_manager.parsing_impls -= 1;

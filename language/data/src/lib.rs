@@ -57,9 +57,11 @@ pub trait SourceSet: Debug {
     fn get_files(&self) -> Vec<Box<dyn Readable>>;
 
     fn relative(&self, other: &Box<dyn Readable>) -> String;
+
+    fn cloned(&self) -> Box<dyn SourceSet>;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FileSourceSet {
     pub root: PathBuf,
 }
@@ -93,6 +95,10 @@ impl SourceSet for FileSourceSet {
             return name[0..name.len()-3].to_string();
         }
         return name.as_str()[2..name.len() - 3].to_string();
+    }
+
+    fn cloned(&self) -> Box<dyn SourceSet> {
+        return Box::new(self.clone());
     }
 }
 

@@ -234,7 +234,7 @@ impl FinalizedStruct {
                     let name = name.clone();
                     let temp: &FinalizedTypes = generics.get(i).unwrap();
                     for bound in bounds {
-                        if !temp.of_type(&bound, syntax) {
+                        if !temp.of_type(&bound, Some(syntax)) {
                             panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
                         }
                     }
@@ -301,12 +301,9 @@ impl TopElement for StructData {
         {
             let mut locked = syntax.lock().unwrap();
             if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
-                println!("        Waking for {}", data.name);
                 for waker in wakers {
                     waker.wake();
                 }
-            } else {
-                println!("        None found for {}", data.name);
             }
 
             locked.structures.data.insert(data, structure.clone());

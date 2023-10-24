@@ -87,18 +87,21 @@ impl Syntax {
         }
         self.async_manager.finished = true;
 
-        for wakers in &mut self.structures.wakers.values() {
-            for waker in wakers {
+        let mut keys = Vec::new();
+        self.structures.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        for key in &keys {
+            for waker in self.structures.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
             }
         }
-        for wakers in &mut self.functions.wakers.values() {
-            for waker in wakers {
+
+        keys.clear();
+        self.functions.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        for key in &keys {
+            for waker in self.functions.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
             }
         }
-        self.structures.wakers.clear();
-        self.functions.wakers.clear();
     }
 
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used

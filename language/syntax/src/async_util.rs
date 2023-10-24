@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
+use std::mem;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc};
@@ -10,6 +11,8 @@ use std::task::{Context, Poll, Waker};
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 
 use crate::{ParsingError, TopElement};
 use crate::function::display_parenless;
@@ -67,6 +70,11 @@ impl<T: TopElement> AsyncTypesGetter<T> {
     }
 
     fn clean_up(&self, syntax: &mut Syntax, imports: &Vec<String>) {
+        // Can't clean till parsing is over
+        if !syntax.async_manager.finished {
+            return;
+        }
+
         let manager = T::get_manager(syntax);
         if let Some(found) = manager.wakers.remove(&self.getting) {
             for waker in found {
@@ -169,7 +177,6 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         // The finalized element doesn't exist, sleep.
         manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
-        println!("        Sleeping for {}", self.getting.name());
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
     }
@@ -202,4 +209,17 @@ pub trait NameResolver: Send + Sync {
 
     /// Clones the name resolver in a box, because it's a trait it can't be directly cloned.
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
+}
+
+
+pub struct HandleWrapper {
+    pub handle: Handle,
+    pub joining: Vec<JoinHandle<()>>
+}
+
+impl HandleWrapper {
+    pub fn spawn<T: Send + 'static, F: Future<Output=T> + Send + 'static>(&mut self, future: F) {
+        let handle = self.handle.spawn(future);
+        self.joining.push(unsafe { mem::transmute(handle) });
+    }
 }

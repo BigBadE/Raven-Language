@@ -30,7 +30,7 @@ mod test {
 
                     let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
                     let path = format!("{}::test", &path[0..path.len() - 3]);
-                    match build::<bool>(path.clone(), &mut arguments, vec!(Box::new(InnerFileSourceSet {
+                    match build::<bool>(path.clone(), arguments, vec!(Box::new(InnerFileSourceSet {
                         set: file
                     }))) {
                         Ok(inner) => match inner {
@@ -51,7 +51,7 @@ mod test {
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InnerFileSourceSet {
     set: &'static File<'static>,
 }
@@ -65,5 +65,9 @@ impl SourceSet for InnerFileSourceSet {
         let name = other.path()
             .replace(path::MAIN_SEPARATOR, "::");
         return name[0..name.len() - 3].to_string();
+    }
+
+    fn cloned(&self) -> Box<dyn SourceSet> {
+        return Box::new(self.clone());
     }
 }

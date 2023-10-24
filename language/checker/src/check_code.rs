@@ -111,9 +111,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             let temp = verify_effect(process_manager, resolver,
-                          Effects::ImplementationCall(calling, operation.name.clone(),
-                                                      String::new(), values, None),
-                          syntax, variables, references).await?;
+                                     Effects::ImplementationCall(calling, operation.name.clone(),
+                                                                 String::new(), values, None),
+                                     syntax, variables, references).await?;
             temp
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {
@@ -137,6 +137,26 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 {
                     let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
+                    if return_type.of_type(&data, None) {
+                        if method.is_empty() {
+                            return Ok(FinalizedEffects::VirtualCall(0,
+                                                                    AsyncDataGetter::new(syntax.clone(),
+                                                                                         data.inner_struct().data.functions[0].clone()).await,
+                                                              finalized_effects));
+                        }
+                        let mut i = 0;
+                        for found in &data.inner_struct().data.functions {
+                            if found.name == method {
+                                return Ok(FinalizedEffects::VirtualCall(i,
+                                                                        AsyncDataGetter::new(syntax.clone(), found.clone()).await,
+                                                                        finalized_effects));
+                            }
+                            i += 1;
+                        }
+
+                        return Err(placeholder_error(format!("Unknown method {} in {}", method, data)));
+                    }
+
                     let data = &data.inner_struct().data;
                     while !syntax.lock().unwrap().finished_impls() {
                         {
@@ -196,7 +216,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
-                    
+
                     if !check_args(&method, &mut finalized_effects, syntax, variables).await? {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
@@ -309,7 +329,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let types = output.get(0).map(|found| found.get_return(variables).unwrap());
             if let Some(found) = &types {
                 for checking in &output {
-                    if !checking.get_return(variables).unwrap().of_type(found, syntax) {
+                    if !checking.get_return(variables).unwrap().of_type(found, Some(syntax)) {
                         return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
                     }
                 }
@@ -392,7 +412,7 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
         if returning.is_some() {
             let inner = returning.as_ref().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
-            if !inner.of_type(other, syntax) {
+            if !inner.of_type(other, Some(syntax)) {
                 return Ok(false);
             }
 
