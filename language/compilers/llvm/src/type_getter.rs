@@ -97,20 +97,15 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub async fn compile<T>(&mut self, target: String, syntax: &Arc<Mutex<Syntax>>, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
-                      _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>)
-                      -> Option<JitFunction<'_, Main<T>>> {
-        match Syntax::get_function(syntax.clone(), ParsingError::empty(), target.clone(),
+    pub async fn compile(&mut self, target: String, syntax: &Arc<Mutex<Syntax>>, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+                      _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> bool {
+        match Syntax::get_function(syntax.clone(), ParsingError::empty(), target,
                              Box::new(EmptyNameResolver {}), false).await {
             Ok(_) => {},
-            Err(_) => return None
+            Err(_) => return false
         };
 
-        let target = target.as_str();
-
-        println!("Main exists!");
         let function = MainFuture { syntax: syntax.clone() }.await;
-        println!("Got main!");
 
         instance_function(Arc::new(function.to_codeless()), self);
 
@@ -124,7 +119,6 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 continue
             }
 
-            println!("Compiling {}", function.data.name);
             let finalized_function;
             {
                 let reading = functions.read().unwrap();
@@ -148,10 +142,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         //}
 
         print_formatted(self.compiler.module.to_string());
-        return self.get_target(target);
+        return true;
     }
 
-    fn get_target<T>(&self, target: &str) -> Option<JitFunction<'_, Main<T>>> {
+    pub(crate) fn get_target<T>(&self, target: &str) -> Option<JitFunction<'_, Main<T>>> {
         return unsafe {
             match self.compiler.execution_engine.get_function(target) {
                 Ok(value) => Some(value),

@@ -9,6 +9,7 @@ use std::mem::size_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use include_dir::{Dir, DirEntry, File, include_dir};
+use tokio::runtime::Builder;
 
 use data::{Arguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
@@ -33,7 +34,7 @@ fn main() {
 
         println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
         match build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
-                                 &mut arguments, vec!(Box::new(FileSourceSet {
+                                 arguments, vec!(Box::new(FileSourceSet {
             root: target,
         }))) {
             _ => return
@@ -72,14 +73,14 @@ fn main() {
     }
 
     println!("Building and running project...");
-    match build::<()>("main::main".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+    match build::<()>("main::main".to_string(), arguments, vec!(Box::new(FileSourceSet {
         root: source
     }))) {
         _ => {}
     }
 }
 
-pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>)
+pub fn build<T: Send + 'static>(target: String, mut arguments: Arguments, mut source: Vec<Box<dyn SourceSet>>)
     -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
@@ -98,16 +99,15 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
         set: &CORE
     }));
 
-    arguments.runner_settings.sources = source;
+    arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
 
     let value = run::<T>(target, &arguments);
-    println!("Loaded inner value");
     return match value {
         Ok(inner) => Ok(inner),
         Err(errors) => {
             println!("Errors:");
             for error in errors {
-                error.print(&arguments.runner_settings.sources);
+                error.print(&source);
             }
             Err(())
         },
@@ -115,9 +115,8 @@ pub fn build<T: Send + 'static>(target: String, arguments: &mut Arguments, mut s
 }
 
 fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = arguments.cpu_runtime.block_on(
+    let result = Builder::new_current_thread().build().unwrap().block_on(
         runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
-    println!("Loading!");
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
@@ -192,7 +191,7 @@ fn load_array<T: Debug>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
     return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InnerSourceSet {
     set: &'static Dir<'static>,
 }
@@ -213,6 +212,10 @@ impl SourceSet for InnerSourceSet {
         let name = other.path()
             .replace(path::MAIN_SEPARATOR, "::");
         return name[0..name.len() - 3].to_string();
+    }
+
+    fn cloned(&self) -> Box<dyn SourceSet> {
+        return Box::new(self.clone());
     }
 }
 

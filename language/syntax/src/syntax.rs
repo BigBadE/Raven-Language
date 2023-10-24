@@ -13,6 +13,7 @@ use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use tokio::sync::mpsc::Receiver;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
@@ -87,18 +88,21 @@ impl Syntax {
         }
         self.async_manager.finished = true;
 
-        for wakers in &mut self.structures.wakers.values() {
-            for waker in wakers {
+        let mut keys = Vec::new();
+        self.structures.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        for key in &keys {
+            for waker in self.structures.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
             }
         }
-        for wakers in &mut self.functions.wakers.values() {
-            for waker in wakers {
+
+        keys.clear();
+        self.functions.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        for key in &keys {
+            for waker in self.functions.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
             }
         }
-        self.structures.wakers.clear();
-        self.functions.wakers.clear();
     }
 
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used
@@ -395,5 +399,6 @@ impl Syntax {
 #[async_trait]
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
-    async fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
+    /// Waits for the receiver before calling any of the code
+    async fn compile(&self, target: String, receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
 }

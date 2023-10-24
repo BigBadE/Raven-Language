@@ -9,6 +9,7 @@ use no_deadlocks::Mutex;
 use std::sync::Mutex;
 
 use inkwell::context::Context;
+use tokio::sync::mpsc::Receiver;
 use async_trait::async_trait;
 use syntax::function::FinalizedFunction;
 use syntax::r#struct::FinalizedStruct;
@@ -53,14 +54,16 @@ impl LLVMCompiler {
 
 #[async_trait]
 impl<T> Compiler<T> for LLVMCompiler {
-    async fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
+    async fn compile(&self, target: String, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
         let mut binding = CompilerTypeGetter::new(
             Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        let result = binding.compile(target, syntax, &self.compiling,
-                                     &self.struct_compiling).await;
+        if binding.compile(target.clone(), syntax, &self.compiling,
+                                     &self.struct_compiling).await {
+            receiver.recv().await.unwrap();
+            return binding.get_target(&target).map(|inner| unsafe { inner.call() });
+        }
 
-        println!("Ready to call!");
-        return result.map(|inner| unsafe { inner.call() });
+        return None;
     }
 }

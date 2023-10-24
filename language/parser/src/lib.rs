@@ -6,8 +6,7 @@ use std::sync::Arc; #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
-use tokio::runtime::Handle;
-use syntax::async_util::{NameResolver, UnparsedType};
+use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
 use crate::parser::top_parser::parse_top;
 use crate::parser::util::ParserUtils;
@@ -17,7 +16,7 @@ use crate::tokens::tokens::TokenTypes;
 pub mod parser;
 pub mod tokens;
 
-pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, file: String) {
+pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Arc<Mutex<HandleWrapper>>, name: String, file: String) {
     let mut tokenizer = Tokenizer::new(file.as_bytes());
     let mut tokens = Vec::new();
     loop {
@@ -34,7 +33,7 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Handle, name: String, fil
         syntax,
         file: name.clone(),
         imports: ImportNameResolver::new(name.clone()),
-        handle,
+        handle
     };
 
     parse_top(&mut parser_utils);

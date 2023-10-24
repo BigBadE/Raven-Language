@@ -1,15 +1,17 @@
-use std::sync::{Arc, mpsc};
-use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 use anyhow::Error;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use checker::output::TypesChecker;
 use data::Arguments;
 use parser::parse;
+use syntax::async_util::HandleWrapper;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 
@@ -23,11 +25,13 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     let syntax = Arc::new(Mutex::new(syntax));
 
-    let (sender, receiver) = mpsc::channel();
+    let (sender, mut receiver) = mpsc::channel(1);
+    let (go_sender, go_receiver) = mpsc::channel(1);
 
-    settings.cpu_runtime.spawn(start(target, settings.runner_settings.compiler.clone(), sender, syntax.clone()));
+    settings.cpu_runtime.spawn(start(target, settings.runner_settings.compiler.clone(), sender, go_receiver, syntax.clone()));
 
     //Parse source, getting handles and building into the unresolved syntax.
+    let handle = Arc::new(Mutex::new(HandleWrapper { handle: settings.cpu_runtime.handle().clone(), joining: vec!() }));
     let mut handles = Vec::new();
     for source_set in &settings.runner_settings.sources {
         for file in source_set.get_files() {
@@ -36,7 +40,7 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
             }
 
             handles.push(
-                settings.io_runtime.spawn(parse(syntax.clone(), settings.io_runtime.handle().clone(),
+                settings.io_runtime.spawn(parse(syntax.clone(), handle.clone(),
                                                 source_set.relative(&file).clone(),
                                                 file.read())));
         }
@@ -62,12 +66,30 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    let output = receiver.recv().unwrap();
-    println!("Got output!");
-    return output;
+    let mut failed = false;
+    while let Some(found) = handle.lock().unwrap().joining.pop() {
+        match found.await {
+            Err(error) => {
+                failed = true;
+                println!("Error: {}", error);
+            },
+            _ => {}
+        }
+    }
+    if failed {
+        panic!("Error detected!");
+    }
+
+    let errors = syntax.lock().unwrap().errors.clone();
+    if errors.is_empty() {
+        go_sender.send(()).await.unwrap();
+        return Ok(receiver.recv().await.unwrap());
+    } else {
+        return Err(errors);
+    }
 }
 
-pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Option<T>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start<T>(target: String, compiler: String, sender: Sender<Option<T>>, receiver: Receiver<()>, syntax: Arc<Mutex<Syntax>>) {
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();
@@ -75,13 +97,5 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Op
                                      locked.strut_compiling.clone(), compiler);
     }
 
-    println!("Compiling!");
-    let returning = code_compiler.compile(target, &syntax).await;
-    let errors = &syntax.lock().unwrap().errors;
-
-    if errors.is_empty() {
-        sender.send(Ok(returning)).unwrap();
-    } else {
-        sender.send(Err(errors.clone())).unwrap();
-    }
+    sender.send(code_compiler.compile(target, receiver, &syntax).await).await.unwrap();
 }

@@ -54,6 +54,7 @@ impl Token {
 }
 
 /// This allows for Tokens to be used in the Result type.
+///
 impl Try for Token {
     type Output = Token;
     type Residual = Token;

@@ -16,15 +16,12 @@ mod test {
     #[test]
     pub fn test_magpie() {
         test_recursive(&TESTS);
-        println!("Finished test!");
     }
 
     fn test_recursive(dir: &'static Dir) {
         for entry in dir.entries() {
-            println!("Starting entry!");
             match entry {
                 DirEntry::File(file) => {
-                    println!("Starting with {}", file.path().to_str().unwrap());
                     let mut arguments = Arguments::build_args(false, RunnerSettings {
                         sources: vec!(),
                         debug: false,
@@ -33,7 +30,7 @@ mod test {
 
                     let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
                     let path = format!("{}::test", &path[0..path.len() - 3]);
-                    match build::<bool>(path.clone(), &mut arguments, vec!(Box::new(InnerFileSourceSet {
+                    match build::<bool>(path.clone(), arguments, vec!(Box::new(InnerFileSourceSet {
                         set: file
                     }))) {
                         Ok(inner) => match inner {
@@ -44,22 +41,17 @@ mod test {
                         },
                         Err(()) => assert!(false, "Failed to compile test {}!", path)
                     }
-                    println!("Passed test");
                 }
                 DirEntry::Dir(dir) => {
-                    println!("Recursing!");
                     test_recursive(dir);
-                    println!("Done recursing!")
                 }
             }
-            println!("Done with entry!");
         }
-        println!("Done!");
     }
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InnerFileSourceSet {
     set: &'static File<'static>,
 }
@@ -73,5 +65,9 @@ impl SourceSet for InnerFileSourceSet {
         let name = other.path()
             .replace(path::MAIN_SEPARATOR, "::");
         return name[0..name.len() - 3].to_string();
+    }
+
+    fn cloned(&self) -> Box<dyn SourceSet> {
+        return Box::new(self.clone());
     }
 }

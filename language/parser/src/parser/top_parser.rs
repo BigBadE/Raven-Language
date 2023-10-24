@@ -26,7 +26,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, false, attributes, modifiers);
                 let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
-                parser_utils.handle.spawn(FunctionData::verify(function, parser_utils.syntax.clone(),
+                parser_utils.handle.lock().unwrap().spawn(FunctionData::verify(function, parser_utils.syntax.clone(),
                                                                Box::new(parser_utils.imports.clone()),
                                                                parser_utils.syntax.lock().unwrap().process_manager.cloned()));
 
@@ -61,8 +61,12 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ImplStart => {
                 let implementor = parse_implementor(parser_utils,
                                                     attributes, modifiers);
-                let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
-                parser_utils.handle.spawn(
+                let process_manager = {
+                    let mut locked = parser_utils.syntax.lock().unwrap();
+                    locked.async_manager.parsing_impls += 1;
+                    locked.process_manager.cloned()
+                };
+                parser_utils.handle.lock().unwrap().spawn(
                         ParserUtils::add_implementor(parser_utils.syntax.clone(), implementor,
                         parser_utils.imports.boxed_clone(), process_manager));
                 attributes = Vec::new();

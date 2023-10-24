@@ -68,7 +68,9 @@ impl Types {
     pub async fn finalize(&self, syntax: Arc<Mutex<Syntax>>) -> FinalizedTypes {
         return match self {
             Types::Struct(structs) =>
-                FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
+                {
+                    FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await)
+                },
             Types::Reference(structs) =>
                 FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
             Types::Array(inner) => FinalizedTypes::Array(Box::new(inner.finalize(syntax).await)),
@@ -174,13 +176,17 @@ impl FinalizedTypes {
     /// Checks if the type is of the other type, following Raven's type rules.
     /// May block until all implementations are finished parsing, must not be called from
     /// implementation parsing to prevent deadlocking.
-    pub fn of_type(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>) -> bool {
+    pub fn of_type(&self, other: &FinalizedTypes, syntax: Option<&Arc<Mutex<Syntax>>>) -> bool {
         return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
                     if found == other_struct {
                         true
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
+                        if syntax.is_none() {
+                            return false;
+                        }
+                        let syntax = syntax.unwrap();
                         // Only check for implementations if being compared against a trait.
                         // Wait for the implementation to finish.
                         while !syntax.lock().unwrap().finished_impls() {
@@ -198,7 +204,7 @@ impl FinalizedTypes {
                 FinalizedTypes::Generic(_, bounds) => {
                     // If any bounds fail, the type isn't of the generic.
                     for bound in bounds {
-                        if !self.of_type(bound, syntax) {
+                        if !other.of_type(bound, syntax) {
                             return false;
                         }
                     }
@@ -218,14 +224,18 @@ impl FinalizedTypes {
                 // Only arrays can equal arrays
                 _ => false
             },
-            FinalizedTypes::GenericType(base, _generics) => match other {
-                FinalizedTypes::GenericType(_other_base, _other_generics) => {
-                    if !base.of_type(self, syntax) {
+            FinalizedTypes::GenericType(base, generics) => match other {
+                FinalizedTypes::GenericType(other_base, other_generics) => {
+                    if generics.len() != other_generics.len() || !base.of_type(other_base, syntax) {
                         return false;
                     }
 
-                    //TODO check generics, I have no clue how to with respect to subFinalizedTypes.
-                    todo!()
+                    for i in 0..generics.len() {
+                        if !generics[i].of_type(&other_generics[i], syntax) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
                 FinalizedTypes::Generic(_, bounds) => {
                     // Check each bound, if any are violated it's not of the generic type.
@@ -237,9 +247,7 @@ impl FinalizedTypes {
                     true
                 }
                 // Against structures just check the base.
-                FinalizedTypes::Struct(_) => {
-                    base.of_type(other, syntax)
-                }
+                FinalizedTypes::Struct(_) => base.of_type(other, syntax),
                 // References are ignored for type checking.
                 FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
                 FinalizedTypes::Array(_) => false
@@ -274,7 +282,7 @@ impl FinalizedTypes {
             FinalizedTypes::Generic(_name, bounds) => {
                 // Check for bound errors.
                 for bound in bounds {
-                    if !other.of_type(bound, syntax) {
+                    if !other.of_type(bound, Some(syntax)) {
                         return Err(bounds_error);
                     }
                 }
@@ -310,14 +318,13 @@ impl FinalizedTypes {
                 if let Some(found) = generics.get(name) {
                     // This should never trip, but it's a sanity check.
                     for bound in bounds {
-                        if !found.of_type(bound, syntax) {
+                        if !found.of_type(bound, Some(syntax)) {
                             return Err(bounds_error);
                         }
                     }
                     *self = found.clone();
                     Ok(())
                 } else {
-                    println!("Failed to find {} in {:?}", name, generics.keys());
                     Err(none_error)
                 }
             }

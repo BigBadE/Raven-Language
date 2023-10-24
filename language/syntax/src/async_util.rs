@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
+use std::mem;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::{Arc};
@@ -10,6 +11,8 @@ use std::task::{Context, Poll, Waker};
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 
 use crate::{ParsingError, TopElement};
 use crate::function::display_parenless;
@@ -65,6 +68,33 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 
         return None;
     }
+
+    fn clean_up(&self, syntax: &mut Syntax, imports: &Vec<String>) {
+        // Can't clean till parsing is over
+        if !syntax.async_manager.finished {
+            return;
+        }
+
+        let manager = T::get_manager(syntax);
+        if let Some(found) = manager.wakers.remove(&self.getting) {
+            for waker in found {
+                waker.wake();
+            }
+        }
+
+        for import in imports {
+            let import = if import.ends_with(&self.getting) {
+                import.clone()
+            } else {
+                format!("{}::{}", import, self.getting)
+            };
+            if let Some(found) = manager.wakers.remove(&import) {
+                for waker in found {
+                    waker.wake();
+                }
+            }
+        }
+    }
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
@@ -95,24 +125,24 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        // Check if a structure directly referenced with that name exists.
+        // Check if an element directly referenced with that name exists.
         if let Some(output) = self.get_types(&mut locked,
                                              String::new(), cx.waker().clone(), not_trait) {
+            self.clean_up(&mut locked, self.name_resolver.imports());
             return Poll::Ready(output);
         }
 
-        // Check each import if the structure is in those files.
+        // Check each import if the element is in those files.
         for import in self.name_resolver.imports().clone() {
             if let Some(output) = self.get_types(&mut locked,
                                                  import, cx.waker().clone(), not_trait) {
+                self.clean_up(&mut locked, self.name_resolver.imports());
                 return Poll::Ready(output);
             }
         }
 
         // If the async manager is finished, return an error.
         if locked.async_manager.finished {
-            println!("Error for {} from {:?}: {}", self.getting, T::get_manager(locked.deref_mut())
-                .types.keys(), self.error);
             return Poll::Ready(Err(self.error.clone()));
         }
 
@@ -145,11 +175,7 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         }
 
         // The finalized element doesn't exist, sleep.
-        if let Some(wakers) = manager.wakers.get_mut(self.getting.name()) {
-            wakers.push(cx.waker().clone());
-        } else {
-            manager.wakers.insert(self.getting.name().clone(), vec!(cx.waker().clone()));
-        }
+        manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
@@ -183,4 +209,17 @@ pub trait NameResolver: Send + Sync {
 
     /// Clones the name resolver in a box, because it's a trait it can't be directly cloned.
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
+}
+
+
+pub struct HandleWrapper {
+    pub handle: Handle,
+    pub joining: Vec<JoinHandle<()>>
+}
+
+impl HandleWrapper {
+    pub fn spawn<T: Send + 'static, F: Future<Output=T> + Send + 'static>(&mut self, future: F) {
+        let handle = self.handle.spawn(future);
+        self.joining.push(unsafe { mem::transmute(handle) });
+    }
 }
