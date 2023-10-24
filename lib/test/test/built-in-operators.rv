@@ -1,0 +1,4 @@
+fn test() -> bool {
+    let value = (1 + 2) - 3 / 4 * 5;
+    return !(value != 3);
+}

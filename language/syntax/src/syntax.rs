@@ -134,7 +134,7 @@ impl Syntax {
         for implementation in &self.implementations {
             if &implementation.target.inner_struct().data == implementor_struct &&
                 (implementing_trait.eq(&implementation.base) ||
-                    self.solve(&implementing_trait, &implementation.base)) {
+                    self.solve(&implementation.base, &implementing_trait)) {
                 return Some(implementation.functions.clone());
             }
         }

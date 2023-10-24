@@ -2,6 +2,5 @@ import stdio;
 
 fn main() {
     printf("Start!");
-
     printf("Stop!");
 }

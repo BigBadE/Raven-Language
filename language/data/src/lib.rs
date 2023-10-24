@@ -17,7 +17,7 @@ pub struct RunnerSettings {
 pub struct Arguments {
     pub io_runtime: Runtime,
     pub cpu_runtime: Runtime,
-    pub runner_settings: RunnerSettings,
+    pub runner_settings: RunnerSettings
 }
 
 impl Arguments {
@@ -33,7 +33,7 @@ impl Arguments {
                 .expect("Failed to build I/O runtime"),
             cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
-            runner_settings,
+            runner_settings
         };
     }
 }

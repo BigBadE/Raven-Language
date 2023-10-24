@@ -33,7 +33,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         tokenizer.make_token(TokenTypes::ParenClose)
     } else if tokenizer.matches(".") {
         // This is only a number if the thing before and after is a digit. "1." and ".1" aren't numbers.
-        if (tokenizer.buffer[tokenizer.index] as char).is_numeric() && tokenizer.buffer[tokenizer.index].is_ascii_digit() {
+        if tokenizer.buffer[tokenizer.index].is_ascii_digit() && tokenizer.buffer[tokenizer.index-2].is_ascii_digit() {
             tokenizer.index -= 1;
             parse_numbers(tokenizer)
         } else {
@@ -50,8 +50,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     } else if tokenizer.matches_word("false") {
         tokenizer.make_token(TokenTypes::False)
         // For loops only come at the beginning of a line.
-    } else if tokenizer.matches_word("for") &&
-        (tokenizer.last.token_type == TokenTypes::LineEnd || tokenizer.last.token_type == TokenTypes::CodeEnd) {
+    } else if tokenizer.matches_word("for") {
         tokenizer.make_token(TokenTypes::For)
         // While loops only come at the beginning of a line.
     } else if tokenizer.matches_word("while") {

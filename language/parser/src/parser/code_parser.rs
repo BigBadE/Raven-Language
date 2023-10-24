@@ -94,7 +94,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             }
             TokenTypes::Integer => {
                 if effect.is_some() {
-                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected integer! Did you forget a semicolon?")));
+                    return Err(token.make_error(parser_utils.file.clone(), format!("Unexpected integer! Did you forget a semicolon? {:?}", effect.unwrap())));
                 }
                 effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
             }
@@ -266,7 +266,17 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             }
             TokenTypes::Else => return Err(token.make_error(parser_utils.file.clone(),
                                                             "Unexpected Else!".to_string())),
-            TokenTypes::Period | TokenTypes::Comment => {}
+            TokenTypes::Period => if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Period {
+                let operator = parse_operator(effect, parser_utils, &state)?;
+                // Operators inside operators return immediately so operators can be combined
+                // later on for operators like [].
+                if ParseState::InOperator == state || ParseState::ControlOperator == state {
+                    return Ok(Some(Expression::new(expression_type, operator)));
+                } else {
+                    effect = Some(operator);
+                }
+            },
+            TokenTypes::Comment => {},
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }

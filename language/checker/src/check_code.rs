@@ -139,10 +139,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     let data = inner.finalize(syntax.clone()).await;
                     if return_type.of_type(&data, None) {
                         if method.is_empty() {
-                            return Ok(FinalizedEffects::VirtualCall(0,
-                                                                    AsyncDataGetter::new(syntax.clone(),
-                                                                                         data.inner_struct().data.functions[0].clone()).await,
-                                                              finalized_effects));
+                            let found = AsyncDataGetter::new(syntax.clone(),
+                                                             data.inner_struct().data.functions[0].clone()).await;
+                            match check_method(process_manager, found, finalized_effects, syntax, variables, None).await? {
+                                FinalizedEffects::MethodCall(_, calling, args) =>
+                                    return Ok(FinalizedEffects::VirtualCall(0, calling,
+                                                                            args)),
+                                _ => panic!("This code path should be impossible!")
+                            };
                         }
                         let mut i = 0;
                         for found in &data.inner_struct().data.functions {
@@ -267,12 +271,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 verify_effect(process_manager, resolver, *effect, syntax, variables, references).await?),
                                           first, second),
         Effects::CreateStruct(target, effects) => {
-            let mut target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
-                                                resolver.boxed_clone(), target)
+            let target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
+                                            resolver.boxed_clone(), target)
                 .await?.finalize(syntax.clone()).await;
-            if let FinalizedTypes::GenericType(mut base, mut bounds) = target {
-                target = base.flatten(&mut bounds, syntax).await?;
-            }
             let mut final_effects = Vec::new();
             for (field_name, effect) in effects {
                 let mut i = 0;

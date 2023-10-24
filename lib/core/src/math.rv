@@ -51,7 +51,7 @@ trait Multiply<E, C> {
     fn multiply(self, other: E) -> C;
 }
 
-#[priority(1)]
+#[priority(2)]
 #[operation({}*={})]
 trait MultiplyAndAssign<E, C> {
     fn multiply_assign(self, other: E) -> C;
@@ -63,7 +63,7 @@ trait Divide<E, C> {
     fn divide(self, other: E) -> C;
 }
 
-#[priority(1)]
+#[priority(2)]
 #[operation({}/={})]
 trait DivideAndAssign<E, C> {
     fn divide_assign(self, other: E) -> C;
@@ -75,7 +75,7 @@ trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(1)]
+#[priority(2)]
 #[operation({}%={})]
 trait RemainderAndAssign<E, C> {
     fn remainder_assign(self, other: E) -> C;
@@ -85,5 +85,87 @@ trait RemainderAndAssign<E, C> {
 pub internal impl<T: Number, E: Number> Equal<T> for E {
     fn equal(self, other: T) -> bool {
 
+    }
+}
+
+pub impl<T, E: Equal<T>> NotEqual<T> for T {
+    fn not_equal(self, other: E) -> bool {
+        return !(other == self);
+    }
+}
+
+pub internal impl Not<bool> for bool {
+    fn not(self) -> bool {
+
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Add<T, T> for T {
+    fn add(self, other: T) -> T {
+
+    }
+}
+
+pub impl<E, T: Add<E>> AddAndAssign<T, T> for E {
+    fn add_assign(self, other: T) -> E {
+        self = other + self;
+        return self;
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Subtract<T, T> for T {
+    fn subtract(self, other: T) -> T {
+
+    }
+}
+
+pub impl<E, T: Subtract<E>> SubtractAndAssign<T, T> for E {
+    fn subtract_assign(self, other: T) -> E {
+        self = other - self;
+        return self;
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Multiply<T, T> for T {
+    fn multiply(self, other: T) -> T {
+
+    }
+}
+
+pub impl<E, T: Multiply<E>> MultiplyAndAssign<T, T> for E {
+    fn multiply_assign(self, other: T) -> E {
+        self = other * self;
+        return self;
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Divide<T, T> for T {
+    fn divide(self, other: T) -> T {
+
+    }
+}
+
+pub impl<E, T: Divide<E>> DivideAndAssign<T, T> for E {
+    fn divide_assign(self, other: T) -> E {
+        self = other / self;
+        return self;
+    }
+}
+
+//Basic math operations, implemented internally by the compiler.
+pub internal impl<T: Number> Remainder<T, T> for T {
+    fn remainder(self, other: T) -> T {
+
+    }
+}
+
+pub impl<E, T: Remainder<E>> RemainderAndAssign<T, T> for E {
+    fn remainder_assign(self, other: T) -> E {
+        self = other % self;
+        return self;
     }
 }
