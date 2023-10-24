@@ -64,8 +64,6 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    let output = receiver.recv().unwrap();
-
     let mut failed = false;
     while let Some(found) = handle.lock().unwrap().joining.pop() {
         match found.await {
@@ -80,10 +78,15 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
         panic!("Error detected!");
     }
 
-    return output;
+    let errors = syntax.lock().unwrap().errors.clone();
+    if errors.is_empty() {
+        return Ok(receiver.recv().unwrap());
+    } else {
+        return Err(errors);
+    }
 }
 
-pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Option<T>, Vec<ParsingError>>>, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start<T>(target: String, compiler: String, sender: Sender<Option<T>>, syntax: Arc<Mutex<Syntax>>) {
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();
@@ -92,11 +95,5 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Result<Op
     }
 
     let returning = code_compiler.compile(target, &syntax).await;
-    let errors = &syntax.lock().unwrap().errors;
-
-    if errors.is_empty() {
-        sender.send(Ok(returning)).unwrap();
-    } else {
-        sender.send(Err(errors.clone())).unwrap();
-    }
+    sender.send(returning).unwrap();
 }
