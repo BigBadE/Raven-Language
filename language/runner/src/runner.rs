@@ -1,11 +1,12 @@
-use std::sync::{Arc, mpsc};
-use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 use anyhow::Error;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use checker::output::TypesChecker;
 use data::Arguments;
@@ -24,12 +25,13 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     let syntax = Arc::new(Mutex::new(syntax));
 
-    let (sender, receiver) = mpsc::channel();
+    let (sender, mut receiver) = mpsc::channel(1);
+    let (go_sender, go_receiver) = mpsc::channel(1);
 
-    settings.cpu_runtime.spawn(start(target, settings.runner_settings.compiler.clone(), sender, syntax.clone()));
+    settings.cpu_runtime.spawn(start(target, settings.runner_settings.compiler.clone(), sender, go_receiver, syntax.clone()));
 
     //Parse source, getting handles and building into the unresolved syntax.
-    let mut handle = Arc::new(Mutex::new(HandleWrapper { handle: settings.cpu_runtime.handle().clone(), joining: vec!() }));
+    let handle = Arc::new(Mutex::new(HandleWrapper { handle: settings.cpu_runtime.handle().clone(), joining: vec!() }));
     let mut handles = Vec::new();
     for source_set in &settings.runner_settings.sources {
         for file in source_set.get_files() {
@@ -80,13 +82,14 @@ pub async fn run<T: Send + 'static>(target: String, settings: &Arguments)
 
     let errors = syntax.lock().unwrap().errors.clone();
     if errors.is_empty() {
-        return Ok(receiver.recv().unwrap());
+        go_sender.send(()).await.unwrap();
+        return Ok(receiver.recv().await.unwrap());
     } else {
         return Err(errors);
     }
 }
 
-pub async fn start<T>(target: String, compiler: String, sender: Sender<Option<T>>, syntax: Arc<Mutex<Syntax>>) {
+pub async fn start<T>(target: String, compiler: String, sender: Sender<Option<T>>, receiver: Receiver<()>, syntax: Arc<Mutex<Syntax>>) {
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();
@@ -94,6 +97,5 @@ pub async fn start<T>(target: String, compiler: String, sender: Sender<Option<T>
                                      locked.strut_compiling.clone(), compiler);
     }
 
-    let returning = code_compiler.compile(target, &syntax).await;
-    sender.send(returning).unwrap();
+    sender.send(code_compiler.compile(target, receiver, &syntax).await).await.unwrap();
 }

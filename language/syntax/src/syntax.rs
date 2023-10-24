@@ -13,6 +13,7 @@ use indexmap::IndexMap;
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use tokio::sync::mpsc::Receiver;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
@@ -398,5 +399,6 @@ impl Syntax {
 #[async_trait]
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
-    async fn compile(&self, target: String, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
+    /// Waits for the receiver before calling any of the code
+    async fn compile(&self, target: String, receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
 }

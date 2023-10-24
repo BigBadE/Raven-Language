@@ -69,8 +69,7 @@ impl Types {
         return match self {
             Types::Struct(structs) =>
                 {
-                    let found = AsyncDataGetter::new(syntax, structs.clone()).await;
-                    FinalizedTypes::Struct(found)
+                    FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await)
                 },
             Types::Reference(structs) =>
                 FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
