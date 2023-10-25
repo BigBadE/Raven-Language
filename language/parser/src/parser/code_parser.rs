@@ -307,29 +307,37 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
                 // get the text from the Raven file starting at the last token up to the current escape character
                 let found = token.to_string(parser_utils.buffer);
 
+                // check if it a hex value, because if it is, then it will 4 characters long (\xAA)
+                let is_hex = found.len() >= 3 && &found[found.len() - 3..found.len() - 2] == "x";
+                let string_end = found.len() - (if is_hex { 4 } else { 2 });
+
                 // add the text to the string, because this text is part of the string in the Raven Code
-                // end at -2 because the last character is the \, which should not be in the string
-                string += &found[0..found.len() - 2];
+                string += &found[0..string_end];
 
                 // match the character after the \ to see what type of escape character it is
-                match parser_utils.buffer[token.end_offset - 1] {
-                    b'n' => {
+                let index = if is_hex { found.len() - 3 } else { found.len() - 1 };
+                match &found[index..index + 1] {
+                    "n" => {
                        string += "\n";
                     }
-                    b't' => {
+                    "t" => {
                         string += "\t";
                     }
-                    b'r' => {
+                    "r" => {
                         string += "\r";
                     }
-                    b'\\' => {
+                    "\\" => {
                         string += "\\";
                     }
-                    b'\'' => {
+                    "\'" => {
                         string += "\'";
                     }
-                    b'\"' => {
+                    "\"" => {
                         string += "\"";
+                    }
+                    "x" => {
+                        // Convert the hex to a character, and append it to the string
+                        string.push(u8::from_str_radix(&found[found.len() - 2..found.len()], 16).expect("Unexpected hex value") as char);
                     }
                     _ => {
                         // not a supported character

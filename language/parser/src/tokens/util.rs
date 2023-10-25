@@ -119,10 +119,18 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::StringStart)
             },
             b'\\' => {
+
+                // if it is a hex value, then increment the tokenizer by an extra 2 because
+                // the escape character is 4 characters long instead of 2 (ex. \xAA)
+                if tokenizer.buffer[tokenizer.index] == b'x' {
+                    tokenizer.index += 2;
+                }
+
                 // increment the tokenizer so that it includes the \
                 // if you didn't do this, then the character being escaped (ex. n or t or r)
                 //   would be included in the string
                 tokenizer.index += 1;
+
                 return tokenizer.make_token(TokenTypes::StringEscape)
             },
             _ => {}
