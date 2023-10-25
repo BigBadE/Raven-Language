@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "language/checker",
-    "language/cli",
     "language/parser",
     "language/runner",
     "language/syntax",

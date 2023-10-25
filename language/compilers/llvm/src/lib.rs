@@ -1,7 +1,6 @@
 #![feature(get_mut_unchecked, box_into_inner)]
 
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
@@ -19,7 +18,6 @@ use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
 
 pub mod internal;
-pub mod lifetimes;
 pub mod compiler;
 pub mod function_compiler;
 pub mod main_future;
@@ -56,10 +54,11 @@ impl LLVMCompiler {
 impl<T> Compiler<T> for LLVMCompiler {
     async fn compile(&self, target: String, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
         let mut binding = CompilerTypeGetter::new(
-            Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
+            Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        if binding.compile(target.clone(), syntax, &self.compiling,
-                                     &self.struct_compiling).await {
+        let compiler = binding.compiler.clone();
+        if CompilerImpl::compile(&mut binding, compiler, target.clone(),
+                                 syntax, &self.compiling, &self.struct_compiling).await {
             receiver.recv().await.unwrap();
             return binding.get_target(&target).map(|inner| unsafe { inner.call() });
         }
