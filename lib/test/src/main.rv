@@ -1,12 +1,6 @@
 import stdio;
 
 fn main() {
-    printf("Start!\t\n");
-
-    let i = 0;
-    while i != 5 {
-        i += 1;
-    }
-
-    printf("\"\'\nS\tt\nop!\"");
+    printf("Start!");
+    printf("Stop!");
 }

@@ -26,7 +26,7 @@ fn main() {
 
     if args.len() == 2 {
         let target = env::current_dir().unwrap().join(args[1].clone());
-        let mut arguments = Arguments::build_args(false, RunnerSettings {
+        let arguments = Arguments::build_args(false, RunnerSettings {
             sources: vec!(),
             debug: false,
             compiler: "llvm".to_string(),
@@ -50,7 +50,7 @@ fn main() {
         return;
     }
 
-    let mut arguments = Arguments::build_args(false, RunnerSettings {
+    let arguments = Arguments::build_args(false, RunnerSettings {
         sources: vec!(),
         debug: false,
         compiler: "llvm".to_string(),

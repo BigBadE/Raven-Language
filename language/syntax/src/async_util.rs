@@ -212,6 +212,28 @@ pub trait NameResolver: Send + Sync {
 }
 
 
+static EMPTY: Vec<String> = Vec::new();
+
+pub struct EmptyNameResolver {}
+
+impl NameResolver for EmptyNameResolver {
+    fn imports(&self) -> &Vec<String> {
+        return &EMPTY;
+    }
+
+    fn generic(&self, _name: &String) -> Option<Vec<UnparsedType>> {
+        panic!("Should not be called after finalizing!")
+    }
+
+    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>> {
+        panic!("Should not be called after finalizing!")
+    }
+
+    fn boxed_clone(&self) -> Box<dyn NameResolver> {
+        return Box::new(EmptyNameResolver {});
+    }
+}
+
 pub struct HandleWrapper {
     pub handle: Handle,
     pub joining: Vec<JoinHandle<()>>

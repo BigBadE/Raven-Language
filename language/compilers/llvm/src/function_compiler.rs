@@ -489,6 +489,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 Some(malloc.as_basic_value_enum())
             }
         }
+        FinalizedEffects::GenericMethodCall(_, _, _) => panic!("Tried to compile generic method call!")
     };
 }
 

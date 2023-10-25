@@ -159,35 +159,18 @@ impl CodelessFinalizedFunction {
                            returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
-            if let Some(mut returning) = returning {
-                if let FinalizedTypes::GenericType(inner, _) = returning {
-                    returning = FinalizedTypes::clone(inner.deref());
-                }
-
-                if let Some((old, other)) =
-                    inner.resolve_generic(&returning, syntax,
-                                          placeholder_error("Invalid bounds!".to_string())).await? {
-                    if let FinalizedTypes::Generic(name, _) = old {
-                        manager.mut_generics().insert(name, other);
-                    } else {
-                        panic!("resolve_generic should never return any type other than the generic to replace!");
-                    }
-                }
+            if let Some(returning) = returning {
+                inner.resolve_generic(&returning, syntax, manager.mut_generics(),
+                                      placeholder_error("Invalid bounds!".to_string())).await?
             }
         }
 
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
             let effect = arguments.get(i).unwrap().get_return(variables).unwrap();
-            if let Some((old, other)) = method.arguments.get(i).unwrap()
-                .field.field_type.resolve_generic(&effect, syntax,
-                placeholder_error("Invalid bounds!".to_string())).await? {
-                if let FinalizedTypes::Generic(name, _) = old {
-                    manager.mut_generics().insert(name, other);
-                } else {
-                    panic!("resolve_generic should never return any type other than the generic to replace!");
-                }
-            }
+            method.arguments.get(i).unwrap()
+                .field.field_type.resolve_generic(&effect, syntax, manager.mut_generics(),
+                                                  placeholder_error("Invalid bounds!".to_string())).await?
         }
 
         // Now all the generic types have been resolved, it's time to replace them with
@@ -210,14 +193,14 @@ impl CodelessFinalizedFunction {
             // Degeneric the arguments.
             for arguments in &mut new_method.arguments {
                 arguments.field.field_type.degeneric(&manager.generics(), syntax,
-                                                     placeholder_error("No generic!".to_string()),
+                                                     placeholder_error(format!("No generic in {}", name)),
                                                      placeholder_error("Invalid bounds!".to_string())).await?;
             }
 
             // Degeneric the return type if there is one.
             if let Some(returning) = &mut new_method.return_type {
                 returning.degeneric(&manager.generics(), syntax,
-                                    placeholder_error("No generic!".to_string()),
+                                    placeholder_error(format!("No generic in {}", name)),
                                     placeholder_error("Invalid bounds!".to_string())).await?;
             }
 
@@ -231,6 +214,7 @@ impl CodelessFinalizedFunction {
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();
             handle.spawn(degeneric_code(syntax.clone(), original, new_method.clone(), manager));
+
             return Ok(new_method);
         };
     }

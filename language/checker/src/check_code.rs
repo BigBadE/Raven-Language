@@ -132,18 +132,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                                  traits.clone(), resolver.boxed_clone()).await {
+                                                  traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let mut output = None;
                 {
                     let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
                     if return_type.of_type(&data, None) {
-                        if method.is_empty() {
-                            return Ok(FinalizedEffects::VirtualCall(0,
-                                                                    AsyncDataGetter::new(syntax.clone(),
-                                                                                         data.inner_struct().data.functions[0].clone()).await,
-                                                              finalized_effects));
-                        }
                         let mut i = 0;
                         for found in &data.inner_struct().data.functions {
                             if found.name == method {
@@ -154,7 +148,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             i += 1;
                         }
 
-                        return Err(placeholder_error(format!("Unknown method {} in {}", method, data)));
+                        if !method.is_empty() {
+                            return Err(placeholder_error(
+                                format!("Unknown method {} in {}", method, data)));
+                        }
                     }
 
                     let data = &data.inner_struct().data;
@@ -172,10 +169,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             let locked = syntax.lock().unwrap();
                             match locked.get_implementation(&return_type, data) {
                                 Some(inner) => inner,
-                                None => return Err(
-                                    placeholder_error(format!("{} doesn't implement {}:\n{}", return_type, inner,
-                                                              locked.implementations.iter().map(|inner|
-                                                                  format!("{} impls {}", inner.target, inner.base)).collect::<Vec<_>>().join("\n"))))
+                                None => {
+                                    return Err(
+                                        placeholder_error(format!("Nothing implements {} for {} and {} ({} and {})\n{}", inner, return_type, data.name,
+                                                                  locked.async_manager.finished, locked.async_manager.parsing_impls,
+                                        locked.implementations.iter().map(|inner| format!("{} and {}", inner.base, inner.target)).collect::<Vec<_>>().join("\n"))))
+                                }
                             }
                         }
                     };
@@ -192,7 +191,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                 let returning = match returning {
                     Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
-                                                           resolver, inner).await?.finalize(syntax.clone()).await),
+                                                           resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
                     None => None
                 };
                 check_method(process_manager, method,
@@ -208,16 +207,35 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             let method = if let Some(found) = calling {
-                let found = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables, references).await?;
-                let return_type = found.get_return(variables).unwrap();
+                let calling = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables, references).await?;
+                let return_type = calling.get_return(variables).unwrap();
 
+                if let Some(mut found) = return_type.find_method(&method) {
+                    finalized_effects.insert(0, calling);
+                    let mut output = vec!();
+                    for (found_trait, function) in &mut found {
+                        let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
+                        if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
+                            output.push((found_trait, temp));
+                        }
+                    }
+
+                    if output.len() > 1 {
+                        return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
+                    } else if output.is_empty() {
+                        return Err(placeholder_error(format!("No method {} for generic!", method)));
+                    }
+
+                    let (found_trait, found) = output.pop().unwrap();
+                    return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects))
+                }
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
-                    finalized_effects.insert(0, found);
+                    finalized_effects.insert(0, calling);
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
 
-                    if !check_args(&method, &mut finalized_effects, syntax, variables).await? {
+                    if !check_args(&method, &mut finalized_effects, syntax, variables).await {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                              finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -227,7 +245,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                     return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
-                finalized_effects.insert(0, found);
+                finalized_effects.insert(0, calling);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
@@ -255,7 +273,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             let returning = match returning {
                 Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
-                                                       resolver, inner).await?.finalize(syntax.clone()).await),
+                                                       resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
                 None => None
             };
 
@@ -267,12 +285,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 verify_effect(process_manager, resolver, *effect, syntax, variables, references).await?),
                                           first, second),
         Effects::CreateStruct(target, effects) => {
-            let mut target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
-                                                resolver.boxed_clone(), target)
+            let target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
+                                            resolver.boxed_clone(), target, vec!())
                 .await?.finalize(syntax.clone()).await;
-            if let FinalizedTypes::GenericType(mut base, mut bounds) = target {
-                target = base.flatten(&mut bounds, syntax).await?;
-            }
             let mut final_effects = Vec::new();
             for (field_name, effect) in effects {
                 let mut i = 0;
@@ -345,7 +360,7 @@ async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<d
                                    method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone()).await {
+                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
             let value = value.finalize(syntax.clone()).await;
             if let Some(value) = syntax.lock().unwrap().get_implementation(
                 &return_type,
@@ -384,7 +399,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &mut effects, syntax, variables).await? {
+    if !check_args(&method, &mut effects, syntax, variables).await {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -402,9 +417,9 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                        variables: &mut SimpleVariableManager) -> Result<bool, ParsingError> {
+                        variables: &mut SimpleVariableManager) -> bool {
     if function.arguments.len() != args.len() {
-        return Ok(false);
+        return false;
     }
 
     for i in 0..function.arguments.len() {
@@ -413,10 +428,11 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
             let inner = returning.as_ref().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
             if !inner.of_type(other, Some(syntax)) {
-                return Ok(false);
+                return false;
             }
 
-            if inner != other {
+            // Only downcast if an implementation was found. Don't downcast if they're of the same type.
+            if !inner.of_type(other, None) {
                 //Handle downcasting
                 let temp = args.remove(i);
                 let funcs = Syntax::get_implementation(&syntax.lock().unwrap(),
@@ -429,10 +445,12 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
 
                 args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone()));
             }
+        } else {
+            return false;
         }
     }
 
-    return Ok(true);
+    return true;
 }
 
 pub fn assign_with_priority(operator: FinalizedEffects) -> FinalizedEffects {

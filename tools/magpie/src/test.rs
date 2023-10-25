@@ -22,7 +22,7 @@ mod test {
         for entry in dir.entries() {
             match entry {
                 DirEntry::File(file) => {
-                    let mut arguments = Arguments::build_args(false, RunnerSettings {
+                    let arguments = Arguments::build_args(false, RunnerSettings {
                         sources: vec!(),
                         debug: false,
                         compiler: "llvm".to_string(),

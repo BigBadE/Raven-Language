@@ -35,7 +35,7 @@ impl<'a> ParserUtils<'a> {
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(), token.make_error(self.file.clone(),
                                                   format!("Failed to find type named {}", &name)),
-            name, Box::new(self.imports.clone())));
+            name, Box::new(self.imports.clone()), vec!()));
     }
 
     pub fn add_struct(&mut self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
@@ -52,21 +52,20 @@ impl<'a> ParserUtils<'a> {
         };
 
         Syntax::add::<StructData>(&self.syntax, token.make_error(self.file.clone(),
-                                                            format!("Duplicate structure {}", structure.data.name)),
+                                                                 format!("Duplicate structure {}", structure.data.name)),
                                   structure.data());
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
         self.handle.lock().unwrap().spawn(StructData::verify(structure, self.syntax.clone(),
-                                             Box::new(self.imports.clone()), process_manager));
+                                                             Box::new(self.imports.clone()), process_manager));
     }
 
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>,
                                  resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         match implementor {
             Ok(implementor) => {
-
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(error) => {
                         let mut locked = syntax.lock().unwrap();
                         locked.async_manager.parsing_impls -= 1;
@@ -74,7 +73,7 @@ impl<'a> ParserUtils<'a> {
                         locked.errors.push(error);
                     }
                 };
-            },
+            }
             Err(error) => {
                 println!("Error: {:?}", error);
                 let mut locked = syntax.lock().unwrap();
@@ -165,9 +164,13 @@ pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedT
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Variable => last = Some((UnparsedType::Basic(token.to_string(parser_utils.buffer)), Box::pin(Syntax::get_struct(parser_utils.syntax.clone(),
-                                                                   token.make_error(parser_utils.file.clone(), format!("")),
-                                                                   token.to_string(parser_utils.buffer), Box::new(parser_utils.imports.clone()))))),
+            TokenTypes::Variable => {
+                last = Some((UnparsedType::Basic(token.to_string(parser_utils.buffer)),
+                             Box::pin(Syntax::get_struct(parser_utils.syntax.clone(),
+                                                         token.make_error(parser_utils.file.clone(), format!("")),
+                                                         token.to_string(parser_utils.buffer),
+                                                         Box::new(parser_utils.imports.clone()), vec!()))))
+            }
             TokenTypes::Operator => if let Some((unparsed, types)) = last {
                 let (unparsed, types) = inner_generic(unparsed, types, parser_utils);
                 generics.push(Box::pin(types));
@@ -213,9 +216,9 @@ fn inner_generic(unparsed: UnparsedType, outer: ParsingFuture<Types>, parser_uti
                 }
                 last = Some((UnparsedType::Basic(token.to_string(parser_utils.buffer)),
                              Box::pin(Syntax::get_struct(parser_utils.syntax.clone(),
-                                                token.make_error(parser_utils.file.clone(), format!("Idk here")),
-                token.to_string(parser_utils.buffer), Box::new(parser_utils.imports.clone())))));
-            },
+                                                         token.make_error(parser_utils.file.clone(), format!("Idk here")),
+                                                         token.to_string(parser_utils.buffer), Box::new(parser_utils.imports.clone()), vec!()))));
+            }
             TokenTypes::Operator => if let Some((unparsed, types)) = last {
                 let (unparsed, types) = inner_generic(unparsed, types, parser_utils);
                 unparsed_values.push(unparsed);

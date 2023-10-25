@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use async_recursion::async_recursion;
 
 use crate::{Attribute, SimpleVariableManager, ParsingError, ProcessManager, VariableManager};
-use crate::async_util::UnparsedType;
+use crate::async_util::{AsyncDataGetter, UnparsedType};
 use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
 use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
@@ -141,7 +141,7 @@ pub enum Effects {
     Int(i64),
     UInt(u64),
     Bool(bool),
-    String(String)
+    String(String),
 }
 
 #[derive(Clone, Debug)]
@@ -158,6 +158,8 @@ pub enum FinalizedEffects {
     CodeBody(FinalizedCodeBody),
     // Calls the function on the given value (if any) with the given arguments.
     MethodCall(Option<Box<FinalizedEffects>>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    // Calls the trait's function with the given arguments.
+    GenericMethodCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
     // Sets given reference to given value.
     Set(Box<FinalizedEffects>, Box<FinalizedEffects>),
     // Loads variable with the given name.
@@ -185,7 +187,7 @@ pub enum FinalizedEffects {
     // Loads from the given reference.
     ReferenceLoad(Box<FinalizedEffects>),
     // Stores an effect on the stack.
-    StackStore(Box<FinalizedEffects>)
+    StackStore(Box<FinalizedEffects>),
 }
 
 impl FinalizedEffects {
@@ -251,7 +253,11 @@ impl FinalizedEffects {
             FinalizedEffects::CreateArray(types, _) =>
                 types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner))),
             // Downcasts simply return the downcasting target.
-            FinalizedEffects::Downcast(_, target) => Some(target.clone())
+            FinalizedEffects::Downcast(_, target) => Some(target.clone()),
+            FinalizedEffects::GenericMethodCall(function, _, _) =>
+                function.return_type.as_ref().map(|inner| {
+                    FinalizedTypes::Reference(Box::new(inner.clone()))
+                })
         };
         return temp;
     }
@@ -267,7 +273,7 @@ impl FinalizedEffects {
             FinalizedEffects::CreateVariable(_, first, other) => {
                 first.degeneric(process_manager, variables, syntax).await?;
                 other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
-            },
+            }
             FinalizedEffects::Jump(_) => {}
             FinalizedEffects::CompareJump(comparing, _, _) =>
                 comparing.degeneric(process_manager, variables, syntax).await?,
@@ -288,6 +294,29 @@ impl FinalizedEffects {
                 // Calls the degeneric method on the method.
                 *method = CodelessFinalizedFunction::degeneric(method.clone(), manager,
                                                                effects, syntax, variables, None).await?;
+            }
+            FinalizedEffects::GenericMethodCall(function, found_trait, effects) => {
+                let mut calling = effects.remove(0);
+                calling.degeneric(process_manager, variables, syntax).await?;
+
+                let implementor = calling.get_return(variables).unwrap();
+                let implementation = Syntax::get_implementation_finisher(syntax, &implementor,
+                                                                         &found_trait.inner_struct().data).await?.unwrap();
+
+                let name = function.data.name.split("::").last().unwrap();
+                let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
+
+                for effect in &mut *effects {
+                    effect.degeneric(process_manager, variables, syntax).await?;
+                }
+                let mut effects = effects.clone();
+                effects.insert(0, calling.clone());
+                let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
+                let function = CodelessFinalizedFunction::degeneric(function.clone(), process_manager.cloned(),
+                                                                    &effects, syntax, variables, None).await?;
+                *self = FinalizedEffects::MethodCall(None,
+                                                     function,
+                                                     effects.clone());
             }
             // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
             FinalizedEffects::VirtualCall(_, _, effects) => {

@@ -1,0 +1,7 @@
+fn test() -> bool {
+    return calling();
+}
+
+fn calling() -> bool {
+    return true;
+}

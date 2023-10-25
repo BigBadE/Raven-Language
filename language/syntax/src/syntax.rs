@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::task::Waker;
-use std::mem;
+use std::{mem, thread};
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
@@ -134,11 +134,25 @@ impl Syntax {
         for implementation in &self.implementations {
             if &implementation.target.inner_struct().data == implementor_struct &&
                 (implementing_trait.eq(&implementation.base) ||
-                    self.solve(&implementing_trait, &implementation.base)) {
+                    self.solve(&implementation.base, &implementing_trait)) {
                 return Some(implementation.functions.clone());
             }
         }
         return None;
+    }
+
+    pub async fn get_implementation_finisher(syntax: &Arc<Mutex<Syntax>>, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Result<Option<Vec<Arc<FunctionData>>>, ParsingError> {
+        let mut output = None;
+        while output.is_none() && !syntax.lock().unwrap().finished_impls() {
+            output = syntax.lock().unwrap().get_implementation(implementing_trait, implementor_struct);
+            thread::yield_now();
+        }
+
+        return Ok(if let Some(value) = output {
+            Some(value)
+        } else {
+            syntax.lock().unwrap().get_implementation(implementing_trait, implementor_struct)
+        })
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
@@ -308,20 +322,23 @@ impl Syntax {
     /// Asynchronously gets a struct, or returns the error if that struct isn't found.
     #[async_recursion]
     pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                            getting: String, name_resolver: Box<dyn NameResolver>) -> Result<Types, ParsingError> {
+                            getting: String, name_resolver: Box<dyn NameResolver>, mut resolved_generics: Vec<String>) -> Result<Types, ParsingError> {
         // Handles arrays by removing the brackets and getting the inner type
         if getting.as_bytes()[0] == b'[' {
             return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[1..getting.len() - 1].to_string(),
-                                                             name_resolver).await?)));
+                                                             name_resolver, resolved_generics).await?)));
         }
 
         // Checks if the type is a generic type
         if let Some(found) = name_resolver.generic(&getting) {
             let mut bounds = Vec::new();
             // Get all the generic's bounds.
-            for bound in found {
-                bounds.push(Self::parse_type(syntax.clone(), error.clone(),
-                                             name_resolver.boxed_clone(), bound).await?);
+            if !resolved_generics.contains(&getting) {
+                resolved_generics.push(getting.clone());
+                for bound in found {
+                    bounds.push(Self::parse_type(syntax.clone(), error.clone(),
+                                                 name_resolver.boxed_clone(), bound, resolved_generics.clone()).await?);
+                }
             }
 
             return Ok(Types::Generic(getting, bounds));
@@ -346,14 +363,14 @@ impl Syntax {
                     let (size, bounds) =
                         Self::parse_bounds(&input[i+1..], syntax, error, name_resolver).await?;
                     let first = Self::get_struct(syntax.clone(), error.clone(),
-                                                first.to_string(), name_resolver.boxed_clone()).await?;
+                                                first.to_string(), name_resolver.boxed_clone(), vec!()).await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
                     i += size;
                 },
                 b',' => {
                     let getting = String::from_utf8_lossy(&input[last..i]);
                     found.push(Self::get_struct(syntax.clone(), error.clone(),
-                                                getting.to_string(), name_resolver.boxed_clone()).await?);
+                                                getting.to_string(), name_resolver.boxed_clone(), vec!()).await?);
                     last = i;
                 },
                 b'>' => return Ok((i, found)),
@@ -364,25 +381,25 @@ impl Syntax {
 
         let end = String::from_utf8_lossy(&input[last..]);
         found.push(Self::get_struct(syntax.clone(), error.clone(),
-                                    end.to_string(), name_resolver.boxed_clone()).await?);
+                                    end.to_string(), name_resolver.boxed_clone(), vec!()).await?);
         return Ok((input.len(), found));
     }
 
     /// Parses an UnparsedType into a Types
     #[async_recursion]
     pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
-                            types: UnparsedType) -> Result<Types, ParsingError> {
+                            types: UnparsedType, resolved_generics: Vec<String>) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
             UnparsedType::Basic(name) =>
-                Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver).await,
+                Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver, resolved_generics).await,
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::new();
                 for arg in args {
                     generics.push(Self::parse_type(syntax.clone(),
-                                                   error.clone(), resolver.boxed_clone(), arg).await?);
+                                                   error.clone(), resolver.boxed_clone(), arg, resolved_generics.clone()).await?);
                 }
                 Ok(Types::GenericType(Box::new(
-                    Self::parse_type(syntax, error, resolver, *name).await?),
+                    Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?),
                                       generics))
             }
         };
