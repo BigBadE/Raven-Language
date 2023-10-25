@@ -273,7 +273,10 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
 
                 break;
             }
-            _ => panic!("Unknown token type {:?} - {}", token.token_type, parser_utils.file)
+            _ => panic!("Unknown token type {:?} - {} ({:?})", token.token_type, parser_utils.file,
+            parser_utils.tokens[parser_utils.index-8..parser_utils.index].iter()
+                .map(|inner| format!("{:?} ({})", &inner.token_type, inner.to_string(parser_utils.buffer)))
+                .collect::<Vec<_>>())
         }
     }
 }
@@ -298,10 +301,11 @@ pub fn parse_bounds(mut name: String, parser_utils: &mut ParserUtils) -> Option<
                     return None;
                 }
             },
+            TokenTypes::GenericEnd => {},
             TokenTypes::GenericBoundEnd => {
                 break
             },
-            TokenTypes::GenericEnd | TokenTypes::GenericsEnd => {
+            TokenTypes::GenericsEnd => {
                 parser_utils.index -= 1;
                 break
             }
