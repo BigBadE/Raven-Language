@@ -18,5 +18,6 @@ All contributions will automatically be checked by the CI. This will let you kno
 The repository follows the Rust style, with: 
 - snake_case method, file, variable, and folder names
 - CamelCase structure names 
+- All unsafe code must have a SAFETY comment above them
 
 When in doubt, follow the established code style found in the source.

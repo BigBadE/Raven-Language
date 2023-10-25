@@ -1,6 +1,5 @@
 use std::mem::MaybeUninit;
 use std::ops::Deref;
-use std::rc::Rc;
 use std::sync::Arc;
 use inkwell::AddressSpace;
 use inkwell::basic_block::BasicBlock;
@@ -34,7 +33,7 @@ pub fn instance_function<'a, 'ctx>(function: Arc<CodelessFinalizedFunction>, typ
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
         value = create_function_value(&function, type_getter, None);
-        unsafe { Rc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
+        unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
     }
     return value;
 }
@@ -457,7 +456,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             } else {
                 let mut table = type_getter.vtable.clone();
                 let base = compile_effect(type_getter, function, base, id).unwrap();
-                let table = unsafe { Rc::get_mut_unchecked(&mut table) }
+                let table = unsafe { Arc::get_mut_unchecked(&mut table) }
                     .get_vtable(type_getter, &found, &target.inner_struct().data);
                 *id += 1;
 

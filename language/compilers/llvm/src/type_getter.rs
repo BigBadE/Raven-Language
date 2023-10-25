@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
@@ -13,43 +12,42 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::{ParsingError, VariableManager};
-use syntax::async_util::EmptyNameResolver;
-use syntax::r#struct::FinalizedStruct;
+use syntax::VariableManager;
 use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
 use crate::compiler::CompilerImpl;
-use crate::function_compiler::{compile_block, instance_function, instance_types};
+use crate::function_compiler::{instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
-use crate::main_future::MainFuture;
-use crate::util::print_formatted;
 use crate::vtable_manager::VTableManager;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
-    pub vtable: Rc<VTableManager<'ctx>>,
-    pub compiler: Rc<CompilerImpl<'ctx>>,
-    pub compiling: Rc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
+    pub vtable: Arc<VTableManager<'ctx>>,
+    pub compiler: Arc<CompilerImpl<'ctx>>,
+    pub compiling: Arc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
     pub current_block: Option<BasicBlock<'ctx>>,
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
 }
 
-unsafe impl Sync for CompilerTypeGetter<'_> {
-
-}
-
+/// SAFETY LLVM isn't safe for access across multiple threads, but this module only accesses it from
+/// one thread at a time.
 unsafe impl Send for CompilerTypeGetter<'_> {
 
 }
 
+/// SAFETY See above
+unsafe impl Sync for CompilerTypeGetter<'_> {
+
+}
+
 impl<'ctx> CompilerTypeGetter<'ctx> {
-    pub fn new(compiler: Rc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
+    pub fn new(compiler: Arc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
         return Self {
             syntax,
-            vtable: Rc::new(VTableManager::new()),
+            vtable: Arc::new(VTableManager::new()),
             compiler,
-            compiling: Rc::new(Vec::new()),
+            compiling: Arc::new(Vec::new()),
             blocks: HashMap::new(),
             current_block: None,
             variables: HashMap::new(),
@@ -95,54 +93,6 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             FinalizedTypes::Reference(_) => found.ptr_type(AddressSpace::default()).as_basic_type_enum(),
             _ => panic!("Can't compile a generic! {:?}", found)
         };
-    }
-
-    pub async fn compile(&mut self, target: String, syntax: &Arc<Mutex<Syntax>>, functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
-                      _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> bool {
-        match Syntax::get_function(syntax.clone(), ParsingError::empty(), target,
-                             Box::new(EmptyNameResolver {}), false).await {
-            Ok(_) => {},
-            Err(_) => return false
-        };
-
-        let function = MainFuture { syntax: syntax.clone() }.await;
-
-        instance_function(Arc::new(function.to_codeless()), self);
-
-        while !self.compiling.is_empty() {
-            let (function_type, function) = unsafe {
-                Rc::get_mut_unchecked(&mut self.compiling)
-            }.remove(0);
-
-            if !function.data.poisoned.is_empty() || function.data.name.is_empty() {
-                // The checker handles the poisoned functions
-                continue
-            }
-
-            let finalized_function;
-            {
-                let reading = functions.read().unwrap();
-                finalized_function = if let Some(found) = reading.get(&function.data.name) {
-                    found.clone()
-                } else {
-                    unsafe {
-                        Rc::get_mut_unchecked(&mut self.compiling)
-                    }.push((function_type, function));
-                    continue
-                };
-            }
-            compile_block(&finalized_function.code, function_type,
-                          &mut self.for_function(&finalized_function, function_type), &mut 0);
-        }
-
-        //let pass_manager = PassManager::create(&self.compiler.module);
-
-        //unsafe {
-            //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
-        //}
-
-        print_formatted(self.compiler.module.to_string());
-        return true;
     }
 
     pub(crate) fn get_target<T>(&self, target: &str) -> Option<JitFunction<'_, Main<T>>> {

@@ -80,3 +80,4 @@ IF 1 and 2 failed, THEN Nope! is printed and nothing else happens.
 
 If the logic doesn't make sense, feel free to mess around with the code on your own.
 
+Once, you understand control flow, it's time to learn functions. [Chapter 4: Functions](4_functions.md)

@@ -1,7 +1,6 @@
 # Modules
 
 - Checker: Verifies all borrows, generics, method calls, returns, etc...
-- CLI: Command Line Interface for using Raven
 - Compilers: The compilers Raven uses
 - Data: Settings data used by every package. Seperated to prevent dependency loops.
 - Parser: Raven's Lexer and Parser
