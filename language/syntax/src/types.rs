@@ -11,7 +11,7 @@ use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use async_recursion::async_recursion;
-use crate::function::{display, display_parenless};
+use crate::function::{display, display_parenless, FunctionData};
 use crate::{is_modifier, Modifier, ParsingError, StructData, TopElement};
 use crate::async_util::AsyncDataGetter;
 use crate::chalk_interner::ChalkIr;
@@ -109,6 +109,31 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => inner.get_fields(),
             _ => panic!("Tried to get fields of generic!")
         };
+    }
+
+    pub fn find_method(&self, name: &String) -> Option<Vec<(FinalizedTypes, Arc<FunctionData>)>> {
+        return match self {
+            FinalizedTypes::Struct(inner) => inner.data.functions.iter().find(|inner| inner.name.ends_with(name))
+                .map(|inner| vec!((self.clone(), inner.clone()))),
+            FinalizedTypes::Reference(inner) => inner.find_method(name),
+            FinalizedTypes::GenericType(base, _) => base.find_method(name),
+            FinalizedTypes::Generic(_, bounds) => {
+                let mut output = vec!();
+                for bound in bounds {
+                    if let Some(found) = bound.find_method(name) {
+                        for temp in found {
+                            output.push(temp);
+                        }
+                    }
+                }
+                if output.is_empty() {
+                    None
+                } else {
+                    Some(output)
+                }
+            },
+            FinalizedTypes::Array(_) => None
+        }
     }
 
     /// Assumes the type is a trait and returns its inner Chalk Trait data.

@@ -47,7 +47,11 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
             },
             TokenTypes::FunctionStart => {
                 let file = parser_utils.file.clone();
-                parser_utils.file = name.clone();
+                if parser_utils.file.is_empty() {
+                    parser_utils.file = format!("{}", name);
+                } else {
+                    parser_utils.file = format!("{}::{}", parser_utils.file, name);
+                }
                 let function = parse_function(parser_utils,
                                               is_modifier(modifiers, Modifier::Trait), member_attributes, member_modifiers);
                 functions.push(ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function));
@@ -153,8 +157,15 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                 }
             },
             TokenTypes::FunctionStart => {
+                let file = parser_utils.file.clone();
+                if parser_utils.file.is_empty() {
+                    parser_utils.file = format!("{}_{}", base.clone().unwrap(), implementor.clone().unwrap());
+                } else {
+                    parser_utils.file = format!("{}::{}_{}", parser_utils.file, base.clone().unwrap(), implementor.clone().unwrap());
+                }
                 let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
                 functions.push(function?);
+                parser_utils.file = file;
                 member_attributes = Vec::new();
                 member_modifiers = Vec::new();
             }

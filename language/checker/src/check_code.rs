@@ -131,7 +131,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.insert(0, found);
             }
 
-            println!("Found return type {}", return_type);
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
                                                   traits.clone(), resolver.boxed_clone()).await {
                 let mut output = None;
@@ -208,16 +207,35 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             let method = if let Some(found) = calling {
-                let found = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables, references).await?;
-                let return_type = found.get_return(variables).unwrap();
+                let calling = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables, references).await?;
+                let return_type = calling.get_return(variables).unwrap();
 
+                if let Some(mut found) = return_type.find_method(&method) {
+                    finalized_effects.insert(0, calling);
+                    let mut output = vec!();
+                    for (found_trait, function) in &mut found {
+                        let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
+                        if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
+                            output.push((found_trait, temp));
+                        }
+                    }
+
+                    if output.len() > 1 {
+                        return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
+                    } else if output.is_empty() {
+                        return Err(placeholder_error(format!("No method {} for generic!", method)));
+                    }
+
+                    let (found_trait, found) = output.pop().unwrap();
+                    return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects))
+                }
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
-                    finalized_effects.insert(0, found);
+                    finalized_effects.insert(0, calling);
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
 
-                    if !check_args(&method, &mut finalized_effects, syntax, variables).await? {
+                    if !check_args(&method, &mut finalized_effects, syntax, variables).await {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                              finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -227,7 +245,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                     return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
-                finalized_effects.insert(0, found);
+                finalized_effects.insert(0, calling);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
@@ -381,7 +399,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &mut effects, syntax, variables).await? {
+    if !check_args(&method, &mut effects, syntax, variables).await {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -399,9 +417,9 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                        variables: &mut SimpleVariableManager) -> Result<bool, ParsingError> {
+                        variables: &mut SimpleVariableManager) -> bool {
     if function.arguments.len() != args.len() {
-        return Ok(false);
+        return false;
     }
 
     for i in 0..function.arguments.len() {
@@ -410,10 +428,11 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
             let inner = returning.as_ref().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
             if !inner.of_type(other, Some(syntax)) {
-                return Ok(false);
+                return false;
             }
 
-            if inner != other {
+            // Only downcast if an implementation was found. Don't downcast if they're of the same type.
+            if !inner.of_type(other, None) {
                 //Handle downcasting
                 let temp = args.remove(i);
                 let funcs = Syntax::get_implementation(&syntax.lock().unwrap(),
@@ -426,10 +445,12 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
 
                 args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone()));
             }
+        } else {
+            return false;
         }
     }
 
-    return Ok(true);
+    return true;
 }
 
 pub fn assign_with_priority(operator: FinalizedEffects) -> FinalizedEffects {

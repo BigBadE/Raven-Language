@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::task::Waker;
-use std::mem;
+use std::{mem, thread};
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
@@ -139,6 +139,20 @@ impl Syntax {
             }
         }
         return None;
+    }
+
+    pub async fn get_implementation_finisher(syntax: &Arc<Mutex<Syntax>>, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Result<Option<Vec<Arc<FunctionData>>>, ParsingError> {
+        let mut output = None;
+        while output.is_none() && !syntax.lock().unwrap().finished_impls() {
+            output = syntax.lock().unwrap().get_implementation(implementing_trait, implementor_struct);
+            thread::yield_now();
+        }
+
+        return Ok(if let Some(value) = output {
+            Some(value)
+        } else {
+            syntax.lock().unwrap().get_implementation(implementing_trait, implementor_struct)
+        })
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
