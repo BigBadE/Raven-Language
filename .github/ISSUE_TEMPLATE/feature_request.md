@@ -11,6 +11,4 @@ assignees: ''
 
 **Provide a Code Snippet Using Your Feature**
 
-**Additional Context**
-
 **Additional Information**
