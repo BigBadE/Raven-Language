@@ -29,3 +29,11 @@ pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<S
     }
     return Ok(output);
 }
+
+pub trait Add<T, E> {}
+
+pub trait AddAndAssign<T, E> {}
+
+impl<T: Add<E, T>, E> AddAndAssign<T, E> for T {
+
+}

@@ -82,15 +82,15 @@ trait RemainderAndAssign<E, C> {
 }
 
 //Basic math operations, implemented internally by the compiler.
-pub internal impl<T: Number, E: Number> Equal<T> for E {
-    fn equal(self, other: T) -> bool {
+pub internal impl<T: Number, E: Number> Equal<E> for T {
+    fn equal(self, other: E) -> bool {
 
     }
 }
 
-pub impl<T, E: Equal<T>> NotEqual<T> for T {
+pub impl<T: Equal<E>, E> NotEqual<E> for T {
     fn not_equal(self, other: E) -> bool {
-        return !(other.equal(self));
+        return !(self.equal(other));
     }
 }
 
@@ -107,7 +107,7 @@ pub internal impl<T: Number> Add<T, T> for T {
     }
 }
 
-pub impl<T: Add<E, C>, E, C> AddAndAssign<E, C> for T {
+pub impl<T: Add<E, T>, E> AddAndAssign<E, T> for T {
     fn add_assign(self, other: E) -> C {
         self = self.add(other);
         return self;
@@ -121,8 +121,8 @@ pub internal impl<T: Number> Subtract<T, T> for T {
     }
 }
 
-pub impl<T: Subtract<E, C>, E, C> SubtractAndAssign<E, C> for T {
-    fn subtract_assign(self, other: E) -> C {
+pub impl<T: Subtract<E, T>, E> SubtractAndAssign<E, T> for T {
+    fn subtract_assign(self, other: E) -> T {
         self = self.subtract(other);
         return self;
     }
@@ -135,8 +135,8 @@ pub internal impl<T: Number> Multiply<T, T> for T {
     }
 }
 
-pub impl<T: Multiply<E, C>, E, C> MultiplyAndAssign<E, C> for T {
-    fn multiply_assign(self, other: E) -> C {
+pub impl<T: Multiply<E, T>, E> MultiplyAndAssign<E, T> for T {
+    fn multiply_assign(self, other: E) -> T {
         self = self.multiply(other);
         return self;
     }
@@ -149,8 +149,8 @@ pub internal impl<T: Number> Divide<T, T> for T {
     }
 }
 
-pub impl<T: Remainder<E, C>, E, C> DivideAndAssign<E, C> for T {
-    fn divide_assign(self, other: E) -> C {
+pub impl<T: Divide<E, T>, E> DivideAndAssign<E, T> for T {
+    fn divide_assign(self, other: E) -> T {
         self = self.divide(other);
         return self;
     }
@@ -163,8 +163,8 @@ pub internal impl<T: Number> Remainder<T, T> for T {
     }
 }
 
-pub impl<T: Remainder<E, C>, E, C> RemainderAndAssign<E, C> for T {
-    fn remainder_assign(self, other: E) -> C {
+pub impl<T: Remainder<E, T>, E> RemainderAndAssign<E, T> for T {
+    fn remainder_assign(self, other: E) -> T {
         self = self.remainder(other);
         return self;
     }

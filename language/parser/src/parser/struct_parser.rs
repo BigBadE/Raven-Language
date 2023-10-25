@@ -181,13 +181,13 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
         Syntax::parse_type(
             parser_utils.syntax.clone(),
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
-            parser_utils.imports.boxed_clone(), base.unwrap()));
+            parser_utils.imports.boxed_clone(), base.unwrap(), vec!()));
 
     let implementor = Box::pin(
         Syntax::parse_type(
             parser_utils.syntax.clone(),
             token.make_error(parser_utils.file.clone(), format!("Failed to find")),
-            parser_utils.imports.boxed_clone(), implementor.unwrap()));
+            parser_utils.imports.boxed_clone(), implementor.unwrap(), vec!()));
 
     return Ok(TraitImplementor {
         base,
@@ -263,7 +263,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 bounds.push(Syntax::parse_type(parser_utils.syntax.clone(),
                                                parser_utils.tokens.get(parser_utils.index-1).unwrap()
                                                    .make_error(parser_utils.file.clone(), format!("Bounds error!")),
-                                               parser_utils.imports.boxed_clone(), unparsed));
+                                               parser_utils.imports.boxed_clone(), unparsed, vec!()));
             }
             TokenTypes::GenericsEnd => {
                 if !name.is_empty() {
@@ -281,18 +281,29 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
     }
 }
 
-pub fn parse_bounds(mut name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
+pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
+    if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::GenericsStart {
+        parser_utils.index += 1;
+    } else {
+        return Some(UnparsedType::Basic(name));
+    }
     let mut unparsed_bounds: Vec<UnparsedType> = Vec::new();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Generic | TokenTypes::GenericBound => {
-                name = token.to_string(parser_utils.buffer);
+                let mut name = token.to_string(parser_utils.buffer);
                 if name.starts_with(":") {
                     name = name[1..].to_string();
                 }
                 name = name.trim().to_string();
+                let unparsed = if let Some(inner) = parse_bounds(name.clone(), parser_utils) {
+                    inner
+                } else {
+                    break;
+                };
+                unparsed_bounds.push(unparsed);
             },
             TokenTypes::GenericsStart => {
                 if let Some(inner) = parse_bounds(String::new(), parser_utils) {

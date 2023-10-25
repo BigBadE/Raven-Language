@@ -165,7 +165,6 @@ impl FinalizedTypes {
             FinalizedTypes::Array(inner) =>
                 TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
             FinalizedTypes::Generic(name, _bounds) => {
-                println!("{} in {:?}", name, binders);
                 let index = binders.iter().position(|found| *found == name).unwrap();
                 TyKind::BoundVar(BoundVar {
                     debruijn: DebruijnIndex::INNERMOST,

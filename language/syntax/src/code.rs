@@ -314,7 +314,6 @@ impl FinalizedEffects {
                 let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
                 let function = CodelessFinalizedFunction::degeneric(function.clone(), process_manager.cloned(),
                                                                     &effects, syntax, variables, None).await?;
-                println!("Finished with call to {}", function.data.name);
                 *self = FinalizedEffects::MethodCall(None,
                                                      function,
                                                      effects.clone());

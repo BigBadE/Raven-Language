@@ -50,7 +50,7 @@ fn main() {
         return;
     }
 
-    let mut arguments = Arguments::build_args(false, RunnerSettings {
+    let arguments = Arguments::build_args(false, RunnerSettings {
         sources: vec!(),
         debug: false,
         compiler: "llvm".to_string(),

@@ -80,8 +80,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
     for (key, generic) in &parser_utils.imports.generics {
         let mut bounds = Vec::new();
         for bound in generic {
-            bounds.push(Syntax::parse_type(parser_utils.syntax.clone(),
-                                                    ParsingError::empty(), parser_utils.imports.boxed_clone(), bound.clone()));
+            bounds.push(Syntax::parse_type(parser_utils.syntax.clone(), ParsingError::empty(),
+                                           parser_utils.imports.boxed_clone(), bound.clone(), vec!()));
         }
         generics.insert(key.clone(), bounds);
     }

@@ -132,7 +132,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             }
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                                  traits.clone(), resolver.boxed_clone()).await {
+                                                  traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let mut output = None;
                 {
                     let mut result = None;
@@ -191,7 +191,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                 let returning = match returning {
                     Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
-                                                           resolver, inner).await?.finalize(syntax.clone()).await),
+                                                           resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
                     None => None
                 };
                 check_method(process_manager, method,
@@ -273,7 +273,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             let returning = match returning {
                 Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
-                                                       resolver, inner).await?.finalize(syntax.clone()).await),
+                                                       resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
                 None => None
             };
 
@@ -286,7 +286,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                           first, second),
         Effects::CreateStruct(target, effects) => {
             let target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
-                                            resolver.boxed_clone(), target)
+                                            resolver.boxed_clone(), target, vec!())
                 .await?.finalize(syntax.clone()).await;
             let mut final_effects = Vec::new();
             for (field_name, effect) in effects {
@@ -360,7 +360,7 @@ async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<d
                                    method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone()).await {
+                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
             let value = value.finalize(syntax.clone()).await;
             if let Some(value) = syntax.lock().unwrap().get_implementation(
                 &return_type,

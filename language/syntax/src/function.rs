@@ -193,14 +193,14 @@ impl CodelessFinalizedFunction {
             // Degeneric the arguments.
             for arguments in &mut new_method.arguments {
                 arguments.field.field_type.degeneric(&manager.generics(), syntax,
-                                                     placeholder_error("No generic!".to_string()),
+                                                     placeholder_error(format!("No generic in {}", name)),
                                                      placeholder_error("Invalid bounds!".to_string())).await?;
             }
 
             // Degeneric the return type if there is one.
             if let Some(returning) = &mut new_method.return_type {
                 returning.degeneric(&manager.generics(), syntax,
-                                    placeholder_error("No generic!".to_string()),
+                                    placeholder_error(format!("No generic in {}", name)),
                                     placeholder_error("Invalid bounds!".to_string())).await?;
             }
 
