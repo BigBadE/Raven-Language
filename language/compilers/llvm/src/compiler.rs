@@ -18,7 +18,6 @@ use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
 use crate::main_future::MainFuture;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::print_formatted;
 
 pub struct CompilerImpl<'ctx> {
     pub context: &'ctx Context,
@@ -51,7 +50,7 @@ impl<'ctx> CompilerImpl<'ctx> {
         };
     }
 
-    pub async fn compile(type_getter: &mut CompilerTypeGetter<'ctx>, compiler: Arc<CompilerImpl<'ctx>>,
+    pub async fn compile(type_getter: &mut CompilerTypeGetter<'ctx>,
                          target: String, syntax: &Arc<Mutex<Syntax>>,
                          functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
                          _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> bool {
@@ -63,8 +62,8 @@ impl<'ctx> CompilerImpl<'ctx> {
 
         let function = MainFuture { syntax: syntax.clone() }.await;
 
-
         instance_function(Arc::new(function.to_codeless()), type_getter);
+
         while !type_getter.compiling.is_empty() {
             let (function_type, function) = unsafe {
                 Arc::get_mut_unchecked(&mut type_getter.compiling)
@@ -97,7 +96,7 @@ impl<'ctx> CompilerImpl<'ctx> {
         //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
         //}
 
-        print_formatted(compiler.module.to_string());
+        //print_formatted(compiler.module.to_string());
         return true;
     }
 }
