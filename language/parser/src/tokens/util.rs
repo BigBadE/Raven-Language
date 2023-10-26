@@ -101,10 +101,14 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
         if tokenizer.len == tokenizer.index {
             return tokenizer.make_token(TokenTypes::EOF);
         }
+
+        // get the next character
         let next = tokenizer.buffer[tokenizer.index];
         tokenizer.index += 1;
+
         match next {
-            b'"' => return if tokenizer.last.token_type != TokenTypes::StringEscape {
+            // if the last character was a \, then the quote is escaped, so don't end the string here
+            b'"' => return if /*tokenizer.last.token_type != TokenTypes::StringEscape*/tokenizer.buffer[tokenizer.index - 1] != '\\' as u8 {
                 tokenizer.state = if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
                     TokenizerState::CODE_TO_STRUCT_TOP
                 } else {
@@ -115,6 +119,18 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::StringStart)
             },
             b'\\' => {
+
+                // if it is a hex value, then increment the tokenizer by an extra 2 because
+                // the escape character is 4 characters long instead of 2 (ex. \xAA)
+                if tokenizer.buffer[tokenizer.index] == b'x' {
+                    tokenizer.index += 2;
+                }
+
+                // increment the tokenizer so that it includes the \
+                // if you didn't do this, then the character being escaped (ex. n or t or r)
+                //   would be included in the string
+                tokenizer.index += 1;
+
                 return tokenizer.make_token(TokenTypes::StringEscape)
             },
             _ => {}

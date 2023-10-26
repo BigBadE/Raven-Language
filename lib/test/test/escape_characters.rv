@@ -1,0 +1,34 @@
+fn test() -> bool {
+    let a = "\na\nb\ncd\n";
+    let b = "\t\"abc\"";
+    let c = "\t\t\t\t\t\"\"\"\"\"\'\'\'\'\'\'";
+    let d = "abc\rdef\rghi";
+    let e = "\x48\x45\x4Clo\x21\n";
+
+    //a should output:
+    //
+    //a
+    //b
+    //cd
+    //
+    //printf(a); // don't printf because that would require importing the stdio library
+
+    //b should output
+    //  "abc"
+    //printf(b);
+
+    //c should output
+    //                  """"""''''''
+    //printf(c);
+
+    //d should output
+    //ghi
+    //printf(d);
+
+    //e should output
+    //HELLO!
+    //
+    //printf(e);
+
+    return true;
+}

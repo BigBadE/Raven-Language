@@ -284,11 +284,16 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
 }
 
+///Parses tokens from the Raven code into a string
 fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
-    let mut string = String::new();
-    loop {
+    let mut string = String::new(); //the string from the Raven code
+
+    loop { //loop through the tokens until a StringEnd is reached
+
+        //get the next token
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
+
         match token.token_type {
             TokenTypes::StringEnd => {
                 // End of string, must have a null character at the end
@@ -298,10 +303,49 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
             }
             TokenTypes::StringEscape => {
                 // Escape token
+
+                // get the text from the Raven file starting at the last token up to the current escape character
                 let found = token.to_string(parser_utils.buffer);
-                string += &found[0..found.len() - 1];
+
+                // check if it a hex value, because if it is, then it will 4 characters long (\xAA)
+                let is_hex = found.len() >= 3 && &found[found.len() - 3..found.len() - 2] == "x";
+                let string_end = found.len() - (if is_hex { 4 } else { 2 });
+
+                // add the text to the string, because this text is part of the string in the Raven Code
+                string += &found[0..string_end];
+
+                // match the character after the \ to see what type of escape character it is
+                let index = if is_hex { found.len() - 3 } else { found.len() - 1 };
+                match &found[index..index + 1] {
+                    "n" => {
+                       string += "\n";
+                    }
+                    "t" => {
+                        string += "\t";
+                    }
+                    "r" => {
+                        string += "\r";
+                    }
+                    "\\" => {
+                        string += "\\";
+                    }
+                    "\'" => {
+                        string += "\'";
+                    }
+                    "\"" => {
+                        string += "\"";
+                    }
+                    "x" => {
+                        // Convert the hex to a character, and append it to the string
+                        string.push(u8::from_str_radix(&found[found.len() - 2..found.len()], 16).expect("Unexpected hex value") as char);
+                    }
+                    _ => {
+                        // not a supported character
+                        panic!("Unexpected escape character: {}", parser_utils.buffer[token.end_offset - 1] as char)
+                    }
+                }
             }
-            TokenTypes::StringStart => {}
+            TokenTypes::StringStart => {} //the first token is always a StringStart, so skip this
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
     }
