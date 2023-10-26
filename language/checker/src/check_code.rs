@@ -59,6 +59,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let error = ParsingError::new(String::new(), (0, 0), 0,
                                           (0, 0), 0, format!("Failed to find operation {} with {:?}", operation, values));
             let mut outer_operation = None;
+            // Check if it's two operations that should be combined, like a list ([])
             if values.len() > 0 {
                 let mut last = values.last().unwrap();
                 if let Effects::CreateArray(effects) = last {
@@ -67,10 +68,23 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
                 }
                 if let Effects::Operation(inner_operation, _) = last {
-                    if operation.ends_with("{}") && inner_operation.starts_with("{}") {
+                    if operation.ends_with("{}") || inner_operation.starts_with("{}") {
+                        let operation = if operation.ends_with("{}") {
+                            if inner_operation.starts_with("{}") {
+                                println!("Trying to find {} and {}", operation, inner_operation);
+                                operation[0..operation.len()-2].to_string() + inner_operation
+                            } else {
+                                println!("Trying to find {} and {}", operation, inner_operation);
+                                operation.clone() + &inner_operation
+                            }
+                        } else {
+                            println!("Trying to find {} and {}", operation, inner_operation);
+                            operation.clone() + &inner_operation
+                        };
+                        println!("Trying to find {}", operation);
                         let getter = OperationGetter {
                             syntax: syntax.clone(),
-                            operation: operation[0..operation.len() - 2].to_string() + &inner_operation,
+                            operation,
                             error: error.clone(),
                         };
                         if let Ok(found) = getter.await {

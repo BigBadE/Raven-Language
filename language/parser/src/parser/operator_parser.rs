@@ -8,6 +8,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
     let mut operation = String::new();
     let mut effects = Vec::new();
 
+    let last_found = last.is_some();
     if let Some(effect) = last {
         operation += "{}";
         effects.push(effect);
@@ -83,7 +84,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
 
     let mut last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
     while TokenTypes::BlockStart == last || TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last ||
-        TokenTypes::ArgumentEnd == last || TokenTypes::Operator == last || TokenTypes::ParenClose == last {
+        TokenTypes::ArgumentEnd == last || (last_found && TokenTypes::Operator == last) || TokenTypes::ParenClose == last {
         if TokenTypes::Operator == last {
             operation.truncate(operation.len()-1);
         }

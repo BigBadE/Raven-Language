@@ -14,7 +14,6 @@ pub struct GetterManager {
     pub impl_waiters: Vec<Waker>,
 
     pub target: String,
-    pub found_target: bool,
     pub target_waker: Option<Waker>
 }
 

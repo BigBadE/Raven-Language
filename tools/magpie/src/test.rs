@@ -5,9 +5,9 @@ use crate::FileWrapper;
 
 #[cfg(test)]
 mod test {
-    use std::path;
+    use std::{env, path};
     use include_dir::{Dir, DirEntry, include_dir};
-    use data::{Arguments, RunnerSettings};
+    use data::{Arguments, CompilerArguments, RunnerSettings};
     use crate::build;
     use crate::test::InnerFileSourceSet;
 
@@ -22,16 +22,20 @@ mod test {
         for entry in dir.entries() {
             match entry {
                 DirEntry::File(file) => {
-                    let arguments = Arguments::build_args(false, RunnerSettings {
-                        sources: vec!(),
-                        debug: false,
-                        compiler: "llvm".to_string(),
-                    });
-
                     let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
                     println!("Running {}", path);
                     let path = format!("{}::test", &path[0..path.len() - 3]);
-                    match build::<bool>(path.clone(), arguments, vec!(Box::new(InnerFileSourceSet {
+                    let mut arguments = Arguments::build_args(false, RunnerSettings {
+                        sources: vec!(),
+                        debug: false,
+                        compiler_arguments: CompilerArguments {
+                            compiler: "llvm".to_string(),
+                            target: path.clone(),
+                            temp_folder: env::current_dir().unwrap().join("target")
+                        }
+                    });
+
+                    match build::<bool>(&mut arguments, vec!(Box::new(InnerFileSourceSet {
                         set: file
                     }))) {
                         Ok(inner) => match inner {

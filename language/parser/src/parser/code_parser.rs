@@ -120,7 +120,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
                 if effect.is_some() {
                     return Err(token.make_error(parser_utils.file.clone(),
-                                                format!("Unexpected code end! Did you forget a semicolon?")));
+                                                format!("Unexpected code end! Did you forget a semicolon? {:?}",
+                                                        effect.unwrap())));
                 }
                 return Ok(None)
             },

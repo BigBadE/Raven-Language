@@ -10,6 +10,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
+    println!("Internal {}", name);
     if name.starts_with("numbers::Cast") {
         build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
         return;

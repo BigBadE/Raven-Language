@@ -12,6 +12,7 @@ use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use std::sync::{Arc, RwLock};
+use data::CompilerArguments;
 use syntax::async_util::EmptyNameResolver;
 use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
@@ -28,14 +29,10 @@ pub struct CompilerImpl<'ctx> {
 
 /// SAFETY LLVM isn't safe for access across multiple threads, but this module only accesses it from
 /// one thread at a time.
-unsafe impl Send for CompilerImpl<'_> {
-
-}
+unsafe impl Send for CompilerImpl<'_> {}
 
 /// SAFETY See above
-unsafe impl Sync for CompilerImpl<'_> {
-
-}
+unsafe impl Sync for CompilerImpl<'_> {}
 
 impl<'ctx> CompilerImpl<'ctx> {
     pub fn new(context: &'ctx Context) -> Self {
@@ -51,17 +48,16 @@ impl<'ctx> CompilerImpl<'ctx> {
     }
 
     pub async fn compile(type_getter: &mut CompilerTypeGetter<'ctx>,
-                         target: String, syntax: &Arc<Mutex<Syntax>>,
+                         arguments: &CompilerArguments, syntax: &Arc<Mutex<Syntax>>,
                          functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
                          _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> bool {
-        match Syntax::get_function(syntax.clone(), ParsingError::empty(), target,
+        match Syntax::get_function(syntax.clone(), ParsingError::empty(), arguments.target.clone(),
                                    Box::new(EmptyNameResolver {}), false).await {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(_) => return false
         };
 
         let function = MainFuture { syntax: syntax.clone() }.await;
-
         instance_function(Arc::new(function.to_codeless()), type_getter);
 
         while !type_getter.compiling.is_empty() {
@@ -71,9 +67,10 @@ impl<'ctx> CompilerImpl<'ctx> {
 
             if !function.data.poisoned.is_empty() || function.data.name.is_empty() {
                 // The checker handles the poisoned functions
-                continue
+                continue;
             }
 
+            println!("{}", function.data.name);
             let finalized_function;
             {
                 let reading = functions.read().unwrap();
@@ -83,7 +80,7 @@ impl<'ctx> CompilerImpl<'ctx> {
                     unsafe {
                         Arc::get_mut_unchecked(&mut type_getter.compiling)
                     }.push((function_type, function));
-                    continue
+                    continue;
                 };
             }
             compile_block(&finalized_function.code, function_type,
@@ -92,11 +89,13 @@ impl<'ctx> CompilerImpl<'ctx> {
 
         //let pass_manager = PassManager::create(&self.compiler.module);
 
-        //unsafe {
-        //LLVMWriteBitcodeToFile(self.compiler.module.as_mut_ptr(), c_str("main.bc"));
-        //}
+        /*unsafe {
+            LLVMWriteBitcodeToFile(type_getter.compiler.module.as_mut_ptr(),
+                                   CString::new(arguments.temp_folder.join("output.bc")
+                                       .to_str().unwrap()).unwrap().as_ptr());
+        }*/
 
-        //print_formatted(compiler.module.to_string());
+        //print_formatted(type_getter.compiler.module.to_string());
         return true;
     }
 }

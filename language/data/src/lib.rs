@@ -7,11 +7,17 @@ use colored::Colorize;
 
 pub type Main<T> = unsafe extern "C" fn() -> T;
 
-#[repr(C)]
 pub struct RunnerSettings {
     pub sources: Vec<Box<dyn SourceSet>>,
     pub debug: bool,
+    pub compiler_arguments: CompilerArguments
+}
+
+#[derive(Clone)]
+pub struct CompilerArguments {
     pub compiler: String,
+    pub target: String,
+    pub temp_folder: PathBuf
 }
 
 pub struct Arguments {
@@ -40,9 +46,9 @@ impl Arguments {
 
 impl RunnerSettings {
     pub fn include_references(&self) -> bool {
-        return match self.compiler.to_lowercase().as_str() {
+        return match self.compiler_arguments.compiler.to_lowercase().as_str() {
             "llvm" => true,
-            _ => panic!("Unknown compiler {}", self.compiler)
+            _ => panic!("Unknown compiler {}", self.compiler_arguments.compiler)
         };
     }
 }

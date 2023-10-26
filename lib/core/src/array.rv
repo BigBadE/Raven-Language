@@ -1,0 +1,29 @@
+#[operation([{+}])]
+trait Array<T> {
+    fn instance(self) -> T;
+}
+
+pub impl<T> Array<T> for [T] {
+    fn instance(self) -> T {
+        return self;
+    }
+}
+
+pub impl<T> Array<T> for T {
+    fn instance(self) -> T {
+        return self;
+    }
+}
+
+pub internal fn empty<T>() -> [T] {
+
+}
+
+#[operation({}[{}])]
+trait Index<T> {
+    fn index(self, index: u64) -> T;
+}
+
+pub internal impl<T> Index<T> for [T] {
+    fn index(self, index: u64) -> T {}
+}

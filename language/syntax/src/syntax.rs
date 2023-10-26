@@ -425,5 +425,5 @@ impl Syntax {
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.
     /// Waits for the receiver before calling any of the code
-    async fn compile(&self, target: String, receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
+    async fn compile(&self, receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T>;
 }
