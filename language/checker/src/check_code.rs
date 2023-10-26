@@ -207,29 +207,35 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables, references).await?)
             }
 
+            // Finds methods based off the calling type.
             let method = if let Some(found) = calling {
                 let calling = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables, references).await?;
                 let return_type = calling.get_return(variables).unwrap();
 
-                if let Some(mut found) = return_type.find_method(&method) {
-                    finalized_effects.insert(0, calling);
-                    let mut output = vec!();
-                    for (found_trait, function) in &mut found {
-                        let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
-                        if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
-                            output.push((found_trait, temp));
+                // If it's generic, check its trait bounds for the method
+                if return_type.name_safe().is_none() {
+                    if let Some(mut found) = return_type.find_method(&method) {
+                        finalized_effects.insert(0, calling);
+                        let mut output = vec!();
+                        for (found_trait, function) in &mut found {
+                            let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
+                            if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
+                                output.push((found_trait, temp));
+                            }
                         }
-                    }
 
-                    if output.len() > 1 {
-                        return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
-                    } else if output.is_empty() {
-                        return Err(placeholder_error(format!("No method {} for generic!", method)));
-                    }
+                        if output.len() > 1 {
+                            return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
+                        } else if output.is_empty() {
+                            return Err(placeholder_error(format!("No method {} for generic!", method)));
+                        }
 
-                    let (found_trait, found) = output.pop().unwrap();
-                    return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects))
+                        let (found_trait, found) = output.pop().unwrap();
+                        return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects))
+                    }
                 }
+
+                // If it's a trait, handle virtual method calls.
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
                     finalized_effects.insert(0, calling);
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),

@@ -1,14 +1,15 @@
+import trait-calls::Test;
+
 fn test() -> bool {
-    //return 0.trait_test();
-    return true;
+    return 0.trait_test();
 }
 
 trait Test {
-    fn trait_test() -> bool;
+    fn trait_test(self) -> bool;
 }
 
 impl Test for u64 {
-    pub fn trait_test() -> bool {
+    pub fn trait_test(self) -> bool {
         return true;
     }
 }

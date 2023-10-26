@@ -1,0 +1,20 @@
+import stdio;
+
+fn test() -> bool {
+    virtual_call(0);
+    return true;
+}
+
+trait Test {
+    fn call_test(self);
+}
+
+impl Test for u64 {
+    fn call_test(self) {
+        printf("Test!");
+    }
+}
+
+fn virtual_call(test: Test) {
+    test.call_test();
+}
