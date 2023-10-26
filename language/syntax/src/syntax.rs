@@ -104,6 +104,7 @@ impl Syntax {
             }
         }
 
+        keys.clear();
         self.operation_wakers.keys().for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.operation_wakers.remove(key).unwrap() {
