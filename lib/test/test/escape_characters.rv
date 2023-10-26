@@ -11,24 +11,24 @@ fn test() -> bool {
     //b
     //cd
     //
-    printf(a);
+    //printf(a); // don't printf because that would require importing the stdio library
 
     //b should output
     //  "abc"
-    printf(b);
+    //printf(b);
 
     //c should output
     //                  """"""''''''
-    printf(c);
+    //printf(c);
 
     //d should output
     //ghi
-    printf(d);
+    //printf(d);
 
     //e should output
     //HELLO!
     //
-    printf(e);
+    //printf(e);
 
     return true;
 }
