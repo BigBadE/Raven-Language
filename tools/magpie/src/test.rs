@@ -29,6 +29,7 @@ mod test {
                     });
 
                     let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
+                    println!("Running {}", path);
                     let path = format!("{}::test", &path[0..path.len() - 3]);
                     match build::<bool>(path.clone(), arguments, vec!(Box::new(InnerFileSourceSet {
                         set: file

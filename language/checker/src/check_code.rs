@@ -114,6 +114,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                      Effects::ImplementationCall(calling, operation.name.clone(),
                                                                  String::new(), values, None),
                                      syntax, variables, references).await?;
+
             temp
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {

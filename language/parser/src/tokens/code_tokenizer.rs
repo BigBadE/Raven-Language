@@ -33,7 +33,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         tokenizer.make_token(TokenTypes::ParenClose)
     } else if tokenizer.matches(".") {
         // This is only a number if the thing before and after is a digit. "1." and ".1" aren't numbers.
-        if tokenizer.buffer[tokenizer.index].is_ascii_digit() && tokenizer.buffer[tokenizer.index-2].is_ascii_digit() {
+        if tokenizer.buffer[tokenizer.index].is_ascii_digit() && tokenizer.buffer[tokenizer.index - 2].is_ascii_digit() {
             tokenizer.index -= 1;
             parse_numbers(tokenizer)
         } else {
@@ -81,9 +81,12 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
         tokenizer.make_token(TokenTypes::StringStart)
     } else {
         let found = tokenizer.next_included()?;
-        if (found as char).is_alphabetic() || found == b'_' {
+        if tokenizer.matches("//") {
+            tokenizer.parse_to_line_end(TokenTypes::Comment)
+        } else if (found as char).is_alphabetic() || found == b'_' {
             // A character or an underscore is a variable.
-            parse_acceptable(tokenizer, TokenTypes::Variable)
+            let temp = parse_acceptable(tokenizer, TokenTypes::Variable);
+            temp
         } else if found >= b'0' && found <= b'9' {
             // A number is a number.
             parse_numbers(tokenizer)

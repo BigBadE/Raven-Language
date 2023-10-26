@@ -66,12 +66,15 @@ impl<'a> Tokenizer<'a> {
 
     pub fn next(&mut self) -> Token {
         if self.matches("//") {
-            return self.parse_to_line_end(TokenTypes::Comment);
+            self.parse_to_line_end(TokenTypes::Comment);
+            self.last = self.make_token(TokenTypes::Comment);
+            return self.last.clone();
         } else if self.matches("/*") {
             while !self.matches("*/") {
                 self.index += 1;
             }
-            return self.make_token(TokenTypes::Comment);
+            self.last = self.make_token(TokenTypes::Comment);
+            return self.last.clone();
         }
 
         self.last = match self.state {

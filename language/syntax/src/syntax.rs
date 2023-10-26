@@ -103,6 +103,14 @@ impl Syntax {
                 waker.wake_by_ref();
             }
         }
+
+        keys.clear();
+        self.operation_wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        for key in &keys {
+            for waker in self.operation_wakers.remove(key).unwrap() {
+                waker.wake_by_ref();
+            }
+        }
     }
 
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used

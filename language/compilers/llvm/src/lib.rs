@@ -56,8 +56,7 @@ impl<T> Compiler<T> for LLVMCompiler {
         let mut binding = CompilerTypeGetter::new(
             Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        let compiler = binding.compiler.clone();
-        if CompilerImpl::compile(&mut binding, compiler, target.clone(),
+        if CompilerImpl::compile(&mut binding, target.clone(),
                                  syntax, &self.compiling, &self.struct_compiling).await {
             receiver.recv().await.unwrap();
             return binding.get_target(&target).map(|inner| unsafe { inner.call() });

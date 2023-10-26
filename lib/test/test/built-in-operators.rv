@@ -1,8 +1,8 @@
 fn test() -> bool {
+    let temp = 5;
     let value = (1 + 2) - 3 / 4 * 5;
-    let other = 5;
-    other *= 3;
-    other /= 2;
-    other %= 4;
-    return !(value != other);
+    temp *= 3;
+    temp /= 2;
+    temp %= 4;
+    return !(value != temp);
 }
