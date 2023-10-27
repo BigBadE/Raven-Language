@@ -1,6 +1,13 @@
 import stdio;
 
 fn main() {
-    printf("Start!");
-    printf("Stop!");
+    let a = 3;
+    let b = 3;
+
+    let c = a ^ b;
+    if c == 0 {
+        printf("Success");
+    } else {
+        printf("Fail");
+    }
 }
