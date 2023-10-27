@@ -178,8 +178,7 @@ fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects,
 fn create_if(effect: Effects, body: CodeBody,
                    mut else_ifs: Vec<(Effects, CodeBody)>,
                    else_body: Option<CodeBody>, mut id: u32) -> Result<Effects, ParsingError> {
-    let body = body;
-    let end = CodeBody::new(Vec::new(), id.to_string() + "end");
+    let mut body = body;
 
     // Maps the else body, if there is an else_if there needs to be an empty else to put the else if into.
     let mut else_body = if let Some(body) = else_body {
@@ -191,11 +190,14 @@ fn create_if(effect: Effects, body: CodeBody,
     };
 
     // Where we jump if the if fails
-    let if_jumping = if let Some(body) = &else_body {
+    let if_jumping = if let Some(body) = &mut else_body {
+        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
         body.label.clone()
     } else {
-        end.label.clone()
+        id.to_string() + "end"
     };
+
+    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
 
     // The CodeBody before the if statement that controls the control flow
     let mut top = CodeBody::new(
@@ -231,9 +233,6 @@ fn create_if(effect: Effects, body: CodeBody,
                                              Effects::CodeBody(body)));
     }
 
-    // Add the end after everything runs
-    top.expressions.push(
-        Expression::new(ExpressionType::Line, Effects::CodeBody(end)));
     return Ok(Effects::CodeBody(top));
 }
 
