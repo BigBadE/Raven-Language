@@ -171,6 +171,18 @@ pub internal impl<T: Number> BitXOR<T, T> for T {
     }
 }
 
+pub internal impl<T: Number> BitAnd<T, T> for T {
+    fn bix_and(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> BitOr<T, T> for T {
+    fn bix_or(self, other: T) -> T {
+
+    }
+}
+
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number> Divide<T, T> for T {
     fn divide(self, other: T) -> T {
