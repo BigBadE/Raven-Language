@@ -5,9 +5,13 @@ fn main() {
     let b = 3;
 
     let c = a | b;
-    if c == 3 {
+    if test() {
         printf("Success");
     } else {
         printf("Fail");
     }
+}
+
+fn test() -> bool {
+    return 4 & 3 == 0;
 }
