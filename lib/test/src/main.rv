@@ -3,4 +3,10 @@ import stdio;
 fn main() {
     printf("Start!");
     printf("Stop!");
+    let array = [1, 2, 3];
+    if array[1] + array[2] == array[3] {
+        printf("Yep!");
+    } else {
+        printf("No!");
+    }
 }
