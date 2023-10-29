@@ -130,6 +130,27 @@ impl Attribute {
         }
         return None;
     }
+
+    pub fn as_string_attribute(&self) -> Option<&String> {
+        match self {
+            Attribute::String(_, value) => Some(value),
+            _ => None
+        }
+    }
+
+    pub fn as_int_attribute(&self) -> Option<i64> {
+        match self {
+            Attribute::Integer(_, value) => Some(*value),
+            _ => None
+        }
+    }
+
+    pub fn as_bool_attribute(&self) -> Option<bool> {
+        match self {
+            Attribute::Bool(_, value) => Some(*value),
+            _ => None
+        }
+    }
 }
 
 #[async_trait]

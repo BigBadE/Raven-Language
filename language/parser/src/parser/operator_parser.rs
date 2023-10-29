@@ -84,10 +84,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
 
     let mut last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
     while TokenTypes::BlockStart == last || TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last ||
-        TokenTypes::ArgumentEnd == last || TokenTypes::Operator == last || TokenTypes::ParenClose == last {
-        if TokenTypes::Operator == last {
-            operation.truncate(operation.len()-1);
-        }
+        TokenTypes::ArgumentEnd == last || TokenTypes::ParenClose == last {
         parser_utils.index -= 1;
         last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
     }

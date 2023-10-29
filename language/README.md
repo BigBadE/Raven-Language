@@ -15,6 +15,7 @@
 - Compilation-time: Something that happens during compilation:
 - Runtime: Something that happens when the program runs
 - Constant: Something that is computed at compilation time, for example generics are constant types because the compiler degenerics them at compiler-time. 
+- Desugaring: Certain things are known as syntax sugar, which means it's just an easier way to write code. For example, if statements are really just jumps. Desugaring is the process of turning syntax sugar into its raw form for compilation.
 
 # Compilation
 

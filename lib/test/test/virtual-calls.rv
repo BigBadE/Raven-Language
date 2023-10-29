@@ -1,20 +1,20 @@
 import stdio;
+import virtual-calls::Test;
 
 fn test() -> bool {
-    virtual_call(0);
-    return true;
+    return virtual_call(0);
 }
 
 trait Test {
-    fn call_test(self);
+    fn call_test(self) -> bool;
 }
 
 impl Test for u64 {
-    fn call_test(self) {
-        printf("Test!");
+    fn call_test(self) -> bool {
+        return true;
     }
 }
 
-fn virtual_call(test: Test) {
-    test.call_test();
+fn virtual_call(test: Test) -> bool {
+    return test.call_test();
 }

@@ -1,4 +1,4 @@
-use std::{mem, thread};
+use std::thread;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
@@ -11,7 +11,7 @@ use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::operation_util::OperationGetter;
-use syntax::r#struct::VOID;
+use syntax::r#struct::{StructData, VOID};
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
@@ -59,46 +59,77 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let error = ParsingError::new(String::new(), (0, 0), 0,
                                           (0, 0), 0, format!("Failed to find operation {} with {:?}", operation, values));
             let mut outer_operation = None;
+            // Check if it's two operations that should be combined, like a list ([])
             if values.len() > 0 {
-                let mut last = values.last().unwrap();
-                if let Effects::CreateArray(effects) = last {
+                let mut reading_array = None;
+                let mut last = values.pop().unwrap();
+                if let Effects::CreateArray(mut effects) = last {
                     if effects.len() > 0 {
-                        last = effects.last().unwrap();
+                        last = effects.pop().unwrap();
+                        reading_array = Some(effects);
+                    } else {
+                        last = Effects::CreateArray(vec!());
                     }
                 }
-                if let Effects::Operation(inner_operation, _) = last {
+
+                if let Effects::Operation(inner_operation, effects) = last {
                     if operation.ends_with("{}") && inner_operation.starts_with("{}") {
+                        let combined =
+                            operation[0..operation.len() - 2].to_string() + &inner_operation;
+                        let new_operation = if operation.starts_with("{}") && inner_operation.ends_with("{}") {
+                            let mut output = vec!();
+                            for i in 1..combined.len() - operation.len() - 2 {
+                                let mut temp = combined.clone();
+                                temp.truncate(operation.len() + i);
+                                output.push(temp);
+                            }
+                            output
+                        } else {
+                            vec!(combined.clone())
+                        };
+
                         let getter = OperationGetter {
                             syntax: syntax.clone(),
-                            operation: operation[0..operation.len() - 2].to_string() + &inner_operation,
+                            operation: new_operation.clone(),
                             error: error.clone(),
                         };
                         if let Ok(found) = getter.await {
-                            outer_operation = Some(found);
+                            let new_operation = Attribute::find_attribute("operation", &found.attributes).unwrap().as_string_attribute().unwrap();
+
+                            if let Some(found) = reading_array {
+                                for effect in found {
+                                    values.push(effect);
+                                }
+                            }
+                            if new_operation.len() >= combined.len() {
+                                for effect in effects {
+                                    values.push(effect);
+                                }
+                                outer_operation = Some(found);
+                            } else {
+                                let new_inner = "{}".to_string() + &combined[new_operation.replace("{+}", "{}").len()..];
+
+                                let inner_data = OperationGetter {
+                                    syntax: syntax.clone(),
+                                    operation: vec!(new_inner.clone()),
+                                    error: error.clone()
+                                }.await?;
+                                (outer_operation, values) = assign_with_priority(new_operation.clone(), &found,
+                                                                                 values, new_inner, &inner_data, effects);
+                            }
                         }
                     }
+                } else {
+                    values.push(last);
                 }
             }
 
             let operation = if let Some(found) = outer_operation {
-                let top = values.pop().unwrap();
-                if let Effects::CreateArray(mut inner) = top {
-                    if let Effects::Operation(_, found) = inner.pop().unwrap() {
-                        for effect in found {
-                            inner.push(effect);
-                        }
-                    }
-                    values.push(Effects::CreateArray(inner));
-                } else if let Effects::Operation(_, found) = top {
-                    for value in found {
-                        values.push(value);
-                    }
-                }
                 found
             } else {
                 OperationGetter {
                     syntax: syntax.clone(),
-                    operation,
+                    operation: vec!(operation),
                     error,
                 }.await?
             };
@@ -110,12 +141,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 calling = Box::new(Effects::NOP());
             }
 
-            let temp = verify_effect(process_manager, resolver,
-                                     Effects::ImplementationCall(calling, operation.name.clone(),
-                                                                 String::new(), values, None),
-                                     syntax, variables, references).await?;
-
-            temp
+            verify_effect(process_manager, resolver,
+                          Effects::ImplementationCall(calling, operation.name.clone(),
+                                                      String::new(), values, None),
+                          syntax, variables, references).await?
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
@@ -128,11 +157,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 return_type = FinalizedTypes::Struct(VOID.clone());
             } else {
                 let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, syntax, variables, references).await?;
+                println!("Found {:?}: {} ({:?})", found, found.get_return(variables).unwrap(), variables.variables);
                 return_type = found.get_return(variables).unwrap();
                 finalized_effects.insert(0, found);
             }
 
-            if let Ok(inner) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
+            if let Ok(inner) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                                   traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let mut output = None;
                 {
@@ -171,10 +201,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             match locked.get_implementation(&return_type, data) {
                                 Some(inner) => inner,
                                 None => {
-                                    return Err(
-                                        placeholder_error(format!("Nothing implements {} for {} and {} ({} and {})\n{}", inner, return_type, data.name,
-                                                                  locked.async_manager.finished, locked.async_manager.parsing_impls,
-                                        locked.implementations.iter().map(|inner| format!("{} and {}", inner.base, inner.target)).collect::<Vec<_>>().join("\n"))))
+                                    return Err(placeholder_error(
+                                        format!("Nothing implements {} for {}", inner, return_type)));
                                 }
                             }
                         }
@@ -231,7 +259,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
-                        return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects))
+                        return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
                     }
                 }
 
@@ -460,61 +488,22 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
     return true;
 }
 
-pub fn assign_with_priority(operator: FinalizedEffects) -> FinalizedEffects {
-    //Needs ownership of the value
-    let (target, func, mut effects) = if let FinalizedEffects::MethodCall(target, func, effects) = operator {
-        (target, func, effects)
+pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut values: Vec<Effects>,
+                            inner_operator: String, inner_data: &Arc<StructData>, mut inner_effects: Vec<Effects>) -> (Option<Arc<StructData>>, Vec<Effects>) {
+    let op_priority = Attribute::find_attribute("priority", &found.attributes)
+        .map(|inner| inner.as_int_attribute().unwrap_or(0)).unwrap_or(0);
+    let op_parse_left = Attribute::find_attribute("parse_left", &found.attributes)
+        .map(|inner| inner.as_bool_attribute().unwrap_or(false)).unwrap_or(false);
+    let lhs_priority = Attribute::find_attribute("priority", &inner_data.attributes)
+        .map(|inner| inner.as_int_attribute().unwrap_or(0)).unwrap_or(0);
+
+    return if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
+        values.push(inner_effects.remove(0));
+        inner_effects.insert(0, Effects::Operation(operation, values));
+        (Some(inner_data.clone()), inner_effects)
     } else {
-        panic!("If your seeing this, something went VERY wrong");
-    };
-    if effects.len() != 2 {
-        return FinalizedEffects::MethodCall(None, func, effects);
+        values.push(Effects::Operation(inner_operator, inner_effects));
+        println!("2 {:?} and {:?}", operation, values);
+        (Some(found.clone()), values)
     }
-
-    let op_priority = match Attribute::find_attribute("priority", &func.data.attributes) {
-        Some(found) => match found {
-            Attribute::Integer(_, priority) => *priority,
-            _ => 0,
-        },
-        None => 0
-    };
-
-    let op_parse_left = match Attribute::find_attribute("parse_left", &func.data.attributes) {
-        Some(found) => match found {
-            Attribute::Bool(_, priority) => *priority,
-            _ => true,
-        },
-        None => true
-    };
-
-    let lhs = effects.remove(0);
-
-    let lhs_priority = match Attribute::find_attribute("priority", &func.data.attributes) {
-        Some(found) => match found {
-            Attribute::Integer(_, priority) => *priority,
-            _ => 0,
-        },
-        None => 0
-    };
-
-    match lhs {
-        // Code explained using the following example: 1 + 2 / 2
-        FinalizedEffects::MethodCall(lhs_target, lhs_func, mut lhs) => {
-            // temp_lhs = (1 + 2), operator = {} / 2
-            if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
-                // temp_lhs = 1 + {}, operator = 2 / 2
-                mem::swap(lhs.last_mut().unwrap(), effects.first_mut().unwrap());
-
-                // 1 + (2 / 2)
-                mem::swap(lhs.last_mut().unwrap(), &mut FinalizedEffects::MethodCall(target, func, effects));
-
-                return FinalizedEffects::MethodCall(lhs_target, lhs_func.clone(), lhs);
-            } else {
-                effects.insert(0, FinalizedEffects::MethodCall(lhs_target, lhs_func.clone(), lhs));
-            }
-        }
-        _ => effects.insert(0, lhs)
-    }
-
-    return FinalizedEffects::MethodCall(target, func, effects);
 }

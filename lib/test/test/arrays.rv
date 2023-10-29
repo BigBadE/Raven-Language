@@ -1,0 +1,5 @@
+fn test() -> bool {
+    let testing = [false, false, true];
+    let other = [true];
+    return testing[2];
+}

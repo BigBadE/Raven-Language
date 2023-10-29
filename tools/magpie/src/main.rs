@@ -1,18 +1,13 @@
-extern crate alloc;
-extern crate core;
-
-use alloc::ffi::CString;
 use core::fmt::Debug;
 use std::{env, path, ptr};
-use std::ffi::{c_char, c_int};
-use std::mem::size_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use include_dir::{Dir, DirEntry, File, include_dir};
 use tokio::runtime::Builder;
 
-use data::{Arguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
+use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
+pub mod project;
 mod test;
 static CORE: Dir = include_dir!("lib/core/src");
 static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
@@ -26,15 +21,18 @@ fn main() {
 
     if args.len() == 2 {
         let target = env::current_dir().unwrap().join(args[1].clone());
-        let arguments = Arguments::build_args(false, RunnerSettings {
+        let mut arguments = Arguments::build_args(false, RunnerSettings {
             sources: vec!(),
             debug: false,
-            compiler: "llvm".to_string(),
+            compiler_arguments: CompilerArguments {
+                target: format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
+                compiler: "llvm".to_string(),
+                temp_folder: env::current_dir().unwrap().join("target")
+            }
         });
 
         println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
-        match build::<RawRavenProject>(format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
-                                 arguments, vec!(Box::new(FileSourceSet {
+        match build::<()>(&mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
         }))) {
             _ => return
@@ -50,21 +48,30 @@ fn main() {
         return;
     }
 
-    let arguments = Arguments::build_args(false, RunnerSettings {
+    let mut arguments = Arguments::build_args(false, RunnerSettings {
         sources: vec!(),
         debug: false,
-        compiler: "llvm".to_string(),
+        compiler_arguments: CompilerArguments {
+            target: "build::project".to_string(),
+            compiler: "llvm".to_string(),
+            temp_folder: env::current_dir().unwrap().join("target")
+        }
     });
 
     println!("Setting up build...");
-    /*let _project = match build::<RawRavenProject>("build::project".to_string(), &mut arguments, vec!(Box::new(FileSourceSet {
+    /*let project = match build::<RawRavenProject>(&mut arguments, vec!(Box::new(FileSourceSet {
         root: build_path,
     }), Box::new(InnerSourceSet {
         set: &MAGPIE
     }))) {
-        Some(found) => RavenProject::from(found),
-        None => panic!("No project method in build file!")
+        Ok(found) => match found {
+            Some(found) => RavenProject::from(found),
+            None => panic!("No project method in build file!")
+        },
+        Err(()) => panic!("Error during build detected!")
     };*/
+
+    arguments.runner_settings.compiler_arguments.target = "main::main".to_string();
 
     let source = env::current_dir().unwrap().join("src");
 
@@ -73,14 +80,14 @@ fn main() {
     }
 
     println!("Building and running project...");
-    match build::<()>("main::main".to_string(), arguments, vec!(Box::new(FileSourceSet {
+    match build::<()>(&mut arguments, vec!(Box::new(FileSourceSet {
         root: source
     }))) {
         _ => {}
     }
 }
 
-pub fn build<T: Send + 'static>(target: String, mut arguments: Arguments, mut source: Vec<Box<dyn SourceSet>>)
+pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>)
     -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
@@ -101,7 +108,7 @@ pub fn build<T: Send + 'static>(target: String, mut arguments: Arguments, mut so
 
     arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
 
-    let value = run::<T>(target, &arguments);
+    let value = run::<T>(&arguments);
     return match value {
         Ok(inner) => Ok(inner),
         Err(errors) => {
@@ -114,81 +121,10 @@ pub fn build<T: Send + 'static>(target: String, mut arguments: Arguments, mut so
     }
 }
 
-fn run<T: Send + 'static>(target: String, arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     let result = Builder::new_current_thread().build().unwrap().block_on(
-        runner::runner::run::<AtomicPtr<T>>(target, &arguments))?;
+        runner::runner::run::<AtomicPtr<T>>(&arguments))?;
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
-}
-
-#[derive(Debug)]
-#[repr(C, align(8))]
-pub struct RawRavenProject {
-    type_id: c_int,
-    pub name: AtomicPtr<c_char>,
-    //pub dependencies: AtomicPtr<RawArray>,
-}
-
-#[derive(Debug)]
-pub struct RawArray {}
-
-#[repr(C, align(8))]
-#[derive(Debug)]
-pub struct RawDependency {
-    type_id: c_int,
-    pub name: c_int,
-}
-
-#[derive(Debug)]
-pub struct RavenProject {
-    pub name: String,
-    //pub dependencies: Vec<Dependency>,
-}
-
-#[derive(Debug)]
-pub struct Dependency {
-    //pub name: String,
-}
-
-fn load_raw<T: Debug>(length: u64, pointer: *mut T) -> Vec<T> {
-    let mut output = Vec::new();
-    let offset = size_of::<T>() as u64;
-    let mut pointer = pointer;
-
-    for _ in 0..length {
-        output.push(unsafe { ptr::read(pointer) });
-        pointer = (pointer as u64 + offset) as *mut T;
-    }
-
-    return output;
-}
-
-impl From<RawRavenProject> for RavenProject {
-    fn from(value: RawRavenProject) -> Self {
-        unsafe {
-            return Self {
-                name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
-                //dependencies: load_array(value.dependencies).into_iter()
-                //    .map(|inner: RawDependency| Dependency::from(inner)).collect::<Vec<_>>(),
-            };
-        }
-    }
-}
-
-impl From<RawDependency> for Dependency {
-    fn from(value: RawDependency) -> Self {
-        unsafe {
-            return Self {
-                //name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string()
-            };
-        }
-    }
-}
-
-fn load_array<T: Debug>(ptr: AtomicPtr<RawArray>) -> Vec<T> {
-    let ptr = ptr.load(Ordering::Relaxed);
-    let len = unsafe { ptr::read(ptr as *mut u64) };
-    println!("{:?}", unsafe { ptr::read(ptr as *mut [u64; 5]) });
-    return load_raw(len, (ptr as u64 + size_of::<u64>() as u64) as *mut T);
 }
 
 #[derive(Clone, Debug)]

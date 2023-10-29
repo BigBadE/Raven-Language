@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use inkwell::context::Context;
 use tokio::sync::mpsc::Receiver;
 use async_trait::async_trait;
+use data::CompilerArguments;
 use syntax::function::FinalizedFunction;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::{Compiler, Syntax};
@@ -28,6 +29,7 @@ pub mod vtable_manager;
 pub struct LLVMCompiler {
     compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
     struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
+    arguments: CompilerArguments,
     context: Context,
 }
 
@@ -41,10 +43,11 @@ unsafe impl Send for LLVMCompiler {
 
 impl LLVMCompiler {
     pub fn new(compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
-               struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> Self {
+               struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>, arguments: CompilerArguments) -> Self {
         return Self {
             compiling,
             struct_compiling,
+            arguments,
             context: Context::create(),
         };
     }
@@ -52,14 +55,14 @@ impl LLVMCompiler {
 
 #[async_trait]
 impl<T> Compiler<T> for LLVMCompiler {
-    async fn compile(&self, target: String, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
+    async fn compile(&self, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
         let mut binding = CompilerTypeGetter::new(
             Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        if CompilerImpl::compile(&mut binding, target.clone(),
+        if CompilerImpl::compile(&mut binding, &self.arguments,
                                  syntax, &self.compiling, &self.struct_compiling).await {
             receiver.recv().await.unwrap();
-            return binding.get_target(&target).map(|inner| unsafe { inner.call() });
+            return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
         }
 
         return None;

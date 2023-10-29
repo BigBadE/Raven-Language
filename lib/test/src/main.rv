@@ -1,17 +1,12 @@
 import stdio;
 
 fn main() {
-    let a = 3;
-    let b = 3;
-
-    let c = a | b;
-    if test() {
-        printf("Success");
+    printf("Start!");
+    printf("Stop!");
+    let array = [1, 2, 3];
+    if array[1] + array[2] == array[3] {
+        printf("Yep!");
     } else {
-        printf("Fail");
+        printf("No!");
     }
-}
-
-fn test() -> bool {
-    return 4 & 3 == 0;
 }
