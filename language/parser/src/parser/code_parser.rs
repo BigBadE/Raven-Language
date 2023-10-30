@@ -78,7 +78,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                                                           name.clone(), effects, None));
                     }
                     // If it's not a method call, it's a parenthesized effect.
-                    _ => if let Some(expression) = parse_line(parser_utils, state.clone())? {
+                    _ => if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
                         effect = Some(Effects::Paren(Box::new(expression.effect)));
                     } else {
                         //effect = None;
@@ -241,8 +241,10 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     // Operators inside operators return immediately so operators can be combined
                     // later on for operators like [].
                     if ParseState::InOperator == state || ParseState::ControlOperator == state {
+                        println!("Operator break!");
                         return Ok(Some(Expression::new(expression_type, operator)));
                     } else {
+                        println!("Operator continue!");
                         effect = Some(operator);
                     }
                 }
