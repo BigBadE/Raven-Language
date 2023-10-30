@@ -565,7 +565,6 @@ pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut valu
         (Some(inner_data.clone()), inner_effects)
     } else {
         values.push(Effects::Operation(inner_operator, inner_effects));
-        println!("If you hit this please report it: {:?} and {:?}", operation, values);
         (Some(found.clone()), values)
     };
 }
