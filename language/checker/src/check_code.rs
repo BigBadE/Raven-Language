@@ -133,7 +133,18 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                     panic!("Expected array!");
                                 }
                             } else {
-                                values.push(Effects::Operation(inner_operation, effects));
+                                let outer_data = OperationGetter {
+                                    syntax: syntax.clone(),
+                                    operation: vec!(operation.clone()),
+                                    error: error.clone(),
+                                }.await?;
+                                let inner_data = OperationGetter {
+                                    syntax: syntax.clone(),
+                                    operation: vec!(inner_operation.clone()),
+                                    error: error.clone(),
+                                }.await?;
+                                (outer_operation, values) = assign_with_priority(operation.clone(), &outer_data, values,
+                                inner_operation, &inner_data, effects, false);
                             }
                         }
                     } else {
@@ -554,7 +565,7 @@ pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut valu
         (Some(inner_data.clone()), inner_effects)
     } else {
         values.push(Effects::Operation(inner_operator, inner_effects));
-        println!("2 {:?} and {:?}", operation, values);
+        println!("If you hit this please report it: {:?} and {:?}", operation, values);
         (Some(found.clone()), values)
     };
 }

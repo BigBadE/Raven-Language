@@ -4,5 +4,9 @@ fn test() -> bool {
     temp *= 3;
     temp /= 2;
     temp %= 4;
+    // Checks to make sure priority works.
+    if 5 / 2 - 1 != 1 {
+        return false;
+    }
     return !(value != temp);
 }
