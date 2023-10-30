@@ -104,7 +104,6 @@ trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(-100)]
 #[priority(0)]
 #[operation({}&{})]
 trait BitAnd<E, C> {
@@ -189,14 +188,20 @@ pub impl<T: Multiply<E, T>, E> MultiplyAndAssign<E, T> for T {
     }
 }
 
-pub internal impl<T: Number> BitOR<T, T> for T {
-    fn bix_or(self, other: T) -> T {
+pub internal impl<T: Number> BitOr<T, T> for T {
+    fn bit_or(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> BitAnd<T, T> for T {
+    fn bit_and(self, other: T) -> T {
 
     }
 }
 
 pub internal impl<T: Number> BitXOR<T, T> for T {
-    fn bix_xor(self, other: T) -> T {
+    fn bit_xor(self, other: T) -> T {
 
     }
 }

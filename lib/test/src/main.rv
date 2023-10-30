@@ -1,7 +1,11 @@
 import stdio;
 
 fn main() {
-    for i in 0..5 {
-        printf("Test!");
+    let a = 1;
+    let b = 2;
+    if a & b == 0 {
+        printf("Yep!");
+    } else {
+        printf("No!");
     }
 }
