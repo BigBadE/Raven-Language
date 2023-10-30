@@ -96,14 +96,22 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         if let Ok(found) = getter.await {
                             let new_operation = Attribute::find_attribute("operation", &found.attributes).unwrap().as_string_attribute().unwrap();
 
+                            let mut inner_array = false;
                             if let Some(found) = reading_array {
-                                for effect in found {
-                                    values.push(effect);
-                                }
+                                values.push(Effects::CreateArray(found));
+                                inner_array = true;
                             }
                             if new_operation.len() >= combined.len() {
-                                for effect in effects {
-                                    values.push(effect);
+                                if inner_array {
+                                    if let Effects::CreateArray(last) = values.last_mut().unwrap() {
+                                        for effect in effects {
+                                            last.push(effect);
+                                        }
+                                    }
+                                } else {
+                                    for effect in effects {
+                                        values.push(effect);
+                                    }
                                 }
                                 outer_operation = Some(found);
                             } else {
@@ -114,8 +122,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                     operation: vec!(new_inner.clone()),
                                     error: error.clone()
                                 }.await?;
-                                (outer_operation, values) = assign_with_priority(new_operation.clone(), &found,
-                                                                                 values, new_inner, &inner_data, effects);
+                                (outer_operation, values) = assign_with_priority(new_operation.clone(), &found, values,
+                                                                                 new_inner, &inner_data, effects, inner_array);
                             }
                         }
                     }
@@ -157,7 +165,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 return_type = FinalizedTypes::Struct(VOID.clone());
             } else {
                 let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, syntax, variables, references).await?;
-                println!("Found {:?}: {} ({:?})", found, found.get_return(variables).unwrap(), variables.variables);
                 return_type = found.get_return(variables).unwrap();
                 finalized_effects.insert(0, found);
             }
@@ -489,7 +496,8 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
 }
 
 pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut values: Vec<Effects>,
-                            inner_operator: String, inner_data: &Arc<StructData>, mut inner_effects: Vec<Effects>) -> (Option<Arc<StructData>>, Vec<Effects>) {
+                            inner_operator: String, inner_data: &Arc<StructData>, mut inner_effects: Vec<Effects>,
+inner_array: bool) -> (Option<Arc<StructData>>, Vec<Effects>) {
     let op_priority = Attribute::find_attribute("priority", &found.attributes)
         .map(|inner| inner.as_int_attribute().unwrap_or(0)).unwrap_or(0);
     let op_parse_left = Attribute::find_attribute("parse_left", &found.attributes)
@@ -498,7 +506,15 @@ pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut valu
         .map(|inner| inner.as_int_attribute().unwrap_or(0)).unwrap_or(0);
 
     return if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
-        values.push(inner_effects.remove(0));
+        if inner_array {
+            if let Effects::CreateArray(inner) = values.last_mut().unwrap() {
+                inner.push(inner_effects.remove(0));
+            } else {
+                panic!("Assumed op args ended with an array when they didn't!")
+            }
+        } else {
+            values.push(inner_effects.remove(0));
+        }
         inner_effects.insert(0, Effects::Operation(operation, values));
         (Some(inner_data.clone()), inner_effects)
     } else {

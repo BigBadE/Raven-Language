@@ -10,7 +10,6 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
-    println!("Internal {}", name);
     if name.starts_with("numbers::Cast") {
         build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
         return;
@@ -78,7 +77,9 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                 .build_in_bounds_gep(params.get(0).unwrap().into_pointer_value(),
                                      &[offset], "1");
         }
-        compiler.builder.build_return(Some(&compiler.builder.build_bitcast(gep, compiler.context.i64_type().ptr_type(AddressSpace::default()), "2")));
+
+        let gep = compiler.builder.build_load(gep, "2");
+        compiler.builder.build_return(Some(&gep));
     } else if name.starts_with("array::Empty") {
         let size = unsafe {
             type_getter.compiler.builder.build_gep(value.get_type().get_return_type().unwrap()
