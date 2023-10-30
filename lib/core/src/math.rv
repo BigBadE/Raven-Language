@@ -190,6 +190,12 @@ pub impl<T: Multiply<E, T>, E> MultiplyAndAssign<E, T> for T {
     }
 }
 
+pub internal impl<T: Number> BitOR<T, T> for T {
+    fn bix_or(self, other: T) -> T {
+
+    }
+}
+
 pub internal impl<T: Number> BitXOR<T, T> for T {
     fn bix_xor(self, other: T) -> T {
 
