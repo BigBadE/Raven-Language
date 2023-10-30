@@ -13,9 +13,19 @@ fn test() -> bool {
     if a ^ b != 3 {
         return false;
     }
+
+    a ^= 3;
+    b |= 4;
+    b &= 2;
+    // Bitwise xor assignment
+    if a != 2 {
+        return false;
+    }
+    // Bitwise or and bitwise and assignments
+    if b != 2 {
+        return false;
+    }
     // Bitwise xor test 2
-    a = 2;
-    b = 2;
     if a ^ b != 0 {
         return false;
     }

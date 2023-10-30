@@ -97,19 +97,19 @@ trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(0)]
+#[priority(30)]
 #[operation({}&{})]
 trait BitAnd<E, C> {
     fn bit_and(self, other: E) -> C;
 }
 
-#[priority(-1)]
+#[priority(20)]
 #[operation({}^{})]
 trait BitXOR<E, C> {
     fn bit_xor(self, other: E) -> C;
 }
 
-#[priority(-2)]
+#[priority(10)]
 #[operation({}|{})]
 trait BitOr<E, C> {
     fn bit_or(self, other: E) -> C;
