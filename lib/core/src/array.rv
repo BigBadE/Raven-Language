@@ -13,7 +13,7 @@ pub internal fn empty<T>() -> [T] {
 
 }
 
-#[priority(5)]
+#[priority(1000)]
 #[operation({}[{}])]
 trait Index<T> {
     fn index(self, index: u64) -> T;
