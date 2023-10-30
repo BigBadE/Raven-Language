@@ -78,7 +78,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                                                           name.clone(), effects, None));
                     }
                     // If it's not a method call, it's a parenthesized effect.
-                    _ => if let Some(expression) = parse_line(parser_utils, state.clone())? {
+                    _ => if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
                         effect = Some(Effects::Paren(Box::new(expression.effect)));
                     } else {
                         //effect = None;
