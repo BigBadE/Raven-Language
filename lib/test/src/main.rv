@@ -1,8 +1,9 @@
 import stdio;
 
 fn main() {
-    let array = [1, 2, 3];
-    if array[0] | array[1] == array[2] {
+    let a = 1;
+    let b = 2;
+    if a & b == 0 {
         printf("Yep!");
     } else {
         printf("No!");
