@@ -1,7 +1,9 @@
 import stdio;
 
 fn main() {
-    if 1 + (2 + 3) == 6 {
+    let a = 1;
+    let b = 2;
+    if a & b == 0 {
         printf("Yep!");
     } else {
         printf("No!");
