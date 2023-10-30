@@ -193,7 +193,16 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                                                    compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else {
+    } else if name.starts_with("math::BitXOR") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+
+        let returning = compiler.builder.build_xor(compiler.builder.build_load(pointer_type, "2").into_int_value(),
+                                                       compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
+    }
+    else {
         panic!("Unknown internal operation: {}", name)
     }
 }
