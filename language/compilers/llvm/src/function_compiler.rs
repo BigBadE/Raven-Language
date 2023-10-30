@@ -13,7 +13,7 @@ use syntax::code::{ExpressionType, FinalizedEffects};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::types::FinalizedTypes;
 
-use crate::internal::instructions::compile_internal;
+use crate::internal::instructions::{compile_internal, malloc_type};
 use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
 use crate::util::create_function_value;
@@ -341,6 +341,11 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
             *id += 1;
 
+            let size = type_getter.compiler.builder.build_bitcast(size,
+                                                                  type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()), &id.to_string()).into_pointer_value();
+
+            *id += 1;
+
             let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
                                                                      .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
                                                                  &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
@@ -353,46 +358,21 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             Some(malloc.as_basic_value_enum())
         }
         FinalizedEffects::CreateArray(types, values) => {
-            //Get the output type, [] if empty
-            let output = types.as_ref().map(|inner| type_getter.get_type(&inner))
-                .unwrap_or(type_getter.compiler.context.const_struct(&[], false).get_type().as_basic_type_enum());
-            let size = if types.is_some() {
-                let pointer_type = if output.is_pointer_type() {
-                    output.into_pointer_type()
-                } else {
-                    output.ptr_type(AddressSpace::default())
-                };
-
-                let gep;
+            let ptr_type = types.as_ref().map(|inner| {
+                let inner = type_getter.get_type(inner);
                 unsafe {
-                    gep = type_getter.compiler.builder
-                        .build_gep(pointer_type.const_zero(),
+                    type_getter.compiler.builder
+                        .build_gep(if inner.is_pointer_type() {
+                            inner.into_pointer_type()
+                        } else {
+                            inner.ptr_type(AddressSpace::default())
+                        }.const_zero(),
                                    &[type_getter.compiler.context.i64_type()
                                        .const_int(values.len() as u64 + 1, false)],
-                                   &id.to_string());
+                                   &id.to_string())
                 }
-                gep
-            } else {
-                let alloc = type_getter.compiler.builder.build_alloca(type_getter.compiler.context.i64_type(), &id.to_string());
-                *id += 1;
-                type_getter.compiler.builder.build_store(alloc, type_getter.compiler.context
-                    .i64_type().const_int(0, false).as_basic_value_enum());
-
-                alloc
-            };
-
-            let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
-                                                                     .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
-                                                                 &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string())
-                .try_as_basic_value().unwrap_left().into_pointer_value();
-            *id += 1;
-
-            let malloc =
-                type_getter.compiler.builder
-                    .build_pointer_cast(malloc,
-                                        output.ptr_type(AddressSpace::default()),
-                                        &id.to_string());
-            *id += 1;
+            }).unwrap_or(type_getter.compiler.context.struct_type(&[], false).ptr_type(AddressSpace::default()).const_zero());
+            let malloc = malloc_type(type_getter, ptr_type, id);
 
             type_getter.compiler.builder.build_store(malloc, type_getter.compiler.context.i64_type().const_int(values.len() as u64, false));
 
@@ -442,7 +422,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             let offset = type_getter.compiler.builder.build_load(offset, &id.to_string()).into_pointer_value();
             *id += 2;
             type_getter.compiler.builder.build_call(CallableValue::try_from(offset).unwrap(),
-                                                               compiled_args.into_boxed_slice().deref(), &(*id - 1).to_string())
+                                                    compiled_args.into_boxed_slice().deref(), &(*id - 1).to_string())
                 .try_as_basic_value().left()
         }
         FinalizedEffects::Downcast(base, target) => {
@@ -462,23 +442,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
 
                 let structure = type_getter.compiler.context.struct_type(
                     &[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
-                let size = unsafe {
-                    type_getter.compiler.builder.build_gep(structure.ptr_type(AddressSpace::default()).const_zero(),
-                    &[type_getter.compiler.context.i64_type().const_int(1, false)],
-                    &id.to_string())
-                };
-                *id += 1;
 
-                let malloc = type_getter.compiler.builder.build_call(
-                    type_getter.compiler.module.get_function("malloc")
-                                                                         .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
-                                                                     &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string())
-                    .try_as_basic_value().unwrap_left().into_pointer_value();
-                *id += 1;
-                let malloc = type_getter.compiler.builder
-                    .build_bitcast(malloc, structure.ptr_type(AddressSpace::default()),
-                                   &id.to_string()).into_pointer_value();
-                *id += 1;
+                let malloc = malloc_type(type_getter, structure.ptr_type(AddressSpace::default()).const_zero(), id);
                 type_getter.compiler.builder.build_store(malloc, base);
 
                 let offset = type_getter.compiler.builder.build_struct_gep(malloc, 1, &id.to_string()).unwrap();

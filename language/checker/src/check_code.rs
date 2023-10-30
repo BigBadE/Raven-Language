@@ -120,15 +120,43 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 let inner_data = OperationGetter {
                                     syntax: syntax.clone(),
                                     operation: vec!(new_inner.clone()),
-                                    error: error.clone()
+                                    error: error.clone(),
                                 }.await?;
                                 (outer_operation, values) = assign_with_priority(new_operation.clone(), &found, values,
                                                                                  new_inner, &inner_data, effects, inner_array);
                             }
+                        } else {
+                            if let Some(mut found) = reading_array {
+                                if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
+                                    inner.push(Effects::Operation(inner_operation, effects));
+                                } else {
+                                    panic!("Expected array!");
+                                }
+                            } else {
+                                values.push(Effects::Operation(inner_operation, effects));
+                            }
+                        }
+                    } else {
+                        if let Some(mut found) = reading_array {
+                            if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
+                                inner.push(Effects::Operation(inner_operation, effects));
+                            } else {
+                                panic!("Expected array!");
+                            }
+                        } else {
+                            values.push(Effects::Operation(inner_operation, effects));
                         }
                     }
                 } else {
-                    values.push(last);
+                    if let Some(mut found) = reading_array {
+                        if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
+                            inner.push(last);
+                        } else {
+                            panic!("Expected array!");
+                        }
+                    } else {
+                        values.push(last);
+                    }
                 }
             }
 
@@ -141,6 +169,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     error,
                 }.await?
             };
+
+            if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}") {
+                if let Effects::CreateArray(_) = values.get(0).unwrap() {} else {
+                    let effect = Effects::CreateArray(vec!(values.remove(0)));
+                    values.push(effect);
+                }
+            }
 
             let calling;
             if values.len() > 0 {
@@ -497,7 +532,7 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
 
 pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut values: Vec<Effects>,
                             inner_operator: String, inner_data: &Arc<StructData>, mut inner_effects: Vec<Effects>,
-inner_array: bool) -> (Option<Arc<StructData>>, Vec<Effects>) {
+                            inner_array: bool) -> (Option<Arc<StructData>>, Vec<Effects>) {
     let op_priority = Attribute::find_attribute("priority", &found.attributes)
         .map(|inner| inner.as_int_attribute().unwrap_or(0)).unwrap_or(0);
     let op_parse_left = Attribute::find_attribute("parse_left", &found.attributes)
@@ -521,5 +556,5 @@ inner_array: bool) -> (Option<Arc<StructData>>, Vec<Effects>) {
         values.push(Effects::Operation(inner_operator, inner_effects));
         println!("2 {:?} and {:?}", operation, values);
         (Some(found.clone()), values)
-    }
+    };
 }

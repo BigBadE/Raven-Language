@@ -1,5 +1,4 @@
 fn test() -> bool {
-    let testing = [false, false, true];
-    let other = [true];
-    return testing[2];
+    let testing = [123];
+    return testing[0] == 123;
 }
