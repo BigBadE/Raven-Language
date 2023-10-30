@@ -175,7 +175,7 @@ impl ParsingError {
         }
         let file = file.unwrap();
         let contents = file.read();
-        let line = contents.split("\n").nth(self.start.0 as usize - 1).unwrap_or("???");
+        let line = contents.split("\n").nth((self.start.0 as usize).max(1) - 1).unwrap_or("???");
         println!("{}", self.message.bright_red());
         println!("{}", format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red());
         println!("{} {}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan());

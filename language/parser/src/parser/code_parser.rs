@@ -241,10 +241,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     // Operators inside operators return immediately so operators can be combined
                     // later on for operators like [].
                     if ParseState::InOperator == state || ParseState::ControlOperator == state {
-                        println!("Operator break!");
                         return Ok(Some(Expression::new(expression_type, operator)));
                     } else {
-                        println!("Operator continue!");
                         effect = Some(operator);
                     }
                 }

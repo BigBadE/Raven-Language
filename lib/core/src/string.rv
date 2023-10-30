@@ -1,0 +1,7 @@
+import math;
+
+internal impl Add<str, str> for str {
+    pub fn add(self, other: str) -> str {
+
+    }
+}

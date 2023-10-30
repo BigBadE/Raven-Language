@@ -20,7 +20,7 @@ use async_trait::async_trait;
 // Re-export main
 pub use data::Main;
 
-use crate::{Attribute, FinishedTraitImplementor, ParsingError, ProcessManager, TopElement, Types};
+use crate::{Attribute, FinishedTraitImplementor, is_modifier, Modifier, ParsingError, ProcessManager, TopElement, Types};
 use crate::top_element_manager::{TopElementManager, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
@@ -209,6 +209,9 @@ impl Syntax {
         }
 
         let second_ty = &second.inner_struct().data;
+        if !is_modifier(second_ty.modifiers, Modifier::Trait) {
+            return false;
+        }
         let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
 
         let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];

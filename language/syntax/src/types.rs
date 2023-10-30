@@ -472,7 +472,7 @@ impl Display for Types {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Types::Struct(structure) => write!(f, "{}", structure.name),
-            Types::Reference(structure) => write!(f, "&{}", structure),
+            Types::Reference(structure) => write!(f, "{}", structure),
             Types::Array(inner) => write!(f, "[{}]", inner),
             Types::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
@@ -486,7 +486,7 @@ impl Display for FinalizedTypes {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             FinalizedTypes::Struct(structure) => write!(f, "{}", structure.data.name),
-            FinalizedTypes::Reference(structure) => write!(f, "&{}", structure),
+            FinalizedTypes::Reference(structure) => write!(f, "{}", structure),
             FinalizedTypes::Array(inner) => write!(f, "[{}]", inner),
             FinalizedTypes::Generic(name, bounds) =>
                 write!(f, "{}: {}", name, display(bounds, " + ")),
