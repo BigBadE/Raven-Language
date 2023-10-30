@@ -73,6 +73,24 @@ trait DivideAndAssign<E, C> {
     fn divide_assign(self, other: E) -> C;
 }
 
+#[priority(-100)]
+#[operation({}&={})]
+trait AndAndAssign<E, C> {
+    fn and_assign(self, other: E) -> C;
+}
+
+#[priority(-100)]
+#[operation({}|={})]
+trait OrAndAssign<E, C> {
+    fn or_assign(self, other: E) -> C;
+}
+
+#[priority(-100)]
+#[operation({}^={})]
+trait XORAndAssign<E, C> {
+    fn xor_assign(self, other: E) -> C;
+}
+
 #[priority(100)]
 #[operation({}%{})]
 trait Remainder<E, C> {
@@ -131,6 +149,27 @@ pub internal impl<T: Number> Add<T, T> for T {
 pub impl<T: Add<E, T>, E> AddAndAssign<E, T> for T {
     fn add_assign(self, other: E) -> T {
         self = self.add(other);
+        return self;
+    }
+}
+
+pub impl<T: BitAnd<E, T>, E> AndAndAssign<E, T> for T {
+    fn and_assign(self, other: E) -> T {
+        self = self.bit_and(other);
+        return self;
+    }
+}
+
+pub impl<T: BitOr<E, T>, E> OrAndAssign<E, T> for T {
+    fn or_assign(self, other: E) -> T {
+        self = self.bit_or(other);
+        return self;
+    }
+}
+
+pub impl<T: BitXOR<E, T>, E> XORAndAssign<E, T> for T {
+    fn xor_assign(self, other: E) -> T {
+        self = self.bit_xor(other);
         return self;
     }
 }

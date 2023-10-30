@@ -3,7 +3,8 @@ import stdio;
 fn main() {
     let a = 1;
     let b = 2;
-    if a & b == 0 {
+    a |= 2;
+    if a == 3 {
         printf("Yep!");
     } else {
         printf("No!");
