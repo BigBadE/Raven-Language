@@ -1,4 +1,3 @@
-
 use syntax::code::Effects;
 use syntax::ParsingError;
 
