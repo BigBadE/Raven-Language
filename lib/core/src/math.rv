@@ -3,103 +3,79 @@ import numbers;
 // Defines an equality operator, which takes two arguments.
 // It has a priority of -1 (0 is addition/subtraction)
 // Types can implement this trait to implement the operator.
-#[priority(-10)]
+#[priority(-1)]
 #[operation({}=={})]
 trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
-#[priority(-10)]
+#[priority(-1)]
 #[operation({}!={})]
 trait NotEqual<T> {
     fn not_equal(self, other: T) -> bool;
 }
 
-#[priority(40)]
+#[priority(4)]
 #[operation(!{})]
 trait Not<T> {
     fn not(self) -> T;
 }
 
-#[priority(40)]
-#[operation(~{})]
-trait BitNot<T> {
-    fn bit_not(self) -> T;
-}
-
-#[priority(10)]
+#[priority(1)]
 #[operation({}+{})]
 trait Add<E, C> {
     fn add(self, other: E) -> C;
 }
 
-#[priority(10)]
+#[priority(1)]
 #[operation({}+={})]
 trait AddAndAssign<E, C> {
     fn add_assign(self, other: E) -> C;
 }
 
-#[priority(10)]
+#[priority(1)]
 #[operation({}-{})]
 trait Subtract<E, C> {
     fn subtract(self, other: E) -> C;
 }
 
-#[priority(10)]
+#[priority(1)]
 #[operation({}-={})]
 trait SubtractAndAssign<E, C> {
     fn subtract_assign(self, other: E) -> C;
 }
 
-#[priority(20)]
+#[priority(2)]
 #[operation({}*{})]
 trait Multiply<E, C> {
     fn multiply(self, other: E) -> C;
 }
 
-#[priority(10)]
+#[priority(1)]
 #[operation({}*={})]
 trait MultiplyAndAssign<E, C> {
     fn multiply_assign(self, other: E) -> C;
 }
 
-#[priority(20)]
+#[priority(2)]
 #[operation({}/{})]
 trait Divide<E, C> {
     fn divide(self, other: E) -> C;
 }
 
-#[priority(10)]
+#[priority(1)]
 #[operation({}/={})]
 trait DivideAndAssign<E, C> {
     fn divide_assign(self, other: E) -> C;
 }
 
-#[priority(20)]
+#[priority(2)]
 #[operation({}%{})]
 trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(0)]
-#[operation({}&{})]
-trait BitAnd<E, C> {
-    fn bit_and(self, other: E) -> C;
-}
-
-#[priority(-1)]
-#[operation({}^{})]
-trait BitXOR<E, C> {
-    fn bit_xor(self, other: E) -> C;
-}
-
-#[priority(-2)]
-#[operation({}|{})]
-trait BitOr<E, C> {
-    fn bit_or(self, other: E) -> C;
-}
-
-#[priority(10)]
+#[priority(1)]
 #[operation({}%={})]
 trait RemainderAndAssign<E, C> {
     fn remainder_assign(self, other: E) -> C;
@@ -162,12 +138,6 @@ pub impl<T: Multiply<E, T>, E> MultiplyAndAssign<E, T> for T {
     fn multiply_assign(self, other: E) -> T {
         self = self.multiply(other);
         return self;
-    }
-}
-
-pub internal impl<T: Number> BitXOR<T, T> for T {
-    fn bix_xor(self, other: T) -> T {
-
     }
 }
 
