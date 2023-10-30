@@ -1,0 +1,23 @@
+fn test() -> bool {
+    let a = 1;
+    let b = 2;
+    // Bitwise and test
+    if a & b != 0 {
+        return false;
+    }
+    // Bitwise or test
+    if a | b != 3 {
+        return false;
+    }
+    // Bitwise xor test 1
+    if a ^ b != 3 {
+        return false;
+    }
+    // Bitwise xor test 2
+    a = 2;
+    b = 2;
+    if a ^ b != 0 {
+        return false;
+    }
+    return true;
+}
