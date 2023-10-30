@@ -122,7 +122,6 @@ trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(-100)]
 #[priority(0)]
 #[operation({}&{})]
 trait BitAnd<E, C> {
