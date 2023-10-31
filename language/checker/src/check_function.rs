@@ -64,6 +64,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 
+
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
         println!("5 - {}", codeless.data.name);
