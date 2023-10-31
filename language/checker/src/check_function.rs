@@ -30,12 +30,14 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
 
         fields.push(field);
     }
+    println!("2 - {}", function.data.name);
 
     let return_type = if let Some(return_type) = function.return_type.as_mut() {
         Some(return_type.await?.finalize(syntax.clone()).await)
     } else {
         None
     };
+    println!("3 - {}", function.data.name);
 
     let codeless = CodelessFinalizedFunction {
         generics: finalize_generics(syntax, function.generics).await?,
@@ -43,6 +45,7 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
         return_type,
         data: function.data.clone(),
     };
+    println!("4 - {}", codeless.data.name);
 
     return Ok((codeless, function.code));
 }
@@ -63,7 +66,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
-        println!("2 - {}", codeless.data.name);
+        println!("5 - {}", codeless.data.name);
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
     }
 
@@ -81,6 +84,6 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         }
     }
 
-    println!("2 - {}", codeless.data.name);
+    println!("5 - {}", codeless.data.name);
     return Ok(codeless.clone().add_code(code));
 }
