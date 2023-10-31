@@ -302,9 +302,11 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 // If it's generic, check its trait bounds for the method
                 if return_type.name_safe().is_none() {
                     if let Some(mut found) = return_type.find_method(&method) {
+                        println!("Found methods!");
                         finalized_effects.insert(0, calling);
                         let mut output = vec!();
                         for (found_trait, function) in &mut found {
+                            println!("Getting {}", function.name);
                             let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
                             if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
                                 output.push((found_trait, temp));
@@ -318,6 +320,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
+                        println!("Done!");
                         return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
                     }
                 }
@@ -340,10 +343,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
                 finalized_effects.insert(0, calling);
+                println!("Finding {}", method);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
                 } else {
+                    println!("Failed, looking for trait");
                     let mut output = None;
                     while output.is_none() && !syntax.lock().unwrap().finished_impls() {
                         output = find_trait_implementation(syntax, &resolver, &method, &return_type).await?;
