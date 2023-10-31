@@ -45,6 +45,9 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
+    if variables.variables.contains_key("temp") {
+        println!("On {:?}", effect);
+    }
     let output = match effect {
         Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
@@ -78,7 +81,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             operation[0..operation.len() - 2].to_string() + &inner_operation;
                         let new_operation = if operation.starts_with("{}") && inner_operation.ends_with("{}") {
                             let mut output = vec!();
-                            for i in 1..combined.len() - operation.len() - 2 {
+                            for i in 0..combined.len() - operation.len() - 2 {
                                 let mut temp = combined.clone();
                                 temp.truncate(operation.len() + i);
                                 output.push(temp);
@@ -93,6 +96,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             operation: new_operation.clone(),
                             error: error.clone(),
                         };
+
                         if let Ok(found) = getter.await {
                             let new_operation = Attribute::find_attribute("operation", &found.attributes).unwrap().as_string_attribute().unwrap();
 
@@ -122,6 +126,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                     operation: vec!(new_inner.clone()),
                                     error: error.clone(),
                                 }.await?;
+
                                 (outer_operation, values) = assign_with_priority(new_operation.clone(), &found, values,
                                                                                  new_inner, &inner_data, effects, inner_array);
                             }
@@ -143,6 +148,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                     operation: vec!(inner_operation.clone()),
                                     error: error.clone(),
                                 }.await?;
+
                                 (outer_operation, values) = assign_with_priority(operation.clone(), &outer_data, values,
                                 inner_operation, &inner_data, effects, false);
                             }
