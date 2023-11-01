@@ -179,6 +179,7 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
             return Poll::Ready(output.clone());
         }
 
+
         println!("Missed for {}", self.getting.name());
         // The finalized element doesn't exist, sleep.
         manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
