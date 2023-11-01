@@ -62,7 +62,6 @@ impl<'a> ParserUtils<'a> {
 
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>,
                                  resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
-        println!("Adding implementation!");
         match implementor {
             Ok(implementor) => {
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
@@ -70,13 +69,11 @@ impl<'a> ParserUtils<'a> {
                     Err(error) => {
                         let mut locked = syntax.lock().unwrap();
                         locked.async_manager.parsing_impls -= 1;
-                        println!("Error: {:?}", error);
                         locked.errors.push(error);
                     }
                 };
             }
             Err(error) => {
-                println!("Error: {:?}", error);
                 let mut locked = syntax.lock().unwrap();
                 locked.async_manager.parsing_impls -= 1;
                 locked.errors.push(error);
@@ -86,7 +83,6 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
-        println!("Inner adding!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();
@@ -96,16 +92,18 @@ impl<'a> ParserUtils<'a> {
             generics.insert(generic, final_bounds);
         }
 
-        println!("Trying to get types!");
         let target = implementor.base.await?;
         let base = implementor.implementor.await?;
 
         println!("Started impl {} and {}", target, base);
         let target = target.finalize(syntax.clone()).await;
+        println!("First of {} and {}", target, base);
         let base = base.finalize(syntax.clone()).await;
+        println!("Second of {} and {}", target, base);
 
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
+        println!("Chalk type of {} and {}", target, base);
         let mut functions = Vec::new();
         for function in &implementor.functions {
             functions.push(function.data.clone());

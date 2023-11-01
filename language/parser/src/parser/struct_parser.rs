@@ -177,7 +177,6 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
 
     let token = parser_utils.tokens.get(parser_utils.index - 1).unwrap();
 
-    println!("Parsing {} and {}", base.as_ref().unwrap(), implementor.as_ref().unwrap());
     let base = Box::pin(
         Syntax::parse_type(
             parser_utils.syntax.clone(),
