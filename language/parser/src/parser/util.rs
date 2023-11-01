@@ -88,10 +88,12 @@ impl<'a> ParserUtils<'a> {
         println!("Started generics!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
+            println!("Getting for generic {}", generic);
             let mut final_bounds = Vec::new();
             for bound in bounds {
                 final_bounds.push(bound.await?.finalize(syntax.clone()).await);
             }
+            println!("Got generic {}: {:?}", generic, final_bounds);
             generics.insert(generic, final_bounds);
         }
 
