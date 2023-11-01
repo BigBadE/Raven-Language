@@ -8,6 +8,7 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# Cancel any other build tasks running right now to prevent stale uploads
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
