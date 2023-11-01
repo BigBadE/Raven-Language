@@ -312,6 +312,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
                         println!("Done with that!");
 
+
                         if output.len() > 1 {
                             return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
                         } else if output.is_empty() {
