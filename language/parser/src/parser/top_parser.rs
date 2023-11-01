@@ -67,7 +67,6 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                     locked.process_manager.cloned()
                 };
 
-                println!("Trying to run!");
                 parser_utils.handle.lock().unwrap().spawn(
                         ParserUtils::add_implementor(parser_utils.syntax.clone(), implementor,
                         parser_utils.imports.boxed_clone(), process_manager));

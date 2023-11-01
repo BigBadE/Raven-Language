@@ -221,7 +221,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.insert(0, found);
             }
 
-            println!("Here!");
+            if variables.variables.contains_key("temp") {
+                println!("Here!");
+            }
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                                   traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let mut output = None;
@@ -246,7 +248,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
 
                     let data = &data.inner_struct().data;
-                    println!("Waiting for impls of {} and {}", return_type, data.name);
+
+                    if variables.variables.contains_key("temp") {
+                        println!("Waiting for impls of {} and {}", return_type, data.name);
+                    }
                     while !syntax.lock().unwrap().finished_impls() {
                         {
                             let locked = syntax.lock().unwrap();
@@ -276,20 +281,25 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
                 }
 
-                println!("Almost done!");
                 let output = output.unwrap();
                 let method = AsyncDataGetter::new(syntax.clone(), output).await;
 
-
-                println!("Returning check!");
                 let returning = match returning {
                     Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
                                                            resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
                     None => None
                 };
-                println!("Did it!");
-                check_method(process_manager, method,
-                             finalized_effects, syntax, variables, returning).await?
+
+                if variables.variables.contains_key("temp") {
+                    println!("Did it!");
+                }
+                let temp = check_method(process_manager, method,
+                             finalized_effects, syntax, variables, returning).await?;
+
+                if variables.variables.contains_key("temp") {
+                    println!("Here!");
+                }
+                temp
             } else {
                 panic!("Screwed up trait! {} for {:?}", traits, resolver.imports());
             }
