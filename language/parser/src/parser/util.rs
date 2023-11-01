@@ -97,6 +97,7 @@ impl<'a> ParserUtils<'a> {
         let target = implementor.base.await?;
         let base = implementor.implementor.await?;
 
+        println!("Started impl {} and {}", target, base);
         let target = target.finalize(syntax.clone()).await;
         let base = base.finalize(syntax.clone()).await;
 
@@ -118,6 +119,7 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
+            println!("Added impl {} and {}", output.base, output.target);
             locked.implementations.push(output);
 
             locked.async_manager.parsing_impls -= 1;
