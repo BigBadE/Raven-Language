@@ -260,6 +260,7 @@ impl Syntax {
                 manager.sorted.push(Arc::clone(adding));
             }
 
+            println!("Added {}", adding.name());
             manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 

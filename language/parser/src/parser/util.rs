@@ -104,7 +104,7 @@ impl<'a> ParserUtils<'a> {
 
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
-        println!("Chalk type of {} and {}", target, base);
+
         let mut functions = Vec::new();
         for function in &implementor.functions {
             functions.push(function.data.clone());
