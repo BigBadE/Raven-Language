@@ -260,6 +260,7 @@ impl Syntax {
                 manager.sorted.push(Arc::clone(adding));
             }
 
+            println!("Adding {}", adding.name());
             manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 
@@ -297,6 +298,7 @@ impl Syntax {
         }
 
         // Wakes every waker waiting for that type.
+        println!("Waking {}: {:?}", name, T::get_manager(locked.deref_mut()).wakers.get(&name).unwrap_or(&vec!()));
         if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
             for waker in wakers {
                 waker.wake();

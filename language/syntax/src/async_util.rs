@@ -60,6 +60,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         }
 
         //Add a waker for that type
+        println!("Sleeping for {}", name);
         if let Some(vectors) = getting.wakers.get_mut(&name) {
             vectors.push(waker);
         } else {

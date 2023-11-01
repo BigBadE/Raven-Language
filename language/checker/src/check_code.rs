@@ -45,9 +45,6 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
-    if variables.variables.contains_key("temp") {
-        println!("On {:?}", effect);
-    }
     let output = match effect {
         Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
@@ -302,7 +299,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 // If it's generic, check its trait bounds for the method
                 if return_type.name_safe().is_none() {
                     if let Some(mut found) = return_type.find_method(&method) {
-                        println!("Found methods!");
                         finalized_effects.insert(0, calling);
                         let mut output = vec!();
                         for (found_trait, function) in &mut found {
@@ -320,7 +316,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
-                        println!("Done!");
                         return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
                     }
                 }
@@ -343,12 +338,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
                 finalized_effects.insert(0, calling);
-                println!("Finding {}", method);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
                 } else {
-                    println!("Failed, looking for trait");
                     let mut output = None;
                     while output.is_none() && !syntax.lock().unwrap().finished_impls() {
                         output = find_trait_implementation(syntax, &resolver, &method, &return_type).await?;
