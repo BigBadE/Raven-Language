@@ -165,20 +165,19 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
 
     /// Look for the finalized element given the data.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        println!("Locking!");
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        println!("Getting manager");
-        let manager = T::get_manager(locked.deref_mut());
-        println!("Finding");
+        println!("Derefing for {}", self.getting.name());
+        let deref = locked.deref_mut();
+        println!("Getting manager for {}", self.getting.name());
+        let manager = T::get_manager(deref);
+        println!("Finding for {}", self.getting.name());
         // The finalized element exists, return
         if let Some(output) = manager.data.get(&self.getting) {
-            println!("Found!");
             return Poll::Ready(output.clone());
         }
 
-        println!("Sleeping");
         // The finalized element doesn't exist, sleep.
         manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
