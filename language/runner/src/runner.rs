@@ -76,6 +76,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
             _ => {}
         }
     }
+    println!("Joined!");
     if failed {
         panic!("Error detected!");
     }
