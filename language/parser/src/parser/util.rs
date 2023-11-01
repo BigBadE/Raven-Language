@@ -95,9 +95,7 @@ impl<'a> ParserUtils<'a> {
             generics.insert(generic, final_bounds);
         }
 
-        println!("1");
         let target = implementor.base.await?;
-        println!("2");
         let base = implementor.implementor.await?;
 
         println!("Started impl {} and {}", target, base);
@@ -122,7 +120,7 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
-            println!("Added impl {} and {}", output.base, output.target);
+            println!("Added impl {} and {} ({} left)", output.base, output.target, locked.async_manager.parsing_impls);
             locked.implementations.push(output);
 
             locked.async_manager.parsing_impls -= 1;
