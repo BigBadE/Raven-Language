@@ -45,6 +45,9 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
+    if variables.variables.contains_key("temp") {
+        println!("On {:?}", effect);
+    }
     let output = match effect {
         Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
@@ -320,10 +323,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
+                        println!("Finished!");
                         return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
                     }
                 }
 
+                println!("Nope!");
                 // If it's a trait, handle virtual method calls.
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
                     finalized_effects.insert(0, calling);
@@ -341,6 +346,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                     return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
+                println!("Trying to get");
                 finalized_effects.insert(0, calling);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
@@ -374,6 +380,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
+            println!("Done!");
             check_method(process_manager, method, finalized_effects, syntax, variables, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>

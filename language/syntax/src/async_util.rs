@@ -172,7 +172,6 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
 
         // The finalized element exists, return
         if let Some(output) = manager.data.get(&self.getting) {
-            println!("Hit it! {}: {:?}", self.getting.name(), manager.wakers.keys().collect::<Vec<_>>());
             return Poll::Ready(output.clone());
         }
 
@@ -180,7 +179,6 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         // The finalized element doesn't exist, sleep.
         manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
-        println!("Sleeping for {}", self.getting.name());
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
     }

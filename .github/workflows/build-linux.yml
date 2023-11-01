@@ -26,10 +26,10 @@ jobs:
         submodules: true
     - name: Add Nightly
       run: rustup toolchain install nightly
-    - name: Build
-      run: cargo +nightly build --verbose --release --bin magpie
     - name: Test
       run: cargo +nightly test --verbose --bin magpie -- --nocapture
+    - name: Build
+      run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
       run: cargo +nightly build --verbose --release --bin magpie-wrapper
     - name: Release Raven

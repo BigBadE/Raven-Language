@@ -57,7 +57,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
                 waker.wake();
             }
         }
-        println!("Added {}", codeless.data.name);
+
         locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 
