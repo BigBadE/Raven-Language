@@ -280,6 +280,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 let output = output.unwrap();
                 let method = AsyncDataGetter::new(syntax.clone(), output).await;
 
+
                 println!("Returning check!");
                 let returning = match returning {
                     Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
