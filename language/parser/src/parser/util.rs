@@ -62,6 +62,7 @@ impl<'a> ParserUtils<'a> {
 
     pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>,
                                  resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+        println!("Adding implementation!");
         match implementor {
             Ok(implementor) => {
                 match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
@@ -85,18 +86,17 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
-        println!("Started generics!");
+        println!("Inner adding!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
-            println!("Getting for generic {}", generic);
             let mut final_bounds = Vec::new();
             for bound in bounds {
                 final_bounds.push(bound.await?.finalize(syntax.clone()).await);
             }
-            println!("Got generic {}: {:?}", generic, final_bounds);
             generics.insert(generic, final_bounds);
         }
 
+        println!("Trying to get types!");
         let target = implementor.base.await?;
         let base = implementor.implementor.await?;
 
