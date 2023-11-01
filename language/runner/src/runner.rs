@@ -68,6 +68,11 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     let mut failed = false;
     while let Some(found) = handle.lock().unwrap().joining.pop() {
+        if !found.is_finished() {
+            handle.lock().unwrap().joining.insert(0, found);
+            continue
+        }
+
         match found.await {
             Err(error) => {
                 failed = true;
