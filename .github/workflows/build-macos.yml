@@ -1,4 +1,4 @@
-name: Rust
+name: Raven-MacOS
 
 # Currently doesn't work, no clue where the LLVM install for MacOS is.
 # Probably need to compile the whole thing.
@@ -11,7 +11,7 @@ on:
   #  branches: [ "master" ]
 
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:

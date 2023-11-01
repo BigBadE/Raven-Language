@@ -1,4 +1,4 @@
-name: Rust
+name: Raven-Linux
 
 on:
   schedule:
