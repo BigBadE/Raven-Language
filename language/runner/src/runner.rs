@@ -15,7 +15,7 @@ use syntax::async_util::HandleWrapper;
 use syntax::ParsingError;
 use syntax::syntax::Syntax;
 
-use crate::get_compiler;
+use crate::{get_compiler, JoinWaiter};
 
 pub async fn run<T: Send + 'static>(settings: &Arguments)
                                     -> Result<Option<T>, Vec<ParsingError>> {
@@ -66,29 +66,8 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    let mut failed = false;
-    let mut current = handle.lock().unwrap().joining.pop();
-    let mut i = 0;
-    while let Some(found) = current {
-        i += 1;
-        if i % 50000 == 0 {
-            println!("{}", handle.lock().unwrap().joining.len());
-        }
-        current = handle.lock().unwrap().joining.pop();
-            if !found.is_finished() {
-            handle.lock().unwrap().joining.insert(0, found);
-            continue
-        }
+    let failed = JoinWaiter { handle }.await;
 
-        match found.await {
-            Err(error) => {
-                failed = true;
-                println!("Error: {}", error);
-            },
-            _ => {}
-        }
-    }
-    println!("Joined!");
     if failed {
         panic!("Error detected!");
     }
