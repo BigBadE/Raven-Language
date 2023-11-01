@@ -67,8 +67,10 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
     syntax.lock().unwrap().finish();
 
     let mut failed = false;
-    while let Some(found) = handle.lock().unwrap().joining.pop() {
-        if !found.is_finished() {
+    let mut current = handle.lock().unwrap().joining.pop();
+    while let Some(found) = current {
+        current = handle.lock().unwrap().joining.pop();
+            if !found.is_finished() {
             handle.lock().unwrap().joining.insert(0, found);
             continue
         }
