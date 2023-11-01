@@ -60,7 +60,6 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         }
 
         //Add a waker for that type
-        println!("Sleeping for {}", name);
         if let Some(vectors) = getting.wakers.get_mut(&name) {
             vectors.push(waker);
         } else {
@@ -178,6 +177,7 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         // The finalized element doesn't exist, sleep.
         manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
+        println!("Sleeping for {}", self.getting.name());
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
     }
