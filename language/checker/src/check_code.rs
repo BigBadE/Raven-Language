@@ -304,10 +304,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         for (found_trait, function) in &mut found {
                             println!("Getting {}", function.name);
                             let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
+                            println!("Done!");
                             if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
                                 output.push((found_trait, temp));
                             }
+                            println!("Got args");
                         }
+                        println!("Done with that!");
 
                         if output.len() > 1 {
                             return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));

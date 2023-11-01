@@ -168,11 +168,8 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         let locked = self.syntax.clone();
         let mut locked = locked.lock().unwrap();
 
-        println!("Derefing for {}", self.getting.name());
-        let deref = locked.deref_mut();
-        println!("Getting manager for {}", self.getting.name());
-        let manager = T::get_manager(deref);
-        println!("Finding for {}", self.getting.name());
+        let manager = T::get_manager(locked.deref_mut());
+
         // The finalized element exists, return
         if let Some(output) = manager.data.get(&self.getting) {
             println!("Hit it! {}: {:?}", self.getting.name(), manager.wakers.keys().collect::<Vec<_>>());
@@ -180,7 +177,6 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         }
 
 
-        println!("Missed for {}", self.getting.name());
         // The finalized element doesn't exist, sleep.
         manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
 
