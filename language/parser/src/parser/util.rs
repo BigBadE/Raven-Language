@@ -85,6 +85,7 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
+        println!("Started generics!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();
@@ -94,7 +95,9 @@ impl<'a> ParserUtils<'a> {
             generics.insert(generic, final_bounds);
         }
 
+        println!("1");
         let target = implementor.base.await?;
+        println!("2");
         let base = implementor.implementor.await?;
 
         println!("Started impl {} and {}", target, base);
