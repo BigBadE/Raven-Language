@@ -1,12 +1,14 @@
 use std::fmt::{Debug, Display};
+use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
-use std::thread;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
@@ -90,10 +92,15 @@ impl TopElement for FunctionData {
         // Finalize the code and combine it with the codeless finalized function.
         let finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
         let finalized_function = Arc::new(finalized_function);
-        let locked = syntax.lock().unwrap();
+        let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
         locked.compiling.write().unwrap().insert(name, finalized_function.clone());
+        for waker in &locked.compiling_wakers {
+            waker.wake_by_ref();
+        }
+        locked.compiling_wakers.clear();
+
         if finalized_function.data.name == locked.async_manager.target {
             if let Some(found) = locked.async_manager.target_waker.as_ref() {
                 found.wake_by_ref();
@@ -225,14 +232,26 @@ fn placeholder_error(error: String) -> ParsingError {
     return ParsingError::new(String::new(), (0, 0), 0, (0, 0), 0, error);
 }
 
+struct GenericWaiter { syntax: Arc<Mutex<Syntax>>, name: String }
+
+impl Future for GenericWaiter {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        return if self.syntax.lock().unwrap().compiling.read().unwrap().contains_key(&self.name) {
+            Poll::Ready(())
+        } else {
+            self.syntax.lock().unwrap().compiling_wakers.push(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
 /// Degenerics the code body of the method.
 async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>,
                         degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
     // This has to wait until the original is ready to be compiled.
-    // Can be improved in the future to use a waiter.
-    while !syntax.lock().unwrap().compiling.read().unwrap().contains_key(&original.data.name) {
-        thread::yield_now();
-    }
+    GenericWaiter { syntax: syntax.clone(), name: original.data.name.clone() }.await;
 
     // Gets a clone of the code of the original.
     let code = syntax.lock().unwrap().compiling.read().unwrap().get(&original.data.name).unwrap().code.clone();
@@ -249,7 +268,12 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
         .add_code(code);
 
     // Sends the finalized function to be compiled.
-    syntax.lock().unwrap().compiling.write().unwrap().insert(output.data.name.clone(), Arc::new(output));
+    let mut locked = syntax.lock().unwrap();
+    locked.compiling.write().unwrap().insert(output.data.name.clone(), Arc::new(output));
+    for waker in &locked.compiling_wakers {
+        waker.wake_by_ref();
+    }
+    locked.compiling_wakers.clear();
 }
 
 /// A finalized function, which is ready to be compiled and has been checked of any errors.
