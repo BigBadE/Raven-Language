@@ -249,31 +249,17 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                     let data = &data.inner_struct().data;
 
+                    let result = ImplWaiter {
+                        syntax: syntax.clone(),
+                        return_type: return_type.clone(),
+                        data: data.clone(),
+                        error: placeholder_error(
+                            format!("Nothing implements {} for {}", inner, return_type)),
+                    }.await?;
+
                     if variables.variables.contains_key("temp") {
                         println!("Waiting for impls of {} and {}", return_type, data.name);
                     }
-                    while !syntax.lock().unwrap().finished_impls() {
-                        {
-                            let locked = syntax.lock().unwrap();
-                            result = locked.get_implementation(&return_type, data);
-                        }
-                        thread::yield_now();
-                    }
-
-                    let result = match result {
-                        Some(inner) => inner,
-                        None => {
-                            let locked = syntax.lock().unwrap();
-                            match locked.get_implementation(&return_type, data) {
-                                Some(inner) => inner,
-                                None => {
-                                    return Err(placeholder_error(
-                                        format!("Nothing implements {} for {}", inner, return_type)));
-                                }
-                            }
-                        }
-                    };
-
                     for temp in &result {
                         if temp.name == method || method.is_empty() {
                             output = Some(temp.clone());
