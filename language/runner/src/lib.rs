@@ -26,25 +26,47 @@ pub fn get_compiler<T>(compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFuncti
 }
 
 pub struct JoinWaiter {
-    handle: Arc<Mutex<HandleWrapper>>
+    handle: Arc<Mutex<HandleWrapper>>,
 }
 
 impl Future for JoinWaiter {
     type Output = bool;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let next = self.handle.lock().unwrap().joining.pop();
+        let mut locked = self.handle.lock().unwrap();
 
-        return if let Some(mut found) = next {
-            match Pin::new(&mut found).poll(cx) {
-                Poll::Ready(inner) => if inner.is_err() {
-                    return Poll::Ready(true)
+        let mut removing = Vec::new();
+
+        let mut i = 0;
+        for mut handle in &mut locked.joining {
+            if handle.is_finished() {
+                removing.push(i);
+                i += 1;
+            } else {
+                match Pin::new(&mut handle).poll(cx) {
+                    Poll::Ready(inner) => match inner {
+                        Ok(_) => {
+                            removing.push(i);
+                            i += 1;
+                        }
+                        Err(error) => {
+                            panic!("{}", error);
+                        }
+                    }
+                    Poll::Pending => {}
                 }
-                Poll::Pending => self.handle.lock().unwrap().joining.insert(0, found)
             }
-            Poll::Pending
-        } else {
+        }
+
+        removing.reverse();
+        for found in removing {
+            locked.joining.remove(found);
+        }
+        return if locked.joining.is_empty() {
             Poll::Ready(false)
+        } else {
+            locked.waker = Some(cx.waker().clone());
+            Poll::Pending
         }
     }
 }

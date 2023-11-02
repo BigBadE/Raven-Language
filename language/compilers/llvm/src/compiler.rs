@@ -85,7 +85,7 @@ impl<'ctx> CompilerImpl<'ctx> {
             if finalized_function.code.expressions.len() == 0 {
                 continue
             }
-            println!("Compiling {}", finalized_function.data.name);
+
             compile_block(&finalized_function.code, function_type,
                           &mut type_getter.for_function(&finalized_function, function_type), &mut 0);
         }

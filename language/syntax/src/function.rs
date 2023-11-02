@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 
 use crate::{Attribute, ParsingError, TopElement, Types, ProcessManager, Syntax, TopElementManager, is_modifier, Modifier, ParsingFuture, DataType, SimpleVariableManager};
-use crate::async_util::{AsyncDataGetter, NameResolver};
+use crate::async_util::{AsyncDataGetter, HandleWrapper, NameResolver};
 use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
 
@@ -84,7 +84,7 @@ impl TopElement for FunctionData {
     }
 
     /// Verifies the function and adds it to the compiler after it finished verifying.
-    async fn verify(current: UnfinalizedFunction, syntax: Arc<Mutex<Syntax>>,
+    async fn verify(handle: Arc<Mutex<HandleWrapper>>, current: UnfinalizedFunction, syntax: Arc<Mutex<Syntax>>,
                     resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let name = current.data.name.clone();
         // Get the codeless finalized function and the code from the function.
@@ -106,6 +106,7 @@ impl TopElement for FunctionData {
                 found.wake_by_ref();
             }
         }
+        handle.lock().unwrap().finish_task();
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {

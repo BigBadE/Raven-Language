@@ -25,7 +25,7 @@ use indexmap::IndexMap;
 use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::top_element_manager::TopElementManager;
-use crate::async_util::NameResolver;
+use crate::async_util::{HandleWrapper, NameResolver};
 use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
@@ -232,7 +232,8 @@ pub trait TopElement where Self: Sized {
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
     // Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
-    async fn verify(current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
+    async fn verify(handle: Arc<Mutex<HandleWrapper>>, current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>,
+                    resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
 
     // Gets the getter for that type on the syntax
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self>;

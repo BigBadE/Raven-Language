@@ -1,18 +1,17 @@
-use std::thread;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use no_deadlocks::Mutex;
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
+use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
 use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError};
 use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::operation_util::OperationGetter;
 use syntax::r#struct::{StructData, VOID};
-use syntax::top_element_manager::ImplWaiter;
+use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
@@ -46,9 +45,6 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 #[async_recursion]
 async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
-    if variables.variables.contains_key("temp") {
-        println!("On {:?}", effect);
-    }
     let output = match effect {
         Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
@@ -222,16 +218,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.insert(0, found);
             }
 
-            if variables.variables.contains_key("temp") {
-                println!("Here!");
-            }
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                                   traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let mut output = None;
                 {
-                    let mut result = None;
                     let data = inner.finalize(syntax.clone()).await;
-                    if return_type.of_type(&data, None) {
+                    if return_type.of_type(&data, None).await {
                         let mut i = 0;
                         for found in &data.inner_struct().data.functions {
                             if found.name == method {
@@ -258,9 +250,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             format!("Nothing implements {} for {}", inner, return_type)),
                     }.await?;
 
-                    if variables.variables.contains_key("temp") {
-                        println!("Waiting for impls of {} and {}", return_type, data.name);
-                    }
                     for temp in &result {
                         if temp.name == method || method.is_empty() {
                             output = Some(temp.clone());
@@ -277,16 +266,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     None => None
                 };
 
-                if variables.variables.contains_key("temp") {
-                    println!("Did it!");
-                }
-                let temp = check_method(process_manager, method,
-                             finalized_effects, syntax, variables, returning).await?;
-
-                if variables.variables.contains_key("temp") {
-                    println!("Here!");
-                }
-                temp
+                check_method(process_manager, method,
+                             finalized_effects, syntax, variables, returning).await?
             } else {
                 panic!("Screwed up trait! {} for {:?}", traits, resolver.imports());
             }
@@ -308,16 +289,11 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         finalized_effects.insert(0, calling);
                         let mut output = vec!();
                         for (found_trait, function) in &mut found {
-                            println!("Getting {}", function.name);
                             let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
-                            println!("Done!");
                             if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
                                 output.push((found_trait, temp));
                             }
-                            println!("Got args");
                         }
-                        println!("Done with that!");
-
 
                         if output.len() > 1 {
                             return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
@@ -326,12 +302,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
-                        println!("Finished!");
                         return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
                     }
                 }
 
-                println!("Nope!");
                 // If it's a trait, handle virtual method calls.
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
                     finalized_effects.insert(0, calling);
@@ -349,27 +323,19 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                     return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
                 }
-                println!("Trying to get");
+
                 finalized_effects.insert(0, calling);
                 if let Ok(value) = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
                 } else {
-                    let mut output = None;
-                    while output.is_none() && !syntax.lock().unwrap().finished_impls() {
-                        output = find_trait_implementation(syntax, &resolver, &method, &return_type).await?;
-                        thread::yield_now();
-                    }
-
-                    if let Some(value) = output {
-                        value
-                    } else {
-                        if let Some(value) = find_trait_implementation(syntax, &resolver, &method, &return_type).await? {
-                            value
-                        } else {
-                            return Err(placeholder_error(format!("Unknown method {}", method)));
-                        }
-                    }
+                    TraitImplWaiter {
+                        syntax: syntax.clone(),
+                        resolver: resolver.boxed_clone(),
+                        method: method.clone(),
+                        return_type: return_type.clone(),
+                        error: placeholder_error(format!("Unknown method {}", method))
+                    }.await?
                 }
             } else {
                 Syntax::get_function(syntax.clone(), placeholder_error(format!("Unknown method {}", method)),
@@ -383,7 +349,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
-            println!("Done!");
             check_method(process_manager, method, finalized_effects, syntax, variables, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>
@@ -450,7 +415,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let types = output.get(0).map(|found| found.get_return(variables).unwrap());
             if let Some(found) = &types {
                 for checking in &output {
-                    if !checking.get_return(variables).unwrap().of_type(found, Some(syntax)) {
+                    let returning = checking.get_return(variables).unwrap();
+                    if !returning.of_type(found, Some(syntax.clone())).await {
                         return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
                     }
                 }
@@ -459,28 +425,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             store(FinalizedEffects::CreateArray(types, output))
         }
     };
+
     return Ok(output);
 }
 
-async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
-                                   method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
-    for import in resolver.imports() {
-        if let Ok(value) = Syntax::get_struct(syntax.clone(), placeholder_error(String::new()),
-                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
-            let value = value.finalize(syntax.clone()).await;
-            if let Some(value) = syntax.lock().unwrap().get_implementation(
-                &return_type,
-                &value.inner_struct().data) {
-                for temp in &value {
-                    if &temp.name.split("::").last().unwrap() == method {
-                        return Ok(Some(temp.clone()));
-                    }
-                }
-            }
-        }
-    };
-    return Ok(None);
-}
 
 fn store(effect: FinalizedEffects) -> FinalizedEffects {
     return FinalizedEffects::HeapStore(Box::new(effect));
@@ -533,12 +481,12 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
         if returning.is_some() {
             let inner = returning.as_ref().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
-            if !inner.of_type(other, Some(syntax)) {
+            if !inner.of_type(other, Some(syntax.clone())).await {
                 return false;
             }
 
             // Only downcast if an implementation was found. Don't downcast if they're of the same type.
-            if !inner.of_type(other, None) {
+            if !inner.of_type(other, None).await {
                 //Handle downcasting
                 let temp = args.remove(i);
                 let funcs = Syntax::get_implementation(&syntax.lock().unwrap(),

@@ -237,12 +237,19 @@ impl NameResolver for EmptyNameResolver {
 
 pub struct HandleWrapper {
     pub handle: Handle,
-    pub joining: Vec<JoinHandle<()>>
+    pub joining: Vec<JoinHandle<()>>,
+    pub waker: Option<Waker>
 }
 
 impl HandleWrapper {
     pub fn spawn<T: Send + 'static, F: Future<Output=T> + Send + 'static>(&mut self, future: F) {
         let handle = self.handle.spawn(future);
         self.joining.push(unsafe { mem::transmute(handle) });
+    }
+
+    pub fn finish_task(&mut self) {
+        if let Some(found) = &self.waker {
+            found.wake_by_ref();
+        }
     }
 }

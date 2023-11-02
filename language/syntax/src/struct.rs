@@ -14,7 +14,7 @@ use crate::{DataType, is_modifier, Modifier, ParsingFuture, ProcessManager, Synt
 use crate::code::{FinalizedMemberField, MemberField};
 use crate::{Attribute, ParsingError};
 use crate::top_element_manager::TopElementManager;
-use crate::async_util::NameResolver;
+use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
 use crate::function::{FunctionData, UnfinalizedFunction};
 use crate::types::{FinalizedTypes, Types};
@@ -293,7 +293,7 @@ impl TopElement for StructData {
         return StructData::new_poisoned(name, error);
     }
 
-    async fn verify(mut current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+    async fn verify(handle: Arc<Mutex<HandleWrapper>>, mut current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let data = current.data.clone();
         let functions = current.functions;
         current.functions = Vec::new();
@@ -325,6 +325,7 @@ impl TopElement for StructData {
             }
             locked.compiling_wakers.clear();
         }
+        handle.lock().unwrap().finish_task();
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {

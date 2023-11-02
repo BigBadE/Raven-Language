@@ -21,7 +21,7 @@ pub struct CompilerArguments {
 }
 
 pub struct Arguments {
-    pub io_runtime: Runtime,
+    pub io_runtime: Option<Runtime>,
     pub cpu_runtime: Runtime,
     pub runner_settings: RunnerSettings
 }
@@ -35,9 +35,13 @@ impl Arguments {
         };
 
         return Arguments {
-            io_runtime: io_runtime.worker_threads(2).thread_name("io-runtime").build()
-                .expect("Failed to build I/O runtime"),
-            cpu_runtime: cpu_runtime.worker_threads(2).thread_name("cpu-runtime").build()
+            io_runtime: if single_threaded {
+                None
+            } else {
+                Some(io_runtime.thread_name("io-runtime").build()
+                    .expect("Failed to build I/O runtime"))
+            },
+            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
             runner_settings
         };

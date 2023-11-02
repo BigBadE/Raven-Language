@@ -56,15 +56,15 @@ impl<'a> ParserUtils<'a> {
                                   structure.data());
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
-        self.handle.lock().unwrap().spawn(StructData::verify(structure, self.syntax.clone(),
+        self.handle.lock().unwrap().spawn(StructData::verify(self.handle.clone(), structure, self.syntax.clone(),
                                                              Box::new(self.imports.clone()), process_manager));
     }
 
-    pub async fn add_implementor(syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>,
+    pub async fn add_implementor(handle: Arc<Mutex<HandleWrapper>>, syntax: Arc<Mutex<Syntax>>, implementor: Result<TraitImplementor, ParsingError>,
                                  resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         match implementor {
             Ok(implementor) => {
-                match Self::add_implementation(syntax.clone(), implementor, resolver, process_manager).await {
+                match Self::add_implementation(handle.clone(), syntax.clone(), implementor, resolver, process_manager).await {
                     Ok(_) => {}
                     Err(error) => {
                         let mut locked = syntax.lock().unwrap();
@@ -79,9 +79,10 @@ impl<'a> ParserUtils<'a> {
                 locked.errors.push(error);
             }
         }
+        handle.lock().unwrap().finish_task();
     }
 
-    async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
+    async fn add_implementation(handle: Arc<Mutex<HandleWrapper>>, syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
@@ -127,8 +128,8 @@ impl<'a> ParserUtils<'a> {
         }
 
         for function in implementor.functions {
-            FunctionData::verify(function, syntax.clone(), resolver.boxed_clone(),
-                                 process_manager.cloned()).await;
+            handle.lock().unwrap().spawn(FunctionData::verify(handle.clone(), function, syntax.clone(), resolver.boxed_clone(),
+                                 process_manager.cloned()));
         }
 
         return Ok(());
