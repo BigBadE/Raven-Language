@@ -11,6 +11,7 @@ use crate::async_util::{AsyncDataGetter, UnparsedType};
 use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
 use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
+use crate::top_element_manager::ImplWaiter;
 use crate::types::{FinalizedTypes, Types};
 
 /// An expression is a single line of code, containing an effect and the type of expression.
@@ -300,8 +301,12 @@ impl FinalizedEffects {
                 calling.degeneric(process_manager, variables, syntax).await?;
 
                 let implementor = calling.get_return(variables).unwrap();
-                let implementation = Syntax::get_implementation_finisher(syntax, &implementor,
-                                                                         &found_trait.inner_struct().data).await?.unwrap();
+                let implementation = ImplWaiter {
+                    syntax: syntax.clone(),
+                    return_type: implementor.clone(),
+                    data: found_trait.inner_struct().data.clone(),
+                    error: ParsingError::empty()
+                }.await?;
 
                 let name = function.data.name.split("::").last().unwrap();
                 let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
