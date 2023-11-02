@@ -5,3 +5,24 @@ internal impl Add<str, str> for str {
 
     }
 }
+
+impl Array for str {
+    pub fn length(self) {
+        return strlen(self);
+    }
+}
+
+#[llvm_intrinsic]
+internal fn strlen(source: str) -> u64 {
+
+}
+
+#[llvm_intrinsic]
+internal fn strcpy(destination: str, source: str) -> str {
+
+}
+
+#[llvm_intrinsic]
+internal fn strcat(destination: str, source: str) -> str {
+
+}

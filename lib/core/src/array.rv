@@ -1,9 +1,19 @@
+trait Array {
+    fn length() -> u64;
+}
+
+internal impl<T> Array for [T] {
+    fn length() -> u64 {
+
+    }
+}
+
 #[operation([{+}])]
-trait Array<T> {
+trait CreateArray<T> {
     fn instance(self) -> [T];
 }
 
-pub impl<T> Array<T> for [T] {
+pub impl<T> CreateArray<T> for [T] {
     fn instance(self) -> [T] {
         return self;
     }

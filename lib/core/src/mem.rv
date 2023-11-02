@@ -1,9 +1,9 @@
-/*#[llvm_intrinsic]
+#[llvm_intrinsic]
 pub internal fn malloc(size: u64) -> u64 {
 
 }
 
-#[llvm_intrinsic]
+/*#[llvm_intrinsic]
 pub internal fn calloc(size: u64, count: u64) -> u64 {
 
 }
