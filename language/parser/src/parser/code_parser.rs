@@ -157,6 +157,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 effect = Some(parse_new(parser_utils)?);
             },
             TokenTypes::BlockStart => if ParseState::ControlVariable == state || ParseState::ControlOperator == state {
+                parser_utils.index -= 1;
                 break;
             } else {
                 if effect.is_some() {

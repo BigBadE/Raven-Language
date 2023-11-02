@@ -19,10 +19,12 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     }
 
     // Make sure the if statement ended with a bracket
-    if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type != TokenTypes::BlockStart {
+    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
         return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
             .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
     }
+
+    parser_utils.index += 1;
 
     // Get the code inside the if statement
     let (mut returning, body) = parse_code(parser_utils)?;
@@ -115,10 +117,12 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
             .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
     }
 
-    if parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type != TokenTypes::BlockStart {
+    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
         return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
             .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
     }
+
+    parser_utils.index += 1;
 
     let (_returning, body) = parse_code(parser_utils)?;
     parser_utils.imports.last_id += 1;
