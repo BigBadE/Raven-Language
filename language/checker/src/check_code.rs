@@ -12,6 +12,7 @@ use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
 use syntax::operation_util::OperationGetter;
 use syntax::r#struct::{StructData, VOID};
+use syntax::top_element_manager::ImplWaiter;
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 

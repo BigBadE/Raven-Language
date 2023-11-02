@@ -234,7 +234,7 @@ impl FinalizedStruct {
                     let name = name.clone();
                     let temp: &FinalizedTypes = generics.get(i).unwrap();
                     for bound in bounds {
-                        if !temp.of_type(&bound, Some(syntax)) {
+                        if !temp.of_type(&bound, Some(syntax.clone())).await {
                             panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
                         }
                     }
@@ -318,7 +318,12 @@ impl TopElement for StructData {
 
             let function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
 
-            syntax.lock().unwrap().compiling.write().unwrap().insert(function.data.name.clone(), Arc::new(function));
+            let mut locked = syntax.lock().unwrap();
+            locked.compiling.write().unwrap().insert(function.data.name.clone(), Arc::new(function));
+            for waker in &locked.compiling_wakers {
+                waker.wake_by_ref();
+            }
+            locked.compiling_wakers.clear();
         }
     }
 

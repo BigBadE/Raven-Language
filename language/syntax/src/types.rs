@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::thread;
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
 #[cfg(debug_assertions)]
@@ -18,6 +17,7 @@ use crate::chalk_interner::ChalkIr;
 use crate::code::FinalizedMemberField;
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
+use crate::top_element_manager::TypeWaiter;
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
 /// For example, "test" is a Struct called str, which is an internal type.
@@ -201,7 +201,8 @@ impl FinalizedTypes {
     /// Checks if the type is of the other type, following Raven's type rules.
     /// May block until all implementations are finished parsing, must not be called from
     /// implementation parsing to prevent deadlocking.
-    pub fn of_type(&self, other: &FinalizedTypes, syntax: Option<&Arc<Mutex<Syntax>>>) -> bool {
+    #[async_recursion]
+    pub async fn of_type(&self, other: &FinalizedTypes, syntax: Option<Arc<Mutex<Syntax>>>) -> bool {
         return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
@@ -211,17 +212,11 @@ impl FinalizedTypes {
                         if syntax.is_none() {
                             return false;
                         }
-                        let syntax = syntax.unwrap();
-                        // Only check for implementations if being compared against a trait.
-                        // Wait for the implementation to finish.
-                        while !syntax.lock().unwrap().finished_impls() {
-                            if syntax.lock().unwrap().solve(self, &other) {
-                                return true;
-                            }
-                            thread::yield_now();
-                        }
-                        // Now all impls are parsed so solve is correct.
-                        return syntax.lock().unwrap().solve(self, &other);
+                        return TypeWaiter {
+                            syntax: syntax.unwrap().clone(),
+                            current: self.clone(),
+                            other: other.clone(),
+                        }.await;
                     } else {
                         false
                     }
@@ -229,34 +224,34 @@ impl FinalizedTypes {
                 FinalizedTypes::Generic(_, bounds) => {
                     // If any bounds fail, the type isn't of the generic.
                     for bound in bounds {
-                        if !other.of_type(bound, syntax) {
+                        if !other.of_type(bound, syntax.clone()).await {
                             return false;
                         }
                     }
                     true
                 }
                 // For structures vs generic types, just check the base.
-                FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax),
+                FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax).await,
                 // References are ignored for type checking.
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
                 FinalizedTypes::Array(_) => false
             },
             FinalizedTypes::Array(inner) => match other {
                 // Check the inner type.
-                FinalizedTypes::Array(other) => inner.of_type(other, syntax),
+                FinalizedTypes::Array(other) => inner.of_type(other, syntax).await,
                 // References are ignored for type checking.
-                FinalizedTypes::Reference(other) => self.of_type(other, syntax),
+                FinalizedTypes::Reference(other) => self.of_type(other, syntax).await,
                 // Only arrays can equal arrays
                 _ => false
             },
             FinalizedTypes::GenericType(base, generics) => match other {
                 FinalizedTypes::GenericType(other_base, other_generics) => {
-                    if generics.len() != other_generics.len() || !base.of_type(other_base, syntax) {
+                    if generics.len() != other_generics.len() || !base.of_type(other_base, syntax.clone()).await {
                         return false;
                     }
 
                     for i in 0..generics.len() {
-                        if !generics[i].of_type(&other_generics[i], syntax) {
+                        if !generics[i].of_type(&other_generics[i], syntax.clone()).await {
                             return false;
                         }
                     }
@@ -265,26 +260,26 @@ impl FinalizedTypes {
                 FinalizedTypes::Generic(_, bounds) => {
                     // Check each bound, if any are violated it's not of the generic type.
                     for bound in bounds {
-                        if !self.of_type(bound, syntax) {
+                        if !self.of_type(bound, syntax.clone()).await {
                             return false;
                         }
                     }
                     true
                 }
                 // Against structures just check the base.
-                FinalizedTypes::Struct(_) => base.of_type(other, syntax),
+                FinalizedTypes::Struct(_) => base.of_type(other, syntax).await,
                 // References are ignored for type checking.
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax),
+                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
                 FinalizedTypes::Array(_) => false
             }
             // References are ignored for type checking.
-            FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax),
+            FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax).await,
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
                     // For two generics to be the same, each bound must match at least one other bound.
                     'outer: for bound in bounds {
                         for other_bound in other_bounds {
-                            if other_bound.of_type(bound, syntax) {
+                            if other_bound.of_type(bound, syntax.clone()).await {
                                 continue 'outer;
                             }
                         }
@@ -293,7 +288,7 @@ impl FinalizedTypes {
                     true
                 }
                 // Flip it, because every other type handles generics already, no need to repeat the code.
-                _ => other.of_type(self, syntax)
+                _ => other.of_type(self, syntax).await
             }
         };
     }
@@ -308,7 +303,7 @@ impl FinalizedTypes {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.
                 for bound in bounds {
-                    if !other.of_type(bound, Some(syntax)) {
+                    if !other.of_type(bound, Some(syntax.clone())).await {
                         return Err(bounds_error);
                     }
                 }
@@ -362,7 +357,7 @@ impl FinalizedTypes {
                 if let Some(found) = generics.get(name) {
                     // This should never trip, but it's a sanity check.
                     for bound in bounds {
-                        if !found.of_type(bound, Some(syntax)) {
+                        if !found.of_type(bound, Some(syntax.clone())).await {
                             return Err(bounds_error);
                         }
                     }
