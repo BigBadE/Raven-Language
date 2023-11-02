@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::task::Waker;
-use std::{mem, thread};
+use std::mem;
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
@@ -35,6 +35,8 @@ use crate::types::FinalizedTypes;
 pub struct Syntax {
     // The compiling functions, accessed from the compiler.
     pub compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    // Compiling wakers
+    pub compiling_wakers: Vec<Waker>,
     // The compiling structs, accessed from the compiler..
     pub strut_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
     // All parsing errors on the entire program
@@ -61,6 +63,7 @@ impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
             compiling: Arc::new(RwLock::new(HashMap::new())),
+            compiling_wakers: Vec::new(),
             strut_compiling: Arc::new(RwLock::new(HashMap::new())),
             errors: Vec::new(),
             functions: TopElementManager::new(),
@@ -147,20 +150,6 @@ impl Syntax {
             }
         }
         return None;
-    }
-
-    pub async fn get_implementation_finisher(syntax: &Arc<Mutex<Syntax>>, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Result<Option<Vec<Arc<FunctionData>>>, ParsingError> {
-        let mut output = None;
-        while output.is_none() && !syntax.lock().unwrap().finished_impls() {
-            output = syntax.lock().unwrap().get_implementation(implementing_trait, implementor_struct);
-            thread::yield_now();
-        }
-
-        return Ok(if let Some(value) = output {
-            Some(value)
-        } else {
-            syntax.lock().unwrap().get_implementation(implementing_trait, implementor_struct)
-        })
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
@@ -260,7 +249,6 @@ impl Syntax {
                 manager.sorted.push(Arc::clone(adding));
             }
 
-            println!("Added {}", adding.name());
             manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 

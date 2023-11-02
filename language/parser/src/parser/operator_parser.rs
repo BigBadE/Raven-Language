@@ -18,7 +18,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
         if token.token_type == TokenTypes::Operator || token.token_type == TokenTypes::Equals || token.token_type == TokenTypes::Period {
             operation += token.to_string(parser_utils.buffer).as_str();
         } else {
-            break
+            break;
         }
         parser_utils.index += 1;
     }
@@ -33,22 +33,22 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
     };
 
     if right.is_some() {
-        while parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type == TokenTypes::ArgumentEnd {
+        while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             if let Some(found) = next {
                 if let Effects::NOP() = &found {
-                    break
+                    break;
                 }
                 right = match right.unwrap() {
                     Effects::CreateArray(mut inner) => {
                         inner.push(found);
                         Some(Effects::CreateArray(inner))
-                    },
+                    }
                     other => Some(Effects::CreateArray(vec!(other, found)))
                 };
             } else {
-                break
+                break;
             }
         }
 
@@ -71,7 +71,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
             if last_token.token_type == TokenTypes::Operator {
                 operation += last_token.to_string(parser_utils.buffer).as_str();
             } else {
-                break
+                break;
             }
             parser_utils.index += 1;
         }
@@ -81,11 +81,11 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
         effects.push(found);
     }
 
-    let mut last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
+    let mut last = parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type.clone();
     while TokenTypes::BlockStart == last || TokenTypes::LineEnd == last || TokenTypes::BlockEnd == last ||
         TokenTypes::ArgumentEnd == last || TokenTypes::ParenClose == last {
         parser_utils.index -= 1;
-        last = parser_utils.tokens.get(parser_utils.index-1).unwrap().token_type.clone();
+        last = parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type.clone();
     }
 
     return Ok(Effects::Operation(operation, effects));
