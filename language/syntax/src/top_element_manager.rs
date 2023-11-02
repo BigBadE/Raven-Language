@@ -1,7 +1,19 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::{Pin, pin};
 use std::sync::Arc;
-use std::task::Waker;
+use std::task::{Context, Poll, Waker};
+use crate::syntax::Syntax;
 use crate::TopElement;
+#[cfg(debug_assertions)]
+use no_deadlocks::Mutex;
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
+use data::ParsingError;
+use crate::async_util::NameResolver;
+use crate::function::FunctionData;
+use crate::r#struct::StructData;
+use crate::types::FinalizedTypes;
 
 /// The async manager, just stores basic information about the current parsing state.
 #[derive(Default)]
@@ -17,6 +29,106 @@ pub struct GetterManager {
     pub target_waker: Option<Waker>
 }
 
+pub struct ImplWaiter {
+    pub syntax: Arc<Mutex<Syntax>>,
+    pub return_type: FinalizedTypes,
+    pub data: Arc<StructData>,
+    pub error: ParsingError
+}
+
+impl Future for ImplWaiter {
+    type Output = Result<Vec<Arc<FunctionData>>, ParsingError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut locked = self.syntax.lock().unwrap();
+        return match locked.get_implementation(&self.return_type, &self.data) {
+            Some(found) => Poll::Ready(Ok(found)),
+            None => if locked.finished_impls() {
+                Poll::Ready(Err(self.error.clone()))
+            } else {
+                locked.async_manager.impl_waiters.push(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+    }
+}
+
+pub struct TraitImplWaiter {
+    pub syntax: Arc<Mutex<Syntax>>,
+    pub resolver: Box<dyn NameResolver>,
+    pub method: String,
+    pub return_type: FinalizedTypes,
+    pub error: ParsingError
+}
+
+impl Future for TraitImplWaiter {
+    type Output = Result<Arc<FunctionData>, ParsingError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        return match pin!(find_trait_implementation(&self.syntax, &self.resolver, &self.method, &self.return_type)).poll(cx) {
+            Poll::Ready(inner) => match inner {
+                Ok(inner) => match inner {
+                    Some(found) => Poll::Ready(Ok(found)),
+                    None => if self.syntax.lock().unwrap().finished_impls() {
+                        Poll::Ready(Err(self.error.clone()))
+                    } else {
+                        self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
+                        Poll::Pending
+                    }
+                },
+                Err(error) => return Poll::Ready(Err(error))
+            }
+            Poll::Pending => Poll::Pending
+        };
+    }
+}
+
+pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
+                                       method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
+    for import in resolver.imports() {
+        if let Ok(value) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
+                                              import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
+            let value = value.finalize(syntax.clone()).await;
+            if let Some(value) = syntax.lock().unwrap().get_implementation(
+                &return_type,
+                &value.inner_struct().data) {
+                for temp in &value {
+                    if &temp.name.split("::").last().unwrap() == method {
+                        return Ok(Some(temp.clone()));
+                    }
+                }
+            }
+        }
+    };
+    return Ok(None);
+}
+
+pub struct TypeWaiter {
+    pub syntax: Arc<Mutex<Syntax>>,
+    pub current: FinalizedTypes,
+    pub other: FinalizedTypes
+}
+
+impl Future for TypeWaiter {
+    type Output = bool;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut locked = self.syntax.lock().unwrap();
+        // Only check for implementations if being compared against a trait.
+        // Wait for the implementation to finish.
+        if locked.solve(&self.current, &self.other) {
+            return Poll::Ready(true);
+        }
+
+        if !locked.finished_impls() {
+            locked.async_manager.impl_waiters.push(cx.waker().clone());
+            return Poll::Pending;
+        }
+
+        // Now all impls are parsed so solve is correct.
+        return Poll::Ready(false);
+    }
+}
 /// top element manager, holds the top elements and the wakers requiring those elements.
 /// Wakers are used to allow tasks to wait for an element to be parsed and added
 pub struct TopElementManager<T> where T: TopElement {

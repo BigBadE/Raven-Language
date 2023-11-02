@@ -7,18 +7,20 @@ use crate::FileWrapper;
 mod test {
     use std::{env, path};
     use include_dir::{Dir, DirEntry, include_dir};
+    use async_recursion::async_recursion;
     use data::{Arguments, CompilerArguments, RunnerSettings};
     use crate::build;
     use crate::test::InnerFileSourceSet;
 
     static TESTS: Dir = include_dir!("lib/test/test");
 
-    #[test]
-    pub fn test_magpie() {
-        test_recursive(&TESTS);
+    #[tokio::test]
+    pub async fn test_magpie() {
+        test_recursive(&TESTS).await;
     }
 
-    fn test_recursive(dir: &'static Dir) {
+    #[async_recursion]
+    async fn test_recursive(dir: &'static Dir<'_>) {
         for entry in dir.entries() {
             match entry {
                 DirEntry::File(file) => {
@@ -37,7 +39,7 @@ mod test {
 
                     match build::<bool>(&mut arguments, vec!(Box::new(InnerFileSourceSet {
                         set: file
-                    }))) {
+                    }))).await {
                         Ok(inner) => match inner {
                             Some(found) => if !found {
                                 assert!(false, "Failed test {}!", path)
@@ -48,7 +50,7 @@ mod test {
                     }
                 }
                 DirEntry::Dir(dir) => {
-                    test_recursive(dir);
+                    test_recursive(dir).await;
                 }
             }
         }

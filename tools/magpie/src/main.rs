@@ -3,7 +3,7 @@ use std::{env, path, ptr};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use include_dir::{Dir, DirEntry, File, include_dir};
-use tokio::runtime::Builder;
+use tokio::main;
 
 use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
@@ -16,7 +16,8 @@ static STD_LINUX: Dir = include_dir!("lib/std/linux");
 static STD_MACOS: Dir = include_dir!("lib/std/macos");
 static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
-fn main() {
+#[main]
+async fn main() {
     let args = env::args().collect::<Vec<_>>();
 
     if args.len() == 2 {
@@ -34,7 +35,7 @@ fn main() {
         println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
         match build::<()>(&mut arguments, vec!(Box::new(FileSourceSet {
             root: target,
-        }))) {
+        }))).await {
             _ => return
         }
     } else if args.len() > 2 {
@@ -82,12 +83,12 @@ fn main() {
     println!("Building and running project...");
     match build::<()>(&mut arguments, vec!(Box::new(FileSourceSet {
         root: source
-    }))) {
+    }))).await {
         _ => {}
     }
 }
 
-pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>)
+pub async fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>)
     -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
@@ -108,7 +109,7 @@ pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<d
 
     arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
 
-    let value = run::<T>(&arguments);
+    let value = run::<T>(&arguments).await;
     return match value {
         Ok(inner) => Ok(inner),
         Err(errors) => {
@@ -121,9 +122,8 @@ pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<d
     }
 }
 
-fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = Builder::new_current_thread().build().unwrap().block_on(
-        runner::runner::run::<AtomicPtr<T>>(&arguments))?;
+async fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+    let result = runner::runner::run::<AtomicPtr<T>>(&arguments).await?;
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 

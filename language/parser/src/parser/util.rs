@@ -83,7 +83,6 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
-        println!("Running!");
         let mut generics = IndexMap::new();
         for (generic, bounds) in implementor.generics {
             let mut final_bounds = Vec::new();
@@ -96,11 +95,8 @@ impl<'a> ParserUtils<'a> {
         let target = implementor.base.await?;
         let base = implementor.implementor.await?;
 
-        println!("Started impl {} and {}", target, base);
         let target = target.finalize(syntax.clone()).await;
-        println!("First of {} and {}", target, base);
         let base = base.finalize(syntax.clone()).await;
-        println!("Second of {} and {}", target, base);
 
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
@@ -121,7 +117,6 @@ impl<'a> ParserUtils<'a> {
 
         {
             let mut locked = syntax.lock().unwrap();
-            println!("Added impl {} and {} ({} left)", output.base, output.target, locked.async_manager.parsing_impls);
             locked.implementations.push(output);
 
             locked.async_manager.parsing_impls -= 1;
