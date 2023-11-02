@@ -35,9 +35,9 @@ impl Arguments {
         };
 
         return Arguments {
-            io_runtime: io_runtime.thread_name("io-runtime").build()
+            io_runtime: io_runtime.worker_threads(8).thread_name("io-runtime").build()
                 .expect("Failed to build I/O runtime"),
-            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
+            cpu_runtime: cpu_runtime.worker_threads(8).thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
             runner_settings
         };
