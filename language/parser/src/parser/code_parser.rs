@@ -284,7 +284,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
         }
     }
 
-    return Ok(Some(Expression::new(expression_type, effect.unwrap())));
+    return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
 }
 
 ///Parses tokens from the Raven code into a string
