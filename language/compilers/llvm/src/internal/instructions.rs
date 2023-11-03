@@ -107,6 +107,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     } else if name.starts_with("math::Remainder") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        //? should name.ends_with("u64") be replaced with is_unsigned(name)?
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                     compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
@@ -117,13 +118,21 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::Equal") {
-        let malloc = malloc_type(type_getter,
-                                 type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
-        let returning = compiler.builder
-            .build_int_compare(IntPredicate::EQ, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
-                               compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
-        compiler.builder.build_store(malloc, returning);
-        compiler.builder.build_return(Some(&malloc));
+        compile_relational_op(IntPredicate::EQ, compiler, &params, type_getter);
+    }
+    else if name.starts_with("math::GreaterThan") {
+        if is_unsigned(name){
+            compile_relational_op(IntPredicate::UGT, compiler, &params, type_getter)
+        } else {
+            compile_relational_op(IntPredicate::SGT, compiler, &params, type_getter)
+        };
+    }
+    else if name.starts_with("math::LessThan") {
+        if is_unsigned(name){
+            compile_relational_op(IntPredicate::ULT, compiler, &params, type_getter)
+        } else {
+            compile_relational_op(IntPredicate::SLT, compiler, &params, type_getter)
+        };
     } else if name.starts_with("array::Index") {
         let offset = get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value();
         let offset = compiler.builder.build_int_add(offset, compiler.context.i64_type().const_int(1, false), "3");
@@ -192,4 +201,22 @@ fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> B
 fn build_cast(first: &BasicValueEnum, _second: BasicTypeEnum, compiler: &CompilerImpl) {
     //TODO float casting
     compiler.builder.build_return(Some(&compiler.builder.build_load(first.into_pointer_value(), "1")));
+}
+
+
+fn is_unsigned(name: &String) -> bool {
+    if name.ends_with("u64") || name.ends_with("u32") || name.ends_with("u16") || name.ends_with("u8") {
+        return true;
+    }
+    return false;
+}
+
+fn compile_relational_op(op: IntPredicate, compiler: &CompilerImpl, params: &Vec<BasicValueEnum>, type_getter: &CompilerTypeGetter) {
+    let malloc = malloc_type(type_getter,
+        type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
+    let returning = compiler.builder
+    .build_int_compare(op, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+    compiler.builder.build_store(malloc, returning);
+    compiler.builder.build_return(Some(&malloc));
 }
