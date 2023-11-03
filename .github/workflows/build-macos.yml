@@ -17,7 +17,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  LLVM_SYS_130_PREFIX: "${{github.workspace}}\llvm"
+  LLVM_SYS_130_PREFIX: ${{github.workspace}}\llvm
 
 jobs:
   build:
