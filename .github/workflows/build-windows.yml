@@ -15,6 +15,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  LLVM_SYS_130_PREFIX: ${{github.workspace}}/llvm
 
 jobs:
   build:
@@ -36,9 +37,6 @@ jobs:
       with:
         pathSource: llvm/LLVM-13.0.0-win64.7z
         pathTarget: llvm
-    - name: Set LLVM Env Var
-      shell: bash
-      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test

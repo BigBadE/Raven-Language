@@ -17,7 +17,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  LLVM_SYS_130_PREFIX: ${{github.workspace}}\llvm
+  LLVM_SYS_130_PREFIX: ${{github.workspace}}/llvm
 
 jobs:
   build:
@@ -36,12 +36,6 @@ jobs:
     - name: Fix LLVM Name
       shell: bash
       run: mv clang+llvm-13.0.0-x86_64-apple-darwin llvm
-    - name: Test2
-      run: |
-        LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm export LLVM_SYS_130_PREFIX
-        env
-    - name: Test
-      run: env
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test
