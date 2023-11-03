@@ -2,4 +2,3 @@
 .idea/
 .vscode/
 Cargo.lock
-/lib/test/src
