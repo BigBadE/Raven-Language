@@ -32,16 +32,12 @@ jobs:
     - name: Unzip LLVM
       shell: bash
       run: tar -xf clang+llvm-13.0.0-x86_64-apple-darwin.tar.xz
-    - name: Testing
+    - name: Fix LLVM Name
       shell: bash
-      run: |
-        cd clang+llvm-13.0.0-x86_64-apple-darwin
-        ls
-        cd bin
-        ls
+      run: mv clang+llvm-13.0.0-x86_64-apple-darwin llvm
     - name: Add LLVM env var
       shell: bash
-      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\clang+llvm-13.0.0-x86_64-apple-darwin" >> $GITHUB_ENV
+      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test
