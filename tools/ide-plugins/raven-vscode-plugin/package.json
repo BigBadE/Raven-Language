@@ -1,37 +1,21 @@
 {
-	"name": "raven-vscode",
-	"description": "Raven plugin for VSCode",
-	"author": "Ethan Menell",
+	"name": "lsp-embedded-language-service-sample",
+	"description": "A language server example using language services to support embedded languages",
+	"author": "Microsoft Corporation",
 	"license": "MIT",
 	"version": "1.0.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/BigBadE/raven-language"
+		"url": "https://github.com/Microsoft/vscode-extension-samples"
 	},
-	"publisher": "Ethan Menell",
-	"categories": [
-		"Programming Languages"
-	],
-	"keywords": [
-		"raven"
-	],
+	"publisher": "vscode-samples",
+	"categories": [],
+	"keywords": [],
 	"engines": {
 		"vscode": "^1.74.0"
 	},
-	"capabilities": {
-        "untrustedWorkspaces": {
-            "supported": false,
-            "description": "Raven plugin invokes binaries installed by it. "
-        }
-    },
-	"dependencies": {
-        "vscode-languageclient": "^8.1.0"
-    },
-	"activationEvents": [
-        "workspaceContains:*/build.rv",
-        "workspaceContains:*/*.rv"
-	],
-	"main": "./out/extension",
+	"activationEvents": [],
+	"main": "./client/out/extension",
 	"contributes": {
 		"languages": [
 			{
@@ -39,11 +23,7 @@
 				"extensions": [
 					".rv"
 				],
-				"aliases": [
-					"Raven",
-					"rv"
-				],
-				"configuration": "./raven-configuration.json"
+                "configuration": "language-configuration.json"
 			}
 		]
 	},
@@ -56,10 +36,10 @@
 	},
 	"devDependencies": {
 		"@types/mocha": "^5.2.7",
-		"@types/node": "^16.11.7",
-		"@typescript-eslint/eslint-plugin": "^4.16.0",
-		"@typescript-eslint/parser": "^4.16.0",
+		"@types/node": "^16.18.34",
+		"@typescript-eslint/eslint-plugin": "^6.7.0",
+		"@typescript-eslint/parser": "^6.7.0",
 		"eslint": "^7.21.0",
-		"typescript": "^5.0.2"
+		"typescript": "^5.2.2"
 	}
 }

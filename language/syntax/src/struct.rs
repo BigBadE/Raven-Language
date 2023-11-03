@@ -32,6 +32,7 @@ pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(St
 pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u8".to_string())));
 pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("bool".to_string())));
 pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("str".to_string())));
+pub static ref CHAR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("char".to_string())));
 pub static ref VOID: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("()".to_string())));
 }
 
@@ -49,6 +50,7 @@ pub fn get_internal(name: String) -> Arc<StructData> {
         "u8" => U8.data.clone(),
         "bool" => BOOL.data.clone(),
         "str" => STR.data.clone(),
+        "char" => CHAR.data.clone(),
         _ => panic!("Unknown internal type {}", name)
     };
 }

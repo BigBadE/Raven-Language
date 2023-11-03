@@ -19,6 +19,7 @@ use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
 use crate::main_future::MainFuture;
 use crate::type_getter::CompilerTypeGetter;
+use crate::util::print_formatted;
 
 pub struct CompilerImpl<'ctx> {
     pub context: &'ctx Context,
@@ -98,7 +99,7 @@ impl<'ctx> CompilerImpl<'ctx> {
                                        .to_str().unwrap()).unwrap().as_ptr());
         }*/
 
-        //print_formatted(type_getter.compiler.module.to_string());
+        print_formatted(type_getter.compiler.module.to_string());
         return true;
     }
 }

@@ -1,7 +1,50 @@
 import math;
+import array;
+import iter;
+
+pub internal struct char {}
 
 internal impl Add<str, str> for str {
     pub fn add(self, other: str) -> str {
 
     }
+}
+
+impl Array<char> for str {
+    pub fn length(self) {
+        return strlen(self);
+    }
+
+    pub internal fn iter(self) -> Iter<char> {
+
+    }
+}
+
+pub struct CharIter {
+    pub current: char;
+}
+
+internal impl Iter<char> for CharIter {
+    pub fn next(self) -> u64 {
+        return self.current;
+    }
+
+    pub fn has_next(self) -> bool {
+        return false;
+    }
+}
+
+#[llvm_intrinsic]
+internal fn strlen(source: str) -> u64 {
+
+}
+
+#[llvm_intrinsic]
+internal fn strcpy(destination: str, source: str) -> str {
+
+}
+
+#[llvm_intrinsic]
+internal fn strcat(destination: str, source: str) -> str {
+
 }
