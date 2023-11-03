@@ -4,8 +4,9 @@ import numbers::Cast;
 
 fn main() {
     let temp = 2;
-    let value = 'a' + 2;
-    printf(value.cast<str>());
+    let value = "testing" + ('a' + 2);
+    //printf(value.cast<str>());
+
     //for char in "test".iter() {
     //    printf(char);
     //}

@@ -48,6 +48,28 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                                                     BasicMetadataValueEnum::PointerValue(value.get_params().get(1).unwrap().into_pointer_value())],
                                                 "7").try_as_basic_value().unwrap_left().into_pointer_value();
         type_getter.compiler.builder.build_return(Some(&malloc.as_basic_value_enum()));
+
+    } else if name.starts_with("string::Add<str + char>_str::add") {
+        let length = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strlen")
+                                                                 .unwrap_or(compile_llvm_intrinsics("strlen", type_getter)),
+                                                             &[BasicMetadataValueEnum::PointerValue(value.get_params().get(0).unwrap().into_pointer_value())],
+                                                             "0").try_as_basic_value().unwrap_left().into_int_value();
+        let total = type_getter.compiler.builder.build_int_add(length, type_getter.compiler.context.i64_type().const_int(1, false), "4");
+        let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
+                                                                 .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                             &[BasicMetadataValueEnum::IntValue(total)],
+                                                             "5").try_as_basic_value().unwrap_left().into_pointer_value();
+        type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strcpy")
+                                                    .unwrap_or(compile_llvm_intrinsics("strcpy", type_getter)),
+                                                &[BasicMetadataValueEnum::PointerValue(malloc),
+                                                    BasicMetadataValueEnum::PointerValue(value.get_params().get(0).unwrap().into_pointer_value())],
+                                                "6").try_as_basic_value().unwrap_left().into_pointer_value();
+        type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strcat")
+                                                    .unwrap_or(compile_llvm_intrinsics("strcat", type_getter)),
+                                                &[BasicMetadataValueEnum::PointerValue(malloc),
+                                                    BasicMetadataValueEnum::PointerValue(value.get_params().get(1).unwrap().into_pointer_value())],
+                                                "7").try_as_basic_value().unwrap_left().into_pointer_value();
+        type_getter.compiler.builder.build_return(Some(&malloc.as_basic_value_enum()));
     } else if name.starts_with("math::Add") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
