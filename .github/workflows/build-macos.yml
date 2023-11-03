@@ -31,6 +31,10 @@ jobs:
     #  run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
     - name: Add Nightly
       run: rustup toolchain install nightly
+    - name: Install llvmenv
+      run: cargo install llvmenv
+    - name: Install LLVM
+      run: llvmenv build-entry 13.0.0
     - name: Test
       run: cargo +nightly test --verbose --bin magpie
     - name: Build
