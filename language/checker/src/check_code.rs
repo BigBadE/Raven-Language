@@ -405,6 +405,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::UInt(uint) => store(FinalizedEffects::UInt(uint)),
         Effects::Bool(bool) => store(FinalizedEffects::Bool(bool)),
         Effects::String(string) => store(FinalizedEffects::String(string)),
+        Effects::Char(char) => store(FinalizedEffects::Char(char)),
         Effects::CreateArray(effects) => {
             let mut output = Vec::new();
             for effect in effects {

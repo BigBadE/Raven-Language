@@ -279,6 +279,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         FinalizedEffects::UInt(int) => Some(type_getter.compiler.context.i64_type().const_int(*int, false).as_basic_value_enum()),
         FinalizedEffects::Bool(bool) => Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum()),
         FinalizedEffects::String(string) => Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum()),
+        FinalizedEffects::Char(char) => Some(type_getter.compiler.context.i8_type().const_int(*char as u64, false).as_basic_value_enum()),
         FinalizedEffects::HeapStore(inner) => {
             let mut output = compile_effect(type_getter, function, inner, id).unwrap();
 
