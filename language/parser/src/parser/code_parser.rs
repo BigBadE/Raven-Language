@@ -137,7 +137,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     //Skip because ParenOpen handles this.
                 } else if let TokenTypes::Operator = next.token_type {
                     //Skip if a generic method is being called next to preserve the last effect.
-                     if isGeneric(&token, parser_utils) {
+                     if is_generic(&token, parser_utils) {
                          continue
                      } else {
                         effect = Some(
@@ -238,7 +238,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap();
                 // If there is a variable right next to a less than, it's probably a generic method call.
                 // Example: test<Value>()
-                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) && isGeneric(&token, parser_utils){
+                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) && is_generic(&token, parser_utils){
                      effect = Some(parse_generic_method(effect, parser_utils)?);
                  } else {
                     let operator = parse_operator(effect, parser_utils, &state)?;
@@ -254,7 +254,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             TokenTypes::ArgumentEnd => break,
             TokenTypes::CallingType => {
                 let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
-                if next.token_type == TokenTypes::ParenOpen || isGeneric(&token, parser_utils){
+                if next.token_type == TokenTypes::ParenOpen || is_generic(&token, parser_utils){
                          // Ignored, ParenOpen or Operator handles this
                 } else {
                     if effect.is_none() {
@@ -476,7 +476,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
 // Supposed to replace this check: if next.to_string(parser_utils.buffer) == "<" &&
                     //token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' '
 // to allow for relational operators such as "<" or "<="
-fn isGeneric(token: &Token, parser_utils: &ParserUtils) -> bool{
+fn is_generic(token: &Token, parser_utils: &ParserUtils) -> bool{
     let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
 
     // TODO
