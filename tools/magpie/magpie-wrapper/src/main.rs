@@ -1,5 +1,4 @@
 use std::{env, fs};
-use std::io::{stderr, stdout};
 use std::process::{Command, Stdio};
 use json::JsonValue;
 use reqwest::blocking::Client;

@@ -28,13 +28,13 @@ jobs:
         submodules: true
     - name: Download LLVM
       shell: bash
-      run: wget -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.0/clang%2Bllvm-13.0.0-x86_64-apple-darwin.tar.xz
+      run: wget https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.0/clang%2Bllvm-13.0.0-x86_64-apple-darwin.tar.xz
     - name: Unzip LLVM
       shell: bash
-      run: tar -xf llvm.tar.xz
+      run: tar -xf clang+llvm-13.0.0-x86_64-apple-darwin.tar.xz
     - name: Add LLVM env var
       shell: bash
-      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
+      run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\clang+llvm-13.0.0-x86_64-apple-darwin.tar.xz" >> $GITHUB_ENV
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test
