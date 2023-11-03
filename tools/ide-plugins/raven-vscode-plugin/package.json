@@ -23,16 +23,16 @@
 				"extensions": [
 					".rv"
 				],
-                "configuration": "language-configuration.json"
+				"configuration": "language-configuration.json"
 			}
 		]
 	},
 	"scripts": {
 		"vscode:prepublish": "cd client && npm install && cd .. && npm run compile",
-		"compile": "tsc -b",
-		"watch": "tsc -b -w",
-		"lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
-		"postinstall": "cd client && npm install && cd ../server && npm install && cd .."
+		"compile": "tsc -b && cd .. && cargo build --bin raven-language-server && mv ../../target/debug/raven-language-server.exe raven-vscode-plugin/server/raven-language-server.exe",
+		"watch": "tsc -b -w && cd .. && cargo build --bin raven-language-server && mv ../../target/debug/raven-language-server.exe raven-vscode-plugin/server/raven-language-server.exe",
+		"lint": "eslint ./client/src --ext .ts,.tsx",
+		"postinstall": "cd client && npm install"
 	},
 	"devDependencies": {
 		"@types/mocha": "^5.2.7",

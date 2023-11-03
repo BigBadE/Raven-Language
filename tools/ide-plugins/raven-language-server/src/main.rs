@@ -9,6 +9,7 @@ pub fn main() {
     let mut line = String::new();
     loop {
         input.read_line(&mut line).unwrap();
+        panic!("Found {}", line);
         let input = match Packet::parse(&line) {
             Ok(output) => output,
             Err(error) => panic!("Malformed JSON!")

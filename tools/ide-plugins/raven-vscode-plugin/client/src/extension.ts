@@ -4,42 +4,43 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as path from 'path';
-import { ExtensionContext } from 'vscode';
+import { ExtensionContext, Uri, workspace } from 'vscode';
 
 import {
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions,
+	Executable,
 	TransportKind
 } from 'vscode-languageclient';
 
 let client: LanguageClient;
 
-export function activate(context: ExtensionContext) {
-	// The server is implemented in node
+export async function activate(context: ExtensionContext) {
+	// The server is implemented in Rust
 	const serverModule = context.asAbsolutePath(
-		path.join('server', 'out', 'server.js')
+		path.join('server', 'raven-language-server')
 	);
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	const serverOptions: ServerOptions = {
-		run: { module: serverModule, transport: TransportKind.ipc },
-		debug: {
-			module: serverModule,
-			transport: TransportKind.ipc,
+		command: serverModule,
+		args: [],
+		options: {
+			shell: true
 		}
 	};
 
 	// Options to control the language client
 	const clientOptions: LanguageClientOptions = {
 		// Register the server for plain text documents
-		documentSelector: [{ scheme: 'file', language: 'html1' }]
+		documentSelector: [{ scheme: 'file', language: 'raven' }]
 	};
 
 	// Create the language client and start the client.
 	client = new LanguageClient(
-		'languageServerExample',
-		'Language Server Example',
+		'ravenServer',
+		'Raven Server',
 		serverOptions,
 		clientOptions
 	);

@@ -1,5 +1,9 @@
 import stdio;
+import array::Array;
 
 fn main() {
-    printf("1" + "2");
+    let temp = 2;
+    //for char in "test".iter() {
+    //    printf(char);
+    //}
 }
