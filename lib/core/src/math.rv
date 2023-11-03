@@ -38,9 +38,6 @@ trait GreaterOrEqual<T> {
     fn greater_or_equal(self, other: T) -> bool;
 }
 
-
-
-
 #[priority(0)]
 #[operation({}!={})]
 trait NotEqual<T> {
