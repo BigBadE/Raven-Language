@@ -38,6 +38,10 @@ jobs:
     - name: Add LLVM env var
       shell: bash
       run: echo "LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm" >> $GITHUB_ENV
+    - name: Test
+      run: env
+    - name: Test2
+      run: LLVM_SYS_130_PREFIX=${{github.workspace}}\llvm export LLVM_SYS_130_PREFIX
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test
