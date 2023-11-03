@@ -1,0 +1,18 @@
+fn test() -> bool {
+    let val = 6;
+    if (val >= 5) {
+        if (val > 10){
+            return false;
+        }
+        if (val < 6){
+            return false
+        } 
+        if (val <= 6) {
+            if (val > 1) {
+                return true;
+            }
+        }
+    }
+    return false;
+ 
+ }
