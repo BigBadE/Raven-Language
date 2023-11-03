@@ -472,10 +472,6 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
     return Ok(values);
 }
 
-
-// Supposed to replace this check: if next.to_string(parser_utils.buffer) == "<" &&
-                    //token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' '
-// to allow for relational operators such as "<" or "<="
 fn is_generic(token: &Token, parser_utils: &ParserUtils) -> bool{
     let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
 
