@@ -1,9 +1,17 @@
-trait Array {
-    fn length() -> u64;
+import iter;
+
+trait Array<T> {
+    fn length(self) -> u64;
+
+    fn iter(self) -> Iter<T>;
 }
 
 internal impl<T> Array for [T] {
-    fn length() -> u64 {
+    fn length(self) -> u64 {
+
+    }
+
+    fn iter(self) -> Iter<T> {
 
     }
 }
