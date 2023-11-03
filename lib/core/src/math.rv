@@ -13,6 +13,34 @@ trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
+
+#[priority(0)]
+#[operation({}>{})]
+trait GreaterThan<T> {
+    fn greater_than(self, other: T) -> bool;
+}
+
+#[priority(0)]
+#[operation({}<{})]
+trait LessThan<T> {
+    fn less_than(self, other: T) -> bool;
+}
+
+#[priority(0)]
+#[operation({}<={})]
+trait LessOrEqual<T> {
+    fn less_or_equal(self, other: T) -> bool;
+}
+
+#[priority(0)]
+#[operation({}>={})]
+trait GreaterOrEqual<T> {
+    fn greater_or_equal(self, other: T) -> bool;
+}
+
+
+
+
 #[priority(0)]
 #[operation({}!={})]
 trait NotEqual<T> {
@@ -171,5 +199,29 @@ pub impl<T: Remainder<E, T>, E> RemainderAndAssign<E, T> for T {
     fn remainder_assign(self, other: E) -> T {
         self = self.remainder(other);
         return self;
+    }
+}
+
+pub internal impl<T: Number, E: Number> GreaterThan<E> for T {
+    fn greater_than(self, other: E) -> bool {
+
+    }
+}
+
+pub internal impl<T: Number, E: Number> LessThan<E> for T {
+    fn less_than(self, other: E) -> bool {
+
+    }
+}
+
+
+pub impl<T: GreaterThan<Number>, E: Number> LessOrEqual<E> for T {
+    fn less_or_equal(self, other: E) -> bool {
+        return !(self.greater_than(other));
+   }
+}
+pub impl<T: LessThan<Number>, E: Number> GreaterOrEqual<E> for T {
+    fn greater_or_equal(self, other: E) -> bool {
+        return !(self.less_than(other));
     }
 }

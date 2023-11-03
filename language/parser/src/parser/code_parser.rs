@@ -131,10 +131,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                     //Skip because ParenOpen handles this.
                 } else if let TokenTypes::Operator = next.token_type {
                     //Skip if a generic method is being called next to preserve the last effect.
-                    if next.to_string(parser_utils.buffer) == "<" &&
-                        token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
-                        continue
-                    } else {
+                     if isGeneric(&token, parser_utils) {
+                         continue
+                     } else {
                         effect = Some(
                             Effects::LoadVariable(token.to_string(parser_utils.buffer)))
                     }
@@ -232,11 +231,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap();
                 // If there is a variable right next to a less than, it's probably a generic method call.
                 // Example: test<Value>()
-                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) &&
-                    token.to_string(parser_utils.buffer) == "<" &&
-                    last.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ' {
-                    effect = Some(parse_generic_method(effect, parser_utils)?);
-                } else {
+                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) && isGeneric(&token, parser_utils){
+                     effect = Some(parse_generic_method(effect, parser_utils)?);
+                 } else {
                     let operator = parse_operator(effect, parser_utils, &state)?;
                     // Operators inside operators return immediately so operators can be combined
                     // later on for operators like [].
@@ -250,10 +247,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             TokenTypes::ArgumentEnd => break,
             TokenTypes::CallingType => {
                 let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
-                if next.token_type == TokenTypes::ParenOpen ||
-                    (next.token_type == TokenTypes::Operator && next.to_string(parser_utils.buffer) == "<" &&
-                    token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' ') {
-                    // Ignored, ParenOpen or Operator handles this
+                
+                if next.token_type == TokenTypes::ParenOpen || isGeneric(&token, parser_utils){
+                         // Ignored, ParenOpen or Operator handles this
                 } else {
                     if effect.is_none() {
                         return Err(token.make_error(parser_utils.file.clone(), format!("Extra symbol!")));
@@ -468,4 +464,16 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
     }
 
     return Ok(values);
+}
+
+
+// Supposed to replace this check: if next.to_string(parser_utils.buffer) == "<" &&
+                    //token.to_string(parser_utils.buffer).bytes().last().unwrap() != b' '
+// to allow for relational operators such as "<" or "<="
+fn isGeneric(token: &Token, parser_utils: &ParserUtils) -> bool{
+    let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
+
+    // TODO
+
+    return false;
 }
