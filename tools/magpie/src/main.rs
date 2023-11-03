@@ -13,7 +13,7 @@ static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
 static STD_WINDOWS: Dir = include_dir!("lib/std/windows");
 static STD_LINUX: Dir = include_dir!("lib/std/linux");
 static STD_MACOS: Dir = include_dir!("lib/std/macos");
-static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
+//static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
