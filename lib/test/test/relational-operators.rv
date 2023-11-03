@@ -5,7 +5,7 @@ fn test() -> bool {
             return false;
         }
         if (val < 6){
-            return false
+            return false;
         } 
         if (val <= 6) {
             if (val > 1) {
