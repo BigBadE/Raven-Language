@@ -9,7 +9,7 @@ use async_recursion::async_recursion;
 use crate::{Attribute, SimpleVariableManager, ParsingError, ProcessManager, VariableManager};
 use crate::async_util::{AsyncDataGetter, UnparsedType};
 use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
-use crate::r#struct::{BOOL, F64, FinalizedStruct, STR, U64};
+use crate::r#struct::{BOOL, CHAR, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
 use crate::top_element_manager::ImplWaiter;
 use crate::types::{FinalizedTypes, Types};
@@ -142,6 +142,7 @@ pub enum Effects {
     Int(i64),
     UInt(u64),
     Bool(bool),
+    Char(char),
     String(String),
 }
 
@@ -176,6 +177,7 @@ pub enum FinalizedEffects {
     UInt(u64),
     Bool(bool),
     String(String),
+    Char(char),
     // Calls a virtual method, usually a downcasted trait, with the given function index, function,
     // and on the given arguments (first argument must be the downcased trait).
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
@@ -240,6 +242,7 @@ impl FinalizedEffects {
             FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
             FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
             FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone())),
+            FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone())),
             // Stores just return their inner type.
             FinalizedEffects::HeapStore(inner) => inner.get_return(variables),
             FinalizedEffects::StackStore(inner) => inner.get_return(variables),
@@ -357,6 +360,7 @@ impl FinalizedEffects {
             FinalizedEffects::UInt(_) => {}
             FinalizedEffects::Bool(_) => {}
             FinalizedEffects::String(_) => {}
+            FinalizedEffects::Char(_) => {}
             FinalizedEffects::HeapStore(storing) =>
                 storing.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::HeapAllocate(other) =>

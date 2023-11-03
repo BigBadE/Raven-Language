@@ -297,13 +297,14 @@ impl FinalizedTypes {
     /// Errors if the other type isn't of this type.
     #[async_recursion]
     pub async fn resolve_generic(&self, other: &FinalizedTypes, syntax: &Arc<Mutex<Syntax>>,
-                                 generics: &mut HashMap<String, FinalizedTypes>, bounds_error: ParsingError)
+                                 generics: &mut HashMap<String, FinalizedTypes>, mut bounds_error: ParsingError)
                                  -> Result<(), ParsingError> {
         match self {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.
                 for bound in bounds {
                     if !other.of_type(bound, Some(syntax.clone())).await {
+                        bounds_error.message += &*format!(" {} and {}", other, bound);
                         return Err(bounds_error);
                     }
                 }

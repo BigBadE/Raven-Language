@@ -169,7 +169,7 @@ impl CodelessFinalizedFunction {
         if let Some(inner) = method.return_type.clone() {
             if let Some(returning) = returning {
                 inner.resolve_generic(&returning, syntax, manager.mut_generics(),
-                                      placeholder_error("Invalid bounds!".to_string())).await?
+                                      placeholder_error("Invalid bounds!".to_string())).await?;
             }
         }
 
@@ -178,7 +178,7 @@ impl CodelessFinalizedFunction {
             let effect = arguments.get(i).unwrap().get_return(variables).unwrap();
             method.arguments.get(i).unwrap()
                 .field.field_type.resolve_generic(&effect, syntax, manager.mut_generics(),
-                                                  placeholder_error("Invalid bounds!".to_string())).await?
+                                                  placeholder_error("Invalid bounds!".to_string())).await?;
         }
 
         // Now all the generic types have been resolved, it's time to replace them with

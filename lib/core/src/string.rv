@@ -1,11 +1,30 @@
 import math;
 import array;
 import iter;
+import numbers;
 
 pub internal struct char {}
 
+internal impl Add<char, u64> for char {
+    pub fn add(self, other: u64) -> char {
+
+    }
+}
+
+internal impl Cast<str> for char {
+    pub fn cast(self) -> str {
+
+    }
+}
+
 internal impl Add<str, str> for str {
     pub fn add(self, other: str) -> str {
+
+    }
+}
+
+internal impl Add<str, char> for str {
+    pub fn add(self, other: char) -> str {
 
     }
 }

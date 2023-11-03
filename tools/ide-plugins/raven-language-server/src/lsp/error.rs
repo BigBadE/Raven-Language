@@ -1,17 +1,30 @@
+use json::JsonValue;
 use crate::lsp::Jsonable;
 
 pub struct ResponseError {
-    code: i32,
-    message: String,
-    data: Option<Box<dyn Jsonable>>
+    pub code: i32,
+    pub message: String,
+    pub data: Option<Box<dyn Jsonable>>
+}
+
+impl Jsonable for ResponseError {
+    fn to_json(&self) -> JsonValue {
+        let mut output = JsonValue::new_object();
+        output.insert("code", self.code).unwrap();
+        output.insert("message", self.message.clone()).unwrap();
+        if let Some(found) = &self.data {
+            output.insert("data", found.to_json()).unwrap();
+        }
+        return output;
+    }
 }
 
 // Defined by JSON-RPC
-static PARSE_ERROR: i32 = -32700;
-static INVALID_REQUEST: i32 = -32600;
-static METHOD_NOT_FOUND: i32 = -32601;
-static INVALID_PARAMS: i32 = -32602;
-static INTERNAL_ERROR: i32 = -32603;
+pub static PARSE_ERROR: i32 = -32700;
+pub static INVALID_REQUEST: i32 = -32600;
+pub static METHOD_NOT_FOUND: i32 = -32601;
+pub static INVALID_PARAMS: i32 = -32602;
+pub static INTERNAL_ERROR: i32 = -32603;
 
 /**
  * This is the start range of JSON-RPC reserved error codes.
@@ -22,16 +35,16 @@ static INTERNAL_ERROR: i32 = -32603;
  *
  * @since 3.16.0
  */
-static JSONRPC_RESERVED_ERROR_RANGE_START: i32 = -32099;
+pub static JSONRPC_RESERVED_ERROR_RANGE_START: i32 = -32099;
 /** @deprecated use JSONRPC_RESERVED_ERROR_RANGE_START */
-static SERVER_ERROR_START: i32 = JSONRPC_RESERVED_ERROR_RANGE_START;
+pub static SERVER_ERROR_START: i32 = JSONRPC_RESERVED_ERROR_RANGE_START;
 
 /**
  * Error code indicating that a server received a notification or
  * request before the server has received the `initialize` request.
  */
-static SERVER_NOT_INITIALIZED: i32 = -32002;
-static UNKNOWN_ERROR_CODE: i32 = -32001;
+pub static SERVER_NOT_INITIALIZED: i32 = -32002;
+pub static UNKNOWN_ERROR_CODE: i32 = -32001;
 
 /**
  * This is the end range of JSON-RPC reserved error codes.
@@ -39,9 +52,9 @@ static UNKNOWN_ERROR_CODE: i32 = -32001;
  *
  * @since 3.16.0
  */
-static JSONRPC_RESERVED_ERROR_RANGE_END: i32 = -32000;
+pub static JSONRPC_RESERVED_ERROR_RANGE_END: i32 = -32000;
 /** @deprecated use JSONRPC_RESERVED_ERROR_RANGE_END */
-static SERVER_ERROR_END: i32 = JSONRPC_RESERVED_ERROR_RANGE_END;
+pub static SERVER_ERROR_END: i32 = JSONRPC_RESERVED_ERROR_RANGE_END;
 
 /**
  * This is the start range of LSP reserved error codes.
@@ -49,7 +62,7 @@ static SERVER_ERROR_END: i32 = JSONRPC_RESERVED_ERROR_RANGE_END;
  *
  * @since 3.16.0
  */
-static LSP_RESERVED_ERROR_RANGE_START: i32 = -32899;
+pub static LSP_RESERVED_ERROR_RANGE_START: i32 = -32899;
 
 /**
  * A request failed but it was syntactically correct, e.g the
@@ -59,7 +72,7 @@ static LSP_RESERVED_ERROR_RANGE_START: i32 = -32899;
  *
  * @since 3.17.0
  */
-static REQUEST_FAILED: i32 = -32803;
+pub static REQUEST_FAILED: i32 = -32803;
 
 /**
  * The server cancelled the request. This error code should
@@ -68,7 +81,7 @@ static REQUEST_FAILED: i32 = -32803;
  *
  * @since 3.17.0
  */
-static SERVER_CANCELLED: i32 = -32802;
+pub static SERVER_CANCELLED: i32 = -32802;
 
 /**
  * The server detected that the content of a document got
@@ -80,13 +93,13 @@ static SERVER_CANCELLED: i32 = -32802;
  * If a client decides that a result is not of any use anymore
  * the client should cancel the request.
  */
-static CONTENT_MODIFIED: i32 = -32801;
+pub static CONTENT_MODIFIED: i32 = -32801;
 
 /**
  * The client has canceled a request and a server as detected
  * the cancel.
  */
-static REQUEST_CANCELLED: i32 = -32800;
+pub static REQUEST_CANCELLED: i32 = -32800;
 
 /**
  * This is the end range of LSP reserved error codes.
@@ -94,4 +107,4 @@ static REQUEST_CANCELLED: i32 = -32800;
  *
  * @since 3.16.0
  */
-static LSP_RESERVED_ERROR_RANGE_END: i32 = -32800;
+pub static LSP_RESERVED_ERROR_RANGE_END: i32 = -32800;

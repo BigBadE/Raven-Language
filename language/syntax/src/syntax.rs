@@ -146,6 +146,7 @@ impl Syntax {
             if &implementation.target.inner_struct().data == implementor_struct &&
                 (implementing_trait.eq(&implementation.base) ||
                     self.solve(&implementation.base, &implementing_trait)) {
+                //TODO type check impls
                 return Some(implementation.functions.clone());
             }
         }

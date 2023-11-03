@@ -79,6 +79,13 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
             TokenizerState::STRING_TO_CODE_STRUCT_TOP
         };
         tokenizer.make_token(TokenTypes::StringStart)
+    } else if tokenizer.matches("'") {
+        tokenizer.index += 1;
+        if tokenizer.matches("'") {
+            tokenizer.make_token(TokenTypes::Char)
+        } else {
+            tokenizer.handle_invalid()
+        }
     } else {
         let found = tokenizer.next_included()?;
         if tokenizer.matches("//") {

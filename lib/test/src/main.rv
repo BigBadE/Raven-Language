@@ -1,5 +1,13 @@
 import stdio;
+import array::Array;
+import numbers::Cast;
 
 fn main() {
-    printf("1" + "2");
+    let temp = 2;
+    let value = "testing" + ('a' + 2);
+    //printf(value.cast<str>());
+
+    //for char in "test".iter() {
+    //    printf(char);
+    //}
 }
