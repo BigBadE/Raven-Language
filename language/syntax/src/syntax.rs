@@ -14,14 +14,14 @@ use tokio::sync::mpsc::Receiver;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
+
 // Re-export main
 pub use data::Main;
 
 use crate::{Attribute, FinishedTraitImplementor, is_modifier, Modifier, ParsingError, ProcessManager, TopElement, Types};
 use crate::top_element_manager::{TopElementManager, GetterManager};
-use crate::async_util::{AsyncDataGetter, AsyncTypesGetter, NameResolver, UnparsedType};
+use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
-use crate::code::FinalizedEffects;
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
 use crate::types::FinalizedTypes;
@@ -146,8 +146,8 @@ impl Syntax {
             if &implementation.target.inner_struct().data == implementor_struct &&
                 (implementing_trait.eq(&implementation.base) ||
                     self.solve(&implementation.base, &implementing_trait)) {
-                for function in implementation.functions {
-                    output.push(function);
+                for function in &implementation.functions {
+                    output.push(function.clone());
                 }
             }
         }

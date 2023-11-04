@@ -1,4 +1,4 @@
-#![feature(get_mut_unchecked)]
+#![feature(get_mut_unchecked, async_closure)]
 
 extern crate core;
 

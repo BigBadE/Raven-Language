@@ -144,7 +144,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 }.await?;
 
                                 (outer_operation, values) = assign_with_priority(operation.clone(), &outer_data, values,
-                                inner_operation, &inner_data, effects, false);
+                                                                                 inner_operation, &inner_data, effects, false);
                             }
                         }
                     } else {
@@ -217,28 +217,27 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                                   traits.clone(), resolver.boxed_clone(), vec!()).await {
-                let mut output = None;
-                {
-                    let data = inner.finalize(syntax.clone()).await;
-                    if return_type.of_type(&data, None).await {
-                        let mut i = 0;
-                        for found in &data.inner_struct().data.functions {
-                            if found.name == method {
-                                return Ok(FinalizedEffects::VirtualCall(i,
-                                                                        AsyncDataGetter::new(syntax.clone(), found.clone()).await,
-                                                                        finalized_effects));
-                            }
-                            i += 1;
+                let data = inner.finalize(syntax.clone()).await;
+                if return_type.of_type(&data, None).await {
+                    let mut i = 0;
+                    for found in &data.inner_struct().data.functions {
+                        if found.name == method {
+                            return Ok(FinalizedEffects::VirtualCall(i,
+                                                                    AsyncDataGetter::new(syntax.clone(), found.clone()).await,
+                                                                    finalized_effects));
                         }
-
-                        if !method.is_empty() {
-                            return Err(placeholder_error(
-                                format!("Unknown method {} in {}", method, data)));
-                        }
+                        i += 1;
                     }
 
-                    let data = &data.inner_struct().data;
+                    if !method.is_empty() {
+                        return Err(placeholder_error(
+                            format!("Unknown method {} in {}", method, data)));
+                    }
+                }
 
+                let data = &data.inner_struct().data;
+
+                let try_get_impl = async || -> Result<Option<FinalizedEffects>, ParsingError> {
                     let result = ImplWaiter {
                         syntax: syntax.clone(),
                         return_type: return_type.clone(),
@@ -249,22 +248,33 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                     for temp in &result {
                         if temp.name == method || method.is_empty() {
-                            output = Some(temp.clone());
+                            let method = AsyncDataGetter::new(syntax.clone(), temp.clone()).await;
+
+                            let returning = match &returning {
+                                Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
+                                                                       resolver.boxed_clone(), inner.clone(), vec!()).await?.finalize(syntax.clone()).await),
+                                None => None
+                            };
+
+                            if let Ok(found) = check_method(process_manager, method,
+                                                            finalized_effects.clone(), syntax, &variables, returning).await {
+                                return Ok(Some(found));
+                            }
                         }
                     }
-                }
-
-                let output = output.unwrap();
-                let method = AsyncDataGetter::new(syntax.clone(), output).await;
-
-                let returning = match returning {
-                    Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
-                                                           resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
-                    None => None
+                    return Ok(None);
                 };
 
-                check_method(process_manager, method,
-                             finalized_effects, syntax, variables, returning).await?
+                let mut output = None;
+                while output.is_none() && !syntax.lock().unwrap().finished_impls() {
+                    output = try_get_impl().await?;
+                }
+
+                if output.is_none() {
+                    output = try_get_impl().await?;
+                }
+
+                output.unwrap()
             } else {
                 panic!("Screwed up trait! {} for {:?}", traits, resolver.imports());
             }
@@ -331,7 +341,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         resolver: resolver.boxed_clone(),
                         method: method.clone(),
                         return_type: return_type.clone(),
-                        error: placeholder_error(format!("Unknown method {}", method))
+                        error: placeholder_error(format!("Unknown method {}", method)),
                     }.await?
                 }
             } else {
@@ -435,7 +445,7 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 //The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                           mut effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                          variables: &mut SimpleVariableManager,
+                          variables: &SimpleVariableManager,
                           returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
@@ -469,7 +479,7 @@ pub fn placeholder_error(message: String) -> ParsingError {
 }
 
 pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                        variables: &mut SimpleVariableManager) -> bool {
+                        variables: &SimpleVariableManager) -> bool {
     if function.arguments.len() != args.len() {
         return false;
     }

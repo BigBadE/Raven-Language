@@ -1,13 +1,7 @@
-import numbers::Match;
 import stdio;
 
 fn main() {
-    let x = 0;
-    let y = 5;
-    if(x.matches(y)){
-        printf("hello world");
-    }
-    else{
-        printf("nothing?");
-    }
+    // Write your code here
+    let temp = "test " + 'a';
+    printf(temp);
 }
