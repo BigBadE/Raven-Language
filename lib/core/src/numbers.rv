@@ -1,3 +1,5 @@
+import numbers::Match;
+
 //A trait for every primitive number type.
 pub trait Number {}
 
@@ -33,5 +35,15 @@ trait Cast<T> {
 pub internal impl<T: Number, E: Number> Cast<T> for E {
     pub fn cast(self) -> T {
 
+    }
+}
+
+trait Match{
+    fn matches(self, other) -> bool;
+}
+
+pub impl Match for Number {
+    pub fn matches(self, other: Number) -> bool {
+        return true;
     }
 }
