@@ -1,8 +1,5 @@
 /// This file contains the representation of code in Raven and helper methods to transform that code.
 use std::sync::Arc;
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use async_recursion::async_recursion;
 

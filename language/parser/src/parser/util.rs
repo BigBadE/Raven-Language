@@ -8,9 +8,6 @@ use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 
 use crate::{ImportNameResolver, TokenTypes};

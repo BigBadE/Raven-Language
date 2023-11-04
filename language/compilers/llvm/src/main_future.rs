@@ -3,9 +3,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use syntax::syntax::Syntax;
 
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 use syntax::function::FinalizedFunction;
