@@ -485,12 +485,13 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
 
             // Only downcast if an implementation was found. Don't downcast if they're of the same type.
             if !inner.of_type(other, None).await {
-                //Handle downcasting
+                // Handle downcasting
                 let temp = args.remove(i);
-                let funcs = Syntax::get_implementation(&syntax.lock().unwrap(),
-                                                       &temp.get_return(variables).unwrap(), &other.inner_struct().data).unwrap();
+                // Assumed to only be one function
+                let funcs = Syntax::get_implementation_methods(&syntax.lock().unwrap(),
+                                                               &temp.get_return(variables).unwrap(), &other.inner_struct().data).unwrap();
 
-                //Make sure every function is finished adding
+                // Make sure every function is finished adding
                 for func in funcs {
                     AsyncDataGetter::new(syntax.clone(), func).await;
                 }

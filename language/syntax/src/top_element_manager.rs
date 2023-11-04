@@ -38,7 +38,7 @@ impl Future for ImplWaiter {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
-        return match locked.get_implementation(&self.return_type, &self.data) {
+        return match locked.get_implementation_methods(&self.return_type, &self.data) {
             Some(found) => Poll::Ready(Ok(found)),
             None => if locked.finished_impls() {
                 Poll::Ready(Err(self.error.clone()))
@@ -86,7 +86,7 @@ pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &B
         if let Ok(value) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                               import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
             let value = value.finalize(syntax.clone()).await;
-            if let Some(value) = syntax.lock().unwrap().get_implementation(
+            if let Some(value) = syntax.lock().unwrap().get_implementation_methods(
                 &return_type,
                 &value.inner_struct().data) {
                 for temp in &value {

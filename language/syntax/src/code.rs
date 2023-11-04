@@ -367,7 +367,8 @@ impl FinalizedEffects {
                 loading.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::StackStore(storing) =>
                 storing.degeneric(process_manager, variables, syntax).await?,
-            FinalizedEffects::Downcast(_, _) => {}
+            FinalizedEffects::Downcast(_, target) => target
+                .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?
         }
         return Ok(());
     }

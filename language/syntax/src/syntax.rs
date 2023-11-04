@@ -19,8 +19,9 @@ pub use data::Main;
 
 use crate::{Attribute, FinishedTraitImplementor, is_modifier, Modifier, ParsingError, ProcessManager, TopElement, Types};
 use crate::top_element_manager::{TopElementManager, GetterManager};
-use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
+use crate::async_util::{AsyncDataGetter, AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
+use crate::code::FinalizedEffects;
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
 use crate::types::FinalizedTypes;
@@ -137,17 +138,24 @@ impl Syntax {
         }
     }
 
-    /// Finds an implementation for the given trait.
-    pub fn get_implementation(&self, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>) -> Option<Vec<Arc<FunctionData>>> {
+    /// Finds an implementation method for the given trait.
+    pub fn get_implementation_methods(&self, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>)
+                                      -> Option<Vec<Arc<FunctionData>>> {
+        let mut output = Vec::new();
         for implementation in &self.implementations {
             if &implementation.target.inner_struct().data == implementor_struct &&
                 (implementing_trait.eq(&implementation.base) ||
                     self.solve(&implementation.base, &implementing_trait)) {
-                //TODO type check impls
-                return Some(implementation.functions.clone());
+                for function in implementation.functions {
+                    output.push(function);
+                }
             }
         }
-        return None;
+        return if output.is_empty() {
+            None
+        } else {
+            Some(output)
+        }
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
