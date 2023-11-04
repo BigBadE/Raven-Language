@@ -2,9 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use crate::ParsingError;
 use crate::r#struct::StructData;

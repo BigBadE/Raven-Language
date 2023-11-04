@@ -11,4 +11,4 @@ async-recursion = { path = "../../crates/async-recursion" }
 
 include_dir = "0.7.3"
 
-tokio = { version = "1.25.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.33.0", features = ["rt-multi-thread", "macros"] }

@@ -9,9 +9,6 @@ use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
 use chalk_solve::Solver;
 use chalk_solve::ext::GoalExt;
 use indexmap::IndexMap;
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use tokio::sync::mpsc::Receiver;
 

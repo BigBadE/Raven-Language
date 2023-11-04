@@ -1,7 +1,4 @@
 use std::sync::Arc;
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use syntax::ParsingError;
 use syntax::code::{FinalizedField, FinalizedMemberField};

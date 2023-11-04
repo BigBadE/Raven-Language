@@ -5,9 +5,6 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use crate::syntax::Syntax;
 use crate::TopElement;
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 use data::ParsingError;
 use crate::async_util::NameResolver;

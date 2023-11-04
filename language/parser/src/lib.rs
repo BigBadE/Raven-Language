@@ -3,10 +3,7 @@
 extern crate core;
 
 use std::collections::HashMap;
-use std::sync::Arc; #[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
-use std::sync::Mutex;
+use std::sync::Arc; use std::sync::Mutex;
 use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
 use crate::parser::top_parser::parse_top;

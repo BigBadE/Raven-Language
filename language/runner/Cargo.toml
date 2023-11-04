@@ -16,10 +16,10 @@ data = { path = "../data" }
 compiler-llvm = { path = "../compilers/llvm" }
 
 # Tokio is used for scheduling I/O and CPU operations
-tokio = { version = "1.25.0", features = ["rt-multi-thread"] }
+tokio = { version = "1.33.0", features = ["rt-multi-thread"] }
 
 # Utility / Code Cleanliness
-anyhow = "1.0.69"
+anyhow = "1.0.75"
 
 # Debugging
 no_deadlocks = {version = "1.3.1", default-features = false}

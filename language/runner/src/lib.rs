@@ -9,9 +9,6 @@ use syntax::async_util::HandleWrapper;
 use syntax::function::FinalizedFunction;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::Compiler;
-#[cfg(debug_assertions)]
-use no_deadlocks::Mutex;
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
 
 pub mod runner;
