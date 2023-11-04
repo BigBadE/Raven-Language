@@ -69,6 +69,10 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         } else if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
             // Looking for a field name inside a struct
             parse_to_character(tokenizer, TokenTypes::FieldName, &[b':', b'='])
+        } else if tokenizer.state == TokenizerState::TOP_ELEMENT && tokenizer.matches("")  {
+            // If there are blank lines after all of the modifiers at the EOF, ignore them
+            tokenizer.index += 1;
+            tokenizer.make_token(TokenTypes::BlankLine)
         } else {
             tokenizer.handle_invalid()
         },

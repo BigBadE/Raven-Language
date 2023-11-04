@@ -165,5 +165,6 @@ pub enum TokenTypes {
     GenericBoundEnd = 67,
     GenericsEnd = 68,
     Do = 69,
-    Char = 70
+    Char = 70,
+    BlankLine = 71
 }

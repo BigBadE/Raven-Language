@@ -1,0 +1,73 @@
+fn test() -> bool {
+    if(test_greater()){
+        if(test_less()){
+            if(test_greater_or_eq()){
+                if(test_less_or_eq()){
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+ 
+ }
+
+fn test_greater() -> bool {
+    let x = 5;
+    if(x > 5){
+        return false;
+    }
+    if(x > 10){
+        return false;
+    }
+    if(x > 0){
+        return true;
+    }
+    return false;
+}
+
+
+fn test_less() -> bool {
+    let x = 5;
+    if(x < 5){
+        return false;
+    }
+    if(x < 0){
+        return false;
+    }
+    if(x < 10){
+        return true;
+    }
+    return false;
+}
+
+
+fn test_less_or_eq() -> bool {
+    let x = 5;
+    
+    if(x <= 0){
+        return false;
+    }
+    if(x <= 10){
+        if(x <= 5) {
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+fn test_greater_or_eq() -> bool {
+    let x = 5;
+    
+    if(x >= 10){
+        return false;
+    }
+    if(x >= 0){
+        if(x >= 5) {
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
