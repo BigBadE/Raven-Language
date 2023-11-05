@@ -1,0 +1,22 @@
+fn test() -> bool {
+    let count = 0;
+    if count == 2 {
+        return false;
+    } else if count == 0 {
+        count += 2;
+    } else if count == 2 {
+        return false;
+    } else {
+        return false;
+    }
+
+    do {
+        count += 1;
+    } while count == 0;
+
+    while count < 5 {
+        count += 1;
+    }
+
+    return count == 5;
+}
