@@ -21,6 +21,9 @@ pub fn compile_llvm_intrinsics<'ctx>(name: &str, type_getter: &CompilerTypeGette
             BasicMetadataTypeEnum::from(type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()))], false),
         "strlen" => type_getter.compiler.context.i64_type().fn_type(&[
             BasicMetadataTypeEnum::from(type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()))], false),
+        "strcmp" => type_getter.compiler.context.i64_type().fn_type(&[
+            BasicMetadataTypeEnum::from(type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default())),
+            BasicMetadataTypeEnum::from(type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()))], false),
         _ => panic!("Tried to compile unknown LLVM intrinsic {}", name)
     }, None);
 }

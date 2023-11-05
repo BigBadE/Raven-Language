@@ -60,6 +60,8 @@ impl<T> Compiler<T> for LLVMCompiler {
                                  syntax, &self.compiling, &self.struct_compiling).await {
             receiver.recv().await.unwrap();
             return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
+        } else {
+            receiver.recv().await.unwrap();
         }
 
         return None;

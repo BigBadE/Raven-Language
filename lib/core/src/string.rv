@@ -11,6 +11,12 @@ internal impl Add<char, u64> for char {
     }
 }
 
+impl Equal<str, str> for str {
+    pub fn equal(self, other: str) -> str {
+        return strcmp(self, other) == 0;
+    }
+}
+
 internal impl Cast<str> for char {
     pub fn cast(self) -> str {
 
@@ -55,6 +61,11 @@ internal impl Iter<char> for CharIter {
 
 #[llvm_intrinsic]
 internal fn strlen(source: str) -> u64 {
+
+}
+
+#[llvm_intrinsic]
+internal fn strcmp(source: str, other: str) -> u64 {
 
 }
 
