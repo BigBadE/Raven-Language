@@ -39,8 +39,6 @@ pub enum ParseState {
     InOperator,
     // When inside both an operator and control variable.
     ControlOperator,
-    // When inside a new expression.
-    New
 }
 
 pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
@@ -125,9 +123,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 effect = Some(parse_string(parser_utils)?)
             }
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
-            TokenTypes::BlockEnd if state == ParseState::New => {
-                break;
-            }
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
                 if effect.is_some() {
                     return Err(token.make_error(parser_utils.file.clone(),
@@ -457,7 +452,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
             TokenTypes::Colon | TokenTypes::ArgumentEnd => {
                 let effect = if let TokenTypes::Colon = token.token_type {
                     let token = token.clone();
-                    match parse_line(parser_utils, ParseState::New)? {
+                    match parse_line(parser_utils, ParseState::None)? {
                         Some(inner) => inner.effect,
                         None => return Err(token.make_error(parser_utils.file.clone(), format!("Expected effect!")))
                     }
@@ -468,17 +463,10 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
                 name = String::new();
             }
             TokenTypes::BlockEnd => break,
-            TokenTypes::LineEnd => {
-                if parser_utils.tokens.get(parser_utils.index - 2).unwrap().token_type == TokenTypes::BlockEnd {
-                    parser_utils.index -= 1;
-                    break;
-                }
-            }
             TokenTypes::InvalidCharacters => {}
             TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type)
         }
-
     }
 
     return Ok(values);
