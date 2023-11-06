@@ -1,6 +1,7 @@
 fn test() -> bool {
     let temp = new TopTest {
         inner: new InnerTest {
+            first: 0,
             value: true,
         },
     };
@@ -12,5 +13,6 @@ struct TopTest {
 }
 
 struct InnerTest {
+    first: u64;
     value: bool;
 }

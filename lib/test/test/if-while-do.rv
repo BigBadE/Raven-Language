@@ -4,7 +4,6 @@ import numbers::Cast;
 fn test() -> bool {
     let count = 0;
     if count == 2 {
-        printf("Failed!");
         return false;
     } else if count == 0 {
         count += 2;
@@ -22,6 +21,5 @@ fn test() -> bool {
         count += 1;
     }
 
-    printf(('0' + count).cast<str>());
     return count == 5;
 }
