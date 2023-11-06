@@ -39,7 +39,7 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
 }
 
 trait Match{
-    fn matches(self, other) -> bool;
+    fn matches(self, other: Number) -> bool;
 }
 
 pub impl Match for Number {
