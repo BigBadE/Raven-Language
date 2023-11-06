@@ -190,7 +190,7 @@ fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects,
 
 fn create_if(effect: Effects, body: CodeBody,
                    mut else_ifs: Vec<(Effects, CodeBody)>,
-                   else_body: Option<CodeBody>, mut id: u32) -> Result<Effects, ParsingError> {
+                   else_body: Option<CodeBody>, id: u32) -> Result<Effects, ParsingError> {
     let mut body = body;
 
     // Maps the else body, if there is an else_if there needs to be an empty else to put the else if into.

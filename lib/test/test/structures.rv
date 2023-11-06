@@ -1,0 +1,16 @@
+fn test() -> bool {
+    let temp = new TopTest {
+        inner: new InnerTest {
+            value: true,
+        },
+    };
+    return temp.inner.value;
+}
+
+struct TopTest {
+    inner: InnerTest;
+}
+
+struct InnerTest {
+    value: bool;
+}
