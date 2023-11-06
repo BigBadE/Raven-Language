@@ -38,12 +38,12 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
     }
 }
 
-trait Match{
-    fn matches(self, other: Number) -> bool;
+trait Match<T> {
+    fn matches(self, other: T) -> bool;
 }
 
-pub impl Match for Number {
-    pub fn matches(self, other: Number) -> bool {
+pub impl<T: Number, E: Number> Match for T {
+    pub fn matches(self, other: E) -> bool {
         return true;
     }
 }

@@ -4,7 +4,7 @@ import stdio;
 fn main() {
     let x = 0;
     let y = 5;
-    if(x.matches(y)){
+    if x.matches(y) {
         printf("hello world");
     }
     else{
