@@ -309,6 +309,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
+
                         return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
                     }
                 }
@@ -433,7 +434,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             store(FinalizedEffects::CreateArray(types, output))
         }
     };
-
     return Ok(output);
 }
 
@@ -489,6 +489,7 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
         if returning.is_some() {
             let inner = returning.as_ref().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
+
             if !inner.of_type(other, Some(syntax.clone())).await {
                 return false;
             }

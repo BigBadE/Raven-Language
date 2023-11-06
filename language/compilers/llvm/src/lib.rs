@@ -61,7 +61,7 @@ impl<T> Compiler<T> for LLVMCompiler {
             receiver.recv().await.unwrap();
             return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
         } else {
-            receiver.recv().await.unwrap();
+            receiver.recv().await;
         }
 
         return None;

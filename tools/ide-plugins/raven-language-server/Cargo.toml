@@ -7,4 +7,5 @@ edition = "2021"
 syntax = { path = "../../../language/syntax" }
 parser = { path = "../../../language/parser" }
 
+crossbeam-channel = "0.5.8"
 json = "0.12.4"

@@ -75,11 +75,11 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
     }
 
     let errors = syntax.lock().unwrap().errors.clone();
-    if errors.is_empty() {
+    return if errors.is_empty() {
         go_sender.send(()).await.unwrap();
-        return Ok(receiver.recv().await.unwrap());
+        Ok(receiver.recv().await.unwrap())
     } else {
-        return Err(errors);
+        Err(errors)
     }
 }
 
@@ -91,5 +91,5 @@ pub async fn start<T>(compiler_arguments: CompilerArguments, sender: Sender<Opti
                                      locked.strut_compiling.clone(), compiler_arguments);
     }
 
-    sender.send(code_compiler.compile(receiver, &syntax).await).await.unwrap();
+    let _ = sender.send(code_compiler.compile(receiver, &syntax).await).await;
 }

@@ -243,9 +243,13 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap();
                 // If there is a variable right next to a less than, it's probably a generic method call.
                 // Example: test<Value>()
-                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) && is_generic(&token, parser_utils){
+                parser_utils.index -= 1;
+                if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType) &&
+                    is_generic(&parser_utils.tokens[parser_utils.index-1], parser_utils) {
+                     parser_utils.index += 1;
                      effect = Some(parse_generic_method(effect, parser_utils)?);
                  } else {
+                    parser_utils.index += 1;
                     let operator = parse_operator(effect, parser_utils, &state)?;
                     // Operators inside operators return immediately so operators can be combined
                     // later on for operators like [].
@@ -259,8 +263,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             TokenTypes::ArgumentEnd => break,
             TokenTypes::CallingType => {
                 let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
-                if next.token_type == TokenTypes::ParenOpen || is_generic(&token, parser_utils){
-                         // Ignored, ParenOpen or Operator handles this
+                if next.token_type == TokenTypes::ParenOpen || is_generic(&token, parser_utils) {
+                    // Ignored, ParenOpen or Operator handles this
                 } else {
                     if effect.is_none() {
                         return Err(token.make_error(parser_utils.file.clone(), format!("Extra symbol!")));
@@ -484,10 +488,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
     return Ok(values);
 }
 
-fn is_generic(token: &Token, parser_utils: &ParserUtils) -> bool{
+fn is_generic(token: &Token, parser_utils: &ParserUtils) -> bool {
     let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
-
-    // TODO
-
-    return false;
+    return parser_utils.buffer[token.end_offset] != b' ' && next.to_string(parser_utils.buffer) == "<";
 }

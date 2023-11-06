@@ -24,12 +24,12 @@ impl Jsonable for Body {
         json.insert("jsonrpc", "2.0").unwrap();
         match result {
             Ok(found) => json.insert("result", found).unwrap(),
-            Err(error) => json.insert("error", error).unwrap()
+            Err(error) => json.insert("error", error.to_json()).unwrap()
         }
         return json;
     }
 }
 
 pub trait Request {
-    fn result(self) -> Result<JsonValue, ResponseError>;
+    fn result(&self) -> Result<JsonValue, ResponseError>;
 }

@@ -36,11 +36,20 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
         // Else ifs get added to the else if
         if parser_utils.tokens.get(parser_utils.index+1).unwrap().token_type == TokenTypes::If {
             parser_utils.index += 2;
+
             let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
             if effect.is_none() {
                 return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
                     .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
             }
+
+            if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
+                return Err(parser_utils.tokens.get(parser_utils.index).unwrap()
+                    .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+            }
+
+            parser_utils.index += 1;
+
             // Get the body of the else if block
             let (other_returning, body) = parse_code(parser_utils)?;
             // An if statement is only the return of the block if every code path returns, so if they differ
@@ -237,6 +246,7 @@ fn create_if(effect: Effects, body: CodeBody,
                                              Effects::CodeBody(body)));
     }
 
+    println!("{:?}", top);
     return Ok(Effects::CodeBody(top));
 }
 
