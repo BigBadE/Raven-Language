@@ -202,9 +202,27 @@ fn create_if(effect: Effects, body: CodeBody,
         None
     };
 
+    let mut temp = id+1;
+    // Add every else if statement
+    while !else_ifs.is_empty() {
+        let (effect, mut body) = else_ifs.remove(0);
+        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
+        // Creates the body of the else if by adding another if statement to the top of the else.
+        let inner = CodeBody::new(
+            vec!(Expression::new(ExpressionType::Line,
+                                 Effects::CompareJump(Box::new(effect),
+                                                      body.label.clone(),
+                                                      else_body.as_ref().unwrap().label.clone())),
+                 Expression::new(ExpressionType::Line, Effects::CodeBody(body)),
+                 Expression::new(ExpressionType::Line, Effects::CodeBody(else_body.unwrap()))),
+            temp.to_string());
+        else_body = Some(inner);
+        temp += 1;
+    }
+
     // Where we jump if the if fails
     let if_jumping = if let Some(body) = &mut else_body {
-        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
+        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(body.label.clone())));
         body.label.clone()
     } else {
         id.to_string() + "end"
@@ -218,27 +236,6 @@ fn create_if(effect: Effects, body: CodeBody,
         Box::new(effect), body.label.clone(), if_jumping
     )), Expression::new(ExpressionType::Line, Effects::CodeBody(body))),
                                               id.to_string());
-    id += 1;
-    // Add every else if statement
-    while !else_ifs.is_empty() {
-        let (effect, mut body) = else_ifs.remove(0);
-        // Adds a jump to the end after the code body
-        body.expressions.push(Expression::new(ExpressionType::Line,
-                                                     Effects::Jump(top.label.clone())));
-        else_body.as_mut().unwrap().expressions.push(Expression::new(ExpressionType::Line,
-        Effects::Jump(top.label.clone())));
-        // Creates the body of the else if by adding another if statement to the top of the else.
-        let inner = CodeBody::new(
-            vec!(Expression::new(ExpressionType::Line,
-                                 Effects::CompareJump(Box::new(effect),
-                                                      body.label.clone(),
-                                                      else_body.as_ref().unwrap().label.clone())),
-            Expression::new(ExpressionType::Line, Effects::CodeBody(body)),
-            Expression::new(ExpressionType::Line, Effects::CodeBody(else_body.unwrap()))),
-            id.to_string());
-        else_body = Some(inner);
-        id += 1;
-    }
 
     // Add the else body.
     if let Some(body) = else_body {
@@ -246,7 +243,6 @@ fn create_if(effect: Effects, body: CodeBody,
                                              Effects::CodeBody(body)));
     }
 
-    println!("{:?}", top);
     return Ok(Effects::CodeBody(top));
 }
 
