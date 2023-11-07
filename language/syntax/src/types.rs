@@ -236,7 +236,7 @@ impl FinalizedTypes {
                     // If any bounds fail, the type isn't of the generic.
                     let mut fails = Vec::new();
                     for bound in bounds {
-                        let (result, future) = other.of_type_sync(bound, syntax.clone());
+                        let (result, future) = self.of_type_sync(bound, syntax.clone());
                         if !result {
                             if let Some(found) = future {
                                 fails.push(found);

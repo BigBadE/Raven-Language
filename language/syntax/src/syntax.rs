@@ -143,17 +143,9 @@ impl Syntax {
                                       -> Option<Vec<Arc<FunctionData>>> {
         let mut output = Vec::new();
         for implementation in &self.implementations {
-            /*if (implementation.target.of_type_sync(&implementor_struct, None).0 ||
-                self.solve(&implementation.target, implementor_struct)) &&
-                (implementing_trait.eq(&implementation.base) ||
-                    self.solve(&implementing_trait, &implementation.base)) {
-                for function in &implementation.functions {
-                    output.push(function.clone());
-                }
-            }*/
             if implementation.target.inner_struct().data == implementor_struct.inner_struct().data &&
-                (implementing_trait.eq(&implementation.base) ||
-                    self.solve(&implementation.base, &implementing_trait)) {
+                (implementing_trait.of_type_sync(&implementation.base, None).0 ||
+                    self.solve(&implementing_trait, &implementation.base)) {
                 for function in &implementation.functions {
                     output.push(function.clone());
                 }
