@@ -1,3 +1,6 @@
+import stdio;
+import numbers::Cast;
+
 pub trait Iter<T> {
     pub fn next(self) -> T;
 
@@ -11,11 +14,12 @@ pub struct NumberIter {
 
 impl Iter<u64> for NumberIter {
     pub fn next(self) -> u64 {
-        return self.current;
+        self.current += 1;
+        return self.current - 1;
     }
 
     pub fn has_next(self) -> bool {
-        return false;
+        return self.current < self.end;
     }
 }
 

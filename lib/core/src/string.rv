@@ -12,7 +12,7 @@ internal impl Add<char, u64> for char {
 }
 
 impl Equal<str, str> for str {
-    pub fn equal(self, other: str) -> str {
+    pub fn equal(self, other: str) -> bool {
         return strcmp(self, other) == 0;
     }
 }

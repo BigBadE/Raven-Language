@@ -1,0 +1,19 @@
+import iter;
+
+fn test() -> bool {
+    let sum = 0;
+    for i in 0..5 {
+        sum += i;
+    }
+
+    let temp = new NumberIter {
+        current: 0,
+        end: 5,
+    };
+
+    for i in temp {
+        sum += i;
+    }
+
+    return sum == 20;
+}

@@ -233,11 +233,11 @@ impl FinalizedEffects {
             FinalizedEffects::CreateStruct(_, types, _) =>
                 Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             // Returns the internal constant type.
-            FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
-            FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
-            FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
-            FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone())),
-            FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone())),
+            FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone(), None)),
+            FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone(), None)),
+            FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone(), None)),
+            FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone(), None)),
+            FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone(), None)),
             // Stores just return their inner type.
             FinalizedEffects::HeapStore(inner) => inner.get_return(variables),
             FinalizedEffects::StackStore(inner) => inner.get_return(variables),

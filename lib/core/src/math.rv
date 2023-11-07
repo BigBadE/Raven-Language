@@ -119,7 +119,6 @@ pub internal impl<T: Number, E: Number> Equal<E> for T {
 
 pub impl<T: Equal<E>, E> NotEqual<E> for T {
     fn not_equal(self, other: E) -> bool {
-        let temp = 0;
         return !(self.equal(other));
     }
 }
