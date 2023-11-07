@@ -208,7 +208,7 @@ impl FinalizedTypes {
             found.await
         } else {
             false
-        }
+        };
     }
 
     /// This method doesn't block, instead it returns a future which can be waited on if a blocking
@@ -218,6 +218,8 @@ impl FinalizedTypes {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
                     if found == other_struct {
+                        (true, None)
+                    } else if found.data.name.contains("<") && found.data.name.split("<").next().unwrap() == other_struct.data.name {
                         (true, None)
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         if syntax.is_none() {
@@ -312,7 +314,10 @@ impl FinalizedTypes {
                     (true, None)
                 }
                 // Against structures just check the base.
-                FinalizedTypes::Struct(_) => base.of_type_sync(other, syntax),
+                FinalizedTypes::Struct(_) => {
+                    println!("{} and {}", base, other);
+                    base.of_type_sync(other, syntax)
+                }
                 // References are ignored for type checking.
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
                 FinalizedTypes::Array(_) => (false, None)
@@ -328,7 +333,7 @@ impl FinalizedTypes {
                         for other_bound in other_bounds {
                             let (result, failure) = other_bound.of_type_sync(bound, syntax.clone());
                             if result {
-                                continue 'outer
+                                continue 'outer;
                             } else if let Some(found) = failure {
                                 fails.push(found);
                             }
@@ -478,16 +483,26 @@ impl FinalizedTypes {
                     // Clone the type and add the new type to the structures.
                     let mut other = StructData::clone(&found.data);
                     other.name = name.clone();
+
+                    // Update the structure's functions
+                    for function in &mut other.functions {
+                        let mut temp = FunctionData::clone(function);
+                        temp.name = format!("{}::{}", name, temp.name.split("::").last().unwrap());
+                        let temp = Arc::new(temp);
+                        *function = temp;
+                    }
+
                     let arc_other;
                     {
                         let mut locked = syntax.lock().unwrap();
                         other.set_id(locked.structures.sorted.len() as u64);
                         arc_other = Arc::new(other);
-                        locked.structures.types.insert(name, arc_other.clone());
+                        locked.structures.types.insert(name.clone(), arc_other.clone());
                         locked.structures.sorted.push(arc_other.clone());
                     }
                     // Get the FinalizedStruct and degeneric it.
-                    let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), arc_other.clone()).await.deref());
+                    let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), found.data.clone()).await.deref());
+                    data.data = arc_other.clone();
                     data.degeneric(generics, syntax).await?;
                     let data = Arc::new(data);
                     // Add the flattened type to the
@@ -498,7 +513,7 @@ impl FinalizedTypes {
                         }
                     }
 
-                    locked.structures.data.insert(arc_other.clone(), data.clone());
+                    locked.structures.data.insert(arc_other, data.clone());
                     Ok(FinalizedTypes::Struct(data))
                 }
             }

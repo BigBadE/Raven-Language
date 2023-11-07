@@ -26,7 +26,7 @@ trait Range<T> {
 }
 
 impl Range<u64> for u64 {
-    fn range(self, other: u64) -> Iter<T> {
+    fn range(self, other: u64) -> Iter<u64> {
         return new NumberIter {
             current: self,
             end: other,

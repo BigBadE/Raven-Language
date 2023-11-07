@@ -216,9 +216,16 @@ impl CodelessFinalizedFunction {
             locked.functions.types.insert(name, new_method.data.clone());
             locked.functions.data.insert(new_method.data.clone(), new_method.clone());
 
+            if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
+                for waker in wakers {
+                    waker.wake_by_ref();
+                }
+            }
+            locked.functions.wakers.remove(&new_method.data.name);
+
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();
-            handle.spawn(degeneric_code(syntax.clone(), original, new_method.clone(), manager));
+            handle.lock().unwrap().spawn(degeneric_code(syntax.clone(), original, new_method.clone(), manager));
 
             return Ok(new_method);
         };

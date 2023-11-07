@@ -16,8 +16,14 @@ use crate::{get_compiler, JoinWaiter};
 
 pub async fn run<T: Send + 'static>(settings: &Arguments)
                                     -> Result<Option<T>, Vec<ParsingError>> {
+    //Parse source, getting handles and building into the unresolved syntax.
+    let handle = Arc::new(Mutex::new(HandleWrapper {
+        handle: settings.cpu_runtime.handle().clone(),
+        joining: vec!(),
+        waker: None,
+    }));
     let mut syntax = Syntax::new(Box::new(
-        TypesChecker::new(settings.cpu_runtime.handle().clone(), settings.runner_settings.include_references())));
+        TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
     syntax.async_manager.target = settings.runner_settings.compiler_arguments.target.clone();
 
     let syntax = Arc::new(Mutex::new(syntax));
@@ -27,12 +33,6 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     settings.cpu_runtime.spawn(start(settings.runner_settings.compiler_arguments.clone(), sender, go_receiver, syntax.clone()));
 
-    //Parse source, getting handles and building into the unresolved syntax.
-    let handle = Arc::new(Mutex::new(HandleWrapper {
-        handle: settings.cpu_runtime.handle().clone(),
-        joining: vec!(),
-        waker: None,
-    }));
     let mut handles = Vec::new();
     for source_set in &settings.runner_settings.sources {
         for file in source_set.get_files() {

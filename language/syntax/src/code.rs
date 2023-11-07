@@ -201,13 +201,11 @@ impl FinalizedEffects {
             FinalizedEffects::CodeBody(_) => None,
             FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
             FinalizedEffects::MethodCall(_, function, _) =>
-                function.return_type.as_ref().map(|inner| {
-                    FinalizedTypes::Reference(Box::new(inner.clone()))
-                }),
+                function.return_type.as_ref().map(|inner|
+                    FinalizedTypes::Reference(Box::new(inner.clone()))),
             FinalizedEffects::VirtualCall(_, function, _) =>
-                function.return_type.as_ref().map(|inner| {
-                    FinalizedTypes::Reference(Box::new(inner.clone()))
-                }),
+                function.return_type.as_ref().map(|inner|
+                    FinalizedTypes::Reference(Box::new(inner.clone()))),
             FinalizedEffects::Set(_, to) => to.get_return(variables),
             FinalizedEffects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);

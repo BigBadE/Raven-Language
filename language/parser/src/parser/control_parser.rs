@@ -258,15 +258,15 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
     let mut top = Vec::new();
     // Adds a call to the Iter::next function at the top of the for loop.
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
-    Effects::CreateVariable(name.clone(), Box::new(Effects::MethodCall(
-        Some(Box::new(effect.clone())), "next".to_string(), vec!(), None)))));
+    Effects::CreateVariable(name.clone(), Box::new(Effects::ImplementationCall(
+        Box::new(effect.clone()), "iter::Iter".to_string(), "next".to_string(), vec!(), None)))));
     // Jumps to the header of the for loop after each loop
     body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string())));
 
     // Checks if the end is reached, and if so jumps to the end of the block.
     // The block after is named id + end so it can be named before it exists.
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::ImplementationCall(
-        Box::new(effect), "iter::Iter".to_string(), "iter::Iter::has_next".to_string(), vec!(), None)),
+        Box::new(effect), "iter::Iter".to_string(),  "has_next".to_string(), vec!(), None)),
                                   body.label.clone(), id.to_string() + "end")));
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
 

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
-use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError};
+use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
+use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError, ProcessManager};
 use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
@@ -225,6 +225,18 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             return Ok(FinalizedEffects::VirtualCall(i,
                                                                     AsyncDataGetter::new(syntax.clone(), found.clone()).await,
                                                                     finalized_effects));
+                        } else if found.name.split("::").last().unwrap() == method {
+                            let target = return_type.inner_struct().data.functions.iter()
+                                .find(|inner| inner.name.split("::").last().unwrap() == method).unwrap();
+                            syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                                degeneric_data(target.clone(),
+                                               found.clone(), syntax.clone(), process_manager.cloned(),
+                                               finalized_effects.clone(), variables.clone()));
+
+                            println!("Getting {}", target.name);
+                            return Ok(FinalizedEffects::VirtualCall(i,
+                                                                    AsyncDataGetter::new(syntax.clone(), target.clone()).await,
+                                                                    finalized_effects));
                         }
                         i += 1;
                     }
@@ -314,8 +326,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                 // If it's a trait, handle virtual method calls.
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
-                    println!("Got return type {} from {:?}", return_type, calling);
                     finalized_effects.insert(0, calling);
+
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(
                         format!("Failed to find method {}::{}", return_type.inner_struct().data.name, method)),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
@@ -437,6 +449,17 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     return Ok(output);
 }
 
+async fn degeneric_data(degenericed: Arc<FunctionData>, base: Arc<FunctionData>, syntax: Arc<Mutex<Syntax>>,
+                        manager: Box<dyn ProcessManager>, arguments: Vec<FinalizedEffects>, variables: SimpleVariableManager) -> Result<(), ParsingError> {
+    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter {
+        getting: base,
+        syntax: syntax.clone(),
+    }.await;
+
+    CodelessFinalizedFunction::degeneric(function, manager,
+                                         &arguments, &syntax, &variables, None).await?;
+    return Ok(());
+}
 
 fn store(effect: FinalizedEffects) -> FinalizedEffects {
     return FinalizedEffects::HeapStore(Box::new(effect));

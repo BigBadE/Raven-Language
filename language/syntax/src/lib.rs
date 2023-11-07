@@ -19,7 +19,6 @@ use std::sync::Arc;
 use chalk_solve::rust_ir::ImplDatum;
 use std::sync::Mutex;
 use indexmap::IndexMap;
-use tokio::runtime::Handle;
 use async_trait::async_trait;
 use crate::top_element_manager::TopElementManager;
 use crate::async_util::{HandleWrapper, NameResolver};
@@ -152,7 +151,7 @@ impl Attribute {
 
 #[async_trait]
 pub trait ProcessManager: Send + Sync {
-    fn handle(&self) -> &Handle;
+    fn handle(&self) -> &Arc<Mutex<HandleWrapper>>;
 
     async fn verify_func(&self, function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> (CodelessFinalizedFunction, CodeBody);
 
