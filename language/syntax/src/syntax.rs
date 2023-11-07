@@ -68,7 +68,7 @@ impl Syntax {
             structures: TopElementManager::with_sorted(
                 vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),
                      F64.data.clone(), F32.data.clone(), U64.data.clone(), U32.data.clone(), U16.data.clone(), U8.data.clone(),
-                BOOL.data.clone(), STR.data.clone())),
+                     BOOL.data.clone(), STR.data.clone())),
             implementations: Vec::new(),
             async_manager: GetterManager::default(),
             operations: HashMap::new(),
@@ -135,15 +135,23 @@ impl Syntax {
             }),
             impl_type: ImplType::Local,
             associated_ty_value_ids: vec![],
-        }
+        };
     }
 
     /// Finds an implementation method for the given trait.
-    pub fn get_implementation_methods(&self, implementing_trait: &FinalizedTypes, implementor_struct: &Arc<StructData>)
+    pub fn get_implementation_methods(&self, implementing_trait: &FinalizedTypes, implementor_struct: &FinalizedTypes)
                                       -> Option<Vec<Arc<FunctionData>>> {
         let mut output = Vec::new();
         for implementation in &self.implementations {
-            if &implementation.target.inner_struct().data == implementor_struct &&
+            /*if (implementation.target.of_type_sync(&implementor_struct, None).0 ||
+                self.solve(&implementation.target, implementor_struct)) &&
+                (implementing_trait.eq(&implementation.base) ||
+                    self.solve(&implementing_trait, &implementation.base)) {
+                for function in &implementation.functions {
+                    output.push(function.clone());
+                }
+            }*/
+            if implementation.target.inner_struct().data == implementor_struct.inner_struct().data &&
                 (implementing_trait.eq(&implementation.base) ||
                     self.solve(&implementation.base, &implementing_trait)) {
                 for function in &implementation.functions {
@@ -155,7 +163,7 @@ impl Syntax {
             None
         } else {
             Some(output)
-        }
+        };
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
@@ -169,7 +177,7 @@ impl Syntax {
                     }
                 }
                 Some(true)
-            },
+            }
             FinalizedTypes::Array(inner) => {
                 let mut checking = checking;
                 // Unwrap references because references don't matter for type checking.
@@ -182,13 +190,13 @@ impl Syntax {
                 } else {
                     Some(false)
                 }
-            },
+            }
             FinalizedTypes::Reference(inner) => {
                 // References are unwrapped and the inner is checked.
                 self.solve_nonstruct_types(inner, checking)
             }
             _ => None
-        }
+        };
     }
 
     /// Solves if the first type is the second type, either if they are equal or if it is within the
@@ -214,7 +222,7 @@ impl Syntax {
         let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
             WhereClause::Implemented(TraitRef {
                 trait_id: TraitId(second_ty.id as u32),
-                substitution: Substitution::from_iter(ChalkIr, elements.into_iter())
+                substitution: Substitution::from_iter(ChalkIr, elements.into_iter()),
             })
         )));
 
@@ -367,18 +375,18 @@ impl Syntax {
                 b'<' => {
                     let first = String::from_utf8_lossy(&input[last..i]);
                     let (size, bounds) =
-                        Self::parse_bounds(&input[i+1..], syntax, error, name_resolver).await?;
+                        Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
                     let first = Self::get_struct(syntax.clone(), error.clone(),
-                                                first.to_string(), name_resolver.boxed_clone(), vec!()).await?;
+                                                 first.to_string(), name_resolver.boxed_clone(), vec!()).await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
                     i += size;
-                },
+                }
                 b',' => {
                     let getting = String::from_utf8_lossy(&input[last..i]);
                     found.push(Self::get_struct(syntax.clone(), error.clone(),
                                                 getting.to_string(), name_resolver.boxed_clone(), vec!()).await?);
                     last = i;
-                },
+                }
                 b'>' => return Ok((i, found)),
                 _ => {}
             }

@@ -1,6 +1,10 @@
 import trait-calls::Test;
+import math::Add;
 
 fn test() -> bool {
+    if 2.add(3) != 5 {
+        return false;
+    }
     return 0.trait_test();
 }
 

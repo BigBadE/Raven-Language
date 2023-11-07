@@ -218,7 +218,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                                   traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let data = inner.finalize(syntax.clone()).await;
-                if return_type.of_type(&data, None).await {
+                if return_type.of_type_sync(&data, None).0 {
                     let mut i = 0;
                     for found in &data.inner_struct().data.functions {
                         if found.name == method {
@@ -234,8 +234,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             format!("Unknown method {} in {}", method, data)));
                     }
                 }
-
-                let data = &data.inner_struct().data;
 
                 let try_get_impl = async || -> Result<Option<FinalizedEffects>, ParsingError> {
                     let result = ImplWaiter {
@@ -425,7 +423,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             if let Some(found) = &types {
                 for checking in &output {
                     let returning = checking.get_return(variables).unwrap();
-                    if !returning.of_type(found, Some(syntax.clone())).await {
+                    if !returning.of_type(found, syntax.clone()).await {
                         return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
                     }
                 }
@@ -490,17 +488,17 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
             let inner = returning.as_ref().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
 
-            if !inner.of_type(other, Some(syntax.clone())).await {
+            if !inner.of_type(other, syntax.clone()).await {
                 return false;
             }
 
             // Only downcast if an implementation was found. Don't downcast if they're of the same type.
-            if !inner.of_type(other, None).await {
+            if !inner.of_type_sync(other, None).0 {
                 // Handle downcasting
                 let temp = args.remove(i);
                 // Assumed to only be one function
                 let funcs = Syntax::get_implementation_methods(&syntax.lock().unwrap(),
-                                                               &temp.get_return(variables).unwrap(), &other.inner_struct().data).unwrap();
+                                                               &temp.get_return(variables).unwrap(), &other).unwrap();
 
                 // Make sure every function is finished adding
                 for func in funcs {

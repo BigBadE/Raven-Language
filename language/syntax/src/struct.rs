@@ -233,7 +233,7 @@ impl FinalizedStruct {
                     let name = name.clone();
                     let temp: &FinalizedTypes = generics.get(i).unwrap();
                     for bound in bounds {
-                        if !temp.of_type(&bound, Some(syntax.clone())).await {
+                        if !temp.of_type(&bound, syntax.clone()).await {
                             panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
                         }
                     }

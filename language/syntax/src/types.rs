@@ -1,7 +1,9 @@
 /// Contains all the code for interacting with types in Raven.
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::future::Future;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
@@ -67,7 +69,7 @@ impl Types {
             Types::Struct(structs) =>
                 {
                     FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await)
-                },
+                }
             Types::Reference(structs) =>
                 FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
             Types::Array(inner) => FinalizedTypes::Array(Box::new(inner.finalize(syntax).await)),
@@ -128,9 +130,9 @@ impl FinalizedTypes {
                 } else {
                     Some(output)
                 }
-            },
+            }
             FinalizedTypes::Array(_) => None
-        }
+        };
     }
 
     /// Assumes the type is a trait and returns its inner Chalk Trait data.
@@ -198,96 +200,164 @@ impl FinalizedTypes {
     /// Checks if the type is of the other type, following Raven's type rules.
     /// May block until all implementations are finished parsing, must not be called from
     /// implementation parsing to prevent deadlocking.
-    #[async_recursion]
-    pub async fn of_type(&self, other: &FinalizedTypes, syntax: Option<Arc<Mutex<Syntax>>>) -> bool {
+    pub async fn of_type(&self, other: &FinalizedTypes, syntax: Arc<Mutex<Syntax>>) -> bool {
+        let (result, future) = self.of_type_sync(other, Some(syntax));
+        return if result {
+            true
+        } else if let Some(found) = future {
+            found.await
+        } else {
+            false
+        }
+    }
+
+    /// This method doesn't block, instead it returns a future which can be waited on if a blocking
+    /// result is wanted. This waiter is only there is syntax is Some.
+    pub fn of_type_sync(&self, other: &FinalizedTypes, syntax: Option<Arc<Mutex<Syntax>>>) -> (bool, Option<Pin<Box<dyn Future<Output=bool> + Send + Sync>>>) {
         return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
                     if found == other_struct {
-                        true
+                        (true, None)
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         if syntax.is_none() {
-                            return false;
+                            return (false, None);
                         }
-                        return TypeWaiter {
+                        return (false, Some(Box::pin(TypeWaiter {
                             syntax: syntax.unwrap().clone(),
                             current: self.clone(),
                             other: other.clone(),
-                        }.await;
+                        })));
                     } else {
-                        false
+                        (false, None)
                     }
                 }
                 FinalizedTypes::Generic(_, bounds) => {
                     // If any bounds fail, the type isn't of the generic.
+                    let mut fails = Vec::new();
                     for bound in bounds {
-                        if !other.of_type(bound, syntax.clone()).await {
-                            return false;
+                        let (result, future) = other.of_type_sync(bound, syntax.clone());
+                        if !result {
+                            if let Some(found) = future {
+                                fails.push(found);
+                            } else {
+                                return (false, None);
+                            }
                         }
                     }
-                    true
+                    if !fails.is_empty() {
+                        return (false, Some(Box::pin(Self::join(fails))));
+                    }
+                    (true, None)
                 }
                 // For structures vs generic types, just check the base.
-                FinalizedTypes::GenericType(base, _) => self.of_type(base, syntax).await,
+                FinalizedTypes::GenericType(base, _) => self.of_type_sync(base, syntax),
                 // References are ignored for type checking.
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
-                FinalizedTypes::Array(_) => false
+                FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
+                FinalizedTypes::Array(_) => (false, None)
             },
             FinalizedTypes::Array(inner) => match other {
                 // Check the inner type.
-                FinalizedTypes::Array(other) => inner.of_type(other, syntax).await,
+                FinalizedTypes::Array(other) => inner.of_type_sync(other, syntax),
                 // References are ignored for type checking.
-                FinalizedTypes::Reference(other) => self.of_type(other, syntax).await,
+                FinalizedTypes::Reference(other) => self.of_type_sync(other, syntax),
                 // Only arrays can equal arrays
-                _ => false
+                _ => (false, None)
             },
             FinalizedTypes::GenericType(base, generics) => match other {
                 FinalizedTypes::GenericType(other_base, other_generics) => {
-                    if generics.len() != other_generics.len() || !base.of_type(other_base, syntax.clone()).await {
-                        return false;
+                    let mut fails = Vec::new();
+                    if generics.len() != other_generics.len() {
+                        let (result, future) = base.of_type_sync(other_base, syntax.clone());
+                        if !result {
+                            if let Some(found) = future {
+                                fails.push(found);
+                            } else {
+                                return (false, None);
+                            }
+                        }
                     }
 
                     for i in 0..generics.len() {
-                        if !generics[i].of_type(&other_generics[i], syntax.clone()).await {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-                FinalizedTypes::Generic(_, bounds) => {
-                    // Check each bound, if any are violated it's not of the generic type.
-                    for bound in bounds {
-                        if !self.of_type(bound, syntax.clone()).await {
-                            return false;
-                        }
-                    }
-                    true
-                }
-                // Against structures just check the base.
-                FinalizedTypes::Struct(_) => base.of_type(other, syntax).await,
-                // References are ignored for type checking.
-                FinalizedTypes::Reference(inner) => self.of_type(inner, syntax).await,
-                FinalizedTypes::Array(_) => false
-            }
-            // References are ignored for type checking.
-            FinalizedTypes::Reference(referencing) => referencing.of_type(other, syntax).await,
-            FinalizedTypes::Generic(_, bounds) => match other {
-                FinalizedTypes::Generic(_, other_bounds) => {
-                    // For two generics to be the same, each bound must match at least one other bound.
-                    'outer: for bound in bounds {
-                        for other_bound in other_bounds {
-                            if other_bound.of_type(bound, syntax.clone()).await {
-                                continue 'outer;
+                        let (result, future) = generics[i].of_type_sync(&other_generics[i], syntax.clone());
+                        if !result {
+                            if let Some(found) = future {
+                                fails.push(found);
+                            } else {
+                                return (false, None);
                             }
                         }
-                        return false;
                     }
-                    true
+                    if !fails.is_empty() {
+                        return (false, Some(Box::pin(Self::join(fails))));
+                    }
+                    (true, None)
+                }
+                FinalizedTypes::Generic(_, bounds) => {
+                    let mut fails = Vec::new();
+                    // Check each bound, if any are violated it's not of the generic type.
+                    for bound in bounds {
+                        let (result, future) = self.of_type_sync(bound, syntax.clone());
+                        if !result {
+                            if let Some(found) = future {
+                                fails.push(found);
+                            } else {
+                                return (false, None);
+                            }
+                        }
+                    }
+                    if !fails.is_empty() {
+                        return (false, Some(Box::pin(Self::join(fails))));
+                    }
+                    (true, None)
+                }
+                // Against structures just check the base.
+                FinalizedTypes::Struct(_) => base.of_type_sync(other, syntax),
+                // References are ignored for type checking.
+                FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
+                FinalizedTypes::Array(_) => (false, None)
+            }
+            // References are ignored for type checking.
+            FinalizedTypes::Reference(referencing) => referencing.of_type_sync(other, syntax),
+            FinalizedTypes::Generic(_, bounds) => match other {
+                FinalizedTypes::Generic(_, other_bounds) => {
+                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>> = Vec::new();
+                    // For two generics to be the same, each bound must match at least one other bound.
+                    'outer: for bound in bounds {
+                        let mut fails = Vec::new();
+                        for other_bound in other_bounds {
+                            let (result, failure) = other_bound.of_type_sync(bound, syntax.clone());
+                            if result {
+                                continue 'outer
+                            } else if let Some(found) = failure {
+                                fails.push(found);
+                            }
+                        }
+                        if !fails.is_empty() {
+                            outer_fails.push(Box::pin(Self::join(fails)));
+                        } else {
+                            return (false, None);
+                        }
+                    }
+                    if !outer_fails.is_empty() {
+                        return (false, Some(Box::pin(Self::join(outer_fails))));
+                    }
+
+                    (true, None)
                 }
                 // Flip it, because every other type handles generics already, no need to repeat the code.
-                _ => other.of_type(self, syntax).await
+                _ => other.of_type_sync(self, syntax)
             }
         };
+    }
+
+    pub async fn join(joining: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>>) -> bool {
+        for temp in joining {
+            if !temp.await {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Compares one type against another type to try and solidify any generic types.
@@ -300,7 +370,7 @@ impl FinalizedTypes {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.
                 for bound in bounds {
-                    if !other.of_type(bound, Some(syntax.clone())).await {
+                    if !other.of_type(bound, syntax.clone()).await {
                         bounds_error.message += &*format!(" {} and {}", other, bound);
                         return Err(bounds_error);
                     }
@@ -355,7 +425,7 @@ impl FinalizedTypes {
                 if let Some(found) = generics.get(name) {
                     // This should never trip, but it's a sanity check.
                     for bound in bounds {
-                        if !found.of_type(bound, Some(syntax.clone())).await {
+                        if !found.of_type(bound, syntax.clone()).await {
                             return Err(bounds_error);
                         }
                     }

@@ -194,7 +194,8 @@ fn create_if(effect: Effects, body: CodeBody,
     let mut body = body;
 
     // Maps the else body, if there is an else_if there needs to be an empty else to put the else if into.
-    let mut else_body = if let Some(body) = else_body {
+    let mut else_body = if let Some(mut body) = else_body {
+        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
         Some(body)
     } else if !else_ifs.is_empty() {
         Some(CodeBody::new(Vec::new(), id.to_string()))

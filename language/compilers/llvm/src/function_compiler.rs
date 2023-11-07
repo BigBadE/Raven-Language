@@ -438,7 +438,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                 let mut table = type_getter.vtable.clone();
                 let base = compile_effect(type_getter, function, base, id).unwrap();
                 let table = unsafe { Arc::get_mut_unchecked(&mut table) }
-                    .get_vtable(type_getter, &found, &target.inner_struct().data);
+                    .get_vtable(type_getter, &found, &target);
                 *id += 1;
 
                 let structure = type_getter.compiler.context.struct_type(

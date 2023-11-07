@@ -304,7 +304,7 @@ impl FinalizedEffects {
                 let implementation = ImplWaiter {
                     syntax: syntax.clone(),
                     return_type: implementor.clone(),
-                    data: found_trait.inner_struct().data.clone(),
+                    data: found_trait.clone(),
                     error: ParsingError::empty()
                 }.await?;
 

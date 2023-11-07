@@ -18,8 +18,8 @@ impl<'ctx> VTableManager<'ctx> {
         };
     }
 
-    pub fn get_vtable(&mut self, type_getter: &mut CompilerTypeGetter<'ctx>, structure: &FinalizedTypes, target: &Arc<StructData>) -> GlobalValue<'ctx> {
-        if let Some(found) = self.data.get(&(structure.inner_struct().data.clone(), target.clone())) {
+    pub fn get_vtable(&mut self, type_getter: &mut CompilerTypeGetter<'ctx>, structure: &FinalizedTypes, target: &FinalizedTypes) -> GlobalValue<'ctx> {
+        if let Some(found) = self.data.get(&(structure.inner_struct().data.clone(), target.inner_struct().data.clone())) {
             return found.clone();
         }
         let mut values = Vec::new();
@@ -36,7 +36,7 @@ impl<'ctx> VTableManager<'ctx> {
         let global = type_getter.compiler.module.add_global(value.get_type(),
                                                             Some(AddressSpace::default()), &format!("{}_vtable", structure.name));
         global.set_initializer(&value.as_basic_value_enum());
-        self.data.insert((structure.clone(), target.clone()), global);
-        return self.data.get(&(structure.clone(), target.clone())).unwrap().clone();
+        self.data.insert((structure.clone(), target.inner_struct().data.clone()), global);
+        return self.data.get(&(structure.clone(), target.inner_struct().data.clone())).unwrap().clone();
     }
 }

@@ -2,8 +2,7 @@ import stdio;
 import virtual-calls::Test;
 
 fn test() -> bool {
-    printf(virtual_call(0));
-    return true;
+    return virtual_call(0) == "Test";
 }
 
 trait Test {

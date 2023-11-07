@@ -13,13 +13,29 @@ fn test() -> bool {
         return false;
     }
 
+    if count == 2 {
+        count += 1;
+    } else {
+        return false;
+    }
+
+    if count != 3 {
+        return false;
+    } else {
+        count += 1;
+    }
+
     do {
         count += 1;
     } while count == 0;
 
-    while count < 5 {
+    while count < 10 {
         count += 1;
     }
 
-    return count == 5;
+    while count > 10 {
+        count += 1;
+    }
+
+    return count == 10;
 }

@@ -9,7 +9,6 @@ use std::sync::Mutex;
 use data::ParsingError;
 use crate::async_util::NameResolver;
 use crate::function::FunctionData;
-use crate::r#struct::StructData;
 use crate::types::FinalizedTypes;
 
 /// The async manager, just stores basic information about the current parsing state.
@@ -29,7 +28,7 @@ pub struct GetterManager {
 pub struct ImplWaiter {
     pub syntax: Arc<Mutex<Syntax>>,
     pub return_type: FinalizedTypes,
-    pub data: Arc<StructData>,
+    pub data: FinalizedTypes,
     pub error: ParsingError
 }
 
@@ -87,8 +86,7 @@ pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &B
                                               import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
             let value = value.finalize(syntax.clone()).await;
             if let Some(value) = syntax.lock().unwrap().get_implementation_methods(
-                &return_type,
-                &value.inner_struct().data) {
+                &return_type, &value) {
                 for temp in &value {
                     if &temp.name.split("::").last().unwrap() == method {
                         return Ok(Some(temp.clone()));
