@@ -4,7 +4,7 @@ use crate::tokens::util::{parse_acceptable, parse_numbers};
 
 /// Gets the next token in a block of code.
 pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
-    if let TokenTypes::Period = tokenizer.last.token_type {
+    if let TokenTypes::Period = tokenizer.last.token_type && tokenizer.buffer[tokenizer.index].is_ascii_alphabetic() {
         parse_acceptable(tokenizer, TokenTypes::CallingType)
     } else if tokenizer.matches(";") {
         tokenizer.make_token(TokenTypes::LineEnd)

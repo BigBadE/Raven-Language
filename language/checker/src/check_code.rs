@@ -314,8 +314,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                 // If it's a trait, handle virtual method calls.
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
+                    println!("Got return type {} from {:?}", return_type, calling);
                     finalized_effects.insert(0, calling);
-                    let method = Syntax::get_function(syntax.clone(), placeholder_error(String::new()),
+                    let method = Syntax::get_function(syntax.clone(), placeholder_error(
+                        format!("Failed to find method {}::{}", return_type.inner_struct().data.name, method)),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
 
