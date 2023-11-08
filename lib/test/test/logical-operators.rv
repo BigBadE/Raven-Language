@@ -2,5 +2,21 @@ fn test() -> bool {
     let t = true;
     let f = false;
 
+    if f || f {
+        return false;
+    }
+
+    if !(f || t) {
+        return false;
+    }
+
+    if f && f || f && t || t && f{
+        return false;
+    }
+
+    if t && t ^^ t && t {
+        return false;
+    }
+
     return t && f || t ^^ t && f;
 }
