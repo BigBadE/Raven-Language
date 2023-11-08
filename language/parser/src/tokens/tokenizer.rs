@@ -37,7 +37,7 @@ impl<'a> Tokenizer<'a> {
             index: 0,
             line: 1,
             line_index: 0,
-            last: Token::new(TokenTypes::Start, None, (0, 0), 0, (0, 0), 0),
+            last: Token::new(TokenTypes::Start, None, (1, 0), 0, (1, 0), 0),
             len: buffer.len(),
             buffer,
             code_data: None
@@ -165,8 +165,6 @@ impl<'a> Tokenizer<'a> {
         loop {
             self.index += 1;
             if self.index == self.len || self.buffer[self.index] == b'\n' {
-                self.line_index = self.index as u32;
-                self.line += 1;
                 break;
             }
         }

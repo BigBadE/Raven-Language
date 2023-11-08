@@ -122,22 +122,40 @@ trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(30)]
+#[priority(-10)]
 #[operation({}&{})]
 trait BitAnd<E, C> {
     fn bit_and(self, other: E) -> C;
 }
 
-#[priority(20)]
+#[priority(-11)]
 #[operation({}^{})]
 trait BitXOR<E, C> {
     fn bit_xor(self, other: E) -> C;
 }
 
-#[priority(10)]
+#[priority(-12)]
 #[operation({}|{})]
 trait BitOr<E, C> {
     fn bit_or(self, other: E) -> C;
+}
+
+#[priority(-13)]
+#[operation({}&&{})]
+trait And<E, C> {
+    fn and(self, other: E) -> bool;
+}
+
+#[priority(-14)]
+#[operation({}^^{})]
+trait XOR<E, C> {
+    fn xor(self, other: E) -> bool;
+}
+
+#[priority(-15)]
+#[operation({}||{})]
+trait Or<E, C> {
+    fn or(self, other: E) -> bool;
 }
 
 #[priority(10)]
@@ -241,6 +259,24 @@ pub internal impl<T: Number> BitAnd<T, T> for T {
 
 pub internal impl<T: Number> BitXOR<T, T> for T {
     fn bit_xor(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> And<T, T> for T {
+    fn and(self, other: T) -> bool {
+
+    }
+}
+
+pub internal impl<T: Number> Or<T, T> for T {
+    fn or(self, other: T) -> bool {
+
+    }
+}
+
+pub internal impl<T: Number> XOR<T, T> for T {
+    fn xor(self, other: T) -> bool {
 
     }
 }

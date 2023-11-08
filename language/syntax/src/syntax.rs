@@ -371,24 +371,26 @@ impl Syntax {
                     let first = Self::get_struct(syntax.clone(), error.clone(),
                                                  first.to_string(), name_resolver.boxed_clone(), vec!()).await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
-                    i += size;
+                    return Ok((i + size, found));
                 }
                 b',' => {
                     let getting = String::from_utf8_lossy(&input[last..i]);
                     found.push(Self::get_struct(syntax.clone(), error.clone(),
                                                 getting.to_string(), name_resolver.boxed_clone(), vec!()).await?);
-                    last = i;
+                    last = i+1;
                 }
-                b'>' => return Ok((i, found)),
+                b'>' => {
+                    let first = String::from_utf8_lossy(&input[last..i]);
+                    found.push(Self::get_struct(syntax.clone(), error.clone(),
+                                                first.to_string(), name_resolver.boxed_clone(), vec!()).await?);
+                    return Ok((i, found))
+                },
                 _ => {}
             }
             i += 1;
         }
 
-        let end = String::from_utf8_lossy(&input[last..]);
-        found.push(Self::get_struct(syntax.clone(), error.clone(),
-                                    end.to_string(), name_resolver.boxed_clone(), vec!()).await?);
-        return Ok((input.len(), found));
+        panic!("Expected a < in this bound!")
     }
 
     /// Parses an UnparsedType into a Types

@@ -58,7 +58,6 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 
-
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
         return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
@@ -66,7 +65,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
 
-    let mut code = verify_code(process_manager, &resolver, code, syntax,
+    let mut code = verify_code(process_manager, &resolver, code, &codeless.return_type, syntax,
                                &mut variable_manager, include_refs, true).await?;
 
     if !code.returns {

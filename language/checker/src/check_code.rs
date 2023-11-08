@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
-use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError};
+use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
+use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError, ProcessManager};
 use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
 use syntax::async_util::{AsyncDataGetter, NameResolver};
@@ -12,7 +12,7 @@ use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
 
-pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody,
+pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody, return_type: &Option<FinalizedTypes>,
                          syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool, top: bool) -> Result<FinalizedCodeBody, ParsingError> {
     let mut body = Vec::new();
     let mut found_end = false;
@@ -25,9 +25,29 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 
         body.push(FinalizedExpression::new(line.expression_type,
                                            verify_effect(process_manager, resolver.boxed_clone(),
-                                                         line.effect, syntax, variables, references).await?));
+                                                         line.effect, return_type, syntax, variables, references).await?));
 
         if let ExpressionType::Return = line.expression_type {
+            if let Some(return_type) = return_type {
+                let mut last = body.pop().unwrap();
+                let last_type = last.effect.get_return(variables).unwrap();
+                // Only downcast types that don't match and aren't generic
+                if last_type != *return_type && last_type.name_safe().is_some() {
+                    if last_type.of_type(return_type, syntax.clone()).await {
+                        ImplWaiter {
+                            syntax: syntax.clone(),
+                            return_type: last_type.clone(),
+                            data: return_type.clone(),
+                            error: placeholder_error(format!("You shouldn't see this! Report this!")),
+                        }.await?;
+                        last = FinalizedExpression::new(ExpressionType::Return,
+                                                         FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone()));
+                    } else {
+                        return Err(placeholder_error(format!("Expected {}, found {}", return_type, last_type)))
+                    }
+                }
+                body.push(last);
+            }
             return Ok(FinalizedCodeBody::new(body, code.label.clone(), true));
         }
     }
@@ -40,17 +60,17 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
 }
 
 #[async_recursion]
-async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects,
+async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>, effect: Effects, return_type: &Option<FinalizedTypes>,
                        syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool) -> Result<FinalizedEffects, ParsingError> {
     let output = match effect {
-        Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, syntax, variables, references).await?,
+        Effects::Paren(inner) => verify_effect(process_manager, resolver, *inner, return_type, syntax, variables, references).await?,
         Effects::CodeBody(body) =>
-            FinalizedEffects::CodeBody(verify_code(process_manager, &resolver, body, syntax, &mut variables.clone(), references, false).await?),
+            FinalizedEffects::CodeBody(verify_code(process_manager, &resolver, body, return_type, syntax, &mut variables.clone(), references, false).await?),
         Effects::Set(first, second) => {
             FinalizedEffects::Set(Box::new(
-                verify_effect(process_manager, resolver.boxed_clone(), *first, syntax, variables, references).await?),
+                verify_effect(process_manager, resolver.boxed_clone(), *first, return_type, syntax, variables, references).await?),
                                   Box::new(
-                                      verify_effect(process_manager, resolver, *second, syntax, variables, references).await?))
+                                      verify_effect(process_manager, resolver, *second, return_type, syntax, variables, references).await?))
         }
         Effects::Operation(operation, mut values) => {
             let error = ParsingError::new(String::new(), (0, 0), 0,
@@ -198,32 +218,44 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
                                                       String::new(), values, None),
-                          syntax, variables, references).await?
+                          return_type, syntax, variables, references).await?
         }
         Effects::ImplementationCall(calling, traits, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
-                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables, references).await?)
+                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?)
             }
 
-            let return_type;
+            let finding_return_type;
             if let Effects::NOP() = *calling {
-                return_type = FinalizedTypes::Struct(VOID.clone());
+                finding_return_type = FinalizedTypes::Struct(VOID.clone(), None);
             } else {
-                let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, syntax, variables, references).await?;
-                return_type = found.get_return(variables).unwrap();
+                let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, return_type, syntax, variables, references).await?;
+                finding_return_type = found.get_return(variables).unwrap();
                 finalized_effects.insert(0, found);
             }
 
             if let Ok(inner) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                                   traits.clone(), resolver.boxed_clone(), vec!()).await {
                 let data = inner.finalize(syntax.clone()).await;
-                if return_type.of_type_sync(&data, None).0 {
+                if finding_return_type.of_type_sync(&data, None).0 {
                     let mut i = 0;
                     for found in &data.inner_struct().data.functions {
                         if found.name == method {
                             return Ok(FinalizedEffects::VirtualCall(i,
                                                                     AsyncDataGetter::new(syntax.clone(), found.clone()).await,
+                                                                    finalized_effects));
+                        } else if found.name.split("::").last().unwrap() == method {
+                            let target = finding_return_type.inner_struct().data.functions.iter()
+                                .find(|inner| inner.name.split("::").last().unwrap() == method).unwrap();
+                            syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                                degeneric_header(target.clone(),
+                                                 found.clone(), syntax.clone(), process_manager.cloned(),
+                                                 finalized_effects.clone(), variables.clone()));
+
+                            let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
+                            return Ok(FinalizedEffects::VirtualCall(i,
+                                                                    output,
                                                                     finalized_effects));
                         }
                         i += 1;
@@ -238,14 +270,14 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 let try_get_impl = async || -> Result<Option<FinalizedEffects>, ParsingError> {
                     let result = ImplWaiter {
                         syntax: syntax.clone(),
-                        return_type: return_type.clone(),
+                        return_type: finding_return_type.clone(),
                         data: data.clone(),
                         error: placeholder_error(
-                            format!("Nothing implements {} for {}", inner, return_type)),
+                            format!("Nothing implements {} for {}", inner, finding_return_type)),
                     }.await?;
 
                     for temp in &result {
-                        if temp.name == method || method.is_empty() {
+                        if temp.name.split("::").last().unwrap() == method || method.is_empty() {
                             let method = AsyncDataGetter::new(syntax.clone(), temp.clone()).await;
 
                             let returning = match &returning {
@@ -272,6 +304,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     output = try_get_impl().await?;
                 }
 
+                if output.is_none() {
+                    panic!("Failed for {} and {}", finding_return_type, data);
+                }
                 output.unwrap()
             } else {
                 panic!("Screwed up trait! {} for {:?}", traits, resolver.imports());
@@ -280,12 +315,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::MethodCall(calling, method, effects, returning) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
-                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables, references).await?)
+                finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?)
             }
 
             // Finds methods based off the calling type.
             let method = if let Some(found) = calling {
-                let calling = verify_effect(process_manager, resolver.boxed_clone(), *found, syntax, variables, references).await?;
+                let calling = verify_effect(process_manager, resolver.boxed_clone(), *found, return_type, syntax, variables, references).await?;
                 let return_type = calling.get_return(variables).unwrap();
 
                 // If it's generic, check its trait bounds for the method
@@ -314,8 +349,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
                 // If it's a trait, handle virtual method calls.
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
-                    println!("Got return type {} from {:?}", return_type, calling);
                     finalized_effects.insert(0, calling);
+
                     let method = Syntax::get_function(syntax.clone(), placeholder_error(
                         format!("Failed to find method {}::{}", return_type.inner_struct().data.name, method)),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
@@ -361,7 +396,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
-                verify_effect(process_manager, resolver, *effect, syntax, variables, references).await?),
+                verify_effect(process_manager, resolver, *effect, return_type, syntax, variables, references).await?),
                                           first, second),
         Effects::CreateStruct(target, effects) => {
             let target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
@@ -382,20 +417,20 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     return Err(placeholder_error(format!("Unknown field {}!", field_name)));
                 }
 
-                final_effects.push((i, verify_effect(process_manager, resolver.boxed_clone(), effect, syntax, variables, references).await?));
+                final_effects.push((i, verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?));
             }
 
             FinalizedEffects::CreateStruct(Some(Box::new(FinalizedEffects::HeapAllocate(target.clone()))),
                                            target, final_effects)
         }
         Effects::Load(effect, target) => {
-            let output = verify_effect(process_manager, resolver, *effect, syntax, variables, references).await?;
+            let output = verify_effect(process_manager, resolver, *effect, return_type, syntax, variables, references).await?;
 
             let types = output.get_return(variables).unwrap().inner_struct().clone();
             FinalizedEffects::Load(Box::new(output), target.clone(), types)
         }
         Effects::CreateVariable(name, effect) => {
-            let effect = verify_effect(process_manager, resolver, *effect, syntax, variables, references).await?;
+            let effect = verify_effect(process_manager, resolver, *effect, return_type, syntax, variables, references).await?;
             let found;
             if let Some(temp_found) = effect.get_return(variables) {
                 found = temp_found;
@@ -418,7 +453,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let mut output = Vec::new();
             for effect in effects {
                 output.push(verify_effect(process_manager, resolver.boxed_clone(), effect,
-                                          syntax, variables, references).await?);
+                                          return_type, syntax, variables, references).await?);
             }
 
             let types = output.get(0).map(|found| found.get_return(variables).unwrap());
@@ -437,6 +472,67 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
     return Ok(output);
 }
 
+async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<FunctionData>, syntax: Arc<Mutex<Syntax>>,
+                          mut manager: Box<dyn ProcessManager>, arguments: Vec<FinalizedEffects>, variables: SimpleVariableManager) -> Result<(), ParsingError> {
+    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter {
+        getting: base,
+        syntax: syntax.clone(),
+    }.await;
+
+    if let FinalizedTypes::GenericType(_, generics) = arguments[0].get_return(&variables).unwrap().unflatten() {
+        assert_eq!(function.generics.len(), generics.len());
+
+        let mut iterator = function.generics.iter();
+        for generic in generics {
+            let (name, bounds) = iterator.next().unwrap();
+            manager.mut_generics().insert(name.clone(), generic);
+        }
+    } else {
+        panic!("Wrong type! {:?}", arguments[0].get_return(&variables).unwrap().unflatten())
+    }
+
+    // Copy the method and degeneric every type inside of it.
+    let mut new_method = CodelessFinalizedFunction::clone(&function);
+    // Delete the generics because now they are all solidified.
+    new_method.generics.clear();
+    new_method.data = degenericed;
+
+    // Degeneric the arguments.
+    for arguments in &mut new_method.arguments {
+        arguments.field.field_type.degeneric(&manager.generics(), &syntax,
+                                             placeholder_error(format!("No generic in {}", new_method.data.name)),
+                                             placeholder_error("Invalid bounds!".to_string())).await?;
+    }
+
+    // Degeneric the return type if there is one.
+    if let Some(returning) = &mut new_method.return_type {
+        returning.degeneric(&manager.generics(), &syntax,
+                            placeholder_error(format!("No generic in {}", new_method.data.name)),
+                            placeholder_error("Invalid bounds!".to_string())).await?;
+    }
+
+    let mut locked = syntax.lock().unwrap();
+    locked.functions.types.insert(new_method.data.name.clone(), new_method.data.clone());
+    let new_method = Arc::new(new_method);
+    locked.functions.data.insert(new_method.data.clone(), new_method.clone());
+
+    if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
+        for waker in wakers {
+            waker.wake_by_ref();
+        }
+    }
+    locked.functions.wakers.remove(&new_method.data.name);
+
+    // Give the compiler the empty body
+    locked.compiling.write().unwrap().insert(new_method.data.name.clone(),
+                                             Arc::new(CodelessFinalizedFunction::clone(&new_method).add_code(
+                                                 FinalizedCodeBody::new(vec!(), "empty".to_string(), true))));
+    for waker in &locked.compiling_wakers {
+        waker.wake_by_ref();
+    }
+    locked.compiling_wakers.clear();
+    return Ok(());
+}
 
 fn store(effect: FinalizedEffects) -> FinalizedEffects {
     return FinalizedEffects::HeapStore(Box::new(effect));
@@ -498,9 +594,14 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
             if !inner.of_type_sync(other, None).0 {
                 // Handle downcasting
                 let temp = args.remove(i);
+                let return_type = temp.get_return(variables).unwrap();
                 // Assumed to only be one function
-                let funcs = Syntax::get_implementation_methods(&syntax.lock().unwrap(),
-                                                               &temp.get_return(variables).unwrap(), &other).unwrap();
+                let funcs = ImplWaiter {
+                    syntax: syntax.clone(),
+                    return_type,
+                    data: other.clone(),
+                    error: placeholder_error(format!("Failed to find impl! Report this!")),
+                }.await.unwrap();
 
                 // Make sure every function is finished adding
                 for func in funcs {

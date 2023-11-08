@@ -1,19 +1,21 @@
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::sync::Mutex;
+
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
-use syntax::syntax::Syntax;
-use crate::function_compiler::{compile_block, instance_function};
 
-use std::sync::Mutex;
-use std::sync::{Arc, RwLock};
 use data::CompilerArguments;
 use syntax::async_util::EmptyNameResolver;
 use syntax::function::FinalizedFunction;
 use syntax::ParsingError;
 use syntax::r#struct::FinalizedStruct;
+use syntax::syntax::Syntax;
+
+use crate::function_compiler::{compile_block, instance_function};
 use crate::main_future::MainFuture;
 use crate::type_getter::CompilerTypeGetter;
 

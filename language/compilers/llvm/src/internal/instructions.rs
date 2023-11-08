@@ -108,7 +108,6 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     } else if name.starts_with("math::Remainder") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
-        //? should name.ends_with("u64") be replaced with is_unsigned(name)?
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
                                                     compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
@@ -201,24 +200,34 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                                                    compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::BitXOR") {
+    }  else if name.starts_with("math::And") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let malloc = malloc_type(type_getter,
+                                 type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
+
+        let returning = compiler.builder.build_and(compiler.builder.build_load(pointer_type, "2").into_int_value(),
+                                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
+    }   else if name.starts_with("math::XOR") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter,
+                                 type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
 
         let returning = compiler.builder.build_xor(compiler.builder.build_load(pointer_type, "2").into_int_value(),
                                                    compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::BitXOR") {
+    }   else if name.starts_with("math::Or") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let malloc = malloc_type(type_getter,
+                                 type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
 
-        let returning = compiler.builder.build_xor(compiler.builder.build_load(pointer_type, "2").into_int_value(),
-                                                       compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+        let returning = compiler.builder.build_or(compiler.builder.build_load(pointer_type, "2").into_int_value(),
+                                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    }
-    else {
+    } else {
         panic!("Unknown internal operation: {}", name)
     }
 }

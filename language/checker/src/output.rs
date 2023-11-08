@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc; use std::sync::Mutex;
-
-use tokio::runtime::Handle;
-
 use async_trait::async_trait;
 
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use syntax::ProcessManager;
-use syntax::async_util::NameResolver;
+use syntax::async_util::{HandleWrapper, NameResolver};
 use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
@@ -16,13 +13,13 @@ use crate::check_struct::verify_struct;
 
 #[derive(Clone)]
 pub struct TypesChecker {
-    runtime: Handle,
+    runtime: Arc<Mutex<HandleWrapper>>,
     pub generics: HashMap<String, FinalizedTypes>,
     include_refs: bool
 }
 
 impl TypesChecker {
-    pub fn new(runtime: Handle, include_refs: bool) -> Self {
+    pub fn new(runtime: Arc<Mutex<HandleWrapper>>, include_refs: bool) -> Self {
         return Self {
             runtime,
             generics: HashMap::new(),
@@ -33,7 +30,7 @@ impl TypesChecker {
 
 #[async_trait]
 impl ProcessManager for TypesChecker {
-    fn handle(&self) -> &Handle {
+    fn handle(&self) -> &Arc<Mutex<HandleWrapper>> {
         return &self.runtime;
     }
 

@@ -19,7 +19,6 @@ use crate::syntax::Syntax;
 /// Will never deadlock because types are added to the AsyncGetter before being finalized.
 pub struct AsyncTypesGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
-
     pub error: ParsingError,
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>,
