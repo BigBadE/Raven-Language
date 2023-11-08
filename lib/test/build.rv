@@ -2,12 +2,6 @@ import magpie;
 import array;
 
 // Testing
-// One
-// Two
-// Three
-// Four
-// Five
-// Six
 pub fn project() -> RavenProject {
     return new RavenProject {
         name: "Test",
