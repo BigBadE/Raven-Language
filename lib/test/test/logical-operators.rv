@@ -1,0 +1,6 @@
+fn test() -> bool {
+    let t = true;
+    let f = false;
+
+    return t && f || t ^^ t && f;
+}
