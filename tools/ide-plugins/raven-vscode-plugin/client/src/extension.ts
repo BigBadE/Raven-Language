@@ -4,15 +4,21 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as path from 'path';
-import { ExtensionContext, Uri, workspace } from 'vscode';
+import { ExtensionContext } from 'vscode';
+
+import {
+	LanguageClientOptions,
+	StaticFeature,
+	FeatureState,
+	ClientCapabilities,
+	ServerCapabilities,
+	DocumentSelector
+} from 'vscode-languageclient';
 
 import {
 	LanguageClient,
-	LanguageClientOptions,
-	ServerOptions,
-	Executable,
-	TransportKind
-} from 'vscode-languageclient';
+	ServerOptions
+} from 'vscode-languageclient/node';
 
 let client: LanguageClient;
 
@@ -45,8 +51,29 @@ export async function activate(context: ExtensionContext) {
 		clientOptions
 	);
 
+    client.registerFeature(new OverrideFeatures());
 	// Start the client. This will also launch the server
 	client.start();
+}
+
+class OverrideFeatures implements StaticFeature {
+    getState(): FeatureState {
+        return { kind: "static" };
+    }
+    fillClientCapabilities(capabilities: ClientCapabilities): void {
+        // Force disable `augmentsSyntaxTokens`, VSCode's textmate grammar is somewhat incomplete
+        // making the experience generally worse
+        const caps = capabilities.textDocument?.semanticTokens;
+        if (caps) {
+            caps.augmentsSyntaxTokens = false;
+        }
+    }
+    initialize(
+        _capabilities: ServerCapabilities,
+        _documentSelector: DocumentSelector | undefined,
+    ): void {}
+    dispose(): void {}
+    clear(): void {}
 }
 
 export function deactivate(): Thenable<void> | undefined {
