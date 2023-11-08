@@ -4,41 +4,42 @@ import numbers;
 /// 1000 - Single Value Operations
 /// 100 - Multiplication/Division
 /// 10 - Addition/Subtraction
-/// 0 - Equality Operators
-/// -10 - Bitwise/Logical Operators
+/// 0  - Bitwise Operators
+/// -10 - Equality Operators
+/// -20 - Logical Operators
 /// -100 - Assignment
-#[priority(0)]
+#[priority(-10)]
 #[operation({}=={})]
 trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}>{})]
 trait GreaterThan<T> {
     fn greater_than(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}<{})]
 trait LessThan<T> {
     fn less_than(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}<={})]
 trait LessOrEqual<T> {
     fn less_or_equal(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}>={})]
 trait GreaterOrEqual<T> {
     fn greater_or_equal(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}!={})]
 trait NotEqual<T> {
     fn not_equal(self, other: T) -> bool;
@@ -122,19 +123,19 @@ trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(-10)]
+#[priority(10)]
 #[operation({}&{})]
 trait BitAnd<E, C> {
     fn bit_and(self, other: E) -> C;
 }
 
-#[priority(-11)]
+#[priority(9)]
 #[operation({}^{})]
 trait BitXOR<E, C> {
     fn bit_xor(self, other: E) -> C;
 }
 
-#[priority(-12)]
+#[priority(8)]
 #[operation({}|{})]
 trait BitOr<E, C> {
     fn bit_or(self, other: E) -> C;
