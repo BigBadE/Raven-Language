@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use lsp_server::{Connection, ExtractError, Message, Request, RequestId};
-use lsp_types::{InitializeParams, PositionEncodingKind, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, SemanticTokenType, ServerCapabilities};
+use lsp_types::{InitializeParams, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, SemanticTokenType, ServerCapabilities};
 use lsp_types::request::SemanticTokensFullRequest;
 use tokio::runtime::Builder;
 
@@ -19,7 +19,12 @@ pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
             work_done_progress_options: Default::default(),
             legend: SemanticTokensLegend {
-                token_types: vec!(SemanticTokenType::CLASS, SemanticTokenType::COMMENT),
+                token_types: vec!(SemanticTokenType::NAMESPACE, SemanticTokenType::TYPE, SemanticTokenType::CLASS, SemanticTokenType::ENUM,
+                                  SemanticTokenType::INTERFACE, SemanticTokenType::STRUCT, SemanticTokenType::TYPE_PARAMETER, SemanticTokenType::PARAMETER,
+                                  SemanticTokenType::VARIABLE, SemanticTokenType::PROPERTY, SemanticTokenType::ENUM_MEMBER, SemanticTokenType::EVENT,
+                                  SemanticTokenType::FUNCTION, SemanticTokenType::METHOD, SemanticTokenType::MACRO, SemanticTokenType::KEYWORD,
+                                  SemanticTokenType::MODIFIER, SemanticTokenType::COMMENT, SemanticTokenType::STRING, SemanticTokenType::NUMBER,
+                                  SemanticTokenType::REGEXP, SemanticTokenType::OPERATOR, SemanticTokenType::DECORATOR),
                 token_modifiers: vec!(),
             },
             range: None,
@@ -39,7 +44,7 @@ fn main_loop(
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let pool = Builder::new_multi_thread().build().unwrap();
     let params: InitializeParams = serde_json::from_value(params).unwrap();
-    if params.capabilities.text_document.unwrap().semantic_tokens.unwrap().augments_syntax_tokens.unwrap() {
+    if params.capabilities.text_document.clone().unwrap().semantic_tokens.unwrap().augments_syntax_tokens.unwrap() {
         panic!("Augmenting syntax tokens!")
     }
 

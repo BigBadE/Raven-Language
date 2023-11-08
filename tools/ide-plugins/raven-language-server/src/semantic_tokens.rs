@@ -20,14 +20,18 @@ pub async fn parse_semantic_tokens(id: RequestId, file: Url, sender: Sender<Mess
         }
     }
 
-    let mut last = None;
-    let data = tokens.iter().map(|token| {
-        eprintln!("Line ({}, {}) to ({}, {}) for {:?}", token.start.0, token.start.1, token.end.0, token.end.1, token.token_type);
-        let delta_line = (token.start.0 - 1) - last.map(|inner: &Token| inner.start.0 - 1).unwrap_or(0);
+    let mut last: Option<Token> = None;
+    let data = tokens.into_iter().map(|mut token| {
+        if token.start.0 != token.end.0 {
+            token.start = (token.end.0, 0);
+        }
+        let delta_line = (token.start.0 - 1) - last.clone().map(|inner| inner.start.0 - 1).unwrap_or(0);
+        eprintln!("Line ({}, {}) to ({}, {}) for {:?} ({})", token.start.0, token.start.1, token.end.0, token.end.1, token.token_type,
+                  token.start_offset - last.clone().map(|inner| inner.end_offset).unwrap_or(0));
         let temp = SemanticToken {
             delta_line,
             delta_start: if delta_line == 0 {
-                token.start_offset - last.map(|inner| inner.start_offset).unwrap_or(0)
+                (token.start_offset - last.clone().map(|inner| inner.start_offset).unwrap_or(0)) / 2
             } else {
                 0
             } as u32 * 2,
@@ -48,8 +52,16 @@ pub async fn parse_semantic_tokens(id: RequestId, file: Url, sender: Sender<Mess
 }
 
 fn get_token(token_type: &TokenTypes) -> u32 {
-    return match token_type {
-        TokenTypes::Comment => 1,
-        _ => 0
+    let temp = match token_type {
+        TokenTypes::Identifier => 1,
+        TokenTypes::Variable => 9,
+        TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New | TokenTypes::Modifier |
+        TokenTypes::ReturnType | TokenTypes::FunctionStart => 15,
+        TokenTypes::Comment => 17,
+        TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => 18,
+        TokenTypes::ReturnTypeArrow | TokenTypes::ImportEnd => 100,
+        _ => (token_type.clone() as u32) % 21
     };
+    eprintln!("{:?}: {}", token_type, temp);
+    return temp;
 }

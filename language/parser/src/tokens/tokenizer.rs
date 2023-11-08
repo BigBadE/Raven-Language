@@ -165,7 +165,6 @@ impl<'a> Tokenizer<'a> {
         loop {
             self.index += 1;
             if self.index == self.len || self.buffer[self.index] == b'\n' {
-                self.line_index = self.index as u32;
                 break;
             }
         }
