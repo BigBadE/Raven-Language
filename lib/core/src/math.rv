@@ -4,41 +4,42 @@ import numbers;
 /// 1000 - Single Value Operations
 /// 100 - Multiplication/Division
 /// 10 - Addition/Subtraction
-/// 0 - Equality Operators
-/// -10 - Bitwise/Logical Operators
+/// 0  - Bitwise Operators
+/// -10 - Equality Operators
+/// -20 - Logical Operators
 /// -100 - Assignment
-#[priority(0)]
+#[priority(-10)]
 #[operation({}=={})]
 trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}>{})]
 trait GreaterThan<T> {
     fn greater_than(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}<{})]
 trait LessThan<T> {
     fn less_than(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}<={})]
 trait LessOrEqual<T> {
     fn less_or_equal(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}>={})]
 trait GreaterOrEqual<T> {
     fn greater_or_equal(self, other: T) -> bool;
 }
 
-#[priority(0)]
+#[priority(-10)]
 #[operation({}!={})]
 trait NotEqual<T> {
     fn not_equal(self, other: T) -> bool;
@@ -98,13 +99,67 @@ trait DivideAndAssign<E, C> {
     fn divide_assign(self, other: E) -> C;
 }
 
+#[priority(-100)]
+#[operation({}&={})]
+trait AndAndAssign<E, C> {
+    fn and_assign(self, other: E) -> C;
+}
+
+#[priority(-100)]
+#[operation({}|={})]
+trait OrAndAssign<E, C> {
+    fn or_assign(self, other: E) -> C;
+}
+
+#[priority(-100)]
+#[operation({}^={})]
+trait XORAndAssign<E, C> {
+    fn xor_assign(self, other: E) -> C;
+}
+
 #[priority(100)]
 #[operation({}%{})]
 trait Remainder<E, C> {
     fn remainder(self, other: E) -> C;
 }
 
-#[priority(-100)]
+#[priority(10)]
+#[operation({}&{})]
+trait BitAnd<E, C> {
+    fn bit_and(self, other: E) -> C;
+}
+
+#[priority(9)]
+#[operation({}^{})]
+trait BitXOR<E, C> {
+    fn bit_xor(self, other: E) -> C;
+}
+
+#[priority(8)]
+#[operation({}|{})]
+trait BitOr<E, C> {
+    fn bit_or(self, other: E) -> C;
+}
+
+#[priority(-13)]
+#[operation({}&&{})]
+trait And<E, C> {
+    fn and(self, other: E) -> bool;
+}
+
+#[priority(-14)]
+#[operation({}^^{})]
+trait XOR<E, C> {
+    fn xor(self, other: E) -> bool;
+}
+
+#[priority(-15)]
+#[operation({}||{})]
+trait Or<E, C> {
+    fn or(self, other: E) -> bool;
+}
+
+#[priority(10)]
 #[operation({}%={})]
 trait RemainderAndAssign<E, C> {
     fn remainder_assign(self, other: E) -> C;
@@ -142,6 +197,27 @@ pub impl<T: Add<E, T>, E> AddAndAssign<E, T> for T {
     }
 }
 
+pub impl<T: BitAnd<E, T>, E> AndAndAssign<E, T> for T {
+    fn and_assign(self, other: E) -> T {
+        self = self.bit_and(other);
+        return self;
+    }
+}
+
+pub impl<T: BitOr<E, T>, E> OrAndAssign<E, T> for T {
+    fn or_assign(self, other: E) -> T {
+        self = self.bit_or(other);
+        return self;
+    }
+}
+
+pub impl<T: BitXOR<E, T>, E> XORAndAssign<E, T> for T {
+    fn xor_assign(self, other: E) -> T {
+        self = self.bit_xor(other);
+        return self;
+    }
+}
+
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number> Subtract<T, T> for T {
     fn subtract(self, other: T) -> T {
@@ -167,6 +243,42 @@ pub impl<T: Multiply<E, T>, E> MultiplyAndAssign<E, T> for T {
     fn multiply_assign(self, other: E) -> T {
         self = self.multiply(other);
         return self;
+    }
+}
+
+pub internal impl<T: Number> BitOr<T, T> for T {
+    fn bit_or(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> BitAnd<T, T> for T {
+    fn bit_and(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> BitXOR<T, T> for T {
+    fn bit_xor(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> And<T, T> for T {
+    fn and(self, other: T) -> bool {
+
+    }
+}
+
+pub internal impl<T: Number> Or<T, T> for T {
+    fn or(self, other: T) -> bool {
+
+    }
+}
+
+pub internal impl<T: Number> XOR<T, T> for T {
+    fn xor(self, other: T) -> bool {
+
     }
 }
 

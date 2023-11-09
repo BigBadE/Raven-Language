@@ -1,7 +1,19 @@
 import stdio;
 
 fn main() {
-    for i in 0..5 {
-        printf("Test!");
+    let a = 1;
+    let b = 2;
+    a |= 2;
+    if test() {
+        printf("Yep!");
+    } else {
+        printf("No!");
     }
+}
+
+fn test() -> bool {
+    let t = true;
+    let f = false;
+
+    return t && f || t ^^ t && f;
 }
