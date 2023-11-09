@@ -226,12 +226,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?)
             }
 
-            let finding_return_type;
+            let mut finding_return_type;
             if let Effects::NOP() = *calling {
                 finding_return_type = FinalizedTypes::Struct(VOID.clone(), None);
             } else {
                 let found = verify_effect(process_manager, resolver.boxed_clone(), *calling, return_type, syntax, variables, references).await?;
                 finding_return_type = found.get_return(variables).unwrap();
+                finding_return_type.fix_generics(&resolver, syntax).await?;
                 finalized_effects.insert(0, found);
             }
 
@@ -254,7 +255,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             }
                             let (_, target) = target.pop().unwrap();
 
-                            if let FinalizedTypes::Generic(_, _) = finalized_effects[0].get_return(variables).unwrap().unflatten() {
+                            let return_type = finalized_effects[0].get_return(variables).unwrap().unflatten();
+                            if let FinalizedTypes::Generic(_, _) = return_type {
                                 return Ok(FinalizedEffects::GenericVirtualCall(i, target,
                                                                                AsyncDataGetter::new(syntax.clone(), found.clone()).await,
                                                                                finalized_effects));

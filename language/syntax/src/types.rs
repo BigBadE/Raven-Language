@@ -5,15 +5,18 @@ use std::future::Future;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::Mutex;
+
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
-use std::sync::Mutex;
+
 use async_recursion::async_recursion;
-use crate::function::{display, display_parenless, FunctionData};
+
 use crate::{is_modifier, Modifier, ParsingError, StructData, TopElement};
-use crate::async_util::AsyncDataGetter;
+use crate::async_util::{AsyncDataGetter, NameResolver};
 use crate::chalk_interner::ChalkIr;
 use crate::code::FinalizedMemberField;
+use crate::function::{display, display_parenless, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 use crate::top_element_manager::TypeWaiter;
@@ -99,6 +102,36 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => inner.id(),
             _ => panic!("Tried to ID generic!")
         };
+    }
+
+    #[async_recursion]
+    pub async fn fix_generics(&mut self, resolver: &Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+        match self {
+            FinalizedTypes::Struct(_, inner) => {
+                if let Some(found) = inner {
+                    found.fix_generics(resolver, syntax).await?;
+                }
+            },
+            FinalizedTypes::Reference(inner) => inner.fix_generics(resolver, syntax).await?,
+            FinalizedTypes::Array(inner) => inner.fix_generics(resolver, syntax).await?,
+            FinalizedTypes::Generic(name, bounds) => {
+                let found = &resolver.generics()[name];
+                let mut temp = vec!();
+                for bound in found {
+                    temp.push(Syntax::parse_type(syntax.clone(), ParsingError::empty(),
+                                                 resolver.boxed_clone(), bound.clone(), vec!()).await?
+                        .finalize(syntax.clone()).await)
+                }
+                *bounds = temp;
+            },
+            FinalizedTypes::GenericType(base, bounds) => {
+                base.fix_generics(resolver, syntax).await?;
+                for bound in bounds {
+                    bound.fix_generics(resolver, syntax).await?;
+                }
+            }
+        }
+        return Ok(());
     }
 
     /// Gets the fields of the type. Useful for creating a new struct or getting data from a field of a struct.

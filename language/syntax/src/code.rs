@@ -215,12 +215,6 @@ impl FinalizedEffects {
                 if let Some(found) = variable {
                     match found {
                         // Generics must be resolved to get a concrete type, so this is a sanity check.
-                        FinalizedTypes::Generic(name, _) => {
-                            panic!("Unresolved generic {}", name)
-                        }
-                        FinalizedTypes::GenericType(name, _) => {
-                            panic!("Unresolved generic {:?}", name)
-                        }
                         _ => return Some(found)
                     }
                 }
@@ -395,7 +389,8 @@ pub async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<Function
         syntax: syntax.clone(),
     }.await;
 
-    if let FinalizedTypes::GenericType(_, generics) = arguments[0].get_return(&variables).unwrap().unflatten() {
+    let return_type = arguments[0].get_return(&variables).unwrap().unflatten();
+    if let FinalizedTypes::GenericType(_, generics) = return_type {
         assert_eq!(function.generics.len(), generics.len());
 
         let mut iterator = function.generics.iter();
