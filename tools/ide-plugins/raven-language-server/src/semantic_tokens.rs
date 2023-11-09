@@ -11,7 +11,7 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
     loop {
         tokens.push(tokenizer.next());
         if tokens.last().unwrap().token_type == TokenTypes::EOF {
-            break
+            break;
         }
     }
 
@@ -30,7 +30,7 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
                 0
             } as u32,
             length: (token.end_offset - token.start_offset) as u32,
-            token_type: get_token(&token.token_type),
+            token_type: get_token(last.as_ref().map(|inner| &inner.token_type).unwrap_or(&TokenTypes::EOF), &token.token_type),
             token_modifiers_bitset: 0,
         };
         //eprintln!("Line ({}, {}) to ({}, {}) for {:?} ({:?})", token.start.0, token.start.1, token.end.0, token.end.1, token.token_type,temp);
@@ -46,17 +46,50 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
     sender.send(Message::Response(resp)).unwrap();
 }
 
-fn get_token(token_type: &TokenTypes) -> u32 {
+fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
+    match *last {
+        TokenTypes::FunctionStart => if *token_type == TokenTypes::Identifier {
+            return SemanticTokenTypes::Function as u32;
+        },
+        TokenTypes::ImportStart => return SemanticTokenTypes::Property as u32,
+        _ => {}
+    }
     let temp = match token_type {
-        TokenTypes::Identifier | TokenTypes::ReturnType => 1,
-        TokenTypes::Variable => 9,
+        TokenTypes::Identifier | TokenTypes::ReturnType => SemanticTokenTypes::Type,
+        TokenTypes::Variable => SemanticTokenTypes::Property,
+        TokenTypes::Modifier => SemanticTokenTypes::Keyword,
+        TokenTypes::Comment => SemanticTokenTypes::Comment,
         TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New | TokenTypes::Modifier |
-        TokenTypes::FunctionStart => 15,
-        TokenTypes::Comment => 17,
-        TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => 18,
-        TokenTypes::ReturnTypeArrow | TokenTypes::ImportEnd => 100,
-        _ => (token_type.clone() as u32) % 21
-    };
-    eprintln!("{:?}: {}", token_type, temp);
+        TokenTypes::FunctionStart => SemanticTokenTypes::Keyword,
+        TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => SemanticTokenTypes::String,
+        _ => SemanticTokenTypes::None
+    } as u32;
     return temp;
+}
+
+pub enum SemanticTokenTypes {
+    Namespace = 0, // Same as type
+    Type = 1, // Blue-green color
+    Class = 2, // Same as type
+    Enum = 3, // Same as type
+    Interface = 4, // Same as type
+    Struct = 5, // Same as type
+    TypeParameter = 6, // Same color as Type
+    Parameter = 7, // Same color as Property
+    Variable = 8, // Same color as Property
+    Property = 9, // Light blue
+    EnumMember = 10, // Blue
+    Event = 11, // Same color as Property
+    Function = 12, // Yellow
+    Method = 13, // Same as type
+    Macro = 14, // Same as Property
+    Keyword = 15, // Purple
+    Modifier = 16, // White
+    Comment = 17, // Green
+    String = 18, // Orange
+    Number = 19, // Green-Yellow
+    Regexp = 20, // Dark blue color
+    Operator = 21, // White
+    Decorator = 22, // Same color as Function
+    None = 100
 }
