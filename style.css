@@ -1,0 +1,44 @@
+.btn-warning {
+    margin-top: 100px;
+}
+
+#installnow {
+    margin-top: 80px;
+}
+
+#install-raven{
+    background-color: #272932;
+    border-color:rgb(0, 0, 0);
+}
+
+.navbar-expand{
+    height: 100;
+    background-image:linear-gradient(to right, #272932,#272932);
+    padding: 0;
+}
+
+.navbar-brand{
+    font-size: 30;
+}
+
+.navbar-brand img{
+    height: 100;
+    padding-left: 0px;
+}
+
+.nav-link{
+    font-size: 18;
+}
+
+.p-5{
+    margin-top: 10;
+    background-color: rgba(64, 73, 158, 0.37);
+}
+
+#welcome{
+    margin-top: 130;
+}
+
+.container-fluid{
+    padding-left: 80;
+}
