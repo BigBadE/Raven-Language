@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
+use syntax::code::{degeneric_header, Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
+use syntax::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
 use syntax::{Attribute, SimpleVariableManager, is_modifier, Modifier, ParsingError, ProcessManager};
 use syntax::syntax::Syntax;
 use async_recursion::async_recursion;
@@ -41,9 +41,9 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
                             error: placeholder_error(format!("You shouldn't see this! Report this!")),
                         }.await?;
                         last = FinalizedExpression::new(ExpressionType::Return,
-                                                         FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone()));
+                                                        FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone()));
                     } else {
-                        return Err(placeholder_error(format!("Expected {}, found {}", return_type, last_type)))
+                        return Err(placeholder_error(format!("Expected {}, found {}", return_type, last_type)));
                     }
                 }
                 body.push(last);
@@ -246,8 +246,20 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                                     AsyncDataGetter::new(syntax.clone(), found.clone()).await,
                                                                     finalized_effects));
                         } else if found.name.split("::").last().unwrap() == method {
-                            let target = finding_return_type.inner_struct().data.functions.iter()
-                                .find(|inner| inner.name.split("::").last().unwrap() == method).unwrap();
+                            let mut target = finding_return_type.find_method(&method).unwrap();
+                            if target.len() > 1 {
+                                return Err(placeholder_error(format!("Ambiguous function {}", method)));
+                            } else if target.is_empty() {
+                                return Err(placeholder_error(format!("Unknown function {}", method)));
+                            }
+                            let (_, target) = target.pop().unwrap();
+
+                            if let FinalizedTypes::Generic(_, _) = finalized_effects[0].get_return(variables).unwrap().unflatten() {
+                                return Ok(FinalizedEffects::GenericVirtualCall(i, target,
+                                                                               AsyncDataGetter::new(syntax.clone(), found.clone()).await,
+                                                                               finalized_effects));
+                            }
+
                             syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
                                 degeneric_header(target.clone(),
                                                  found.clone(), syntax.clone(), process_manager.cloned(),
@@ -470,73 +482,6 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         }
     };
     return Ok(output);
-}
-
-async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<FunctionData>, syntax: Arc<Mutex<Syntax>>,
-                          mut manager: Box<dyn ProcessManager>, arguments: Vec<FinalizedEffects>, variables: SimpleVariableManager) -> Result<(), ParsingError> {
-    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter {
-        getting: base,
-        syntax: syntax.clone(),
-    }.await;
-
-    if let FinalizedTypes::GenericType(_, generics) = arguments[0].get_return(&variables).unwrap().unflatten() {
-        assert_eq!(function.generics.len(), generics.len());
-
-        let mut iterator = function.generics.iter();
-        for generic in generics {
-            let (name, bounds) = iterator.next().unwrap();
-            for bound in bounds {
-                if !generic.of_type(bound, syntax.clone()).await {
-                    return Err(placeholder_error("Failed bounds sanity check!".to_string()))
-                }
-            }
-            manager.mut_generics().insert(name.clone(), generic);
-        }
-    } else {
-        panic!("Wrong type! {:?}", arguments[0].get_return(&variables).unwrap().unflatten())
-    }
-
-    // Copy the method and degeneric every type inside of it.
-    let mut new_method = CodelessFinalizedFunction::clone(&function);
-    // Delete the generics because now they are all solidified.
-    new_method.generics.clear();
-    new_method.data = degenericed;
-
-    // Degeneric the arguments.
-    for arguments in &mut new_method.arguments {
-        arguments.field.field_type.degeneric(&manager.generics(), &syntax,
-                                             placeholder_error(format!("No generic in {}", new_method.data.name)),
-                                             placeholder_error("Invalid bounds!".to_string())).await?;
-    }
-
-    // Degeneric the return type if there is one.
-    if let Some(returning) = &mut new_method.return_type {
-        returning.degeneric(&manager.generics(), &syntax,
-                            placeholder_error(format!("No generic in {}", new_method.data.name)),
-                            placeholder_error("Invalid bounds!".to_string())).await?;
-    }
-
-    let mut locked = syntax.lock().unwrap();
-    locked.functions.types.insert(new_method.data.name.clone(), new_method.data.clone());
-    let new_method = Arc::new(new_method);
-    locked.functions.data.insert(new_method.data.clone(), new_method.clone());
-
-    if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
-        for waker in wakers {
-            waker.wake_by_ref();
-        }
-    }
-    locked.functions.wakers.remove(&new_method.data.name);
-
-    // Give the compiler the empty body
-    locked.compiling.write().unwrap().insert(new_method.data.name.clone(),
-                                             Arc::new(CodelessFinalizedFunction::clone(&new_method).add_code(
-                                                 FinalizedCodeBody::new(vec!(), "empty".to_string(), true))));
-    for waker in &locked.compiling_wakers {
-        waker.wake_by_ref();
-    }
-    locked.compiling_wakers.clear();
-    return Ok(());
 }
 
 fn store(effect: FinalizedEffects) -> FinalizedEffects {

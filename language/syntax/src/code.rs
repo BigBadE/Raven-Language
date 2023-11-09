@@ -1,3 +1,4 @@
+use std::mem;
 /// This file contains the representation of code in Raven and helper methods to transform that code.
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -5,7 +6,7 @@ use async_recursion::async_recursion;
 
 use crate::{Attribute, SimpleVariableManager, ParsingError, ProcessManager, VariableManager};
 use crate::async_util::{AsyncDataGetter, UnparsedType};
-use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction};
+use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, CHAR, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
 use crate::top_element_manager::ImplWaiter;
@@ -178,6 +179,8 @@ pub enum FinalizedEffects {
     // Calls a virtual method, usually a downcasted trait, with the given function index, function,
     // and on the given arguments (first argument must be the downcased trait).
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    // Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
+    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     // Downcasts a structure into its trait, which can only be used in a VirtualCall.
     Downcast(Box<FinalizedEffects>, FinalizedTypes),
     // Internally used by low-level verifier to store a type on the heap.
@@ -256,7 +259,8 @@ impl FinalizedEffects {
             FinalizedEffects::GenericMethodCall(function, _, _) =>
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
-                })
+                }),
+            FinalizedEffects::GenericVirtualCall(_, _, function, _) => function.return_type.clone()
         };
         return temp;
     }
@@ -366,8 +370,91 @@ impl FinalizedEffects {
             FinalizedEffects::StackStore(storing) =>
                 storing.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::Downcast(_, target) => target
-                .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?
+                .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
+            FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {
+                println!("{:?}", process_manager.generics());
+                syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                    degeneric_header(target.clone(),
+                                     found.data.clone(), syntax.clone(), process_manager.cloned(),
+                                     effects.clone(), variables.clone()));
+
+                let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
+                let mut temp = vec!();
+                mem::swap(&mut temp, effects);
+                *self = FinalizedEffects::VirtualCall(*index, output, temp);
+            }
         }
         return Ok(());
     }
+}
+
+pub async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<FunctionData>, syntax: Arc<Mutex<Syntax>>,
+                              mut manager: Box<dyn ProcessManager>, arguments: Vec<FinalizedEffects>, variables: SimpleVariableManager) -> Result<(), ParsingError> {
+    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter {
+        getting: base,
+        syntax: syntax.clone(),
+    }.await;
+
+    if let FinalizedTypes::GenericType(_, generics) = arguments[0].get_return(&variables).unwrap().unflatten() {
+        assert_eq!(function.generics.len(), generics.len());
+
+        let mut iterator = function.generics.iter();
+        for generic in generics {
+            let (name, bounds) = iterator.next().unwrap();
+            for bound in bounds {
+                if !generic.of_type(bound, syntax.clone()).await {
+                    return Err(placeholder_error("Failed bounds sanity check!".to_string()));
+                }
+            }
+            manager.mut_generics().insert(name.clone(), generic);
+        }
+    } else {
+        panic!("Wrong type! {:?}", arguments[0].get_return(&variables).unwrap().unflatten())
+    }
+
+    // Copy the method and degeneric every type inside of it.
+    let mut new_method = CodelessFinalizedFunction::clone(&function);
+    // Delete the generics because now they are all solidified.
+    new_method.generics.clear();
+    new_method.data = degenericed;
+
+    // Degeneric the arguments.
+    for arguments in &mut new_method.arguments {
+        arguments.field.field_type.degeneric(&manager.generics(), &syntax,
+                                             placeholder_error(format!("No generic in {}", new_method.data.name)),
+                                             placeholder_error("Invalid bounds!".to_string())).await?;
+    }
+
+    // Degeneric the return type if there is one.
+    if let Some(returning) = &mut new_method.return_type {
+        returning.degeneric(&manager.generics(), &syntax,
+                            placeholder_error(format!("No generic in {}", new_method.data.name)),
+                            placeholder_error("Invalid bounds!".to_string())).await?;
+    }
+
+    let mut locked = syntax.lock().unwrap();
+    locked.functions.types.insert(new_method.data.name.clone(), new_method.data.clone());
+    let new_method = Arc::new(new_method);
+    locked.functions.data.insert(new_method.data.clone(), new_method.clone());
+
+    if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
+        for waker in wakers {
+            waker.wake_by_ref();
+        }
+    }
+    locked.functions.wakers.remove(&new_method.data.name);
+
+    // Give the compiler the empty body
+    locked.compiling.write().unwrap().insert(new_method.data.name.clone(),
+                                             Arc::new(CodelessFinalizedFunction::clone(&new_method).add_code(
+                                                 FinalizedCodeBody::new(vec!(), "empty".to_string(), true))));
+    for waker in &locked.compiling_wakers {
+        waker.wake_by_ref();
+    }
+    locked.compiling_wakers.clear();
+    return Ok(());
+}
+
+fn placeholder_error(error: String) -> ParsingError {
+    return ParsingError::new(String::new(), (0, 0), 0, (0, 0), 0, error);
 }

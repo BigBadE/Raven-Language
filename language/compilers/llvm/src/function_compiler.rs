@@ -455,7 +455,8 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             }
         }
         FinalizedEffects::GenericMethodCall(func, types, _args) =>
-            panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
+            panic!("Tried to compile generic method call! {} and {}", func.data.name, types),
+        FinalizedEffects::GenericVirtualCall(_, _, _, _) => panic!("Generic virtual call not degeneric'd!")
     };
 }
 

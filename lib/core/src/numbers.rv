@@ -1,4 +1,5 @@
 import numbers::Match;
+import iter;
 
 //A trait for every primitive number type.
 pub trait Number {}
@@ -45,5 +46,16 @@ trait Match<T> {
 pub impl<T: Number, E: Number> Match for T {
     pub fn matches(self, other: E) -> bool {
         return true;
+    }
+}
+
+pub impl<T: u64, E: Iter<u64>> Match<E> for T {
+    fn matches(self, other: E) -> bool {
+        for i in other {
+            if i == self {
+                return true;
+            }
+        }
+        return false;
     }
 }

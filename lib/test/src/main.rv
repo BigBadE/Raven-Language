@@ -1,19 +1,10 @@
 import stdio;
+import numbers::Match;
 
 fn main() {
-    let a = 1;
-    let b = 2;
-    a |= 2;
-    if test() {
-        printf("Yep!");
+    if 4.matches(0..5) {
+        printf("Passed!");
     } else {
-        printf("No!");
+        printf("Failed!");
     }
-}
-
-fn test() -> bool {
-    let t = true;
-    let f = false;
-
-    return t && f || t ^^ t && f;
 }
