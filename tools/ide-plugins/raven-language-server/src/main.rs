@@ -66,18 +66,18 @@ fn main_loop(
                                                          connection.sender.clone()));
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
             }
-            Message::Response(resp) => {}
+            Message::Response(_resp) => {}
             Message::Notification(not) => {
                 let not = match cast_not::<DidOpenTextDocument>(not) {
                     Ok(params) => {
                         documents.insert(params.text_document.uri, params.text_document.text);
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
                 let _not = match cast_not::<DidChangeTextDocument>(not) {
@@ -86,7 +86,7 @@ fn main_loop(
                         documents.insert(params.text_document.uri, params.content_changes[0].text.clone());
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
             }

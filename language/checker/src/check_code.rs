@@ -485,6 +485,11 @@ async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<FunctionData
         let mut iterator = function.generics.iter();
         for generic in generics {
             let (name, bounds) = iterator.next().unwrap();
+            for bound in bounds {
+                if !generic.of_type(bound, syntax.clone()).await {
+                    return Err(placeholder_error("Failed bounds sanity check!".to_string()))
+                }
+            }
             manager.mut_generics().insert(name.clone(), generic);
         }
     } else {

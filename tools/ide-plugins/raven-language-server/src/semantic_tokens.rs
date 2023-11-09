@@ -25,7 +25,7 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
         let temp = SemanticToken {
             delta_line,
             delta_start: if delta_line == 0 {
-                (token.start_offset - last.clone().map(|inner| inner.start_offset).unwrap_or(0))
+                token.start_offset - last.clone().map(|inner| inner.start_offset).unwrap_or(0)
             } else {
                 0
             } as u32,
@@ -59,7 +59,7 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
         TokenTypes::Variable => SemanticTokenTypes::Property,
         TokenTypes::Modifier => SemanticTokenTypes::Keyword,
         TokenTypes::Comment => SemanticTokenTypes::Comment,
-        TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New | TokenTypes::Modifier |
+        TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New |
         TokenTypes::FunctionStart => SemanticTokenTypes::Keyword,
         TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => SemanticTokenTypes::String,
         _ => SemanticTokenTypes::None
@@ -67,6 +67,7 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
     return temp;
 }
 
+#[allow(dead_code)]
 pub enum SemanticTokenTypes {
     Namespace = 0, // Same as type
     Type = 1, // Blue-green color
