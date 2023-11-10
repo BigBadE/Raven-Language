@@ -190,6 +190,7 @@ pub internal impl<T: Number> Add<T, T> for T {
 
     }
 }
+
 pub impl<T: Add<E, T>, E> AddAndAssign<E, T> for T {
     fn add_assign(self, other: E) -> T {
         self = self.add(other);

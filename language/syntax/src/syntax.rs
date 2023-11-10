@@ -164,7 +164,7 @@ impl Syntax {
             FinalizedTypes::Generic(_, bounds) => {
                 // If a single bound fails, than the type isn't of the generic type.
                 for bound in bounds {
-                    if !self.solve(checking, bound) {
+                    if !self.solve(bound, checking) && !self.solve(checking, bound) {
                         return Some(false);
                     }
                 }
@@ -196,9 +196,12 @@ impl Syntax {
     /// May not be correct if the syntax isn't finished parsing implementations, check Syntax::finished_impls.
     pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
         // Check to make sure the type is a basic structure, Chalk can't handle any other types.
+        // u64 is T: Add<E, T>
         if let Some(inner) = self.solve_nonstruct_types(second, first) {
             return inner;
         }
+
+        // T: Add<E, T> is u64
         if let Some(inner) = self.solve_nonstruct_types(first, second) {
             return inner;
         }
@@ -220,8 +223,9 @@ impl Syntax {
 
         // Tell Chalk to solve it, ignoring any overflows.
         // TODO add a cache for speed?
-        return RecursiveSolver::new(30, 3000, None)
+        let value = RecursiveSolver::new(30, 3000, None)
             .solve(self, &goal.into_closed_goal(ChalkIr)).is_some();
+        return value;
     }
 
     /// Adds the element to the syntax

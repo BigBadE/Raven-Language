@@ -366,7 +366,6 @@ impl FinalizedEffects {
             FinalizedEffects::Downcast(_, target) => target
                 .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
             FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {
-                println!("{:?}", process_manager.generics());
                 syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
                     degeneric_header(target.clone(),
                                      found.data.clone(), syntax.clone(), process_manager.cloned(),

@@ -173,6 +173,7 @@ impl CodelessFinalizedFunction {
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
             let effect = arguments[i].get_return(variables).unwrap();
+            println!("Resolving generic for {:?} and {} with {}: {}", arguments[i], method.data.name, method.arguments[i].field.name, method.arguments[i].field.field_type);
             method.arguments[i]
                 .field.field_type.resolve_generic(&effect, syntax, manager.mut_generics(),
                                                   placeholder_error("Invalid bounds!".to_string())).await?;
