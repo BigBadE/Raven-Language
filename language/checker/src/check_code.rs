@@ -300,10 +300,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 None => None
                             };
 
-                            if let Ok(found) = check_method(process_manager, method,
-                                                            finalized_effects.clone(), syntax, &variables, returning).await {
-                                return Ok(Some(found));
-                            }
+                            return match check_method(process_manager, method,
+                                                            finalized_effects.clone(), syntax,
+                                                            &variables, &resolver, returning).await {
+                                Ok(found) => Ok(Some(found)),
+                                Err(error) => panic!("Failed {}, {}", temp.name, error)
+                            };
                         }
                     }
                     return Ok(None);
@@ -344,7 +346,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         let mut output = vec!();
                         for (found_trait, function) in &mut found {
                             let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
-                            if check_args(&temp, &mut finalized_effects, &syntax, variables).await {
+                            if check_args(&temp, &resolver, &mut finalized_effects, &syntax, variables).await {
                                 output.push((found_trait, temp));
                             }
                         }
@@ -370,7 +372,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
 
-                    if !check_args(&method, &mut finalized_effects, syntax, variables).await {
+                    if !check_args(&method, &resolver, &mut finalized_effects, syntax, variables).await {
                         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                              finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -401,12 +403,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             let returning = match returning {
                 Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
-                                                       resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
+                                                       resolver.boxed_clone(), inner, vec!()).await?.finalize(syntax.clone()).await),
                 None => None
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
-            check_method(process_manager, method, finalized_effects, syntax, variables, returning).await?
+            check_method(process_manager, method, finalized_effects, syntax, variables, &resolver, returning).await?
         }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
@@ -493,7 +495,7 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 //The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                           mut effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                          variables: &SimpleVariableManager,
+                          variables: &SimpleVariableManager, resolver: &Box<dyn NameResolver>,
                           returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
@@ -509,7 +511,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, &mut effects, syntax, variables).await {
+    if !check_args(&method, resolver, &mut effects, syntax, variables).await {
         return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -526,18 +528,20 @@ pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }
 
-pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
+pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, resolver: &Box<dyn NameResolver>,
+                        args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                         variables: &SimpleVariableManager) -> bool {
     if function.arguments.len() != args.len() {
         return false;
     }
 
     for i in 0..function.arguments.len() {
-        let returning = args.get(i).unwrap().get_return(variables);
+        let mut returning = args.get(i).unwrap().get_return(variables);
         if returning.is_some() {
-            let inner = returning.as_ref().unwrap();
+            let inner = returning.as_mut().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
 
+            inner.fix_generics(resolver, syntax).await.unwrap();
             if !inner.of_type(other, syntax.clone()).await {
                 return false;
             }
