@@ -160,7 +160,7 @@ impl CodelessFinalizedFunction {
     /// The VariableManager here is for the arguments to the function, and not for the function itself.
     pub async fn degeneric(method: Arc<CodelessFinalizedFunction>, mut manager: Box<dyn ProcessManager>,
                            arguments: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                           variables: &SimpleVariableManager,
+                           variables: &SimpleVariableManager, resolver: &Box<dyn NameResolver>,
                            returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
@@ -172,12 +172,18 @@ impl CodelessFinalizedFunction {
 
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
-            let effect = arguments[i].get_return(variables).unwrap();
-            println!("Degenericing against {:?}: {}", arguments[i], method.arguments[i]
-                .field.field_type);
-            method.arguments[i]
+            let mut effect = arguments[i].get_return(variables).unwrap();
+            effect.fix_generics(resolver, syntax).await?;
+            match method.arguments[i]
                 .field.field_type.resolve_generic(&effect, syntax, manager.mut_generics(),
-                                                  placeholder_error("Invalid bounds!".to_string())).await?;
+                                                  placeholder_error(
+                                                      format!("Invalid bounds! {:?}", arguments[i]))).await {
+                Ok(_) => {},
+                Err(error) => {
+                    println!("error: {}", error);
+                    return Err(error)
+                }
+            }
         }
 
         // Now all the generic types have been resolved, it's time to replace them with
@@ -227,7 +233,7 @@ impl CodelessFinalizedFunction {
 
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();
-            handle.lock().unwrap().spawn(degeneric_code(syntax.clone(), original, new_method.clone(), manager));
+            handle.lock().unwrap().spawn(degeneric_code(syntax.clone(), original, resolver.boxed_clone(), new_method.clone(), manager));
 
             return Ok(new_method);
         };
@@ -255,7 +261,7 @@ impl Future for GenericWaiter {
 }
 
 /// Degenerics the code body of the method.
-async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>,
+async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>, resolver: Box<dyn NameResolver>,
                         degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
     // This has to wait until the original is ready to be compiled.
     GenericWaiter { syntax: syntax.clone(), name: original.data.name.clone() }.await;
@@ -265,7 +271,7 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
     // Degenerics the code body.
-    let code = match code.degeneric(&manager, &mut variables, &syntax).await {
+    let code = match code.degeneric(&manager, &resolver, &mut variables, &syntax).await {
         Ok(inner) => inner,
         Err(error) => panic!("Error degenericing code: {}", error)
     };
@@ -340,11 +346,11 @@ impl FinalizedCodeBody {
     }
 
     /// Degenerics every effect inside the body of code.
-    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>,
+    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, resolver: &Box<dyn NameResolver>,
                            variables: &mut SimpleVariableManager, syntax: &Arc<Mutex<Syntax>>)
         -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
-            expression.effect.degeneric(process_manager, variables, syntax).await?;
+            expression.effect.degeneric(process_manager, variables, resolver, syntax).await?;
         }
 
         return Ok(self);

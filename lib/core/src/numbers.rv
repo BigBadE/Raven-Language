@@ -51,11 +51,7 @@ pub impl<T: Number, E: Number> Match for T {
 
 pub impl<T: u64, E: Iter<u64>> Match<E> for T {
     fn matches(self, other: E) -> bool {
-        for i in other {
-            if i == self {
-                return true;
-            }
-        }
+
         return false;
     }
 }

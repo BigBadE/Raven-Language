@@ -2,13 +2,16 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::{Pin, pin};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
+
+use data::ParsingError;
+
+use crate::async_util::NameResolver;
+use crate::code::FinalizedEffects;
+use crate::function::FunctionData;
 use crate::syntax::Syntax;
 use crate::TopElement;
-use std::sync::Mutex;
-use data::ParsingError;
-use crate::async_util::NameResolver;
-use crate::function::FunctionData;
 use crate::types::FinalizedTypes;
 
 /// The async manager, just stores basic information about the current parsing state.
@@ -49,22 +52,35 @@ impl Future for ImplWaiter {
     }
 }
 
-pub struct TraitImplWaiter {
+pub struct TraitImplWaiter<F> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub resolver: Box<dyn NameResolver>,
     pub method: String,
     pub return_type: FinalizedTypes,
+    pub checker: F,
     pub error: ParsingError
 }
 
-impl Future for TraitImplWaiter {
-    type Output = Result<Arc<FunctionData>, ParsingError>;
+impl<T: Future<Output=Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<FunctionData>) -> T> Future for TraitImplWaiter<F> {
+    type Output = Result<FinalizedEffects, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         return match pin!(find_trait_implementation(&self.syntax, &self.resolver, &self.method, &self.return_type)).poll(cx) {
             Poll::Ready(inner) => match inner {
                 Ok(inner) => match inner {
-                    Some(found) => Poll::Ready(Ok(found)),
+                    Some(found) => {
+                        for trying in found {
+                            match pin!((self.checker)(trying)).poll(cx) {
+                                Poll::Ready(found) => match found {
+                                    Ok(found) => return Poll::Ready(Ok(found)),
+                                    Err(_) => {}
+                                },
+                                Poll::Pending => return Poll::Pending
+                            }
+                        }
+                        self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
+                        Poll::Pending
+                    },
                     None => if self.syntax.lock().unwrap().finished_impls() {
                         Poll::Ready(Err(self.error.clone()))
                     } else {
@@ -80,7 +96,9 @@ impl Future for TraitImplWaiter {
 }
 
 pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
-                                       method: &String, return_type: &FinalizedTypes) -> Result<Option<Arc<FunctionData>>, ParsingError> {
+                                       method: &String, return_type: &FinalizedTypes) -> Result<Option<Vec<Arc<FunctionData>>>, ParsingError> {
+    let mut output = Vec::new();
+
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
                                               import.split("::").last().unwrap().to_string(), resolver.boxed_clone(), vec!()).await {
@@ -89,13 +107,17 @@ pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &B
                 &return_type, &value) {
                 for temp in &value {
                     if &temp.name.split("::").last().unwrap() == method {
-                        return Ok(Some(temp.clone()));
+                        output.push(temp.clone());
                     }
                 }
             }
         }
     };
-    return Ok(None);
+    if output.is_empty() {
+        return Ok(None);
+    } else {
+        return Ok(Some(output));
+    }
 }
 
 pub struct TypeWaiter {

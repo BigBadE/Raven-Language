@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use async_recursion::async_recursion;
 
 use crate::{Attribute, SimpleVariableManager, ParsingError, ProcessManager, VariableManager};
-use crate::async_util::{AsyncDataGetter, UnparsedType};
+use crate::async_util::{AsyncDataGetter, NameResolver, UnparsedType};
 use crate::function::{CodeBody, FinalizedCodeBody, CodelessFinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, CHAR, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
@@ -263,38 +263,39 @@ impl FinalizedEffects {
     /// This mostly targets FinalizedTypes or function calls and calls the degeneric function on them.
     #[async_recursion]
     pub async fn degeneric(&mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut SimpleVariableManager,
-                           syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+                           resolver: &Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {
             // Recursively searches nested effects for method calls.
             FinalizedEffects::NOP() => {}
             FinalizedEffects::CreateVariable(_, first, other) => {
-                first.degeneric(process_manager, variables, syntax).await?;
+                first.degeneric(process_manager, variables, resolver, syntax).await?;
                 other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
             }
             FinalizedEffects::Jump(_) => {}
             FinalizedEffects::CompareJump(comparing, _, _) =>
-                comparing.degeneric(process_manager, variables, syntax).await?,
+                comparing.degeneric(process_manager, variables, resolver, syntax).await?,
             FinalizedEffects::CodeBody(body) => {
                 for statement in &mut body.expressions {
-                    statement.effect.degeneric(process_manager, variables, syntax).await?;
+                    statement.effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
             }
             FinalizedEffects::MethodCall(calling, method,
                                          effects) => {
                 if let Some(inner) = calling {
-                    inner.degeneric(process_manager, variables, syntax).await?;
+                    inner.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
                 for effect in &mut *effects {
-                    effect.degeneric(process_manager, variables, syntax).await?;
+                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
                 let manager: Box<dyn ProcessManager> = process_manager.cloned();
                 // Calls the degeneric method on the method.
                 *method = CodelessFinalizedFunction::degeneric(method.clone(), manager,
-                                                               effects, syntax, variables, None).await?;
+                                                               effects, syntax, variables,
+                                                               resolver, None).await?;
             }
             FinalizedEffects::GenericMethodCall(function, found_trait, effects) => {
                 let mut calling = effects.remove(0);
-                calling.degeneric(process_manager, variables, syntax).await?;
+                calling.degeneric(process_manager, variables, resolver, syntax).await?;
 
                 let implementor = calling.get_return(variables).unwrap();
                 let implementation = ImplWaiter {
@@ -308,13 +309,13 @@ impl FinalizedEffects {
                 let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
 
                 for effect in &mut *effects {
-                    effect.degeneric(process_manager, variables, syntax).await?;
+                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
                 let mut effects = effects.clone();
                 effects.insert(0, calling.clone());
                 let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
                 let function = CodelessFinalizedFunction::degeneric(function.clone(), process_manager.cloned(),
-                                                                    &effects, syntax, variables, None).await?;
+                                                                    &effects, syntax, variables, resolver, None).await?;
                 *self = FinalizedEffects::MethodCall(None,
                                                      function,
                                                      effects.clone());
@@ -322,23 +323,23 @@ impl FinalizedEffects {
             // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
             FinalizedEffects::VirtualCall(_, _, effects) => {
                 for effect in &mut *effects {
-                    effect.degeneric(process_manager, variables, syntax).await?;
+                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
             }
             FinalizedEffects::Set(setting, value) => {
-                setting.degeneric(process_manager, variables, syntax).await?;
-                value.degeneric(process_manager, variables, syntax).await?;
+                setting.degeneric(process_manager, variables, resolver, syntax).await?;
+                value.degeneric(process_manager, variables, resolver, syntax).await?;
             }
             FinalizedEffects::LoadVariable(_) => {}
-            FinalizedEffects::Load(effect, _, _) => effect.degeneric(process_manager, variables, syntax).await?,
+            FinalizedEffects::Load(effect, _, _) => effect.degeneric(process_manager, variables, resolver, syntax).await?,
             FinalizedEffects::CreateStruct(target, types, effects) => {
                 if let Some(found) = target {
-                    found.degeneric(process_manager, variables, syntax).await?;
+                    found.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
                 types.degeneric(process_manager.generics(), syntax,
                                 ParsingError::empty(), ParsingError::empty()).await?;
                 for (_, effect) in effects {
-                    effect.degeneric(process_manager, variables, syntax).await?;
+                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
             }
             FinalizedEffects::CreateArray(other, effects) => {
@@ -346,7 +347,7 @@ impl FinalizedEffects {
                     inner.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
                 }
                 for effect in effects {
-                    effect.degeneric(process_manager, variables, syntax).await?;
+                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
             }
             FinalizedEffects::Float(_) => {}
@@ -355,14 +356,14 @@ impl FinalizedEffects {
             FinalizedEffects::String(_) => {}
             FinalizedEffects::Char(_) => {}
             FinalizedEffects::HeapStore(storing) =>
-                storing.degeneric(process_manager, variables, syntax).await?,
+                storing.degeneric(process_manager, variables, resolver, syntax).await?,
             FinalizedEffects::HeapAllocate(other) =>
                 other.degeneric(process_manager.generics(), syntax,
                                 ParsingError::empty(), ParsingError::empty()).await?,
             FinalizedEffects::ReferenceLoad(loading) =>
-                loading.degeneric(process_manager, variables, syntax).await?,
+                loading.degeneric(process_manager, variables, resolver, syntax).await?,
             FinalizedEffects::StackStore(storing) =>
-                storing.degeneric(process_manager, variables, syntax).await?,
+                storing.degeneric(process_manager, variables, resolver, syntax).await?,
             FinalizedEffects::Downcast(_, target) => target
                 .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
             FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {

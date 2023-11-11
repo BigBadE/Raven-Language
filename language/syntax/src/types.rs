@@ -380,8 +380,25 @@ impl FinalizedTypes {
 
                     (true, None)
                 }
-                // Flip it, because every other type handles generics already, no need to repeat the code.
-                _ => other.of_type_sync(self, syntax)
+                FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
+                FinalizedTypes::Struct(_, _) | FinalizedTypes::GenericType(_, _) | FinalizedTypes::Array(_) => {
+                    let mut fails = Vec::new();
+                    for bound in bounds {
+                        let (result, failure) = bound.of_type_sync(other, syntax.clone());
+                        if result {
+                            return (true, None)
+                        } else if let Some(found) = failure {
+                            fails.push(found);
+                        }
+                    }
+                    return if !fails.is_empty() {
+                        (false, Some(Box::pin(Self::join(fails))))
+                    } else {
+                        (false, None)
+                    }
+                }
+                //T: u64 is Number
+                //Number is T: u64
             }
         };
     }

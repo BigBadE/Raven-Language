@@ -1,5 +1,6 @@
 #![feature(box_into_inner)]
 #![feature(get_mut_unchecked)]
+#![feature(fn_traits)]
 
 /// A file containing various structures used throughout the language:
 /// - Modifiers: modifiers on structures, traits, and functions. Like public, internal, etc...

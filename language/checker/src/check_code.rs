@@ -346,9 +346,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         let mut output = vec!();
                         for (found_trait, function) in &mut found {
                             let temp = AsyncDataGetter { getting: function.clone(), syntax: syntax.clone() }.await;
-                            if check_args(&temp, &resolver, &mut finalized_effects, &syntax, variables).await {
+                            /*
+                            TODO figure out how the hell to typecheck this
+                            println!("Found {} with {:?}", found_trait.name(), finalized_effects.iter()
+                                .map(|inner| inner.get_return(variables).unwrap().to_string()).collect::<Vec<_>>());
+                            if check_args(&temp, &resolver, &mut finalized_effects, &syntax, variables).await {*/
                                 output.push((found_trait, temp));
-                            }
+                            //}
                         }
 
                         if output.len() > 1 {
@@ -388,13 +392,28 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                         method.clone(), resolver.boxed_clone(), true).await {
                     value
                 } else {
-                    TraitImplWaiter {
+                    let returning = match returning {
+                        Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
+                                                               resolver.boxed_clone(), inner, vec!()).await?.finalize(syntax.clone()).await),
+                        None => None
+                    };
+
+                    let effects = &finalized_effects;
+                    let variables = &variables;
+                    let resolver_ref  = &resolver;
+                    let returning = &returning;
+                    let checker = async move |method| -> Result<FinalizedEffects, ParsingError> {
+                        check_method(process_manager, AsyncDataGetter::new(syntax.clone(), method).await,
+                                     effects.clone(), syntax, variables, resolver_ref, returning.clone()).await
+                    };
+                    return TraitImplWaiter {
                         syntax: syntax.clone(),
                         resolver: resolver.boxed_clone(),
                         method: method.clone(),
                         return_type: return_type.clone(),
+                        checker,
                         error: placeholder_error(format!("Unknown method {}", method)),
-                    }.await?
+                    }.await;
                 }
             } else {
                 Syntax::get_function(syntax.clone(), placeholder_error(format!("Unknown method {}", method)),
@@ -500,7 +519,8 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
 
-        method = CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects, syntax, variables, returning).await?;
+        method = CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects,
+                                                      syntax, variables, resolver, returning).await?;
 
         let temp_effect = match method.return_type.as_ref() {
             Some(returning) => FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
