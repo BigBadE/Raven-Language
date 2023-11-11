@@ -11,6 +11,7 @@ use syntax::r#struct::{StructData, VOID};
 use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
 use crate::output::TypesChecker;
+use data::tokens::CodeErrorToken;
 
 pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn NameResolver>, code: CodeBody, return_type: &Option<FinalizedTypes>,
                          syntax: &Arc<Mutex<Syntax>>, variables: &mut SimpleVariableManager, references: bool, top: bool) -> Result<FinalizedCodeBody, ParsingError> {
@@ -142,12 +143,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 }.await?;
 
                                 (outer_operation, values) = assign_with_priority(new_operation.clone(), &found, values,
-                                                                                 new_inner, &inner_data, effects, inner_array);
+                                                                                 new_inner, &inner_data, effects, inner_array, token, inner_token);
                             }
                         } else {
                             if let Some(mut found) = reading_array {
                                 if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                                    inner.push(Effects::Operation(inner_operation, effects));
+                                    inner.push(Effects::Operation(inner_operation, effects, inner_token));
                                 } else {
                                     panic!("Expected array!");
                                 }
@@ -164,18 +165,18 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 }.await?;
 
                                 (outer_operation, values) = assign_with_priority(operation.clone(), &outer_data, values,
-                                                                                 inner_operation, &inner_data, effects, false);
+                                                                                 inner_operation, &inner_data, effects, false, token, inner_token);
                             }
                         }
                     } else {
                         if let Some(mut found) = reading_array {
                             if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                                inner.push(Effects::Operation(inner_operation, effects));
+                                inner.push(Effects::Operation(inner_operation, effects, inner_token));
                             } else {
                                 panic!("Expected array!");
                             }
                         } else {
-                            values.push(Effects::Operation(inner_operation, effects));
+                            values.push(Effects::Operation(inner_operation, effects, token));
                         }
                     }
                 } else {
@@ -572,7 +573,7 @@ pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, args: &mut Ve
 
 pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut values: Vec<Effects>,
                             inner_operator: String, inner_data: &Arc<StructData>, mut inner_effects: Vec<Effects>,
-                            inner_array: bool) -> (Option<Arc<StructData>>, Vec<Effects>) {
+                            inner_array: bool, token: CodeErrorToken, inner_token: CodeErrorToken) -> (Option<Arc<StructData>>, Vec<Effects>) {
     let op_priority = Attribute::find_attribute("priority", &found.attributes)
         .map(|inner| inner.as_int_attribute().unwrap_or(0)).unwrap_or(0);
     let op_parse_left = Attribute::find_attribute("parse_left", &found.attributes)
@@ -590,10 +591,10 @@ pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut valu
         } else {
             values.push(inner_effects.remove(0));
         }
-        inner_effects.insert(0, Effects::Operation(operation, values));
+        inner_effects.insert(0, Effects::Operation(operation, values, token));
         (Some(inner_data.clone()), inner_effects)
     } else {
-        values.push(Effects::Operation(inner_operator, inner_effects));
+        values.push(Effects::Operation(inner_operator, inner_effects, inner_token));
         (Some(found.clone()), values)
     };
 }

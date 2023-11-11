@@ -88,6 +88,16 @@ pub struct CodeErrorToken {
     pub file_name: String
 }
 
+impl CodeErrorToken {
+    pub fn new(token: Token, file_name: String) -> Self {
+        return Self {
+            token,
+            file_name
+        }
+    }
+}
+
+
 /// Data about the current code block
 #[derive(Clone, Debug)]
 pub struct TokenCodeData {

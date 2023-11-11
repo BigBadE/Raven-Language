@@ -4,6 +4,7 @@ use syntax::ParsingError;
 
 use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
+use data::tokens::CodeErrorToken;
 
 pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, state: &ParseState) -> Result<Effects, ParsingError> {
     let mut operation = String::new();
@@ -57,7 +58,9 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
             if let Effects::NOP() = inner {
                 parser_utils.index = index;
                 parser_utils.tokens.truncate(tokens);
-                return Ok(Effects::Operation(operation, effects));
+                return Ok(Effects::Operation(operation, effects, 
+                    CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone())
+                    ));
             } else {
                 operation += "{}";
             }
@@ -89,5 +92,5 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
         last = parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type.clone();
     }
 
-    return Ok(Effects::Operation(operation, effects));
+    return Ok(Effects::Operation(operation, effects, CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone())));
 }
