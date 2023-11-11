@@ -1,6 +1,8 @@
 import stdio;
 
 fn test() -> bool {
-  printf("Testing");
+
+  let val = 1 + ;
+
   return false;
 }

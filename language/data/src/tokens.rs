@@ -95,6 +95,10 @@ impl CodeErrorToken {
             file_name
         }
     }
+
+    pub fn make_error(&self, message: String) -> ParsingError{
+        return self.token.make_error(self.file_name.clone(), message);
+    }
 }
 
 

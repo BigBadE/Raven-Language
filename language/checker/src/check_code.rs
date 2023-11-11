@@ -74,8 +74,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                       verify_effect(process_manager, resolver, *second, return_type, syntax, variables, references).await?))
         }
         Effects::Operation(operation, mut values, token) => {
-            let error = ParsingError::new(String::new(), (0, 0), 0,
-                                          (0, 0), 0, format!("Failed to find operation {} with {:?}", operation, values));
+            // let error = ParsingError::new(String::new(), (0, 0), 0,
+                                          // (0, 0), 0, format!("Failed to find operation {} with {:?}", operation, values));
+            let error = token.make_error(format!("Failed to find operation {} with {:?}", operation, values));
             let mut outer_operation = None;
             // Check if it's two operations that should be combined, like a list ([])
             if values.len() > 0 {
