@@ -1,5 +1,7 @@
-(function () {
-  var file = file || "README.md";
+
+
+(function (filename = "README.md") {
+  var file = file || filename;
   var reader = new stmd.DocParser();
   var writer = new stmd.HtmlRenderer();
   var xhr = new XMLHttpRequest();
