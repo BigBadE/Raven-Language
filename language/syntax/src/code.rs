@@ -11,6 +11,7 @@ use crate::r#struct::{BOOL, CHAR, F64, FinalizedStruct, STR, U64};
 use crate::syntax::Syntax;
 use crate::top_element_manager::ImplWaiter;
 use crate::types::{FinalizedTypes, Types};
+use data::tokens::CodeErrorToken;
 
 /// An expression is a single line of code, containing an effect and the type of expression.
 #[derive(Clone, Debug)]
@@ -130,7 +131,7 @@ pub enum Effects {
     // Loads a field with the given name from the structure.
     Load(Box<Effects>, String),
     // An unresolved operation, sent to the checker to resolve, with the given arguments.
-    Operation(String, Vec<Effects>),
+    Operation(String, Vec<Effects>, CodeErrorToken),
     // Struct to create and a tuple of the name of the field and the argument.
     CreateStruct(UnparsedType, Vec<(String, Effects)>),
     // Creates an array of the given effects.

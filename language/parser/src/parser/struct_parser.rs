@@ -9,7 +9,7 @@ use syntax::types::Types;
 use crate::parser::function_parser::parse_function;
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
 use crate::parser::util::ParserUtils;
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 
 pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
                        -> Result<UnfinalizedStruct, ParsingError> {

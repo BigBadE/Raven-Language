@@ -1,3 +1,4 @@
+#![feature(try_trait_v2)]
 use tokio::runtime::{Builder, Runtime};
 use std::path::PathBuf;
 use std::fmt::{Debug, Display, Formatter};
@@ -6,6 +7,8 @@ use std::{fs, path};
 use colored::Colorize;
 
 pub type Main<T> = unsafe extern "C" fn() -> T;
+
+pub mod tokens;
 
 pub struct RunnerSettings {
     pub sources: Vec<Box<dyn SourceSet>>,

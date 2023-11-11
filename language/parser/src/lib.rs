@@ -1,4 +1,4 @@
-#![feature(try_trait_v2, get_mut_unchecked)]
+#![feature(get_mut_unchecked)]
 #![feature(let_chains)]
 extern crate core;
 
@@ -9,7 +9,7 @@ use syntax::syntax::Syntax;
 use crate::parser::top_parser::parse_top;
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokenizer::Tokenizer;
-use crate::tokens::tokens::TokenTypes;
+use data::tokens::TokenTypes;
 
 pub mod parser;
 pub mod tokens;

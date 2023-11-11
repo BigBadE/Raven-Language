@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 syntax = { path = "../syntax" }
+data = { path = "../data" }
 
 async-recursion = { version = "1.0.5", path = "../../crates/async-recursion" }
 anyhow = "1.0.75"

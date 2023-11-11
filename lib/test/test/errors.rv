@@ -1,0 +1,6 @@
+import stdio;
+
+fn test() -> bool {
+  printf("Testing");
+  return false;
+}

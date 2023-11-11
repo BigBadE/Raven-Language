@@ -6,7 +6,7 @@ use syntax::r#struct::StructData;
 use crate::parser::function_parser::parse_function;
 use crate::parser::struct_parser::{parse_implementor, parse_structure};
 use crate::parser::util::ParserUtils;
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 
 pub fn parse_top(parser_utils: &mut ParserUtils) {
     let mut modifiers = Vec::new();

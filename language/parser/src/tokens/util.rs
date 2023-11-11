@@ -1,6 +1,6 @@
 use syntax::MODIFIERS;
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 
 /// Parses to one of the provided end characters
 pub fn parse_to_character(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]) -> Token {

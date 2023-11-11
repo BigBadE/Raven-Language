@@ -1,5 +1,5 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_attribute_val, parse_to_character, parse_modifier};
 
 /// Handles when the tokenizer isn't in any other state.

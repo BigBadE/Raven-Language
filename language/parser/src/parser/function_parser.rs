@@ -10,7 +10,7 @@ use syntax::types::Types;
 use crate::parser::code_parser::parse_code;
 use crate::parser::struct_parser::{parse_generics, to_field};
 use crate::parser::util::ParserUtils;
-use crate::tokens::tokens::TokenTypes;
+use data::tokens::TokenTypes;
 
 pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
                       -> Result<UnfinalizedFunction, ParsingError> {

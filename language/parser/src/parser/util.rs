@@ -11,7 +11,7 @@ use syntax::types::Types;
 use std::sync::Mutex;
 
 use crate::{ImportNameResolver, TokenTypes};
-use crate::tokens::tokens::Token;
+use data::tokens::Token;
 
 pub struct ParserUtils<'a> {
     pub buffer: &'a [u8],

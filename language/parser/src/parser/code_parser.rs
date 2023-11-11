@@ -5,7 +5,7 @@ use syntax::async_util::UnparsedType;
 use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_while};
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 
 /// Parsers a block of code into its return type (if all code paths lead to a single type, or else a line) and the code body.
 pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, CodeBody), ParsingError> {

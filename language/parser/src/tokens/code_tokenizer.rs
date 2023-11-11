@@ -1,5 +1,5 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_acceptable, parse_numbers};
 
 /// Gets the next token in a block of code.
