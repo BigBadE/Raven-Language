@@ -62,10 +62,6 @@ body {
     line-height: 1;
   }
   
-  h2 {
-    border-bottom: solid 1px #aaa;
-  }
-  
   code {
     border-radius: 5px;
     background-color: #eee;
@@ -73,3 +69,13 @@ body {
     padding: 0 8px;
     font-family: Consolas, Courier, monospace;
   }
+
+  #doc_frame{
+    margin: 0;
+    height: 2000px;
+  }
+
+  .tab-content{
+    
+  }
+  

@@ -2,9 +2,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Documentation • Raven</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link href="../style.css" rel="stylesheet" type="text/css" />
+    <script src="js/bootstrap.js"></script>
   </head>
 <body>
     <nav class="navbar navbar-expand fixed-top navbar-dark bg-dark"> <!-- Creates nav element that is a navbar -->
@@ -17,55 +18,61 @@
           </div>
         </div>
       </nav>
-  
 
       <div class="container about-iframe">
-        <div class="row">
-          <div class="col-lg-3 col-md-6">
-            <!-- Larger column content goes here -->
-            <div class="item">
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-              <h1>Example button</h1>
-            </div>
+      <div class="row">
+        <div class="col-3">
+          <div class="list-group" id="myList" role="tablist">
+            <a class="list-group-item list-group-item-action active" data-bs-toggle="list" href="#tab1" role="tab">Documentation</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab2" role="tab">Installation</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab3" role="tab">Getting Started</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab4" role="tab">Control Flow</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab5" role="tab">Functions</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab6" role="tab">Traits</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab7" role="tab">Structures</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab8" role="tab">Generics</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab9" role="tab">Building</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab10" role="tab">Contributing</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="list" href="#tab11" role="tab">Projects</a>
           </div>
-          <div class="col-lg-9 col-md-6">
-            <!-- Smaller column content goes here -->
-            <div class="item">
-              <iframe class="about-iframe" src="../About/markdownreader.html" frameborder="0"></iframe>
+        </div>
+        
+        <div class="col-9">
+          <div class="tab-content">
+            <div class="tab-pane active" id="tab1" role="tabpanel"> 
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc1/doc1.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab2" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc2/doc2.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab3" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc3/doc3.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab4" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc4/doc4.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab5" role="tabpanel"> 
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc5/doc5.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab6" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc6/doc6.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab7" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc7/doc7.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab8" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc8/doc8.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab9" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc9/doc9.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab10" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc10/doc10.html" frameborder="0"></iframe>
+            </div>
+            <div class="tab-pane" id="tab11" role="tabpanel">
+              <iframe id="doc_frame" class="about-iframe" src="MarkdownReaders/Doc11/doc11.html" frameborder="0"></iframe>
             </div>
           </div>
         </div>
       </div>
-
-
-
-      <!-- <div class="container">
-        <div class="row about-iframe">
-          <div class="col"></div>
-          <div class="col-10"><iframe class="about-iframe" src="../About/markdownreader.html" frameborder="0"></iframe></div>
-        </div>
-      </div> -->
-      
-
-
-      <!-- <div class="container documentation-frame">
-        <h1>Documentation</h1>
-        <h2>Read the Documentation</h2>
-        <div class="row">
-          <div class="col-3"><button type="button" id="mybutton" class="btn btn-warning">Guide on topic A</button></div>
-          <div class="col"><h3>Comprehensive guide on topic A</h3></div>
-        </div>
-      </div> -->
-      
-
-</body>
-
-</html>
+  </body> 
