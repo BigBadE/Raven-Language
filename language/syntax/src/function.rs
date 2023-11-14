@@ -92,7 +92,7 @@ impl TopElement for FunctionData {
         let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
-        locked.compiling.write().unwrap().insert(name, finalized_function.clone());
+        locked.compiling.write().unwrap().insert(name.clone(), finalized_function.clone());
         for waker in &locked.compiling_wakers {
             waker.wake_by_ref();
         }

@@ -68,7 +68,9 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
+    println!("Joining!");
     let failed = JoinWaiter { handle }.await;
+    println!("Joined!");
 
     if failed {
         panic!("Error detected!");
@@ -91,5 +93,6 @@ pub async fn start<T>(compiler_arguments: CompilerArguments, sender: Sender<Opti
                                      locked.strut_compiling.clone(), compiler_arguments);
     }
 
+    println!("Compiled!");
     let _ = sender.send(code_compiler.compile(receiver, &syntax).await).await;
 }

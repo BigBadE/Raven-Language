@@ -293,6 +293,7 @@ impl TopElement for StructData {
     }
 
     async fn verify(handle: Arc<Mutex<HandleWrapper>>, mut current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+        println!("1 - {}", current.data.name);
         let data = current.data.clone();
         let functions = current.functions;
         current.functions = Vec::new();
@@ -305,7 +306,7 @@ impl TopElement for StructData {
                 }
             }
 
-            locked.structures.data.insert(data, structure.clone());
+            locked.structures.data.insert(data.clone(), structure.clone());
         }
 
         for function in functions {

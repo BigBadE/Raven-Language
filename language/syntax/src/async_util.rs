@@ -9,7 +9,7 @@ use std::sync::{Arc};
 use std::task::{Context, Poll, Waker};
 use std::sync::Mutex;
 use tokio::runtime::Handle;
-use tokio::task::JoinHandle;
+use tokio::task::{AbortHandle, JoinHandle};
 
 use crate::{ParsingError, TopElement};
 use crate::function::display_parenless;
@@ -23,14 +23,14 @@ pub struct AsyncTypesGetter<T: TopElement> {
     pub getting: String,
     pub name_resolver: Box<dyn NameResolver>,
     pub not_trait: bool,
-    pub finished: Option<Arc<T>>
+    pub finished: Option<Arc<T>>,
 }
 
 /// A future that asynchronously gets a type's finalized type from its respective AsyncGetter.
 /// Will never deadlock as long finalized types don't depend on it.
 pub struct AsyncDataGetter<T: TopElement> {
     pub syntax: Arc<Mutex<Syntax>>,
-    pub getting: Arc<T>
+    pub getting: Arc<T>,
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
@@ -95,14 +95,14 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 
 impl<T: TopElement> AsyncTypesGetter<T> {
     pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String,
-                    name_resolver: Box<dyn NameResolver>, not_trait: bool) -> Self {
+               name_resolver: Box<dyn NameResolver>, not_trait: bool) -> Self {
         return Self {
             syntax,
             error,
             getting,
             name_resolver,
             finished: None,
-            not_trait
+            not_trait,
         };
     }
 }
@@ -151,8 +151,8 @@ impl<T: TopElement> AsyncDataGetter<T> {
     pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
         return AsyncDataGetter {
             syntax,
-            getting
-        }
+            getting,
+        };
     }
 }
 
@@ -234,16 +234,19 @@ impl NameResolver for EmptyNameResolver {
 pub struct HandleWrapper {
     pub handle: Handle,
     pub joining: Vec<JoinHandle<()>>,
-    pub waker: Option<Waker>
+    pub names: HashMap<String, AbortHandle>,
+    pub waker: Option<Waker>,
 }
 
 impl HandleWrapper {
-    pub fn spawn<T: Send + 'static, F: Future<Output=T> + Send + 'static>(&mut self, future: F) {
+    pub fn spawn<T: Send + 'static, F: Future<Output=T> + Send + 'static>(&mut self, name: String, future: F) {
         let handle = self.handle.spawn(future);
+        self.names.insert(name, handle.abort_handle());
         self.joining.push(unsafe { mem::transmute(handle) });
     }
 
-    pub fn finish_task(&mut self) {
+    pub fn finish_task(&mut self, name: &String) {
+        self.names.remove(&name);
         if let Some(found) = &self.waker {
             found.wake_by_ref();
         }
