@@ -304,9 +304,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                             finalized_effects.clone(), syntax,
                                                             &variables, &resolver, returning).await {
                                 Ok(found) => return Ok(Some(found)),
-                                Err(_error) => {
-                                    println!("Failed for {} and {:?}", method.data.name, finalized_effects);
-                                }
+                                Err(_error) => {}
                             };
                         }
                     }
