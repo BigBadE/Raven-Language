@@ -246,7 +246,7 @@ impl HandleWrapper {
     }
 
     pub fn finish_task(&mut self, name: &String) {
-        self.names.remove(&name);
+        self.names.remove(name);
         if let Some(found) = &self.waker {
             found.wake_by_ref();
         }

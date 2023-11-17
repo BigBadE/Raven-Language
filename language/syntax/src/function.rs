@@ -103,7 +103,7 @@ impl TopElement for FunctionData {
                 found.wake_by_ref();
             }
         }
-        handle.lock().unwrap().finish_task();
+        handle.lock().unwrap().finish_task(&name);
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {
@@ -233,7 +233,8 @@ impl CodelessFinalizedFunction {
 
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();
-            handle.lock().unwrap().spawn(degeneric_code(syntax.clone(), original, resolver.boxed_clone(), new_method.clone(), manager));
+            handle.lock().unwrap().spawn(new_method.data.name.clone(),
+                                         degeneric_code(syntax.clone(), original, resolver.boxed_clone(), new_method.clone(), manager));
 
             return Ok(new_method);
         };

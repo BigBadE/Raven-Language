@@ -262,7 +262,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                                                                finalized_effects));
                             }
 
-                            syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                            syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(target.name.clone(),
                                 degeneric_header(target.clone(),
                                                  found.clone(), syntax.clone(), process_manager.cloned(),
                                                  finalized_effects.clone(), variables.clone()));
@@ -300,11 +300,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 None => None
                             };
 
-                            return match check_method(process_manager, method,
+                            match check_method(process_manager, method.clone(),
                                                             finalized_effects.clone(), syntax,
                                                             &variables, &resolver, returning).await {
-                                Ok(found) => Ok(Some(found)),
-                                Err(error) => panic!("Failed {}, {}", temp.name, error)
+                                Ok(found) => return Ok(Some(found)),
+                                Err(_error) => {
+                                    println!("Failed for {} and {:?}", method.data.name, finalized_effects);
+                                }
                             };
                         }
                     }

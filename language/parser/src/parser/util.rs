@@ -53,7 +53,7 @@ impl<'a> ParserUtils<'a> {
                                   structure.data());
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
-        self.handle.lock().unwrap().spawn(StructData::verify(self.handle.clone(), structure, self.syntax.clone(),
+        self.handle.lock().unwrap().spawn(structure.data.name.clone(), StructData::verify(self.handle.clone(), structure, self.syntax.clone(),
                                                              Box::new(self.imports.clone()), process_manager));
     }
 
@@ -76,7 +76,7 @@ impl<'a> ParserUtils<'a> {
                 locked.errors.push(error);
             }
         }
-        handle.lock().unwrap().finish_task();
+        handle.lock().unwrap().finish_task(&"temp".to_string());
     }
 
     async fn add_implementation(handle: Arc<Mutex<HandleWrapper>>, syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
@@ -125,7 +125,7 @@ impl<'a> ParserUtils<'a> {
         }
 
         for function in implementor.functions {
-            handle.lock().unwrap().spawn(FunctionData::verify(handle.clone(), function, syntax.clone(), resolver.boxed_clone(),
+            handle.lock().unwrap().spawn(function.data.name.clone(), FunctionData::verify(handle.clone(), function, syntax.clone(), resolver.boxed_clone(),
                                  process_manager.cloned()));
         }
 

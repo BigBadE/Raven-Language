@@ -27,7 +27,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let function = parse_function(parser_utils, false, attributes, modifiers);
                 let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
                 let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
-                parser_utils.handle.lock().unwrap().spawn(FunctionData::verify(parser_utils.handle.clone(), function, parser_utils.syntax.clone(),
+                parser_utils.handle.lock().unwrap().spawn(function.data.name.clone(), FunctionData::verify(parser_utils.handle.clone(), function, parser_utils.syntax.clone(),
                                                                Box::new(parser_utils.imports.clone()), process_manager));
 
                 attributes = Vec::new();
@@ -67,7 +67,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                     locked.process_manager.cloned()
                 };
 
-                parser_utils.handle.lock().unwrap().spawn(
+                parser_utils.handle.lock().unwrap().spawn("temp".to_string(),
                         ParserUtils::add_implementor(parser_utils.handle.clone(), parser_utils.syntax.clone(), implementor,
                         parser_utils.imports.boxed_clone(), process_manager));
                 attributes = Vec::new();

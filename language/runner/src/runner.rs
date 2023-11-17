@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use std::sync::Mutex;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::time;
 
 use checker::output::TypesChecker;
 use data::{Arguments, CompilerArguments};
@@ -20,7 +22,8 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
     let handle = Arc::new(Mutex::new(HandleWrapper {
         handle: settings.cpu_runtime.handle().clone(),
         joining: vec!(),
-        waker: None,
+        names: Default::default(),
+        waker: None
     }));
     let mut syntax = Syntax::new(Box::new(
         TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
@@ -68,12 +71,14 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    println!("Joining!");
-    let failed = JoinWaiter { handle }.await;
-    println!("Joined!");
-
-    if failed {
-        panic!("Error detected!");
+    match time::timeout(Duration::from_secs(30), JoinWaiter { handle: handle.clone() }).await {
+        Ok(_) => {}
+        Err(_) => {
+            for (name, _) in &handle.lock().unwrap().names {
+                println!("Infinite loop for {}", name);
+            }
+            panic!();
+        }
     }
 
     let errors = syntax.lock().unwrap().errors.clone();
@@ -93,6 +98,5 @@ pub async fn start<T>(compiler_arguments: CompilerArguments, sender: Sender<Opti
                                      locked.strut_compiling.clone(), compiler_arguments);
     }
 
-    println!("Compiled!");
     let _ = sender.send(code_compiler.compile(receiver, &syntax).await).await;
 }

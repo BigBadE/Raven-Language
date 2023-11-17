@@ -38,10 +38,10 @@ impl Arguments {
             io_runtime: if single_threaded {
                 None
             } else {
-                Some(io_runtime.thread_name("io-runtime").build()
+                Some(io_runtime.enable_time().thread_name("io-runtime").build()
                     .expect("Failed to build I/O runtime"))
             },
-            cpu_runtime: cpu_runtime.thread_name("cpu-runtime").build()
+            cpu_runtime: cpu_runtime.enable_time().thread_name("cpu-runtime").build()
                 .expect("Failed to build CPU runtime"),
             runner_settings
         };
