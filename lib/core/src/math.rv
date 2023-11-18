@@ -51,10 +51,34 @@ trait Not<T> {
     fn not(self) -> T;
 }
 
+#[priority(1000)]
+#[operation(~{})]
+trait BitInvert<T> {
+    fn bit_invert(self) -> T;
+}
+
 #[priority(10)]
 #[operation({}+{})]
 trait Add<E, C> {
     fn add(self, other: E) -> C;
+}
+
+#[priority(5)]
+#[operation({}<<{})]
+trait LeftShift<E, C> {
+    fn left_shift(self, other: E) -> C;
+}
+
+#[priority(5)]
+#[operation({}>>{})]
+trait RightShift<E, C> {
+    fn right_shift(self, other: E) -> C;
+}
+
+#[priority(5)]
+#[operation({}>>>{})]
+trait LogicRightShift<E, C> {
+    fn logic_right_shift(self, other: E) -> C;
 }
 
 #[priority(-100)]
@@ -184,9 +208,33 @@ pub internal impl Not<bool> for bool {
     }
 }
 
+pub internal impl<T: Number> BitInvert<T> for T {
+    fn bit_invert(self) -> T {
+
+    }
+}
+
 //Basic math operations, implemented internally by the compiler.
 pub internal impl<T: Number> Add<T, T> for T {
     fn add(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> LeftShift<T, T> for T {
+    fn left_shift(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> RightShift<T, T> for T {
+    fn right_shift(self, other: T) -> T {
+
+    }
+}
+
+pub internal impl<T: Number> LogicRightShift<T, T> for T {
+    fn logic_right_shift(self, other: T) -> T {
 
     }
 }
