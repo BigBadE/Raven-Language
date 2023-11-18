@@ -39,7 +39,7 @@ jobs:
       run: llvm-profdata merge -sparse default_*.profraw -o raven.profdata
     - name: Upload Coverage report
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./raven-profdata
+      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./raven.profdata
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
