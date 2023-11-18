@@ -49,7 +49,7 @@ impl Token {
             start < end {
             end -= 1;
         }
-        return String::from_utf8_lossy(&buffer[start..end+1]).to_string();
+        return String::from_utf8_lossy(&buffer[start..=end]).to_string();
     }
 }
 
