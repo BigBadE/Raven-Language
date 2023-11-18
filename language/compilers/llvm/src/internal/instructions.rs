@@ -79,6 +79,30 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
+    }  else if name.starts_with("math::RightShift") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+
+        let returning = compiler.builder.build_right_shift(compiler.builder.build_load(pointer_type, "2").into_int_value(),
+                                                       compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), true, "1");
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
+    }  else if name.starts_with("math::LogicRightShift") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+
+        let returning = compiler.builder.build_right_shift(compiler.builder.build_load(pointer_type, "2").into_int_value(),
+                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), false, "1");
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
+    }   else if name.starts_with("math::LeftShift") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+
+        let returning = compiler.builder.build_left_shift(compiler.builder.build_load(pointer_type, "2").into_int_value(),
+                                                           compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::Subtract") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
@@ -168,7 +192,14 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
             .build_not(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "1").into_int_value(), "0");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
-    } else if name.starts_with("math::BitXOR") {
+    }else if name.starts_with("math::BitInvert") {
+        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let returning = compiler.builder
+            .build_not(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "1").into_int_value(), "0");
+        compiler.builder.build_store(malloc, returning);
+        compiler.builder.build_return(Some(&malloc));
+    }  else if name.starts_with("math::BitXOR") {
         let pointer_type = params.get(0).unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
