@@ -1,0 +1,2 @@
+ignore:
+  - "crates"  # Crates that have been modified for Raven

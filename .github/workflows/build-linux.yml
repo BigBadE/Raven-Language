@@ -31,14 +31,6 @@ jobs:
       run: cargo +nightly install cargo-llvm-cov
     - name: Test
       run: cargo +nightly llvm-cov --lcov --output-path coverage.info --bin magpie --verbose -- --nocapture
-    - name: Install LLVM (again)
-      run: sudo apt install llvm
-    - name: Install DeepSource CLI
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: curl https://deepsource.io/cli | sh
-    - name: Upload Coverage Report
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./coverage.info
     - name: Upload Coverage Report To Codecov
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
       uses: codecov/codecov-action@v3
