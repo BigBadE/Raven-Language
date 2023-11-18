@@ -185,7 +185,6 @@ impl CodelessFinalizedFunction {
                 }
             }
         }
-
         // Now all the generic types have been resolved, it's time to replace them with
         // their solidified versions.
         // Degenericed function names have a $ seperating the name and the generics.
