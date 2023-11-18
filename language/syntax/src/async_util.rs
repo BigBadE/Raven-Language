@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::mem;
 use std::ops::DerefMut;
 use std::pin::Pin;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use std::sync::Mutex;
 use tokio::runtime::Handle;
