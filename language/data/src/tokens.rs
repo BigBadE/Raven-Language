@@ -99,6 +99,11 @@ impl CodeErrorToken {
     pub fn make_error(&self, message: String) -> ParsingError{
         return self.token.make_error(self.file_name.clone(), message);
     }
+
+    pub fn change_token_end(&mut self, end_token: &Token) {
+        self.token.end = end_token.end;
+        self.token.end_offset = end_token.end_offset;
+    }
 }
 
 

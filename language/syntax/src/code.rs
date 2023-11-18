@@ -111,7 +111,7 @@ pub enum Effects {
     // An effect wrapped in parenthesis, just a wrapper around the effect to prevent issues with operator merging.
     Paren(Box<Effects>),
     // Creates a variable with the given name and value.
-    CreateVariable(String, Box<Effects>),
+    CreateVariable(String, Box<Effects>, CodeErrorToken),
     // Label of jumping to body
     Jump(String),
     // Comparison effect, and label to jump to the first if true, second if false
@@ -133,7 +133,7 @@ pub enum Effects {
     // An unresolved operation, sent to the checker to resolve, with the given arguments.
     Operation(String, Vec<Effects>, CodeErrorToken),
     // Struct to create and a tuple of the name of the field and the argument.
-    CreateStruct(UnparsedType, Vec<(String, Effects)>),
+    CreateStruct(UnparsedType, Vec<(String, Effects, CodeErrorToken)>, CodeErrorToken),
     // Creates an array of the given effects.
     CreateArray(Vec<Effects>),
     // Creates a constant of the given type.

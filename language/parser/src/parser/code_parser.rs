@@ -6,6 +6,7 @@ use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_w
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use data::tokens::{Token, TokenTypes};
+use data::tokens::CodeErrorToken;
 
 /// Parsers a block of code into its return type (if all code paths lead to a single type, or else a line) and the code body.
 pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, CodeBody), ParsingError> {
@@ -400,6 +401,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
 
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let name;
+    let mut error_token;
     {
         let next = parser_utils.tokens.get(parser_utils.index).unwrap();
         if let TokenTypes::Variable = next.token_type {
@@ -408,15 +410,21 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             return Err(next.make_error(parser_utils.file.clone(), "Unexpected token, expected variable name!".to_string()));
         }
 
-        if let TokenTypes::Equals = parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {} else {
+        if let TokenTypes::Equals = parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {
+
+        } else {
             return Err(next.make_error(parser_utils.file.clone(), format!("Unexpected {:?}, expected equals!", next)));
         }
         parser_utils.index += 2;
+        error_token = CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone());
     }
 
     // If the rest of the line doesn't exist, return an error because the value must be set to something.
     return match parse_line(parser_utils, ParseState::None)? {
-        Some(line) => Ok(Effects::CreateVariable(name, Box::new(line.effect))),
+        Some(line) => {
+            error_token.change_token_end(&parser_utils.tokens[parser_utils.index - 2]);
+            Ok(Effects::CreateVariable(name, Box::new(line.effect), error_token))
+        }
         None => Err(parser_utils.tokens.get(parser_utils.index).unwrap()
             .make_error(parser_utils.file.clone(), "Expected value, found void!".to_string()))
     };
@@ -426,6 +434,8 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let mut types: Option<UnparsedType> = None;
 
     let values;
+
+    let type_token = parser_utils.tokens[parser_utils.index].clone();
 
     loop {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -447,10 +457,11 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
         }
     }
 
-    return Ok(Effects::CreateStruct(types.unwrap(), values));
+    return Ok(Effects::CreateStruct(types.unwrap(), values, 
+        CodeErrorToken::new(type_token, parser_utils.file.clone())));
 }
 
-fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects)>, ParsingError> {
+fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects, CodeErrorToken)>, ParsingError> {
     let mut values = Vec::new();
     let mut name = String::new();
     loop {
@@ -468,7 +479,8 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
                 } else {
                     Effects::LoadVariable(name.clone())
                 };
-                values.push((name, effect));
+                values.push((name, effect,
+                    CodeErrorToken::new(parser_utils.tokens[parser_utils.index - 4].clone(), parser_utils.file.clone())));
                 name = String::new();
             }
             TokenTypes::BlockEnd => break,

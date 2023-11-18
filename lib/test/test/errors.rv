@@ -1,8 +1,5 @@
 import stdio;
 
 fn test() -> bool {
-
-  let val = 1 + ;
-
   return false;
 }

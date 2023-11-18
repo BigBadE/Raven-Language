@@ -414,12 +414,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             FinalizedEffects::CompareJump(Box::new(
                 verify_effect(process_manager, resolver, *effect, return_type, syntax, variables, references).await?),
                                           first, second),
-        Effects::CreateStruct(target, effects) => {
-            let target = Syntax::parse_type(syntax.clone(), placeholder_error(format!("Test")),
+        Effects::CreateStruct(target, effects, token) => {
+            let target = Syntax::parse_type(syntax.clone(), token.make_error(format!("Failed to find type {}", target)),
                                             resolver.boxed_clone(), target, vec!())
                 .await?.finalize(syntax.clone()).await;
             let mut final_effects = Vec::new();
-            for (field_name, effect) in effects {
+            for (field_name, effect, field_token) in effects {
                 let mut i = 0;
                 let fields = target.get_fields();
                 for field in fields {
@@ -430,7 +430,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 }
 
                 if i == fields.len() {
-                    return Err(placeholder_error(format!("Unknown field {}!", field_name)));
+                    return Err(field_token.make_error(format!("Unknown field {}!", field_name)));
                 }
 
                 final_effects.push((i, verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?));
@@ -445,13 +445,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             let types = output.get_return(variables).unwrap().inner_struct().clone();
             FinalizedEffects::Load(Box::new(output), target.clone(), types)
         }
-        Effects::CreateVariable(name, effect) => {
+        Effects::CreateVariable(name, effect, token) => {
             let effect = verify_effect(process_manager, resolver, *effect, return_type, syntax, variables, references).await?;
             let found;
             if let Some(temp_found) = effect.get_return(variables) {
                 found = temp_found;
             } else {
-                return Err(placeholder_error("No return type!".to_string()));
+                return Err(token.make_error("No return type!".to_string()));
             };
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)

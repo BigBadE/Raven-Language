@@ -4,6 +4,7 @@ use syntax::ParsingError;
 
 use crate::{ParserUtils, TokenTypes};
 use crate::parser::code_parser::{parse_code, parse_line, ParseState};
+use data::tokens::CodeErrorToken;
 
 /// Parses an if statement into a single expression.
 pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingError> {
@@ -104,11 +105,13 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     let name = name.to_string(parser_utils.buffer);
 
     // Gets the variable we're looping over
+    let mut error_token = CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone());
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
         return Err(parser_utils.tokens.get(parser_utils.index).unwrap().make_error(
             parser_utils.file.clone(), "Expected iterator, found void".to_string()));
     }
+    error_token.change_token_end(&parser_utils.tokens[parser_utils.index]);
 
     // Checks for the code start
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
@@ -123,7 +126,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
 
     // Returns the finished for loop.
     return create_for(name, effect.unwrap().effect,
-                      body, parser_utils.imports.last_id - 2);
+                      body, parser_utils.imports.last_id - 2, error_token);
 }
 
 pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
@@ -254,18 +257,18 @@ fn create_if(effect: Effects, body: CodeBody,
     return Ok(Effects::CodeBody(top));
 }
 
-fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
+fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32, error_token: CodeErrorToken) -> Result<Effects, ParsingError> {
     let mut top = Vec::new();
     let variable = format!("$iter{}", id);
     top.insert(0, Expression::new(ExpressionType::Line,
-                                  Effects::CreateVariable(variable.clone(), Box::new(effect))));
+                                  Effects::CreateVariable(variable.clone(), Box::new(effect), error_token.clone())));
     top.push(Expression::new(ExpressionType::Line,
     Effects::Jump((id + 1).to_string())));
     // Adds a call to the Iter::next function at the top of the for loop.
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
                                                Effects::CreateVariable(name.clone(), Box::new(Effects::ImplementationCall(
                                                    Box::new(Effects::LoadVariable(variable.clone())),
-                                                   "iter::Iter".to_string(), "next".to_string(), vec!(), None)))));
+                                                   "iter::Iter".to_string(), "next".to_string(), vec!(), None)), error_token.clone())));
 
     // Jumps to the header of the for loop after each loop
     body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id + 1).to_string())));
