@@ -328,7 +328,7 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
 
                 // match the character after the \ to see what type of escape character it is
                 let index = if is_hex { found.len() - 3 } else { found.len() - 1 };
-                match &found[index..index + 1] {
+                match &found[index..=index] {
                     "n" => {
                         string += "\n";
                     }
