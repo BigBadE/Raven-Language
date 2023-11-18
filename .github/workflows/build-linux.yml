@@ -29,6 +29,17 @@ jobs:
       run: rustup toolchain install nightly
     - name: Test
       run: RUSTFLAGS="-C instrument-coverage" cargo +nightly test --verbose --bin magpie -- --nocapture
+    - name: Install LLVM (again)
+      run: sudo apt install llvm
+    - name: Install DeepSource CLI
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      run: curl https://deepsource.io/cli | sh
+    - name: Merge Coverage report
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      run: llvm-profdata merge -sparge default_*.profraw -o raven.profdata
+    - name: Upload Coverage report
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./raven-profdata
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
@@ -49,14 +60,3 @@ jobs:
           asset_path: target/release/magpie-wrapper
           asset_name: Magpie-wrapper-linux
           overwrite: true
-    - name: Test
-      run: llvm-config
-    - name: Install DeepSource CLI
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: curl https://deepsource.io/cli | sh
-    - name: Merge Coverage report
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: llvm-profdata merge -sparge default_*.profraw -o raven.profdata
-    - name: Upload Coverage report
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./raven-profdata
