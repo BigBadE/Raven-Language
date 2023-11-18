@@ -36,9 +36,16 @@ jobs:
     - name: Install DeepSource CLI
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
       run: curl https://deepsource.io/cli | sh
-    - name: Upload Coverage report
+    - name: Upload Coverage Report
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
       run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./coverage.info
+    - name: Upload Coverage Report To Codecov
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.info
+        verbose: true
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
