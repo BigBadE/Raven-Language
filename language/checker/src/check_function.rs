@@ -6,7 +6,7 @@ use syntax::async_util::NameResolver;
 use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use crate::finalize_generics;
+use crate::{CodeVerifier, finalize_generics};
 use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
 
@@ -45,8 +45,8 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
 
 pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<dyn NameResolver>,
                              code: CodeBody,
-                             codeless: CodelessFinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
-                             include_refs: bool) -> Result<FinalizedFunction, ParsingError> {
+                             codeless: CodelessFinalizedFunction, syntax: &Arc<Mutex<Syntax>>)
+    -> Result<FinalizedFunction, ParsingError> {
     {
         let mut locked = syntax.lock().unwrap();
         if let Some(wakers) = locked.functions.wakers.remove(&codeless.data.name) {
@@ -64,9 +64,13 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
     }
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
-
-    let mut code = verify_code(process_manager, &resolver, code, &codeless.return_type, syntax,
-                               &mut variable_manager, include_refs, true).await?;
+    let mut code_verifier = CodeVerifier {
+        process_manager,
+        resolver,
+        return_type: codeless.return_type.clone(),
+        syntax: syntax.clone()
+    };
+    let mut code = verify_code(&mut code_verifier, &mut variable_manager, code, true).await?;
 
     if !code.returns {
         if codeless.return_type.is_none() {

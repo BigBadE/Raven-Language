@@ -4,13 +4,20 @@ extern crate core;
 
 use std::sync::Arc;
 use std::sync::Mutex;
+
 use indexmap::IndexMap;
-use syntax::types::{FinalizedTypes, Types};
+
 use syntax::{ParsingError, ParsingFuture};
+use syntax::async_util::NameResolver;
 use syntax::syntax::Syntax;
+use syntax::types::{FinalizedTypes, Types};
+
+use crate::output::TypesChecker;
 
 pub mod check_function;
 pub mod check_code;
+pub mod check_method_call;
+pub mod check_operator;
 pub mod check_struct;
 pub mod output;
 
@@ -27,10 +34,9 @@ pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<S
     return Ok(output);
 }
 
-pub trait Add<T, E> {}
-
-pub trait AddAndAssign<T, E> {}
-
-impl<T: Add<E, T>, E> AddAndAssign<T, E> for T {
-
+pub struct CodeVerifier<'a> {
+    process_manager: &'a TypesChecker,
+    resolver: Box<dyn NameResolver>,
+    return_type: Option<FinalizedTypes>,
+    syntax: Arc<Mutex<Syntax>>
 }

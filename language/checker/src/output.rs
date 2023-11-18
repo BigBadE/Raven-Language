@@ -51,7 +51,7 @@ impl ProcessManager for TypesChecker {
 
     async fn verify_code(&self, function: CodelessFinalizedFunction, code: CodeBody,
                          resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction {
-        return match verify_function_code(self, resolver, code, function, syntax, self.include_refs).await {
+        return match verify_function_code(self, resolver, code, function, syntax).await {
             Ok(output) => output,
             Err(error) => {
                 syntax.lock().unwrap().errors.push(error.clone());
