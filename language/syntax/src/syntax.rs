@@ -270,14 +270,13 @@ impl Syntax {
             let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
             // Gets the name of the operation, or errors if there isn't one.
-            let name = match Attribute::find_attribute("operation", &adding.attributes).unwrap() {
-                Attribute::String(_, name) => name.replace("{+}", "{}").clone(),
-                _ => {
-                    let mut error = ParsingError::empty();
-                    error.message = format!("Expected a string with attribute operator!");
-                    locked.errors.push(error);
-                    return;
-                }
+            let name = if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
+                name.replace("{+}", "{}").clone()
+            } else {
+                let mut error = ParsingError::empty();
+                error.message = format!("Expected a string with attribute operator!");
+                locked.errors.push(error);
+                return;
             };
 
             // Checks if there is a duplicate of that operation.

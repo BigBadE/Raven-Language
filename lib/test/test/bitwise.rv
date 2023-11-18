@@ -29,5 +29,37 @@ fn test() -> bool {
     if a ^ b != 0 {
         return false;
     }
+
+    // Bit invert test
+    if (~a) != (~b) {
+        return false;
+    }
+
+    // Bit invert test
+    if ~a == b {
+        return false;
+    }
+
+    // Bit shift test
+    if a >> 2 << 2 != a {
+        return false;
+    }
+
+    if a >>> 3 << 3 != a {
+        return false;
+    }
+
+    if a << 2 != 8 {
+        return false;
+    }
+
+    if a >> 2 != 0 {
+        return false;
+    }
+
+    if a << b != a << 4 >> 2 {
+        return false;
+    }
+
     return true;
 }
