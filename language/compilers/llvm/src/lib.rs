@@ -58,7 +58,7 @@ impl<T> Compiler<T> for LLVMCompiler {
 
         if CompilerImpl::compile(&mut binding, &self.arguments,
                                  syntax, &self.compiling, &self.struct_compiling).await {
-            if let Some(_) = receiver.recv().await {
+            if receiver.recv().await.is_some() {
                 return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
             }
         } else {
