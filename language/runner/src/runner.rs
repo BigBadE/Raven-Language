@@ -71,7 +71,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     syntax.lock().unwrap().finish();
 
-    match time::timeout(Duration::from_secs(30), JoinWaiter { handle: handle.clone() }).await {
+    match time::timeout(Duration::from_secs(5), JoinWaiter { handle: handle.clone() }).await {
         Ok(_) => {}
         Err(_) => {
             for (name, _) in &handle.lock().unwrap().names {

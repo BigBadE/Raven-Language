@@ -16,6 +16,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   LLVM_SYS_130_PREFIX: ${{github.workspace}}/llvm
+  DEEPSOURCE_DSN: ${{secrets.DEEPSOURCE_DSN}}
 
 jobs:
   build:
@@ -40,7 +41,7 @@ jobs:
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test
-      run: cargo +nightly test --verbose --bin magpie -- --nocapture
+      run: RUSTFLAGS="-C instrument-coverage" cargo +nightly test --verbose --bin magpie -- --nocapture
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
@@ -61,3 +62,12 @@ jobs:
           asset_path: target/release/magpie-wrapper.exe
           asset_name: Magpie-wrapper-windows.exe
           overwrite: true
+    - name: Install DeepSource CLI
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      run: curl https://deepsource.io/cli | sh
+    - name: Merge Coverage report
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      run: ./llvm/bin/llvm-profdata merge -sparge default_*.profraw -o raven.profdata
+    - name: Upload Coverage report
+      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./raven-profdata

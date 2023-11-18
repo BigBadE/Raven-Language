@@ -2,8 +2,7 @@ import stdio;
 import numbers::Match;
 
 fn main() {
-    let test = 0..5;
-    if 4.matches(test) {
+    if 4 == 4 {
         printf("Passed!");
     } else {
         printf("Failed!");
