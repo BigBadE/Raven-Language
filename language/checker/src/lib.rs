@@ -15,6 +15,7 @@ use syntax::types::{FinalizedTypes, Types};
 use crate::output::TypesChecker;
 
 pub mod check_function;
+pub mod check_impl_call;
 pub mod check_code;
 pub mod check_method_call;
 pub mod check_operator;
