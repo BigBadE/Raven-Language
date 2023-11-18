@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use json::JsonValue;
 use reqwest::blocking::Client;
 
-static URL: &'static str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
+static URL: &str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
 
 fn main() {
     println!("Checking version...");
