@@ -7,4 +7,8 @@ fn main() {
     } else {
         printf("Failed!");
     }
+
+    for thing in my_struct.iter().some_other_call() {
+
+    }
 }

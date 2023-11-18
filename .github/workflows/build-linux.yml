@@ -49,6 +49,8 @@ jobs:
           asset_path: target/release/magpie-wrapper
           asset_name: Magpie-wrapper-linux
           overwrite: true
+    - name: Test
+      run: llvm-config
     - name: Install DeepSource CLI
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
       run: curl https://deepsource.io/cli | sh
