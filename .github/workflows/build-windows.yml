@@ -41,6 +41,7 @@ jobs:
     - name: Add Nightly
       run: rustup toolchain install nightly
     - name: Test
+      shell: bash
       run: RUSTFLAGS="-C instrument-coverage" cargo +nightly test --verbose --bin magpie -- --nocapture
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
