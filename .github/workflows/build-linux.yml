@@ -27,19 +27,18 @@ jobs:
         submodules: true
     - name: Add Nightly
       run: rustup toolchain install nightly
+    - name: Install Code Coverage
+      run: cargo +nightly install cargo-llvm-cov
     - name: Test
-      run: RUSTFLAGS="-C instrument-coverage" cargo +nightly test --verbose --bin magpie -- --nocapture
+      run: cargo +nightly llvm-cov --lcov --output-path coverage.info --bin magpie --verbose -- --nocapture
     - name: Install LLVM (again)
       run: sudo apt install llvm
     - name: Install DeepSource CLI
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
       run: curl https://deepsource.io/cli | sh
-    - name: Merge Coverage report
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: llvm-profdata merge -sparse default_*.profraw -o raven.profdata
     - name: Upload Coverage report
       if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./raven.profdata
+      run: ./bin/deepsource report --analyzer test-coverage --key rust --value-file ./coverage.info
     - name: Build
       run: cargo +nightly build --verbose --release --bin magpie
     - name: Build Wrapper
