@@ -108,7 +108,7 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
 
         match next {
             // if the last character was a \, then the quote is escaped, so don't end the string here
-            b'"' => return if /*tokenizer.last.token_type != TokenTypes::StringEscape*/tokenizer.buffer[tokenizer.index - 1] != '\\' as u8 {
+            b'"' => return if /*tokenizer.last.token_type != TokenTypes::StringEscape*/tokenizer.buffer[tokenizer.index - 1] != b'\\' {
                 tokenizer.state = if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
                     TokenizerState::CODE_TO_STRUCT_TOP
                 } else {
