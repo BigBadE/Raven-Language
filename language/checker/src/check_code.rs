@@ -91,6 +91,9 @@ pub async fn verify_effect(
     variables: &mut SimpleVariableManager,
     effect: Effects,
 ) -> Result<FinalizedEffects, ParsingError> {
+    if let Some(found) = finalize_basic(&effect) {
+        return found;
+    }
     let output = match effect {
         Effects::Paren(inner) => verify_effect(code_verifier, variables, *inner).await?,
         Effects::CodeBody(body) => FinalizedEffects::CodeBody(
@@ -164,15 +167,6 @@ pub async fn verify_effect(
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
         }
-        Effects::NOP => panic!("Tried to compile a NOP!"),
-        Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
-        Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
-        Effects::Float(float) => store(FinalizedEffects::Float(float)),
-        Effects::Int(int) => store(FinalizedEffects::UInt(int as u64)),
-        Effects::UInt(uint) => store(FinalizedEffects::UInt(uint)),
-        Effects::Bool(bool) => store(FinalizedEffects::Bool(bool)),
-        Effects::String(string) => store(FinalizedEffects::String(string)),
-        Effects::Char(char) => store(FinalizedEffects::Char(char)),
         Effects::CreateArray(effects) => {
             let mut output = Vec::default();
             for effect in effects {
@@ -184,8 +178,24 @@ pub async fn verify_effect(
 
             store(FinalizedEffects::CreateArray(types, output))
         }
+        _ => unreachable!(),
     };
     return Ok(output);
+}
+
+async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
+    return Some(match effects {
+        Effects::NOP => panic!("Tried to compile a NOP!"),
+        Effects::Jump(jumping) => FinalizedEffects::Jump(jumping.clone()),
+        Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable.clone()),
+        Effects::Float(float) => store(FinalizedEffects::Float(*float)),
+        Effects::Int(int) => store(FinalizedEffects::UInt(*int as u64)),
+        Effects::UInt(uint) => store(FinalizedEffects::UInt(*uint)),
+        Effects::Bool(bool) => store(FinalizedEffects::Bool(*bool)),
+        Effects::String(string) => store(FinalizedEffects::String(string.clone())),
+        Effects::Char(char) => store(FinalizedEffects::Char(*char)),
+        _ => return None,
+    });
 }
 
 async fn check_type(
