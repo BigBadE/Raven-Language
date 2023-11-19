@@ -1,10 +1,12 @@
 use core::fmt::Debug;
-use std::{env, path, ptr};
 use std::sync::atomic::{AtomicPtr, Ordering};
+use std::{env, path, ptr};
 
-use include_dir::{Dir, DirEntry, File, include_dir};
+use include_dir::{include_dir, Dir, DirEntry, File};
 
-use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
+use data::{
+    Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet,
+};
 
 pub mod project;
 mod test;
@@ -20,21 +22,41 @@ fn main() {
 
     if args.len() == 2 {
         let target = env::current_dir().unwrap().join(args[1].clone());
-        let mut arguments = Arguments::build_args(false, RunnerSettings {
-            sources: vec!(),
-            debug: false,
-            compiler_arguments: CompilerArguments {
-                target: format!("{}::main", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")),
-                compiler: "llvm".to_string(),
-                temp_folder: env::current_dir().unwrap().join("target")
-            }
-        });
+        let mut arguments = Arguments::build_args(
+            false,
+            RunnerSettings {
+                sources: vec![],
+                debug: false,
+                compiler_arguments: CompilerArguments {
+                    target: format!(
+                        "{}::main",
+                        args[1]
+                            .clone()
+                            .split(path::MAIN_SEPARATOR)
+                            .last()
+                            .unwrap()
+                            .replace(".rv", "")
+                    ),
+                    compiler: "llvm".to_string(),
+                    temp_folder: env::current_dir().unwrap().join("target"),
+                },
+            },
+        );
 
-        println!("Building and running {}...", args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", ""));
-        match build::<()>(&mut arguments, vec!(Box::new(FileSourceSet {
-            root: target,
-        }))) {
-            _ => return
+        println!(
+            "Building and running {}...",
+            args[1]
+                .clone()
+                .split(path::MAIN_SEPARATOR)
+                .last()
+                .unwrap()
+                .replace(".rv", "")
+        );
+        match build::<()>(
+            &mut arguments,
+            vec![Box::new(FileSourceSet { root: target })],
+        ) {
+            _ => return,
         }
     } else if args.len() > 2 {
         panic!("Unknown extra arguments! {:?}", args);
@@ -47,15 +69,18 @@ fn main() {
         return;
     }
 
-    let mut arguments = Arguments::build_args(false, RunnerSettings {
-        sources: vec!(),
-        debug: false,
-        compiler_arguments: CompilerArguments {
-            target: "build::project".to_string(),
-            compiler: "llvm".to_string(),
-            temp_folder: env::current_dir().unwrap().join("target")
-        }
-    });
+    let mut arguments = Arguments::build_args(
+        false,
+        RunnerSettings {
+            sources: vec![],
+            debug: false,
+            compiler_arguments: CompilerArguments {
+                target: "build::project".to_string(),
+                compiler: "llvm".to_string(),
+                temp_folder: env::current_dir().unwrap().join("target"),
+            },
+        },
+    );
 
     println!("Setting up build...");
     /*let project = match build::<RawRavenProject>(&mut arguments, vec!(Box::new(FileSourceSet {
@@ -79,33 +104,35 @@ fn main() {
     }
 
     println!("Building and running project...");
-    match build::<()>(&mut arguments, vec!(Box::new(FileSourceSet {
-        root: source
-    }))) {
+    match build::<()>(
+        &mut arguments,
+        vec![Box::new(FileSourceSet { root: source })],
+    ) {
         _ => {}
     }
 }
 
-pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>)
-    -> Result<Option<T>, ()> {
+pub fn build<T: Send + 'static>(
+    arguments: &mut Arguments,
+    mut source: Vec<Box<dyn SourceSet>>,
+) -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
         "linux" => &STD_LINUX,
         "macos" => &STD_MACOS,
-        _ => panic!("Unsupported platform {}!", env::consts::OS)
+        _ => panic!("Unsupported platform {}!", env::consts::OS),
     };
 
     source.push(Box::new(InnerSourceSet {
-        set: &STD_UNIVERSAL
+        set: &STD_UNIVERSAL,
     }));
-    source.push(Box::new(InnerSourceSet {
-        set: platform_std
-    }));
-    source.push(Box::new(InnerSourceSet {
-        set: &CORE
-    }));
+    source.push(Box::new(InnerSourceSet { set: platform_std }));
+    source.push(Box::new(InnerSourceSet { set: &CORE }));
 
-    arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
+    arguments.runner_settings.sources = source
+        .iter()
+        .map(|inner| inner.cloned())
+        .collect::<Vec<_>>();
 
     let value = run::<T>(&arguments);
     return match value {
@@ -116,12 +143,14 @@ pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<d
                 error.print(&source);
             }
             Err(())
-        },
-    }
+        }
+    };
 }
 
 fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = arguments.cpu_runtime.block_on(runner::runner::run::<AtomicPtr<T>>(&arguments))?;
+    let result = arguments
+        .cpu_runtime
+        .block_on(runner::runner::run::<AtomicPtr<T>>(&arguments))?;
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
@@ -143,8 +172,7 @@ impl SourceSet for InnerSourceSet {
     }
 
     fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path()
-            .replace(path::MAIN_SEPARATOR, "::");
+        let name = other.path().replace(path::MAIN_SEPARATOR, "::");
         return name[0..name.len() - 3].to_string();
     }
 
@@ -159,9 +187,7 @@ fn read_recursive(base: &Dir<'static>, output: &mut Vec<Box<dyn Readable>>) {
             DirEntry::Dir(directory) => {
                 read_recursive(directory, output);
             }
-            DirEntry::File(file) => {
-                output.push(Box::new(FileWrapper { file }))
-            }
+            DirEntry::File(file) => output.push(Box::new(FileWrapper { file })),
         }
     }
 }

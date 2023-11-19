@@ -1,6 +1,6 @@
-use syntax::MODIFIERS;
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
 use crate::tokens::tokens::{Token, TokenTypes};
+use syntax::MODIFIERS;
 
 /// Parses to one of the provided end characters
 pub fn parse_to_character(tokenizer: &mut Tokenizer, token_type: TokenTypes, end: &[u8]) -> Token {
@@ -62,7 +62,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
                     tokenizer.make_token(TokenTypes::Integer)
                 } else {
                     tokenizer.make_token(TokenTypes::Float)
-                }
+                };
             } else {
                 float = true;
             }
@@ -70,7 +70,7 @@ pub fn parse_numbers(tokenizer: &mut Tokenizer) -> Token {
             if !character.is_numeric() {
                 return if float {
                     // If no number is after the period assume it's a method call not a float.
-                    if tokenizer.buffer[tokenizer.index-1] == b'.' {
+                    if tokenizer.buffer[tokenizer.index - 1] == b'.' {
                         tokenizer.index -= 1;
                         tokenizer.make_token(TokenTypes::Integer)
                     } else {
@@ -108,18 +108,22 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
 
         match next {
             // if the last character was a \, then the quote is escaped, so don't end the string here
-            b'"' => return if /*tokenizer.last.token_type != TokenTypes::StringEscape*/tokenizer.buffer[tokenizer.index - 1] != b'\\' {
-                tokenizer.state = if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
-                    TokenizerState::CODE_TO_STRUCT_TOP
+            b'"' => {
+                return if
+                /*tokenizer.last.token_type != TokenTypes::StringEscape*/
+                tokenizer.buffer[tokenizer.index - 1] != b'\\' {
+                    tokenizer.state =
+                        if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
+                            TokenizerState::CODE_TO_STRUCT_TOP
+                        } else {
+                            TokenizerState::CODE
+                        };
+                    tokenizer.make_token(TokenTypes::StringEnd)
                 } else {
-                    TokenizerState::CODE
+                    tokenizer.make_token(TokenTypes::StringStart)
                 };
-                tokenizer.make_token(TokenTypes::StringEnd)
-            } else {
-                tokenizer.make_token(TokenTypes::StringStart)
-            },
+            }
             b'\\' => {
-
                 // if it is a hex value, then increment the tokenizer by an extra 2 because
                 // the escape character is 4 characters long instead of 2 (ex. \xAA)
                 if tokenizer.buffer[tokenizer.index] == b'x' {
@@ -131,8 +135,8 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
                 //   would be included in the string
                 tokenizer.index += 1;
 
-                return tokenizer.make_token(TokenTypes::StringEscape)
-            },
+                return tokenizer.make_token(TokenTypes::StringEscape);
+            }
             _ => {}
         }
     }
@@ -146,9 +150,13 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
         }
         //              T       : Test       <             Other   <             Second  >               >               ,          E       : Yep
         //GenericsStart Generic GenericBound GenericsStart Generic GenericsStart Generic GenericBoundEnd GenericBoundEnd GenericEnd Generic GenericBound
-        TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericBoundEnd =>
+        TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericBoundEnd => {
             if tokenizer.matches(":") || tokenizer.matches("+") {
-                parse_to_character(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
+                parse_to_character(
+                    tokenizer,
+                    TokenTypes::GenericBound,
+                    &[b',', b'+', b'>', b'<'],
+                )
             } else if tokenizer.matches("<") {
                 tokenizer.generic_depth += 1;
                 tokenizer.make_token(TokenTypes::GenericsStart)
@@ -160,10 +168,12 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
                     // The generics are done, break of out the generic state
                     tokenizer.state = match tokenizer.state {
                         TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
-                        TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
+                        TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => {
+                            TokenizerState::FUNCTION_TO_STRUCT_TOP
+                        }
                         TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
                         TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
-                        _ => panic!("Unexpected generic state!")
+                        _ => panic!("Unexpected generic state!"),
                     };
                     // Reset the generic depth variable in the tokenizer
                     tokenizer.generic_depth = 1;
@@ -173,7 +183,8 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
                 }
             } else {
                 tokenizer.handle_invalid()
-            },
-        token_type => panic!("How'd you get here? {:?}", token_type)
+            }
+        }
+        token_type => panic!("How'd you get here? {:?}", token_type),
     };
 }

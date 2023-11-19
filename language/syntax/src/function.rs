@@ -10,10 +10,15 @@ use std::task::{Context, Poll};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::{Attribute, ParsingError, TopElement, Types, ProcessManager, Syntax, TopElementManager, is_modifier, Modifier, ParsingFuture, DataType, SimpleVariableManager};
 use crate::async_util::{AsyncDataGetter, HandleWrapper, NameResolver};
-use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
+use crate::code::{
+    Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField,
+};
 use crate::types::FinalizedTypes;
+use crate::{
+    is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager,
+    SimpleVariableManager, Syntax, TopElement, TopElementManager, Types,
+};
 
 /// The static data of a function, which is set during parsing and immutable throughout the entire compilation process.
 /// Generics will copy this and change the name and types, but never modify the original.
@@ -41,7 +46,7 @@ impl FunctionData {
             attributes: Vec::default(),
             modifiers: 0,
             name,
-            poisoned: vec!(error),
+            poisoned: vec![error],
         };
     }
 }
@@ -81,18 +86,27 @@ impl TopElement for FunctionData {
     }
 
     /// Verifies the function and adds it to the compiler after it finished verifying.
-    async fn verify(handle: Arc<Mutex<HandleWrapper>>, current: UnfinalizedFunction, syntax: Arc<Mutex<Syntax>>,
-                    resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
+    async fn verify(
+        handle: Arc<Mutex<HandleWrapper>>,
+        current: UnfinalizedFunction,
+        syntax: Arc<Mutex<Syntax>>,
+        resolver: Box<dyn NameResolver>,
+        process_manager: Box<dyn ProcessManager>,
+    ) {
         let name = current.data.name.clone();
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
         // Finalize the code and combine it with the codeless finalized function.
-        let finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
+        let finalized_function = process_manager
+            .verify_code(codeless_function, code, resolver, &syntax)
+            .await;
         let finalized_function = Arc::new(finalized_function);
         let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
-        locked.compiling.insert(name.clone(), finalized_function.clone());
+        locked
+            .compiling
+            .insert(name.clone(), finalized_function.clone());
         for waker in &locked.compiling_wakers {
             waker.wake_by_ref();
         }
@@ -158,15 +172,26 @@ impl CodelessFinalizedFunction {
     /// This can't always figure out return types, so an optional return type variable is passed as well
     /// for function calls that include them (see Effects::MethodCall)
     /// The VariableManager here is for the arguments to the function, and not for the function itself.
-    pub async fn degeneric(method: Arc<CodelessFinalizedFunction>, mut manager: Box<dyn ProcessManager>,
-                           arguments: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                           variables: &SimpleVariableManager, resolver: &dyn NameResolver,
-                           returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
+    pub async fn degeneric(
+        method: Arc<CodelessFinalizedFunction>,
+        mut manager: Box<dyn ProcessManager>,
+        arguments: &Vec<FinalizedEffects>,
+        syntax: &Arc<Mutex<Syntax>>,
+        variables: &SimpleVariableManager,
+        resolver: &dyn NameResolver,
+        returning: Option<FinalizedTypes>,
+    ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
             if let Some(returning) = returning {
-                inner.resolve_generic(&returning, syntax, manager.mut_generics(),
-                                      placeholder_error("Invalid bounds!".to_string())).await?;
+                inner
+                    .resolve_generic(
+                        &returning,
+                        syntax,
+                        manager.mut_generics(),
+                        placeholder_error("Invalid bounds!".to_string()),
+                    )
+                    .await?;
             }
         }
 
@@ -175,24 +200,41 @@ impl CodelessFinalizedFunction {
             let mut effect = arguments[i].get_return(variables).unwrap();
             effect.fix_generics(resolver, syntax).await?;
             match method.arguments[i]
-                .field.field_type.resolve_generic(&effect, syntax, manager.mut_generics(),
-                                                  placeholder_error(
-                                                      format!("Invalid bounds! {:?}", arguments[i]))).await {
-                Ok(_) => {},
+                .field
+                .field_type
+                .resolve_generic(
+                    &effect,
+                    syntax,
+                    manager.mut_generics(),
+                    placeholder_error(format!("Invalid bounds! {:?}", arguments[i])),
+                )
+                .await
+            {
+                Ok(_) => {}
                 Err(error) => {
                     println!("error: {}", error);
-                    return Err(error)
+                    return Err(error);
                 }
             }
         }
         // Now all the generic types have been resolved, it's time to replace them with
         // their solidified versions.
         // Degenericed function names have a $ seperating the name and the generics.
-        let name = format!("{}${}", method.data.name.split("$").next().unwrap(), display_parenless(
-            &manager.generics().values().collect(), "_"));
+        let name = format!(
+            "{}${}",
+            method.data.name.split("$").next().unwrap(),
+            display_parenless(&manager.generics().values().collect(), "_")
+        );
         // If this function has already been degenericed, use the previous one.
         if syntax.lock().unwrap().functions.types.contains_key(&name) {
-            let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
+            let data = syntax
+                .lock()
+                .unwrap()
+                .functions
+                .types
+                .get(&name)
+                .unwrap()
+                .clone();
             return Ok(AsyncDataGetter::new(syntax.clone(), data).await);
         } else {
             // Copy the method and degeneric every type inside of it.
@@ -204,16 +246,28 @@ impl CodelessFinalizedFunction {
             new_method.data = Arc::new(method_data);
             // Degeneric the arguments.
             for arguments in &mut new_method.arguments {
-                arguments.field.field_type.degeneric(&manager.generics(), syntax,
-                                                     placeholder_error(format!("No generic in {}", name)),
-                                                     placeholder_error("Invalid bounds!".to_string())).await?;
+                arguments
+                    .field
+                    .field_type
+                    .degeneric(
+                        &manager.generics(),
+                        syntax,
+                        placeholder_error(format!("No generic in {}", name)),
+                        placeholder_error("Invalid bounds!".to_string()),
+                    )
+                    .await?;
             }
 
             // Degeneric the return type if there is one.
             if let Some(returning) = &mut new_method.return_type {
-                returning.degeneric(&manager.generics(), syntax,
-                                    placeholder_error(format!("No generic in {}", name)),
-                                    placeholder_error("Invalid bounds!".to_string())).await?;
+                returning
+                    .degeneric(
+                        &manager.generics(),
+                        syntax,
+                        placeholder_error(format!("No generic in {}", name)),
+                        placeholder_error("Invalid bounds!".to_string()),
+                    )
+                    .await?;
             }
 
             // Add the new degenericed static data to the locked function.
@@ -221,7 +275,10 @@ impl CodelessFinalizedFunction {
             let new_method = Arc::new(new_method);
             let mut locked = syntax.lock().unwrap();
             locked.functions.types.insert(name, new_method.data.clone());
-            locked.functions.data.insert(new_method.data.clone(), new_method.clone());
+            locked
+                .functions
+                .data
+                .insert(new_method.data.clone(), new_method.clone());
 
             if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
                 for waker in wakers {
@@ -232,8 +289,16 @@ impl CodelessFinalizedFunction {
 
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();
-            handle.lock().unwrap().spawn(new_method.data.name.clone(),
-                                         degeneric_code(syntax.clone(), original, resolver.boxed_clone(), new_method.clone(), manager));
+            handle.lock().unwrap().spawn(
+                new_method.data.name.clone(),
+                degeneric_code(
+                    syntax.clone(),
+                    original,
+                    resolver.boxed_clone(),
+                    new_method.clone(),
+                    manager,
+                ),
+            );
 
             return Ok(new_method);
         };
@@ -245,44 +310,77 @@ fn placeholder_error(error: String) -> ParsingError {
     return ParsingError::new(String::default(), (0, 0), 0, (0, 0), 0, error);
 }
 
-struct GenericWaiter { syntax: Arc<Mutex<Syntax>>, name: String }
+struct GenericWaiter {
+    syntax: Arc<Mutex<Syntax>>,
+    name: String,
+}
 
 impl Future for GenericWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().compiling.contains_key(&self.name) {
+        return if self
+            .syntax
+            .lock()
+            .unwrap()
+            .compiling
+            .contains_key(&self.name)
+        {
             Poll::Ready(())
         } else {
-            self.syntax.lock().unwrap().compiling_wakers.push(cx.waker().clone());
+            self.syntax
+                .lock()
+                .unwrap()
+                .compiling_wakers
+                .push(cx.waker().clone());
             Poll::Pending
-        }
+        };
     }
 }
 
 /// Degenerics the code body of the method.
-async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinalizedFunction>, resolver: Box<dyn NameResolver>,
-                        degenericed_method: Arc<CodelessFinalizedFunction>, manager: Box<dyn ProcessManager>) {
+async fn degeneric_code(
+    syntax: Arc<Mutex<Syntax>>,
+    original: Arc<CodelessFinalizedFunction>,
+    resolver: Box<dyn NameResolver>,
+    degenericed_method: Arc<CodelessFinalizedFunction>,
+    manager: Box<dyn ProcessManager>,
+) {
     // This has to wait until the original is ready to be compiled.
-    GenericWaiter { syntax: syntax.clone(), name: original.data.name.clone() }.await;
+    GenericWaiter {
+        syntax: syntax.clone(),
+        name: original.data.name.clone(),
+    }
+    .await;
 
     // Gets a clone of the code of the original.
-    let code = syntax.lock().unwrap().compiling.get(&original.data.name).unwrap().code.clone();
+    let code = syntax
+        .lock()
+        .unwrap()
+        .compiling
+        .get(&original.data.name)
+        .unwrap()
+        .code
+        .clone();
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
     // Degenerics the code body.
-    let code = match code.degeneric(&*manager, &*resolver, &mut variables, &syntax).await {
+    let code = match code
+        .degeneric(&*manager, &*resolver, &mut variables, &syntax)
+        .await
+    {
         Ok(inner) => inner,
-        Err(error) => panic!("Error degenericing code: {}", error)
+        Err(error) => panic!("Error degenericing code: {}", error),
     };
 
     // Combines the degenericed function with the degenericed code to finalize it.
-    let output = CodelessFinalizedFunction::clone(degenericed_method.deref())
-        .add_code(code);
+    let output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
 
     // Sends the finalized function to be compiled.
     let mut locked = syntax.lock().unwrap();
-    locked.compiling.insert(output.data.name.clone(), Arc::new(output));
+    locked
+        .compiling
+        .insert(output.data.name.clone(), Arc::new(output));
     for waker in &locked.compiling_wakers {
         waker.wake_by_ref();
     }
@@ -329,10 +427,7 @@ pub struct FinalizedCodeBody {
 
 impl CodeBody {
     pub fn new(expressions: Vec<Expression>, label: String) -> Self {
-        return Self {
-            label,
-            expressions,
-        };
+        return Self { label, expressions };
     }
 }
 
@@ -346,11 +441,18 @@ impl FinalizedCodeBody {
     }
 
     /// Degenerics every effect inside the body of code.
-    pub async fn degeneric(mut self, process_manager: &dyn ProcessManager, resolver: &dyn NameResolver,
-                           variables: &mut SimpleVariableManager, syntax: &Arc<Mutex<Syntax>>)
-        -> Result<FinalizedCodeBody, ParsingError> {
+    pub async fn degeneric(
+        mut self,
+        process_manager: &dyn ProcessManager,
+        resolver: &dyn NameResolver,
+        variables: &mut SimpleVariableManager,
+        syntax: &Arc<Mutex<Syntax>>,
+    ) -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
-            expression.effect.degeneric(process_manager, variables, resolver, syntax).await?;
+            expression
+                .effect
+                .degeneric(process_manager, variables, resolver, syntax)
+                .await?;
         }
 
         return Ok(self);
@@ -358,7 +460,10 @@ impl FinalizedCodeBody {
 }
 
 /// Helper functions to display types.
-pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {
+pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String
+where
+    T: Display,
+{
     if input.is_empty() {
         return "()".to_string();
     }
@@ -368,10 +473,16 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
         output += &*format!("{}{}", element, deliminator);
     }
 
-    return format!("({})", (&output[..output.len() - deliminator.len()]).to_string());
+    return format!(
+        "({})",
+        (&output[..output.len() - deliminator.len()]).to_string()
+    );
 }
 
-pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {
+pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String
+where
+    T: Display,
+{
     if input.is_empty() {
         return String::default();
     }
@@ -384,7 +495,10 @@ pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T
     return (&output[..output.len() - deliminator.len()]).to_string();
 }
 
-pub fn debug_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Debug {
+pub fn debug_parenless<T>(input: &Vec<T>, deliminator: &str) -> String
+where
+    T: Debug,
+{
     if input.is_empty() {
         return String::default();
     }

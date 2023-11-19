@@ -5,7 +5,10 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Waker;
 
-use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
+use chalk_ir::{
+    Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId,
+    TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause,
+};
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
@@ -19,13 +22,18 @@ use async_trait::async_trait;
 // Re-export main
 pub use data::Main;
 
-use crate::{Attribute, FinishedTraitImplementor, is_modifier, Modifier, ParsingError, ProcessManager, TopElement, Types};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
 use crate::function::{FinalizedFunction, FunctionData};
-use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
+use crate::r#struct::{
+    FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8,
+};
 use crate::top_element_manager::{GetterManager, TopElementManager};
 use crate::types::FinalizedTypes;
+use crate::{
+    is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager,
+    TopElement, Types,
+};
 
 /// The entire program's syntax. Contains all the data passed to every step of the program.
 /// This structure is usually in a mutex lock, which prevents multiple functions from reading/writing
@@ -66,10 +74,20 @@ impl Syntax {
             strut_compiling: Arc::new(DashMap::default()),
             errors: Vec::default(),
             functions: TopElementManager::default(),
-            structures: TopElementManager::with_sorted(
-                vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),
-                     F64.data.clone(), F32.data.clone(), U64.data.clone(), U32.data.clone(), U16.data.clone(), U8.data.clone(),
-                     BOOL.data.clone(), STR.data.clone())),
+            structures: TopElementManager::with_sorted(vec![
+                I64.data.clone(),
+                I32.data.clone(),
+                I16.data.clone(),
+                I8.data.clone(),
+                F64.data.clone(),
+                F32.data.clone(),
+                U64.data.clone(),
+                U32.data.clone(),
+                U16.data.clone(),
+                U8.data.clone(),
+                BOOL.data.clone(),
+                STR.data.clone(),
+            ]),
             implementations: Vec::default(),
             async_manager: GetterManager::default(),
             operations: HashMap::default(),
@@ -91,7 +109,10 @@ impl Syntax {
         self.async_manager.finished = true;
 
         let mut keys = Vec::default();
-        self.structures.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        self.structures
+            .wakers
+            .keys()
+            .for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.structures.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
@@ -99,7 +120,10 @@ impl Syntax {
         }
 
         keys.clear();
-        self.functions.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        self.functions
+            .wakers
+            .keys()
+            .for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.functions.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
@@ -107,7 +131,9 @@ impl Syntax {
         }
 
         keys.clear();
-        self.operation_wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        self.operation_wakers
+            .keys()
+            .for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.operation_wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
@@ -117,8 +143,11 @@ impl Syntax {
 
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used
     /// in the solve method, which calls on the Chalk library.
-    pub fn make_impldatum(generics: &IndexMap<String, Vec<FinalizedTypes>>,
-                          first: &FinalizedTypes, second: &FinalizedTypes) -> ImplDatum<ChalkIr> {
+    pub fn make_impldatum(
+        generics: &IndexMap<String, Vec<FinalizedTypes>>,
+        first: &FinalizedTypes,
+        second: &FinalizedTypes,
+    ) -> ImplDatum<ChalkIr> {
         let vec_generics = generics.keys().collect::<Vec<_>>();
         let first = first.to_chalk_trait(&vec_generics);
         let mut binders: Vec<VariableKind<ChalkIr>> = Vec::default();
@@ -127,26 +156,39 @@ impl Syntax {
             binders.push(VariableKind::Ty(TyVariableKind::General));
         }
         let second = second.to_chalk_type(&vec_generics);
-        let data: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(second.clone()))];
+        let data: &[GenericArg<ChalkIr>] =
+            &[GenericArg::new(ChalkIr, GenericArgData::Ty(second.clone()))];
         return ImplDatum {
             polarity: Polarity::Positive,
-            binders: Binders::new(VariableKinds::from_iter(ChalkIr, binders), ImplDatumBound {
-                trait_ref: TraitRef { trait_id: first.id.clone(), substitution: Substitution::from_iter(ChalkIr, data) },
-                where_clauses: vec![],
-            }),
+            binders: Binders::new(
+                VariableKinds::from_iter(ChalkIr, binders),
+                ImplDatumBound {
+                    trait_ref: TraitRef {
+                        trait_id: first.id.clone(),
+                        substitution: Substitution::from_iter(ChalkIr, data),
+                    },
+                    where_clauses: vec![],
+                },
+            ),
             impl_type: ImplType::Local,
             associated_ty_value_ids: vec![],
         };
     }
 
     /// Finds an implementation method for the given trait.
-    pub fn get_implementation_methods(&self, implementing_trait: &FinalizedTypes, implementor_struct: &FinalizedTypes)
-                                      -> Option<Vec<Arc<FunctionData>>> {
+    pub fn get_implementation_methods(
+        &self,
+        implementing_trait: &FinalizedTypes,
+        implementor_struct: &FinalizedTypes,
+    ) -> Option<Vec<Arc<FunctionData>>> {
         let mut output = Vec::default();
         for implementation in &self.implementations {
-            if implementation.target.inner_struct().data == implementor_struct.inner_struct().data &&
-                (implementing_trait.of_type_sync(&implementation.base, None).0 ||
-                    self.solve(&implementing_trait, &implementation.base)) {
+            if implementation.target.inner_struct().data == implementor_struct.inner_struct().data
+                && (implementing_trait
+                    .of_type_sync(&implementation.base, None)
+                    .0
+                    || self.solve(&implementing_trait, &implementation.base))
+            {
                 for function in &implementation.functions {
                     output.push(function.clone());
                 }
@@ -160,7 +202,11 @@ impl Syntax {
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
-    fn solve_nonstruct_types(&self, target_type: &FinalizedTypes, checking: &FinalizedTypes) -> Option<bool> {
+    fn solve_nonstruct_types(
+        &self,
+        target_type: &FinalizedTypes,
+        checking: &FinalizedTypes,
+    ) -> Option<bool> {
         return match target_type {
             FinalizedTypes::Generic(_, bounds) => {
                 // If a single bound fails, than the type isn't of the generic type.
@@ -188,7 +234,7 @@ impl Syntax {
                 // References are unwrapped and the inner is checked.
                 self.solve_nonstruct_types(inner, checking)
             }
-            _ => None
+            _ => None,
         };
     }
 
@@ -211,32 +257,52 @@ impl Syntax {
         if !is_modifier(second_ty.modifiers, Modifier::Trait) {
             return false;
         }
-        let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
+        let first_ty = first
+            .inner_struct()
+            .data
+            .chalk_data
+            .as_ref()
+            .unwrap()
+            .get_ty()
+            .clone();
 
-        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
+        let elements: &[GenericArg<ChalkIr>] =
+            &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
         // Construct a goal asking if the first type is implemented by the second type.
-        let goal = Goal::new(ChalkIr, GoalData::DomainGoal(DomainGoal::Holds(
-            WhereClause::Implemented(TraitRef {
+        let goal = Goal::new(
+            ChalkIr,
+            GoalData::DomainGoal(DomainGoal::Holds(WhereClause::Implemented(TraitRef {
                 trait_id: TraitId(second_ty.id as u32),
                 substitution: Substitution::from_iter(ChalkIr, elements.into_iter()),
-            })
-        )));
+            }))),
+        );
 
         // Tell Chalk to solve it, ignoring any overflows.
         // TODO add a cache for speed?
         let value = RecursiveSolver::new(30, 3000, None)
-            .solve(self, &goal.into_closed_goal(ChalkIr)).is_some();
+            .solve(self, &goal.into_closed_goal(ChalkIr))
+            .is_some();
         return value;
     }
 
     /// Adds the element to the syntax
-    pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
+    pub fn add<T: TopElement + Eq + 'static>(
+        syntax: &Arc<Mutex<Syntax>>,
+        dupe_error: ParsingError,
+        adding: &Arc<T>,
+    ) {
         let mut locked = syntax.lock().unwrap();
         unsafe {
             // Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
             // yet, so this is safe.
-            Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.iter().position(|found| &found.name == adding.name())
-                .unwrap_or_else(|| locked.structures.sorted.len()) as u64);
+            Arc::get_mut_unchecked(&mut adding.clone()).set_id(
+                locked
+                    .structures
+                    .sorted
+                    .iter()
+                    .position(|found| &found.name == adding.name())
+                    .unwrap_or_else(|| locked.structures.sorted.len()) as u64,
+            );
         }
 
         // Add any poisons to the syntax errors list.
@@ -245,7 +311,11 @@ impl Syntax {
         }
 
         // Checks if a type with the same name is already in the async manager.
-        if let Some(mut old) = T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned() {
+        if let Some(mut old) = T::get_manager(locked.deref_mut())
+            .types
+            .get_mut(adding.name())
+            .cloned()
+        {
             if adding.errors().is_empty() && adding.errors().is_empty() {
                 // Add a duplication error to the original type.
                 locked.errors.push(dupe_error.clone());
@@ -260,7 +330,9 @@ impl Syntax {
                 manager.sorted.push(Arc::clone(adding));
             }
 
-            manager.types.insert(adding.name().clone(), Arc::clone(adding));
+            manager
+                .types
+                .insert(adding.name().clone(), Arc::clone(adding));
         }
 
         let name = adding.name().clone();
@@ -271,7 +343,9 @@ impl Syntax {
             let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
             // Gets the name of the operation, or errors if there isn't one.
-            let name = if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
+            let name = if let Attribute::String(_, name) =
+                Attribute::find_attribute("operation", &adding.attributes).unwrap()
+            {
                 name.replace("{+}", "{}").clone()
             } else {
                 let mut error = ParsingError::empty();
@@ -323,20 +397,37 @@ impl Syntax {
     }
 
     /// Asynchronously gets a function, or returns the error if that function isn't found.
-    pub async fn get_function(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                              getting: String, name_resolver: Box<dyn NameResolver>,
-                              not_trait: bool) -> Result<Arc<FunctionData>, ParsingError> {
+    pub async fn get_function(
+        syntax: Arc<Mutex<Syntax>>,
+        error: ParsingError,
+        getting: String,
+        name_resolver: Box<dyn NameResolver>,
+        not_trait: bool,
+    ) -> Result<Arc<FunctionData>, ParsingError> {
         return AsyncTypesGetter::new(syntax, error, getting, name_resolver, not_trait).await;
     }
 
     /// Asynchronously gets a struct, or returns the error if that struct isn't found.
     #[async_recursion]
-    pub async fn get_struct(syntax: Arc<Mutex<Syntax>>, error: ParsingError,
-                            getting: String, name_resolver: Box<dyn NameResolver>, mut resolved_generics: Vec<String>) -> Result<Types, ParsingError> {
+    pub async fn get_struct(
+        syntax: Arc<Mutex<Syntax>>,
+        error: ParsingError,
+        getting: String,
+        name_resolver: Box<dyn NameResolver>,
+        mut resolved_generics: Vec<String>,
+    ) -> Result<Types, ParsingError> {
         // Handles arrays by removing the brackets and getting the inner type
         if getting.as_bytes()[0] == b'[' {
-            return Ok(Types::Array(Box::new(Self::get_struct(syntax, error, getting[1..getting.len() - 1].to_string(),
-                                                             name_resolver, resolved_generics).await?)));
+            return Ok(Types::Array(Box::new(
+                Self::get_struct(
+                    syntax,
+                    error,
+                    getting[1..getting.len() - 1].to_string(),
+                    name_resolver,
+                    resolved_generics,
+                )
+                .await?,
+            )));
         }
 
         // Checks if the type is a generic type
@@ -346,8 +437,16 @@ impl Syntax {
             if !resolved_generics.contains(&getting) {
                 resolved_generics.push(getting.clone());
                 for bound in found {
-                    bounds.push(Self::parse_type(syntax.clone(), error.clone(),
-                                                 name_resolver.boxed_clone(), bound, resolved_generics.clone()).await?);
+                    bounds.push(
+                        Self::parse_type(
+                            syntax.clone(),
+                            error.clone(),
+                            name_resolver.boxed_clone(),
+                            bound,
+                            resolved_generics.clone(),
+                        )
+                        .await?,
+                    );
                 }
             }
 
@@ -355,14 +454,25 @@ impl Syntax {
         }
 
         if getting.contains('<') {
-            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver).await?.1.remove(0));
+            return Ok(
+                Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver)
+                    .await?
+                    .1
+                    .remove(0),
+            );
         }
-        return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
+        return Ok(Types::Struct(
+            AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?,
+        ));
     }
 
     #[async_recursion]
-    async fn parse_bounds(input: &[u8], syntax: &Arc<Mutex<Syntax>>, error: &ParsingError,
-                          name_resolver: &dyn NameResolver) -> Result<(usize, Vec<Types>), ParsingError> {
+    async fn parse_bounds(
+        input: &[u8],
+        syntax: &Arc<Mutex<Syntax>>,
+        error: &ParsingError,
+        name_resolver: &dyn NameResolver,
+    ) -> Result<(usize, Vec<Types>), ParsingError> {
         let mut last = 0;
         let mut found = Vec::default();
         let mut i = 0;
@@ -372,23 +482,45 @@ impl Syntax {
                     let first = String::from_utf8_lossy(&input[last..i]);
                     let (size, bounds) =
                         Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
-                    let first = Self::get_struct(syntax.clone(), error.clone(),
-                                                 first.to_string(), name_resolver.boxed_clone(), vec!()).await?;
+                    let first = Self::get_struct(
+                        syntax.clone(),
+                        error.clone(),
+                        first.to_string(),
+                        name_resolver.boxed_clone(),
+                        vec![],
+                    )
+                    .await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
                     return Ok((i + size, found));
                 }
                 b',' => {
                     let getting = String::from_utf8_lossy(&input[last..i]);
-                    found.push(Self::get_struct(syntax.clone(), error.clone(),
-                                                getting.to_string(), name_resolver.boxed_clone(), vec!()).await?);
-                    last = i+1;
+                    found.push(
+                        Self::get_struct(
+                            syntax.clone(),
+                            error.clone(),
+                            getting.to_string(),
+                            name_resolver.boxed_clone(),
+                            vec![],
+                        )
+                        .await?,
+                    );
+                    last = i + 1;
                 }
                 b'>' => {
                     let first = String::from_utf8_lossy(&input[last..i]);
-                    found.push(Self::get_struct(syntax.clone(), error.clone(),
-                                                first.to_string(), name_resolver.boxed_clone(), vec!()).await?);
-                    return Ok((i, found))
-                },
+                    found.push(
+                        Self::get_struct(
+                            syntax.clone(),
+                            error.clone(),
+                            first.to_string(),
+                            name_resolver.boxed_clone(),
+                            vec![],
+                        )
+                        .await?,
+                    );
+                    return Ok((i, found));
+                }
                 _ => {}
             }
             i += 1;
@@ -399,20 +531,44 @@ impl Syntax {
 
     /// Parses an UnparsedType into a Types
     #[async_recursion]
-    pub async fn parse_type(syntax: Arc<Mutex<Syntax>>, error: ParsingError, resolver: Box<dyn NameResolver>,
-                            types: UnparsedType, resolved_generics: Vec<String>) -> Result<Types, ParsingError> {
+    pub async fn parse_type(
+        syntax: Arc<Mutex<Syntax>>,
+        error: ParsingError,
+        resolver: Box<dyn NameResolver>,
+        types: UnparsedType,
+        resolved_generics: Vec<String>,
+    ) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
-            UnparsedType::Basic(name) =>
-                Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver, resolved_generics).await,
+            UnparsedType::Basic(name) => {
+                Syntax::get_struct(
+                    syntax,
+                    Self::swap_error(error, &name),
+                    name,
+                    resolver,
+                    resolved_generics,
+                )
+                .await
+            }
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::default();
                 for arg in args {
-                    generics.push(Self::parse_type(syntax.clone(),
-                                                   error.clone(), resolver.boxed_clone(), arg, resolved_generics.clone()).await?);
+                    generics.push(
+                        Self::parse_type(
+                            syntax.clone(),
+                            error.clone(),
+                            resolver.boxed_clone(),
+                            arg,
+                            resolved_generics.clone(),
+                        )
+                        .await?,
+                    );
                 }
-                Ok(Types::GenericType(Box::new(
-                    Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?),
-                                      generics))
+                Ok(Types::GenericType(
+                    Box::new(
+                        Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?,
+                    ),
+                    generics,
+                ))
             }
         };
         return temp;

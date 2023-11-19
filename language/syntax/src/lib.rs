@@ -2,6 +2,17 @@
 #![feature(get_mut_unchecked)]
 #![feature(fn_traits)]
 
+use crate::async_util::{HandleWrapper, NameResolver};
+use crate::function::{
+    CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction,
+};
+use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
+use crate::syntax::Syntax;
+use crate::top_element_manager::TopElementManager;
+use crate::types::{FinalizedTypes, Types};
+use async_trait::async_trait;
+use chalk_solve::rust_ir::ImplDatum;
+use indexmap::IndexMap;
 /// A file containing various structures used throughout the language:
 /// - Modifiers: modifiers on structures, traits, and functions. Like public, internal, etc...
 ///     - Modifier helper functions for compressing to/from and checking modifier lists in u8 form
@@ -17,18 +28,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use chalk_solve::rust_ir::ImplDatum;
 use std::sync::Mutex;
-use indexmap::IndexMap;
-use async_trait::async_trait;
-use crate::top_element_manager::TopElementManager;
-use crate::async_util::{HandleWrapper, NameResolver};
-use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
-use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
-use crate::syntax::Syntax;
-use crate::types::{FinalizedTypes, Types};
 
-pub mod top_element_manager;
 pub mod async_util;
 pub mod chalk_interner;
 pub mod chalk_support;
@@ -37,18 +38,25 @@ pub mod function;
 pub mod operation_util;
 pub mod r#struct;
 pub mod syntax;
+pub mod top_element_manager;
 pub mod types;
 
 //Re-export ParsingError
-pub use data::ParsingError;
 use crate::chalk_interner::ChalkIr;
+pub use data::ParsingError;
 
 // An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
 // for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.
-pub type ParsingFuture<T> = Pin<Box<dyn Future<Output=Result<T, ParsingError>> + Send + Sync>>;
+pub type ParsingFuture<T> = Pin<Box<dyn Future<Output = Result<T, ParsingError>> + Send + Sync>>;
 
 // All the modifiers, used for modifier parsing and debug output.
-pub static MODIFIERS: [Modifier; 5] = [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal, Modifier::Operation];
+pub static MODIFIERS: [Modifier; 5] = [
+    Modifier::Public,
+    Modifier::Protected,
+    Modifier::Extern,
+    Modifier::Internal,
+    Modifier::Operation,
+];
 
 // All the modifiers structures/functions/fields can have
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -70,7 +78,7 @@ impl Display for Modifier {
             Modifier::Extern => write!(f, "extern"),
             Modifier::Internal => write!(f, "internal"),
             Modifier::Operation => write!(f, "operation"),
-            Modifier::Trait => panic!("Shouldn't display trait modifier!")
+            Modifier::Trait => panic!("Shouldn't display trait modifier!"),
         };
     }
 }
@@ -120,7 +128,7 @@ impl Attribute {
                 Attribute::Basic(found) => found == name,
                 Attribute::Integer(found, _) => found == name,
                 Attribute::Bool(found, _) => found == name,
-                Attribute::String(found, _) => found == name
+                Attribute::String(found, _) => found == name,
             } {
                 return Some(attribute);
             }
@@ -131,21 +139,21 @@ impl Attribute {
     pub fn as_string_attribute(&self) -> Option<&String> {
         match self {
             Attribute::String(_, value) => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_int_attribute(&self) -> Option<i64> {
         match self {
             Attribute::Integer(_, value) => Some(*value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_bool_attribute(&self) -> Option<bool> {
         match self {
             Attribute::Bool(_, value) => Some(*value),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -154,11 +162,26 @@ impl Attribute {
 pub trait ProcessManager: Send + Sync {
     fn handle(&self) -> &Arc<Mutex<HandleWrapper>>;
 
-    async fn verify_func(&self, function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>) -> (CodelessFinalizedFunction, CodeBody);
+    async fn verify_func(
+        &self,
+        function: UnfinalizedFunction,
+        syntax: &Arc<Mutex<Syntax>>,
+    ) -> (CodelessFinalizedFunction, CodeBody);
 
-    async fn verify_code(&self, function: CodelessFinalizedFunction, code: CodeBody, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedFunction;
+    async fn verify_code(
+        &self,
+        function: CodelessFinalizedFunction,
+        code: CodeBody,
+        resolver: Box<dyn NameResolver>,
+        syntax: &Arc<Mutex<Syntax>>,
+    ) -> FinalizedFunction;
 
-    async fn verify_struct(&self, structure: UnfinalizedStruct, resolver: Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> FinalizedStruct;
+    async fn verify_struct(
+        &self,
+        structure: UnfinalizedStruct,
+        resolver: Box<dyn NameResolver>,
+        syntax: &Arc<Mutex<Syntax>>,
+    ) -> FinalizedStruct;
 
     fn generics(&self) -> &HashMap<String, FinalizedTypes>;
 
@@ -169,16 +192,19 @@ pub trait ProcessManager: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SimpleVariableManager {
-    pub variables: HashMap<String, FinalizedTypes>
+    pub variables: HashMap<String, FinalizedTypes>,
 }
 
 impl SimpleVariableManager {
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
-        let mut variable_manager = SimpleVariableManager { variables: HashMap::default() };
+        let mut variable_manager = SimpleVariableManager {
+            variables: HashMap::default(),
+        };
 
         for field in &codeless.arguments {
-            variable_manager.variables.insert(field.field.name.clone(),
-                                              field.field.field_type.clone());
+            variable_manager
+                .variables
+                .insert(field.field.name.clone(), field.field.field_type.clone());
         }
 
         return variable_manager;
@@ -203,7 +229,10 @@ pub trait DataType<T: TopElement> {
 
 // Top elements are structures or functions
 #[async_trait]
-pub trait TopElement where Self: Sized {
+pub trait TopElement
+where
+    Self: Sized,
+{
     type Unfinalized: DataType<Self>;
     type Finalized;
 
@@ -218,7 +247,7 @@ pub trait TopElement where Self: Sized {
 
     // Whether the top element is a trait or trait member
     fn is_trait(&self) -> bool;
-    
+
     // All errors on the element
     fn errors(&self) -> &Vec<ParsingError>;
 
@@ -229,8 +258,13 @@ pub trait TopElement where Self: Sized {
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
     // Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
-    async fn verify(handle: Arc<Mutex<HandleWrapper>>, current: Self::Unfinalized, syntax: Arc<Mutex<Syntax>>,
-                    resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>);
+    async fn verify(
+        handle: Arc<Mutex<HandleWrapper>>,
+        current: Self::Unfinalized,
+        syntax: Arc<Mutex<Syntax>>,
+        resolver: Box<dyn NameResolver>,
+        process_manager: Box<dyn ProcessManager>,
+    );
 
     // Gets the getter for that type on the syntax
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self>;

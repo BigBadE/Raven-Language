@@ -3,19 +3,19 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use inkwell::AddressSpace;
-use inkwell::basic_block::BasicBlock;
-use inkwell::execution_engine::JitFunction;
-use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicValueEnum, FunctionValue};
-use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::VariableManager;
-use syntax::syntax::{Main, Syntax};
-use syntax::types::FinalizedTypes;
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{instance_function, instance_types};
 use crate::internal::structs::get_internal_struct;
 use crate::vtable_manager::VTableManager;
+use inkwell::basic_block::BasicBlock;
+use inkwell::execution_engine::JitFunction;
+use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::values::{BasicValueEnum, FunctionValue};
+use inkwell::AddressSpace;
+use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
+use syntax::syntax::{Main, Syntax};
+use syntax::types::FinalizedTypes;
+use syntax::VariableManager;
 
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
@@ -29,14 +29,10 @@ pub struct CompilerTypeGetter<'ctx> {
 
 /// SAFETY LLVM isn't safe for access across multiple threads, but this module only accesses it from
 /// one thread at a time.
-unsafe impl Send for CompilerTypeGetter<'_> {
-
-}
+unsafe impl Send for CompilerTypeGetter<'_> {}
 
 /// SAFETY See above
-unsafe impl Sync for CompilerTypeGetter<'_> {
-
-}
+unsafe impl Sync for CompilerTypeGetter<'_> {}
 
 impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn new(compiler: Arc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
@@ -51,13 +47,22 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn for_function(&self, function: &Arc<FinalizedFunction>, llvm_function: FunctionValue<'ctx>) -> Self {
+    pub fn for_function(
+        &self,
+        function: &Arc<FinalizedFunction>,
+        llvm_function: FunctionValue<'ctx>,
+    ) -> Self {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
         for i in offset as usize..llvm_function.count_params() as usize {
             let field = &function.fields.get(i + offset as usize).unwrap().field;
-            variables.insert(field.name.clone(),
-                             (field.field_type.clone(), llvm_function.get_nth_param(i as u32).unwrap()));
+            variables.insert(
+                field.name.clone(),
+                (
+                    field.field_type.clone(),
+                    llvm_function.get_nth_param(i as u32).unwrap(),
+                ),
+            );
         }
         return Self {
             syntax: self.syntax.clone(),
@@ -70,7 +75,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn get_function(&mut self, function: &Arc<CodelessFinalizedFunction>) -> FunctionValue<'ctx> {
+    pub fn get_function(
+        &mut self,
+        function: &Arc<CodelessFinalizedFunction>,
+    ) -> FunctionValue<'ctx> {
         match self.compiler.module.get_function(&function.data.name) {
             Some(found) => found,
             None => {
@@ -82,13 +90,16 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn get_type(&mut self, types: &FinalizedTypes) -> BasicTypeEnum<'ctx> {
         let found = match self.compiler.module.get_struct_type(&types.name()) {
             Some(found) => found.as_basic_type_enum(),
-            None => get_internal_struct(self.compiler.context, &types.name()).unwrap_or_else(
-                    || instance_types(types, self))
-        }.as_basic_type_enum();
+            None => get_internal_struct(self.compiler.context, &types.name())
+                .unwrap_or_else(|| instance_types(types, self)),
+        }
+        .as_basic_type_enum();
         return match types {
             FinalizedTypes::Struct(_, _) | FinalizedTypes::Array(_) => found,
-            FinalizedTypes::Reference(_) => found.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-            _ => panic!("Can't compile a generic! {:?}", found)
+            FinalizedTypes::Reference(_) => {
+                found.ptr_type(AddressSpace::default()).as_basic_type_enum()
+            }
+            _ => panic!("Can't compile a generic! {:?}", found),
         };
     }
 
@@ -96,7 +107,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         return unsafe {
             match self.compiler.execution_engine.get_function(target) {
                 Ok(value) => Some(value),
-                Err(_) => None
+                Err(_) => None,
             }
         };
     }

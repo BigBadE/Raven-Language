@@ -7,23 +7,25 @@ use std::sync::Mutex;
 
 use indexmap::IndexMap;
 
-use syntax::{ParsingError, ParsingFuture};
 use syntax::async_util::NameResolver;
 use syntax::syntax::Syntax;
 use syntax::types::{FinalizedTypes, Types};
+use syntax::{ParsingError, ParsingFuture};
 
 use crate::output::TypesChecker;
 
+pub mod check_code;
 pub mod check_function;
 pub mod check_impl_call;
-pub mod check_code;
 pub mod check_method_call;
 pub mod check_operator;
 pub mod check_struct;
 pub mod output;
 
-pub async fn finalize_generics(syntax: &Arc<Mutex<Syntax>>, generics: IndexMap<String, Vec<ParsingFuture<Types>>>)
-    -> Result<IndexMap<String, Vec<FinalizedTypes>>, ParsingError> {
+pub async fn finalize_generics(
+    syntax: &Arc<Mutex<Syntax>>,
+    generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+) -> Result<IndexMap<String, Vec<FinalizedTypes>>, ParsingError> {
     let mut output = IndexMap::default();
     for (generic, value) in generics {
         let mut values = Vec::default();
@@ -39,5 +41,5 @@ pub struct CodeVerifier<'a> {
     process_manager: &'a TypesChecker,
     resolver: Box<dyn NameResolver>,
     return_type: Option<FinalizedTypes>,
-    syntax: Arc<Mutex<Syntax>>
+    syntax: Arc<Mutex<Syntax>>,
 }

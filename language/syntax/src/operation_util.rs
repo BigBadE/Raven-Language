@@ -1,17 +1,17 @@
+use crate::r#struct::StructData;
+use crate::syntax::Syntax;
+use crate::ParsingError;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::sync::Mutex;
-use crate::ParsingError;
-use crate::r#struct::StructData;
-use crate::syntax::Syntax;
+use std::task::{Context, Poll};
 
 /// An asynchronous getter for operations given the operation.
 pub struct OperationGetter {
     pub syntax: Arc<Mutex<Syntax>>,
     pub operation: Vec<String>,
-    pub error: ParsingError
+    pub error: ParsingError,
 }
 
 impl Future for OperationGetter {
@@ -24,7 +24,10 @@ impl Future for OperationGetter {
         for operation in &self.operation {
             if let Some(output) = locked.operations.get(operation) {
                 return Poll::Ready(Ok(output.clone()));
-            } else if let Some(output) = locked.operations.get(&operation.replace("{}", "{+}").to_string()) {
+            } else if let Some(output) = locked
+                .operations
+                .get(&operation.replace("{}", "{+}").to_string())
+            {
                 return Poll::Ready(Ok(output.clone()));
             }
         }
@@ -37,7 +40,9 @@ impl Future for OperationGetter {
             if let Some(found) = locked.operation_wakers.get_mut(operation) {
                 found.push(cx.waker().clone());
             } else {
-                locked.operation_wakers.insert(operation.clone(), vec!(cx.waker().clone()));
+                locked
+                    .operation_wakers
+                    .insert(operation.clone(), vec![cx.waker().clone()]);
             }
         }
 
