@@ -10,10 +10,11 @@ use syntax::function::FinalizedFunction;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::Compiler;
 use std::sync::Mutex;
+use dashmap::DashMap;
 
 pub mod runner;
 
-pub fn get_compiler<T>(compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+pub fn get_compiler<T>(compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
                        struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
                        arguments: CompilerArguments) -> Box<dyn Compiler<T> + Send + Sync> {
     return Box::new(match arguments.compiler.to_lowercase().as_str() {

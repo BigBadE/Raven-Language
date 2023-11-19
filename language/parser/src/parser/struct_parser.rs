@@ -236,7 +236,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
         match token.token_type {
             TokenTypes::Generic => {
                 name = token.to_string(parser_utils.buffer);
-                if name.starts_with(",") {
+                if name.starts_with(b',') {
                     name = name[1..].to_string();
                 }
                 name = name.trim().to_string();
@@ -250,7 +250,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             TokenTypes::GenericBound => {
                 let token = parser_utils.tokens.get(parser_utils.index-1).unwrap();
                 let mut name = token.to_string(parser_utils.buffer);
-                if name.starts_with(":") {
+                if name.starts_with(b':') {
                     name = name[1..].to_string();
                 }
                 let name = name.trim().to_string();
@@ -294,7 +294,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
         match token.token_type {
             TokenTypes::Generic | TokenTypes::GenericBound => {
                 let mut name = token.to_string(parser_utils.buffer);
-                if name.starts_with(":") {
+                if name.starts_with(b':') {
                     name = name[1..].to_string();
                 }
                 name = name.trim().to_string();

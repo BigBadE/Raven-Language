@@ -82,8 +82,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn get_type(&mut self, types: &FinalizedTypes) -> BasicTypeEnum<'ctx> {
         let found = match self.compiler.module.get_struct_type(&types.name()) {
             Some(found) => found.as_basic_type_enum(),
-            None => get_internal_struct(self.compiler.context, &types.name()).unwrap_or(
-                    instance_types(types, self))
+            None => get_internal_struct(self.compiler.context, &types.name()).unwrap_or_else(
+                    || instance_types(types, self))
         }.as_basic_type_enum();
         return match types {
             FinalizedTypes::Struct(_, _) | FinalizedTypes::Array(_) => found,

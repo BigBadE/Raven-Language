@@ -78,8 +78,8 @@ pub struct FileSourceSet {
 
 impl Readable for PathBuf {
     fn read(&self) -> String {
-        return fs::read_to_string(self.clone()).expect(
-            &format!("Failed to read source file: {}", self.to_str().unwrap()));
+        return fs::read_to_string(self.clone()).unwrap_or_else(
+            || panic!("Failed to read source file: {}", self.to_str().unwrap()));
     }
 
     fn path(&self) -> String {
@@ -91,7 +91,7 @@ impl SourceSet for FileSourceSet {
     fn get_files(&self) -> Vec<Box<dyn Readable>> {
         let mut output = Vec::new();
         read_recursive(self.root.clone(), &mut output)
-            .expect(&format!("Failed to read source files! Make sure {:?} exists", self.root));
+            .unwrap_or_else(|| panic!("Failed to read source files! Make sure {:?} exists", self.root));
         return output;
     }
 
@@ -179,7 +179,7 @@ impl ParsingError {
         }
         let file = file.unwrap();
         let contents = file.read();
-        let line = contents.split("\n").nth((self.start.0 as usize).max(1) - 1).unwrap_or("???");
+        let line = contents.lines().nth((self.start.0 as usize).max(1) - 1).unwrap_or("???");
         println!("{}", self.message.bright_red());
         println!("{}", format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red());
         println!("{} {}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan());

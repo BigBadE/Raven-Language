@@ -92,7 +92,7 @@ impl TopElement for FunctionData {
         let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
-        locked.compiling.write().unwrap().insert(name.clone(), finalized_function.clone());
+        locked.compiling.insert(name.clone(), finalized_function.clone());
         for waker in &locked.compiling_wakers {
             waker.wake_by_ref();
         }
@@ -251,7 +251,7 @@ impl Future for GenericWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().compiling.read().unwrap().contains_key(&self.name) {
+        return if self.syntax.lock().unwrap().compiling.contains_key(&self.name) {
             Poll::Ready(())
         } else {
             self.syntax.lock().unwrap().compiling_wakers.push(cx.waker().clone());
@@ -267,7 +267,7 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
     GenericWaiter { syntax: syntax.clone(), name: original.data.name.clone() }.await;
 
     // Gets a clone of the code of the original.
-    let code = syntax.lock().unwrap().compiling.read().unwrap().get(&original.data.name).unwrap().code.clone();
+    let code = syntax.lock().unwrap().compiling.get(&original.data.name).unwrap().code.clone();
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
     // Degenerics the code body.
@@ -282,7 +282,7 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
 
     // Sends the finalized function to be compiled.
     let mut locked = syntax.lock().unwrap();
-    locked.compiling.write().unwrap().insert(output.data.name.clone(), Arc::new(output));
+    locked.compiling.insert(output.data.name.clone(), Arc::new(output));
     for waker in &locked.compiling_wakers {
         waker.wake_by_ref();
     }

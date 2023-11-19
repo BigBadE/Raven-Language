@@ -14,5 +14,7 @@ chalk-solve = "0.94.0"
 chalk-ir = "0.94.0"
 chalk-recursive = "0.94.0"
 
+dashmap = "5.5.3"
+
 tokio = { version = "1.27.0", features = [ "rt" ] }
 async-recursion = { version = "1.0.5", path = "../../crates/async-recursion" }

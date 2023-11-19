@@ -22,7 +22,7 @@ import {
 
 let client: LanguageClient;
 
-export async function activate(context: ExtensionContext) {
+export function activate(context: ExtensionContext) {
 	// The server is implemented in Rust
 	const serverModule = context.asAbsolutePath(
 		path.join('server', 'raven-language-server')

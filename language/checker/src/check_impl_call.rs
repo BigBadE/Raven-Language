@@ -1,4 +1,5 @@
-use syntax::code::{Effects, FinalizedEffects};
+use syntax::ProcessManager;
+use syntax::code::{degeneric_header, Effects, FinalizedEffects};
 use syntax::{ParsingError, SimpleVariableManager};
 use syntax::async_util::AsyncDataGetter;
 use syntax::r#struct::VOID;
@@ -10,7 +11,7 @@ use crate::check_method_call::check_method;
 use crate::CodeVerifier;
 
 pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &mut SimpleVariableManager, effect: Effects)
-    -> Result<FinalizedEffects, ParsingError> {
+                             -> Result<FinalizedEffects, ParsingError> {
     let mut finalized_effects = Vec::new();
     let calling;
     let traits;
@@ -67,10 +68,10 @@ pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &m
                                                                        finalized_effects));
                     }
 
-                    code_verifier.syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(target.name.clone(),
-                                                                                                        degeneric_header(target.clone(),
-                                                                                                                         found.clone(), code_verifier.syntax.clone(), code_verifier.process_manager.cloned(),
-                                                                                                                         finalized_effects.clone(), variables.clone()));
+                    code_verifier.syntax.lock().unwrap().process_manager.handle().lock().unwrap()
+                        .spawn(target.name.clone(), degeneric_header(target.clone(),
+                                                found.clone(), code_verifier.syntax.clone(), code_verifier.process_manager.cloned(),
+                                                finalized_effects.clone(), variables.clone()));
 
                     let output = AsyncDataGetter::new(code_verifier.syntax.clone(), target.clone()).await;
                     return Ok(FinalizedEffects::VirtualCall(i,

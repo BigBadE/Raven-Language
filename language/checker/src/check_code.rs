@@ -37,7 +37,7 @@ pub async fn verify_code(code_verifier: &mut CodeVerifier<'_>, variables: &mut S
     return Ok(FinalizedCodeBody::new(body, code.label.clone(), false));
 }
 
-async fn check_return_type(line: ExpressionType, code_verifier: &CodeVerifier, body: &mut Vec<FinalizedExpression>,
+async fn check_return_type(line: ExpressionType, code_verifier: &CodeVerifier<'_>, body: &mut Vec<FinalizedExpression>,
                            variables: &SimpleVariableManager)
                            -> Result<bool, ParsingError> {
     if line != ExpressionType::Return {
@@ -49,7 +49,7 @@ async fn check_return_type(line: ExpressionType, code_verifier: &CodeVerifier, b
         None => return Ok(false)
     };
 
-    let mut last = body.pop().unwrap();
+    let last = body.pop().unwrap();
     let last_type = last.effect.get_return(variables).unwrap();
     // Only downcast types that don't match and aren't generic
     if last_type == *return_type || !last_type.name_safe().is_some() {
@@ -150,7 +150,7 @@ pub async fn verify_effect(code_verifier: &mut CodeVerifier<'_>, variables: &mut
             }
 
             let types = output.get(0).map(|found| found.get_return(variables).unwrap());
-            check_type(&types, &output, variables, code_verifier)?;
+            check_type(&types, &output, variables, code_verifier).await?;
 
             store(FinalizedEffects::CreateArray(types, output))
         }
@@ -159,9 +159,9 @@ pub async fn verify_effect(code_verifier: &mut CodeVerifier<'_>, variables: &mut
 }
 
 async fn check_type(types: &Option<FinalizedTypes>, output: &Vec<FinalizedEffects>, variables: &SimpleVariableManager,
-                    code_verifier: &CodeVerifier) -> Result<(), ParsingError> {
+                    code_verifier: &CodeVerifier<'_>) -> Result<(), ParsingError> {
     if let Some(found) = types {
-        for checking in &output {
+        for checking in output {
             let returning = checking.get_return(variables).unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
                 return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));

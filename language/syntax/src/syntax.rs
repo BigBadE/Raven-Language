@@ -10,6 +10,7 @@ use chalk_solve::Solver;
 use chalk_solve::ext::GoalExt;
 use indexmap::IndexMap;
 use std::sync::Mutex;
+use dashmap::DashMap;
 use tokio::sync::mpsc::Receiver;
 
 use async_recursion::async_recursion;
@@ -32,7 +33,7 @@ use crate::types::FinalizedTypes;
 /// This is done so that the whole compiler can safely run multithreaded.
 pub struct Syntax {
     // The compiling functions, accessed from the compiler.
-    pub compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    pub compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
     // Compiling wakers
     pub compiling_wakers: Vec<Waker>,
     // The compiling structs, accessed from the compiler..
@@ -60,7 +61,7 @@ impl Syntax {
     /// Constructs a new syntax with internal types.
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
-            compiling: Arc::new(RwLock::new(HashMap::new())),
+            compiling: Arc::new(DashMap::new()),
             compiling_wakers: Vec::new(),
             strut_compiling: Arc::new(RwLock::new(HashMap::new())),
             errors: Vec::new(),
@@ -235,7 +236,7 @@ impl Syntax {
             // Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
             // yet, so this is safe.
             Arc::get_mut_unchecked(&mut adding.clone()).set_id(locked.structures.sorted.iter().position(|found| &found.name == adding.name())
-                .unwrap_or(locked.structures.sorted.len()) as u64);
+                .unwrap_or_else(|| locked.structures.sorted.len()) as u64);
         }
 
         // Add any poisons to the syntax errors list.
@@ -353,7 +354,7 @@ impl Syntax {
             return Ok(Types::Generic(getting, bounds));
         }
 
-        if getting.contains("<") {
+        if getting.contains(b'<') {
             return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &name_resolver).await?.1.remove(0));
         }
         return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));

@@ -441,7 +441,7 @@ pub async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<Function
     locked.functions.wakers.remove(&new_method.data.name);
 
     // Give the compiler the empty body
-    locked.compiling.write().unwrap().insert(new_method.data.name.clone(),
+    locked.compiling.insert(new_method.data.name.clone(),
                                              Arc::new(CodelessFinalizedFunction::clone(&new_method).add_code(
                                                  FinalizedCodeBody::new(vec!(), "empty".to_string(), true))));
     for waker in &locked.compiling_wakers {

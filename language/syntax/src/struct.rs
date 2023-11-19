@@ -318,7 +318,7 @@ impl TopElement for StructData {
             let function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
 
             let mut locked = syntax.lock().unwrap();
-            locked.compiling.write().unwrap().insert(function.data.name.clone(), Arc::new(function));
+            locked.compiling.insert(function.data.name.clone(), Arc::new(function));
             for waker in &locked.compiling_wakers {
                 waker.wake_by_ref();
             }

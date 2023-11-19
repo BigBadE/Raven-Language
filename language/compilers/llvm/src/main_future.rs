@@ -16,13 +16,10 @@ impl Future for MainFuture {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
-        let compiling = locked.compiling.clone();
-        let compiling = compiling.read().unwrap();
-        return if let Some(found) = compiling.get(&locked.async_manager.target) {
-            Poll::Ready(found.clone())
-        } else {
-            locked.async_manager.target_waker = Some(cx.waker().clone());
-            Poll::Pending
-        }
+        locked.async_manager.target_waker = Some(cx.waker().clone());
+        return match locked.compiling.get(&locked.async_manager.target) {
+            Some(found) => Poll::Ready(found.clone()),
+            None => Poll::Pending
+        };
     }
 }

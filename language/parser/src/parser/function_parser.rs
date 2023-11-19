@@ -89,7 +89,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
     return Ok(UnfinalizedFunction {
         generics,
         fields,
-        code: code.unwrap_or(CodeBody::new(Vec::new(), "empty".to_string())),
+        code: code.unwrap_or_else(|| CodeBody::new(Vec::new(), "empty".to_string())),
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name)),
     });

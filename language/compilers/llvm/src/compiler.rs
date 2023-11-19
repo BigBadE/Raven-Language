@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::sync::Mutex;
+use dashmap::DashMap;
 
 use inkwell::builder::Builder;
 use inkwell::context::Context;
@@ -48,7 +49,7 @@ impl<'ctx> CompilerImpl<'ctx> {
 
     pub async fn compile(type_getter: &mut CompilerTypeGetter<'ctx>,
                          arguments: &CompilerArguments, syntax: &Arc<Mutex<Syntax>>,
-                         functions: &Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+                         functions: &Arc<DashMap<String, Arc<FinalizedFunction>>>,
                          _structures: &Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>) -> bool {
         match Syntax::get_function(syntax.clone(), ParsingError::empty(), arguments.target.clone(),
                                    Box::new(EmptyNameResolver {}), false).await {
@@ -71,8 +72,7 @@ impl<'ctx> CompilerImpl<'ctx> {
 
             let finalized_function;
             {
-                let reading = functions.read().unwrap();
-                finalized_function = if let Some(found) = reading.get(&function.data.name) {
+                finalized_function = if let Some(found) = functions.get(&function.data.name) {
                     found.clone()
                 } else {
                     unsafe {

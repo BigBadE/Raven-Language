@@ -44,7 +44,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
             }
 
             handles.push(
-                settings.io_runtime.as_ref().map(|inner| inner.handle().clone()).unwrap_or(settings.cpu_runtime.handle().clone())
+                settings.io_runtime.as_ref().map(|inner| inner.handle().clone()).unwrap_or_else(|| settings.cpu_runtime.handle().clone())
                     .spawn(parse(syntax.clone(), handle.clone(),
                                  source_set.relative(&file).clone(),
                                  file.read())));

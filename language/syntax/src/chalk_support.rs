@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variance, Variances};
+use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
 use chalk_solve::rust_ir::{AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum,
                            AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
                            FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum,
@@ -152,7 +152,6 @@ impl UnificationDatabase<ChalkIr> for Syntax {
     }
 
     fn adt_variance(&self, _adt_id: AdtId<ChalkIr>) -> Variances<ChalkIr> {
-        let variances: [Variance; 0] = [];
-        Variances::from_iter(ChalkIr, variances)
+        Variances::from_iter(ChalkIr, [])
     }
 }

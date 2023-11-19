@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::sync::Mutex;
+use dashmap::DashMap;
 
 use inkwell::context::Context;
 use tokio::sync::mpsc::Receiver;
@@ -24,7 +25,7 @@ pub mod util;
 pub mod vtable_manager;
 
 pub struct LLVMCompiler {
-    compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
     struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
     arguments: CompilerArguments,
     context: Context,
@@ -39,7 +40,7 @@ unsafe impl Send for LLVMCompiler {
 }
 
 impl LLVMCompiler {
-    pub fn new(compiling: Arc<RwLock<HashMap<String, Arc<FinalizedFunction>>>>,
+    pub fn new(compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
                struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>, arguments: CompilerArguments) -> Self {
         return Self {
             compiling,

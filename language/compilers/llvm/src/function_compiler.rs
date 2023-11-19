@@ -297,7 +297,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             *id += 1;
 
             let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
-                                                                     .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                                     .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
                                                                  &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
             *id += 1;
 
@@ -348,7 +348,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             *id += 1;
 
             let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
-                                                                     .unwrap_or(compile_llvm_intrinsics("malloc", type_getter)),
+                                                                     .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
                                                                  &[BasicMetadataValueEnum::PointerValue(size)], &id.to_string()).try_as_basic_value().unwrap_left().into_pointer_value();
             *id += 1;
 
@@ -372,7 +372,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
                                        .const_int(values.len() as u64 + 1, false)],
                                    &id.to_string())
                 }
-            }).unwrap_or(type_getter.compiler.context.struct_type(&[], false).ptr_type(AddressSpace::default()).const_zero());
+            }).unwrap_or_else(|| type_getter.compiler.context.struct_type(&[], false).ptr_type(AddressSpace::default()).const_zero());
             let malloc = malloc_type(type_getter, ptr_type, id);
 
             type_getter.compiler.builder.build_store(malloc, type_getter.compiler.context.i64_type().const_int(values.len() as u64, false));

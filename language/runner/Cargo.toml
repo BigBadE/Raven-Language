@@ -18,5 +18,7 @@ compiler-llvm = { path = "../compilers/llvm" }
 # Tokio is used for scheduling I/O and CPU operations
 tokio = { version = "1.33.0", features = ["rt-multi-thread"] }
 
+dashmap = "5.5.3"
+
 # Utility / Code Cleanliness
 anyhow = "1.0.75"
