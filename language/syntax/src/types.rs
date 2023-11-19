@@ -252,7 +252,7 @@ impl FinalizedTypes {
                 FinalizedTypes::Struct(other_struct, _) => {
                     if found == other_struct {
                         (true, None)
-                    } else if found.data.name.contains(b'<') && found.data.name.split(b'<').next().unwrap() == other_struct.data.name {
+                    } else if found.data.name.contains('<') && found.data.name.split('<').next().unwrap() == other_struct.data.name {
                         (true, None)
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         if syntax.is_none() {

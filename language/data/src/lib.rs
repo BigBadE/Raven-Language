@@ -79,7 +79,7 @@ pub struct FileSourceSet {
 impl Readable for PathBuf {
     fn read(&self) -> String {
         return fs::read_to_string(self.clone()).unwrap_or_else(
-            || panic!("Failed to read source file: {}", self.to_str().unwrap()));
+            |_| panic!("Failed to read source file: {}", self.to_str().unwrap()));
     }
 
     fn path(&self) -> String {
@@ -91,7 +91,7 @@ impl SourceSet for FileSourceSet {
     fn get_files(&self) -> Vec<Box<dyn Readable>> {
         let mut output = Vec::new();
         read_recursive(self.root.clone(), &mut output)
-            .unwrap_or_else(|| panic!("Failed to read source files! Make sure {:?} exists", self.root));
+            .unwrap_or_else(|_| panic!("Failed to read source files! Make sure {:?} exists", self.root));
         return output;
     }
 

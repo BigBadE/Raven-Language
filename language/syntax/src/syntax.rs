@@ -354,7 +354,7 @@ impl Syntax {
             return Ok(Types::Generic(getting, bounds));
         }
 
-        if getting.contains(b'<') {
+        if getting.contains('<') {
             return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &name_resolver).await?.1.remove(0));
         }
         return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
