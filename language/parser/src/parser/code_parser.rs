@@ -79,7 +79,22 @@ pub fn parse_line(
                 _ => {}
             }
         }
+
+        match parse_basic_line(parser_utils, &expression_type, &token)? {
+            ControlFlow::Setting(found) => {
+                effect = Some(found);
+                continue;
+            }
+            ControlFlow::Returning(returning) => return Ok(Some(returning)),
+            ControlFlow::Skipping => continue,
+            ControlFlow::Finish => break,
+            ControlFlow::NotFound => {}
+        }
+
         match token.token_type {
+            TokenTypes::BlockEnd if state == ParseState::New => {
+                break;
+            }
             TokenTypes::ParenOpen => {
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
                 match last.token_type {
@@ -104,23 +119,6 @@ pub fn parse_line(
                         }
                     }
                 }
-            }
-            TokenTypes::Float => {
-                effect = Some(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap()))
-            }
-            TokenTypes::Integer => {
-                effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
-            }
-            TokenTypes::Char => {
-                effect =
-                    Some(Effects::Char(token.to_string(parser_utils.buffer).as_bytes()[1] as char))
-            }
-            TokenTypes::True => effect = Some(Effects::Bool(true)),
-            TokenTypes::False => effect = Some(Effects::Bool(false)),
-            TokenTypes::StringStart => effect = Some(parse_string(parser_utils)?),
-            TokenTypes::LineEnd | TokenTypes::ParenClose => break,
-            TokenTypes::BlockEnd if state == ParseState::New => {
-                break;
             }
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
                 return Ok(None);
@@ -176,26 +174,6 @@ pub fn parse_line(
                     }
                     effect = Some(Effects::CodeBody(body));
                 }
-            }
-            TokenTypes::Let => {
-                return Ok(Some(Expression::new(expression_type, parse_let(parser_utils)?)));
-            }
-            TokenTypes::If => {
-                let expression = parse_if(parser_utils)?;
-                // If the if returns/breaks, the outer block should too
-                if expression_type == ExpressionType::Line {
-                    expression_type = expression.expression_type;
-                }
-                return Ok(Some(Expression::new(expression_type, expression.effect)));
-            }
-            TokenTypes::For => {
-                return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)));
-            }
-            TokenTypes::While => {
-                return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)));
-            }
-            TokenTypes::Do => {
-                return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)));
             }
             TokenTypes::Equals => {
                 let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
@@ -283,12 +261,64 @@ pub fn parse_line(
                     }
                 }
             }
-            TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type),
         }
     }
 
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP))));
+}
+
+enum ControlFlow {
+    NotFound,
+    Skipping,
+    Finish,
+    Returning(Expression),
+    Setting(Effects),
+}
+
+fn parse_basic_line(
+    parser_utils: &mut ParserUtils,
+    expression_type: &ExpressionType,
+    token: &Token,
+) -> Result<ControlFlow, ParsingError> {
+    return Ok(match token.token_type {
+        TokenTypes::Float => ControlFlow::Setting(Effects::Float(
+            token.to_string(parser_utils.buffer).parse().unwrap(),
+        )),
+        TokenTypes::Integer => ControlFlow::Setting(Effects::Int(
+            token.to_string(parser_utils.buffer).parse().unwrap(),
+        )),
+        TokenTypes::Char => ControlFlow::Setting(Effects::Char(
+            token.to_string(parser_utils.buffer).as_bytes()[1] as char,
+        )),
+        TokenTypes::True => ControlFlow::Setting(Effects::Bool(true)),
+        TokenTypes::False => ControlFlow::Setting(Effects::Bool(false)),
+        TokenTypes::StringStart => ControlFlow::Setting(parse_string(parser_utils)?),
+        TokenTypes::Let => {
+            ControlFlow::Returning(Expression::new(*expression_type, parse_let(parser_utils)?))
+        }
+        TokenTypes::If => {
+            let expression = parse_if(parser_utils)?;
+            let mut expression_type = *expression_type;
+            // If the if returns/breaks, the outer block should too
+            if expression_type == ExpressionType::Line {
+                expression_type = expression.expression_type;
+            }
+            ControlFlow::Returning(Expression::new(expression_type, expression.effect))
+        }
+        TokenTypes::For => {
+            ControlFlow::Returning(Expression::new(*expression_type, parse_for(parser_utils)?))
+        }
+        TokenTypes::While => {
+            ControlFlow::Returning(Expression::new(*expression_type, parse_while(parser_utils)?))
+        }
+        TokenTypes::Do => {
+            ControlFlow::Returning(Expression::new(*expression_type, parse_do_while(parser_utils)?))
+        }
+        TokenTypes::LineEnd | TokenTypes::ParenClose => ControlFlow::Finish,
+        TokenTypes::Comment => ControlFlow::Skipping,
+        _ => ControlFlow::NotFound,
+    });
 }
 
 ///Parses tokens from the Raven code into a string

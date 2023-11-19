@@ -91,8 +91,8 @@ pub async fn verify_effect(
     variables: &mut SimpleVariableManager,
     effect: Effects,
 ) -> Result<FinalizedEffects, ParsingError> {
-    if let Some(found) = finalize_basic(&effect) {
-        return found;
+    if let Some(found) = finalize_basic(&effect).await {
+        return Ok(found);
     }
     let output = match effect {
         Effects::Paren(inner) => verify_effect(code_verifier, variables, *inner).await?,

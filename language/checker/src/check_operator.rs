@@ -21,8 +21,16 @@ pub async fn check_operator(
         unreachable!()
     }
 
-    let mut outer_operation = None;
+    let error = ParsingError::new(
+        String::new(),
+        (0, 0),
+        0,
+        (0, 0),
+        0,
+        format!("Failed to find operation {} with {:?}", operation, values),
+    );
     // Check if it's two operations that should be combined, like a list ([])
+    let outer_operation = combine_operation(&operation, &mut values, code_verifier).await?;
 
     let operation = if let Some(found) = outer_operation {
         found
@@ -67,8 +75,8 @@ pub async fn check_operator(
 async fn combine_operation(
     operation: &String,
     values: &mut Vec<Effects>,
-    code_verifier: &mut CodeVerifier,
-) -> Option<Arc<StructData>> {
+    code_verifier: &mut CodeVerifier<'_>,
+) -> Result<Option<Arc<StructData>>, ParsingError> {
     let error = ParsingError::new(
         String::default(),
         (0, 0),
@@ -135,7 +143,7 @@ async fn combine_operation(
                                 values.push(effect);
                             }
                         }
-                        return Some(found);
+                        return Ok(Some(found));
                     } else {
                         let new_inner = "{}".to_string()
                             + &combined[new_operation.replace("{+}", "{}").len()..];
@@ -147,7 +155,7 @@ async fn combine_operation(
                         }
                         .await?;
 
-                        return assign_with_priority(
+                        return Ok(assign_with_priority(
                             new_operation.clone(),
                             &found,
                             values,
@@ -155,7 +163,7 @@ async fn combine_operation(
                             &inner_data,
                             effects,
                             inner_array,
-                        );
+                        ));
                     }
                 } else {
                     if reading_array.is_none() {
@@ -172,7 +180,7 @@ async fn combine_operation(
                         }
                         .await?;
 
-                        return assign_with_priority(
+                        return Ok(assign_with_priority(
                             operation.clone(),
                             &outer_data,
                             values,
@@ -180,7 +188,7 @@ async fn combine_operation(
                             &inner_data,
                             effects,
                             false,
-                        );
+                        ));
                     }
                 }
             }
@@ -197,7 +205,7 @@ async fn combine_operation(
             values.push(last);
         }
     }
-    return None;
+    return Ok(None);
 }
 
 pub fn assign_with_priority(
@@ -229,8 +237,10 @@ pub fn assign_with_priority(
         } else {
             values.push(inner_effects.remove(0));
         }
-        mem::swap(&mut inner_effects, values);
-        inner_effects.insert(0, Effects::Operation(operation, inner_effects));
+        let mut temp = vec![];
+        mem::swap(&mut temp, values);
+        inner_effects.insert(0, Effects::Operation(operation, temp));
+        *values = inner_effects;
 
         Some(inner_data.clone())
     } else {

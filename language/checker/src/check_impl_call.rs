@@ -61,7 +61,7 @@ pub async fn check_impl_call(
     {
         let data = inner.finalize(code_verifier.syntax.clone()).await;
 
-        let impl_checker = ImplCheckerData {
+        let mut impl_checker = ImplCheckerData {
             code_verifier,
             data: &data,
             returning: &returning,
@@ -70,7 +70,7 @@ pub async fn check_impl_call(
             finalized_effects: &mut finalized_effects,
             variables,
         };
-        if let Some(found) = check_virtual_type(&impl_checker)? {
+        if let Some(found) = check_virtual_type(&mut impl_checker).await? {
             return Ok(found);
         }
 
@@ -93,7 +93,7 @@ pub async fn check_impl_call(
 }
 
 pub struct ImplCheckerData<'a> {
-    code_verifier: &'a CodeVerifier<'_>,
+    code_verifier: &'a CodeVerifier<'a>,
     data: &'a FinalizedTypes,
     returning: &'a Option<UnparsedType>,
     method: &'a String,
@@ -103,12 +103,12 @@ pub struct ImplCheckerData<'a> {
 }
 
 async fn check_virtual_type(
-    data: &ImplCheckerData<'_>,
+    data: &mut ImplCheckerData<'_>,
 ) -> Result<Option<FinalizedEffects>, ParsingError> {
-    if &data.finding_return_type.of_type_sync(data.data, None).0 {
+    if data.finding_return_type.of_type_sync(data.data, None).0 {
         let mut i = 0;
-        for found in &data.inner_struct().data.functions {
-            if found.name == data.method {
+        for found in &data.data.inner_struct().data.functions {
+            if found.name == *data.method {
                 let mut temp = vec![];
                 mem::swap(&mut temp, data.finalized_effects);
                 return Ok(Some(FinalizedEffects::VirtualCall(

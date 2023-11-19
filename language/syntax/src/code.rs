@@ -200,7 +200,7 @@ impl FinalizedEffects {
             | FinalizedEffects::CodeBody(_) => None,
             // Downcasts simply return the downcasting target.
             FinalizedEffects::CreateVariable(_, _, types)
-            | FinalizedEffects::Downcast(_, target) => Some(types.clone()),
+            | FinalizedEffects::Downcast(_, types) => Some(types.clone()),
             FinalizedEffects::MethodCall(_, function, _)
             | FinalizedEffects::GenericMethodCall(function, _, _)
             | FinalizedEffects::VirtualCall(_, function, _)
@@ -282,12 +282,12 @@ impl FinalizedEffects {
                     )
                     .await?;
             }
-            FinalizedEffects::CompareJump(comparing, _, _)
+            FinalizedEffects::CompareJump(effect, _, _)
             | FinalizedEffects::Load(effect, _, _)
-            | FinalizedEffects::HeapStore(storing)
-            | FinalizedEffects::ReferenceLoad(loading)
-            | FinalizedEffects::StackStore(storing) => {
-                comparing.degeneric(process_manager, variables, resolver, syntax).await?
+            | FinalizedEffects::HeapStore(effect)
+            | FinalizedEffects::ReferenceLoad(effect)
+            | FinalizedEffects::StackStore(effect) => {
+                effect.degeneric(process_manager, variables, resolver, syntax).await?
             }
             FinalizedEffects::CodeBody(body) => {
                 for statement in &mut body.expressions {
