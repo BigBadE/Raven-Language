@@ -146,7 +146,7 @@ pub async fn check_operator(code_verifier: &mut CodeVerifier<'_>, variables: &mu
     };
 
     if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}") {
-        if let Effects::CreateArray(_) = values.first().unwrap() {} else {
+        if !matches!(values.first().unwrap(), Effects::CreateArray(_)) {
             let effect = Effects::CreateArray(vec!(values.remove(0)));
             values.push(effect);
         }

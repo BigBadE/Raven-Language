@@ -138,9 +138,9 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
             }
             TokenTypes::Variable => {
                 let next = parser_utils.tokens.get(parser_utils.index).unwrap();
-                if let TokenTypes::ParenOpen = next.token_type {
+                if TokenTypes::ParenOpen == next.token_type {
                     //Skip because ParenOpen handles this.
-                } else if let TokenTypes::Operator = next.token_type {
+                } else if TokenTypes::Operator == next.token_type {
                     //Skip if a generic method is being called next to preserve the last effect.
                      if is_generic(&token, parser_utils) {
                          continue
@@ -402,13 +402,13 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let name;
     {
         let next = parser_utils.tokens.get(parser_utils.index).unwrap();
-        if let TokenTypes::Variable = next.token_type {
+        if TokenTypes::Variable == next.token_type {
             name = next.to_string(parser_utils.buffer);
         } else {
             return Err(next.make_error(parser_utils.file.clone(), "Unexpected token, expected variable name!".to_string()));
         }
 
-        if let TokenTypes::Equals = parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {} else {
+        if TokenTypes::Equals != parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {
             return Err(next.make_error(parser_utils.file.clone(), format!("Unexpected {:?}, expected equals!", next)));
         }
         parser_utils.index += 2;
@@ -459,7 +459,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
         match token.token_type {
             TokenTypes::Variable => name = token.to_string(parser_utils.buffer),
             TokenTypes::Colon | TokenTypes::ArgumentEnd => {
-                let effect = if let TokenTypes::Colon = token.token_type {
+                let effect = if TokenTypes::Colon == token.token_type {
                     let token = token.clone();
                     match parse_line(parser_utils, ParseState::New)? {
                         Some(inner) => inner.effect,

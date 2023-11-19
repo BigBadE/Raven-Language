@@ -100,7 +100,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
             }
             ExpressionType::Line => {
                 if broke {
-                    if let FinalizedEffects::CodeBody(_) = &line.effect {
+                    if matches!(&line.effect, FinalizedEffects::CodeBody(_)) {
                         compile_effect(type_getter, function, &line.effect, id);
                     }
                 } else {

@@ -38,7 +38,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             if let Some(found) = next {
-                if let Effects::NOP = &found {
+                if matches!(found, Effects::NOP) {
                     break;
                 }
                 right = match right.unwrap() {
@@ -54,7 +54,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
         }
 
         if let Some(inner) = &right {
-            if let Effects::NOP = inner {
+            if matches!(*inner, Effects::NOP) {
                 parser_utils.index = index;
                 parser_utils.tokens.truncate(tokens);
                 return Ok(Effects::Operation(operation, effects));

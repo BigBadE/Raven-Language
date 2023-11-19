@@ -31,7 +31,7 @@ pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &m
     }
 
     let mut finding_return_type;
-    if let Effects::NOP = *calling {
+    if matches!(*calling, Effects::NOP) {
         finding_return_type = FinalizedTypes::Struct(VOID.clone(), None);
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
@@ -61,7 +61,7 @@ pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &m
                     let (_, target) = target.pop().unwrap();
 
                     let return_type = finalized_effects[0].get_return(variables).unwrap().unflatten();
-                    if let FinalizedTypes::Generic(_, _) = return_type {
+                    if matches!(return_type, FinalizedTypes::Generic(_, _)) {
                         return Ok(FinalizedEffects::GenericVirtualCall(i, target,
                                                                        AsyncDataGetter::new(
                                                                            code_verifier.syntax.clone(), found.clone()).await,

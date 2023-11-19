@@ -286,7 +286,7 @@ fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> B
     if value.is_pointer_value() {
         return compiler.build_load(value.into_pointer_value(), "0");
     }
-    return value.clone();
+    return *value;
 }
 
 fn build_cast(first: &BasicValueEnum, _second: BasicTypeEnum, compiler: &CompilerImpl) {

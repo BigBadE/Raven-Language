@@ -47,18 +47,18 @@ impl<'a> Tokenizer<'a> {
     /// Saves the tokenizer to a ParserState to be loaded later
     pub fn serialize(&mut self) -> ParserState {
         return ParserState {
-            state: self.state.clone(),
-            index: self.index.clone(),
-            line_index: self.line_index.clone(),
-            line: self.line.clone(),
+            state: self.state,
+            index: self.index,
+            line_index: self.line_index,
+            line: self.line,
             last: self.last.clone(),
         };
     }
 
     /// Loads the state from a ParserState
     pub fn load(&mut self, state: &ParserState) {
-        self.state.clone_from(&state.state);
-        self.index.clone_from(&state.index);
+        self.state = state.state;
+        self.index = state.index;
         self.line_index = state.line_index;
         self.line = state.line;
         self.last.clone_from(&state.last);
