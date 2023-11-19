@@ -56,42 +56,41 @@ pub fn parse_line(
         let token = parser_utils.tokens.get(parser_utils.index).unwrap().clone();
 
         parser_utils.index += 1;
+        if effect.is_some() {
+            match token.token_type {
+                TokenTypes::Float
+                | TokenTypes::Integer
+                | TokenTypes::Char
+                | TokenTypes::True
+                | TokenTypes::False
+                | TokenTypes::StringStart
+                | TokenTypes::CodeEnd
+                | TokenTypes::BlockEnd
+                | TokenTypes::Let
+                | TokenTypes::If
+                | TokenTypes::For
+                | TokenTypes::While
+                | TokenTypes::Do => {
+                    return Err(token.make_error(
+                        parser_utils.file.clone(),
+                        format!("Unexpected value! Did you forget a semicolon?"),
+                    ));
+                }
+                _ => {}
+            }
+        }
         match token.token_type {
             TokenTypes::ParenOpen => {
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
                 match last.token_type {
                     TokenTypes::Variable | TokenTypes::CallingType => {
-                        let mut effects = Vec::default();
-                        if parser_utils.tokens.get(parser_utils.index).unwrap().token_type
-                            != TokenTypes::ParenClose
-                        {
-                            // If there are arguments to the method, parse them
-                            while let Some(expression) = parse_line(parser_utils, ParseState::None)?
-                            {
-                                effects.push(expression.effect);
-                                if parser_utils
-                                    .tokens
-                                    .get(parser_utils.index - 1)
-                                    .unwrap()
-                                    .token_type
-                                    == TokenTypes::ArgumentEnd
-                                {
-                                } else {
-                                    break;
-                                }
-                            }
-                        } else {
-                            // No arguments
-                            parser_utils.index += 1;
-                        }
-
                         // Name of the method = the last token
                         let name = last.to_string(parser_utils.buffer);
                         // The calling effect must be boxed if it exists.
                         effect = Some(Effects::MethodCall(
                             effect.map(|inner| Box::new(inner)),
                             name.clone(),
-                            effects,
+                            get_effects(parser_utils)?,
                             None,
                         ));
                     }
@@ -107,77 +106,23 @@ pub fn parse_line(
                 }
             }
             TokenTypes::Float => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected float! Did you forget a semicolon?"),
-                    ));
-                }
                 effect = Some(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap()))
             }
             TokenTypes::Integer => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!(
-                            "Unexpected integer! Did you forget a semicolon? {:?}",
-                            effect.unwrap()
-                        ),
-                    ));
-                }
                 effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
             }
             TokenTypes::Char => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected boolean! Did you forget a semicolon?"),
-                    ));
-                }
                 effect =
                     Some(Effects::Char(token.to_string(parser_utils.buffer).as_bytes()[1] as char))
             }
-            TokenTypes::True => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected boolean! Did you forget a semicolon?"),
-                    ));
-                }
-                effect = Some(Effects::Bool(true))
-            }
-            TokenTypes::False => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected boolean! Did you forget a semicolon?"),
-                    ));
-                }
-                effect = Some(Effects::Bool(false))
-            }
-            TokenTypes::StringStart => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected string! Did you forget a semicolon?"),
-                    ));
-                }
-                effect = Some(parse_string(parser_utils)?)
-            }
+            TokenTypes::True => effect = Some(Effects::Bool(true)),
+            TokenTypes::False => effect = Some(Effects::Bool(false)),
+            TokenTypes::StringStart => effect = Some(parse_string(parser_utils)?),
             TokenTypes::LineEnd | TokenTypes::ParenClose => break,
             TokenTypes::BlockEnd if state == ParseState::New => {
                 break;
             }
             TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!(
-                            "Unexpected code end! Did you forget a semicolon? {:?}",
-                            effect.unwrap()
-                        ),
-                    ));
-                }
                 return Ok(None);
             }
             TokenTypes::Variable => {
@@ -233,22 +178,9 @@ pub fn parse_line(
                 }
             }
             TokenTypes::Let => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected let! Did you forget a semicolon?"),
-                    ));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_let(parser_utils)?)));
             }
             TokenTypes::If => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected if! Did you forget a semicolon?"),
-                    ));
-                }
-
                 let expression = parse_if(parser_utils)?;
                 // If the if returns/breaks, the outer block should too
                 if expression_type == ExpressionType::Line {
@@ -257,30 +189,12 @@ pub fn parse_line(
                 return Ok(Some(Expression::new(expression_type, expression.effect)));
             }
             TokenTypes::For => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected for! Did you forget a semicolon?"),
-                    ));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)));
             }
             TokenTypes::While => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected for! Did you forget a semicolon?"),
-                    ));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)));
             }
             TokenTypes::Do => {
-                if effect.is_some() {
-                    return Err(token.make_error(
-                        parser_utils.file.clone(),
-                        format!("Unexpected for! Did you forget a semicolon?"),
-                    ));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)));
             }
             TokenTypes::Equals => {
@@ -474,6 +388,15 @@ fn parse_generic_method(
         };
 
     parser_utils.index += 1;
+    return Ok(Effects::MethodCall(
+        effect.map(|inner| Box::new(inner)),
+        name.clone(),
+        get_effects(parser_utils)?,
+        returning,
+    ));
+}
+
+fn get_effects(parser_utils: &mut ParserUtils) -> Result<Vec<Effects>, ParsingError> {
     let mut effects = Vec::default();
     // Parse the method call arguments
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
@@ -489,13 +412,7 @@ fn parse_generic_method(
     } else {
         parser_utils.index += 1;
     }
-
-    return Ok(Effects::MethodCall(
-        effect.map(|inner| Box::new(inner)),
-        name.clone(),
-        effects,
-        returning,
-    ));
+    return Ok(effects);
 }
 
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {

@@ -592,8 +592,8 @@ impl FinalizedTypes {
                     let data;
                     {
                         let locked = syntax.lock().unwrap();
-                        data = locked.structures.types.get(&name).unwrap().clone();
                         // skipcq: RS-W1070
+                        data = locked.structures.types.get(&name).unwrap().clone();
                     }
                     let base = AsyncDataGetter::new(syntax.clone(), data).await;
                     Ok(FinalizedTypes::Struct(

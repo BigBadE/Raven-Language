@@ -121,7 +121,7 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
                     tokenizer.make_token(TokenTypes::StringEnd)
                 } else {
                     tokenizer.make_token(TokenTypes::StringStart)
-                }
+                };
             }
             b'\\' => {
                 // if it is a hex value, then increment the tokenizer by an extra 2 because

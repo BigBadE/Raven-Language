@@ -315,6 +315,7 @@ impl Syntax {
             //Downcasts the generic type to be a StructData.
             //Only traits can be operators. This will break if something else is.
             //These is no better way to do this because Rust doesn't allow downcasting generics.
+            // skipcq: RS-W1117
             let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
             // Gets the name of the operation, or errors if there isn't one.

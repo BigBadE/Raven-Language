@@ -254,6 +254,7 @@ impl HandleWrapper {
     ) {
         let handle = self.handle.spawn(future);
         self.names.insert(name, handle.abort_handle());
+        // skipcq: RS-W1117
         self.joining.push(unsafe { mem::transmute(handle) });
     }
 
