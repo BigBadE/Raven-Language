@@ -250,7 +250,7 @@ impl FinalizedStruct {
             if let FinalizedTypes::Generic(name, _) = types {
                 let index = self.generics.iter().position(|(other_name, _)| name == other_name).unwrap();
                 let generic: &FinalizedTypes = generics.get(index).unwrap();
-                *types = generic.clone();
+                types.clone_from(generic);
             }
         }
 

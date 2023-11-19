@@ -54,7 +54,9 @@ export function activate(context: ExtensionContext) {
 
     client.registerFeature(new OverrideFeatures());
 	// Start the client. This will also launch the server
-	client.start().then(_ => {});
+	client.start().then(_ => {
+		// Unused
+	});
 }
 
 class OverrideFeatures implements StaticFeature {

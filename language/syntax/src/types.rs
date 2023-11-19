@@ -481,7 +481,7 @@ impl FinalizedTypes {
                             return Err(bounds_error);
                         }
                     }
-                    *self = found.clone();
+                    self.clone_from(found);
                     Ok(())
                 } else {
                     none_error.message = format!("{}: {} and {:?}", none_error.message, self, generics.keys().collect::<Vec<_>>());
@@ -512,7 +512,7 @@ impl FinalizedTypes {
     pub fn unflatten(&self) -> FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(_, original) =>
-                original.clone().map(|inner| *inner).unwrap_or_else(|| self.clone()),
+                original.clone().map_or_else(|| self.clone(), |inner| *inner),
             FinalizedTypes::Reference(inner) => inner.unflatten(),
             _ => self.clone()
         }
@@ -544,7 +544,7 @@ impl FinalizedTypes {
                 } else {
                     // Clone the type and add the new type to the structures.
                     let mut other = StructData::clone(&found.data);
-                    other.name = name.clone();
+                    other.name.clone_from(&name);
 
                     // Update the structure's functions
                     for function in &mut other.functions {
@@ -564,7 +564,7 @@ impl FinalizedTypes {
                     }
                     // Get the FinalizedStruct and degeneric it.
                     let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), found.data.clone()).await.deref());
-                    data.data = arc_other.clone();
+                    data.data.clone_from(&arc_other);
                     data.degeneric(generics, syntax).await?;
                     let data = Arc::new(data);
                     // Add the flattened type to the
@@ -642,7 +642,7 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name_safe().map(|inner| other.name_safe()
-            .map(|other| inner == other).unwrap_or(false)).unwrap_or(false);
+        return self.name_safe().map_or_else(|| false, |inner| other.name_safe()
+            .map_or_else(|| false, |other| inner == other));
     }
 }

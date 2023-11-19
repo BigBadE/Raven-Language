@@ -78,7 +78,7 @@ impl FromResidual<Token> for Token {
 /// Required for Try
 impl FromResidual<Result<Infallible, Token>> for Token {
     fn from_residual(residual: Result<Infallible, Token>) -> Token {
-        return residual.err().unwrap();
+        return residual.unwrap_err();
     }
 }
 

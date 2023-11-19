@@ -4,6 +4,14 @@ exclude_patterns = [
   "crates/**"
 ]
 
+[[transformers]]
+name = "rustfmt"
+enabled = true
+
+[[transformers]]
+name = "standardjs"
+enabled = true
+
 [[analyzers]]
 name = "rust"
 

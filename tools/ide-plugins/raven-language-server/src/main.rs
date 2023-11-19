@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId};
-use lsp_types::{InitializeParams, SemanticTokenModifier, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, SemanticTokenType, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url};
+use lsp_types::{InitializeParams, SemanticTokenModifier, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, SemanticTokenType, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url, WorkDoneProgressOptions};
 use lsp_types::notification::{DidChangeTextDocument, DidOpenTextDocument};
 use lsp_types::request::SemanticTokensFullRequest;
 use tokio::runtime::Builder;
@@ -19,7 +19,7 @@ pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
-            work_done_progress_options: Default::default(),
+            work_done_progress_options: WorkDoneProgressOptions::default(),
             legend: SemanticTokensLegend {
                 token_types: vec!(SemanticTokenType::NAMESPACE, SemanticTokenType::TYPE, SemanticTokenType::CLASS, SemanticTokenType::ENUM,
                                   SemanticTokenType::INTERFACE, SemanticTokenType::STRUCT, SemanticTokenType::TYPE_PARAMETER, SemanticTokenType::PARAMETER,
