@@ -33,19 +33,12 @@ pub async fn verify_code(
         ));
 
         if check_return_type(line.expression_type, code_verifier, &mut body, variables).await? {
-            return Ok(FinalizedCodeBody::new(
-                body.clone(),
-                code.label.clone(),
-                true,
-            ));
+            return Ok(FinalizedCodeBody::new(body.clone(), code.label.clone(), true));
         }
     }
 
     if !found_end && !top {
-        panic!(
-            "Code body with label {} doesn't return or jump!",
-            code.label
-        )
+        panic!("Code body with label {} doesn't return or jump!", code.label)
     }
 
     return Ok(FinalizedCodeBody::new(body, code.label.clone(), false));
@@ -74,10 +67,7 @@ async fn check_return_type(
         return Ok(true);
     }
 
-    return if last_type
-        .of_type(return_type, code_verifier.syntax.clone())
-        .await
-    {
+    return if last_type.of_type(return_type, code_verifier.syntax.clone()).await {
         ImplWaiter {
             syntax: code_verifier.syntax.clone(),
             return_type: last_type.clone(),
@@ -92,13 +82,11 @@ async fn check_return_type(
         ));
         Ok(true)
     } else {
-        Err(placeholder_error(format!(
-            "Expected {}, found {}",
-            return_type, last_type
-        )))
+        Err(placeholder_error(format!("Expected {}, found {}", return_type, last_type)))
     };
 }
 
+// skipcq: RS-R1000
 #[async_recursion]
 pub async fn verify_effect(
     code_verifier: &mut CodeVerifier<'_>,
@@ -155,9 +143,7 @@ pub async fn verify_effect(
                 output.push(verify_effect(code_verifier, variables, effect).await?);
             }
 
-            let types = output
-                .first()
-                .map(|found| found.get_return(variables).unwrap());
+            let types = output.first().map(|found| found.get_return(variables).unwrap());
             check_type(&types, &output, variables, code_verifier).await?;
 
             store(FinalizedEffects::CreateArray(types, output))
@@ -233,10 +219,7 @@ async fn check_type(
         for checking in output {
             let returning = checking.get_return(variables).unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
-                return Err(placeholder_error(format!(
-                    "{:?} isn't a {:?}!",
-                    checking, types
-                )));
+                return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
             }
         }
     }

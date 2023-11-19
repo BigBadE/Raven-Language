@@ -2,6 +2,7 @@ use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_w
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{add_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
+use std::mem;
 use syntax::async_util::UnparsedType;
 use syntax::code::{Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
@@ -80,11 +81,7 @@ pub fn parse_line(
             }
         }
 
-        match parse_basic_line(parser_utils, &expression_type, &token)? {
-            ControlFlow::Setting(found) => {
-                effect = Some(found);
-                continue;
-            }
+        match parse_basic_line(parser_utils, &mut expression_type, &token, &state, &mut effect)? {
             ControlFlow::Returning(returning) => return Ok(Some(returning)),
             ControlFlow::Skipping => continue,
             ControlFlow::Finish => break,
@@ -92,35 +89,7 @@ pub fn parse_line(
         }
 
         match token.token_type {
-            TokenTypes::BlockEnd if state == ParseState::New => {
-                break;
-            }
-            TokenTypes::ParenOpen => {
-                let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
-                match last.token_type {
-                    TokenTypes::Variable | TokenTypes::CallingType => {
-                        // Name of the method = the last token
-                        let name = last.to_string(parser_utils.buffer);
-                        // The calling effect must be boxed if it exists.
-                        effect = Some(Effects::MethodCall(
-                            effect.map(|inner| Box::new(inner)),
-                            name.clone(),
-                            get_effects(parser_utils)?,
-                            None,
-                        ));
-                    }
-                    // If it's not a method call, it's a parenthesized effect.
-                    _ => {
-                        if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
-                            effect = Some(Effects::Paren(Box::new(expression.effect)));
-                        } else {
-                            //effect = None;
-                            panic!("Unknown code path - report this!");
-                        }
-                    }
-                }
-            }
-            TokenTypes::CodeEnd | TokenTypes::BlockEnd => {
+            TokenTypes::CodeEnd | TokenTypes::BlockEnd | TokenTypes::EOF => {
                 return Ok(None);
             }
             TokenTypes::Variable => {
@@ -144,7 +113,6 @@ pub fn parse_line(
                     effect = Some(Effects::LoadVariable(token.to_string(parser_utils.buffer)))
                 }
             }
-            TokenTypes::Return => expression_type = ExpressionType::Return,
             TokenTypes::New => {
                 if effect.is_some() {
                     return Err(token.make_error(
@@ -224,7 +192,6 @@ pub fn parse_line(
                     }
                 }
             }
-            TokenTypes::ArgumentEnd => break,
             TokenTypes::CallingType => {
                 let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
                 if next.token_type == TokenTypes::ParenOpen || is_generic(&token, parser_utils) {
@@ -241,25 +208,10 @@ pub fn parse_line(
                     ))
                 }
             }
-            TokenTypes::EOF => {
-                return Ok(None);
-            }
             TokenTypes::Else => {
                 return Err(
                     token.make_error(parser_utils.file.clone(), "Unexpected Else!".to_string())
                 )
-            }
-            TokenTypes::Period => {
-                if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Period {
-                    let operator = parse_operator(effect, parser_utils, &state)?;
-                    // Operators inside operators return immediately so operators can be combined
-                    // later on for operators like [].
-                    if ParseState::InOperator == state || ParseState::ControlOperator == state {
-                        return Ok(Some(Expression::new(expression_type, operator)));
-                    } else {
-                        effect = Some(operator);
-                    }
-                }
             }
             _ => panic!("How'd you get here? {:?}", token.token_type),
         }
@@ -273,27 +225,46 @@ enum ControlFlow {
     Skipping,
     Finish,
     Returning(Expression),
-    Setting(Effects),
 }
 
 fn parse_basic_line(
     parser_utils: &mut ParserUtils,
-    expression_type: &ExpressionType,
+    expression_type: &mut ExpressionType,
     token: &Token,
+    state: &ParseState,
+    effect: &mut Option<Effects>,
 ) -> Result<ControlFlow, ParsingError> {
     return Ok(match token.token_type {
-        TokenTypes::Float => ControlFlow::Setting(Effects::Float(
-            token.to_string(parser_utils.buffer).parse().unwrap(),
-        )),
-        TokenTypes::Integer => ControlFlow::Setting(Effects::Int(
-            token.to_string(parser_utils.buffer).parse().unwrap(),
-        )),
-        TokenTypes::Char => ControlFlow::Setting(Effects::Char(
-            token.to_string(parser_utils.buffer).as_bytes()[1] as char,
-        )),
-        TokenTypes::True => ControlFlow::Setting(Effects::Bool(true)),
-        TokenTypes::False => ControlFlow::Setting(Effects::Bool(false)),
-        TokenTypes::StringStart => ControlFlow::Setting(parse_string(parser_utils)?),
+        TokenTypes::BlockEnd if *state == ParseState::New => ControlFlow::Finish,
+        TokenTypes::Return => {
+            *expression_type = ExpressionType::Return;
+            ControlFlow::Skipping
+        }
+        TokenTypes::Float => {
+            *effect = Some(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap()));
+            ControlFlow::Skipping
+        }
+        TokenTypes::Integer => {
+            *effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()));
+            ControlFlow::Skipping
+        }
+        TokenTypes::Char => {
+            *effect =
+                Some(Effects::Char(token.to_string(parser_utils.buffer).as_bytes()[1] as char));
+            ControlFlow::Skipping
+        }
+        TokenTypes::True => {
+            *effect = Some(Effects::Bool(true));
+            ControlFlow::Skipping
+        }
+        TokenTypes::False => {
+            *effect = Some(Effects::Bool(false));
+            ControlFlow::Skipping
+        }
+        TokenTypes::StringStart => {
+            *effect = Some(parse_string(parser_utils)?);
+            ControlFlow::Skipping
+        }
         TokenTypes::Let => {
             ControlFlow::Returning(Expression::new(*expression_type, parse_let(parser_utils)?))
         }
@@ -315,8 +286,54 @@ fn parse_basic_line(
         TokenTypes::Do => {
             ControlFlow::Returning(Expression::new(*expression_type, parse_do_while(parser_utils)?))
         }
-        TokenTypes::LineEnd | TokenTypes::ParenClose => ControlFlow::Finish,
+        TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::ArgumentEnd => {
+            ControlFlow::Finish
+        }
         TokenTypes::Comment => ControlFlow::Skipping,
+        TokenTypes::ParenOpen => {
+            let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
+            match last.token_type {
+                TokenTypes::Variable | TokenTypes::CallingType => {
+                    // Name of the method = the last token
+                    let name = last.to_string(parser_utils.buffer);
+                    let mut temp = None;
+                    mem::swap(&mut temp, effect);
+                    // The calling effect must be boxed if it exists.
+                    *effect = Some(Effects::MethodCall(
+                        temp.map(|inner| Box::new(inner)),
+                        name.clone(),
+                        get_effects(parser_utils)?,
+                        None,
+                    ));
+                    ControlFlow::Skipping
+                }
+                // If it's not a method call, it's a parenthesized effect.
+                _ => {
+                    if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
+                        *effect = Some(Effects::Paren(Box::new(expression.effect)));
+                        ControlFlow::Skipping
+                    } else {
+                        //effect = None;
+                        panic!("Unknown code path - report this!");
+                    }
+                }
+            }
+        }
+        TokenTypes::Period => {
+            if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Period {
+                let mut temp = None;
+                mem::swap(&mut temp, effect);
+                let operator = parse_operator(temp, parser_utils, &state)?;
+                // Operators inside operators return immediately so operators can be combined
+                // later on for operators like [].
+                if ParseState::InOperator == *state || ParseState::ControlOperator == *state {
+                    return Ok(ControlFlow::Returning(Expression::new(*expression_type, operator)));
+                } else {
+                    *effect = Some(operator);
+                }
+            }
+            ControlFlow::Skipping
+        }
         _ => ControlFlow::NotFound,
     });
 }
