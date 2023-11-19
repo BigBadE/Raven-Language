@@ -6,8 +6,8 @@ use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
 
 pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, state: &ParseState) -> Result<Effects, ParsingError> {
-    let mut operation = String::new();
-    let mut effects = Vec::new();
+    let mut operation = String::default();
+    let mut effects = Vec::default();
 
     if let Some(effect) = last {
         operation += "{}";

@@ -28,7 +28,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
     // Get the code inside the if statement
     let (mut returning, body) = parse_code(parser_utils)?;
-    let mut else_ifs = Vec::new();
+    let mut else_ifs = Vec::default();
     let mut else_body = None;
 
     // Loop over every else block
@@ -173,7 +173,7 @@ pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, Parsing
 }
 
 fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
-    let mut top = Vec::new();
+    let mut top = Vec::default();
 
     let label = body.label.clone();
     body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id - 1).to_string() + "end")));
@@ -185,7 +185,7 @@ fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effec
 }
 
 fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
-    let mut top = Vec::new();
+    let mut top = Vec::default();
 
     top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect),
                                                                         body.label.clone(), id.to_string() + "end")));
@@ -205,7 +205,7 @@ fn create_if(effect: Effects, body: CodeBody,
         body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
         Some(body)
     } else if !else_ifs.is_empty() {
-        Some(CodeBody::new(Vec::new(), id.to_string()))
+        Some(CodeBody::new(Vec::default(), id.to_string()))
     } else {
         None
     };
@@ -255,7 +255,7 @@ fn create_if(effect: Effects, body: CodeBody,
 }
 
 fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
-    let mut top = Vec::new();
+    let mut top = Vec::default();
     let variable = format!("$iter{}", id);
     top.insert(0, Expression::new(ExpressionType::Line,
                                   Effects::CreateVariable(variable.clone(), Box::new(effect))));

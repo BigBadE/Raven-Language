@@ -9,8 +9,8 @@ use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::{Token, TokenTypes};
 
 pub fn parse_top(parser_utils: &mut ParserUtils) {
-    let mut modifiers = Vec::new();
-    let mut attributes = Vec::new();
+    let mut modifiers = vec!();
+    let mut attributes = vec!();
     while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -30,15 +30,15 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 parser_utils.handle.lock().unwrap().spawn(function.data.name.clone(), FunctionData::verify(parser_utils.handle.clone(), function, parser_utils.syntax.clone(),
                                                                Box::new(parser_utils.imports.clone()), process_manager));
 
-                attributes = Vec::new();
-                modifiers = Vec::new();
+                attributes = vec!();
+                modifiers = vec!();
             }
             TokenTypes::StructStart => {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.add_struct(token, structure);
-                attributes = Vec::new();
-                modifiers = Vec::new();
+                attributes = vec!();
+                modifiers = vec!();
             }
             TokenTypes::TraitStart => {
                 if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern) {
@@ -55,8 +55,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.add_struct(token, structure);
-                attributes = Vec::new();
-                modifiers = Vec::new();
+                attributes = Vec::default();
+                modifiers = Vec::default();
             }
             TokenTypes::ImplStart => {
                 let implementor = parse_implementor(parser_utils,
@@ -70,8 +70,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 parser_utils.handle.lock().unwrap().spawn("temp".to_string(),
                         ParserUtils::add_implementor(parser_utils.handle.clone(), parser_utils.syntax.clone(), implementor,
                         parser_utils.imports.boxed_clone(), process_manager));
-                attributes = Vec::new();
-                modifiers = Vec::new();
+                attributes = Vec::default();
+                modifiers = Vec::default();
             },
             TokenTypes::Comment => {},
             TokenTypes::EOF => return,

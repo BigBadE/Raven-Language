@@ -13,7 +13,7 @@ use crate::CodeVerifier;
 
 pub async fn verify_code(code_verifier: &mut CodeVerifier<'_>, variables: &mut SimpleVariableManager, code: CodeBody, top: bool)
                          -> Result<FinalizedCodeBody, ParsingError> {
-    let mut body = Vec::new();
+    let mut body = Vec::default();
     let mut found_end = false;
     for line in code.expressions {
         match &line.effect {
@@ -96,7 +96,7 @@ pub async fn verify_effect(code_verifier: &mut CodeVerifier<'_>, variables: &mut
             let target = Syntax::parse_type(code_verifier.syntax.clone(), placeholder_error(format!("Test")),
                                             code_verifier.resolver.boxed_clone(), target, vec!())
                 .await?.finalize(code_verifier.syntax.clone()).await;
-            let mut final_effects = Vec::new();
+            let mut final_effects = Vec::default();
             for (field_name, effect) in effects {
                 let mut i = 0;
                 let fields = target.get_fields();
@@ -144,7 +144,7 @@ pub async fn verify_effect(code_verifier: &mut CodeVerifier<'_>, variables: &mut
         Effects::String(string) => store(FinalizedEffects::String(string)),
         Effects::Char(char) => store(FinalizedEffects::Char(char)),
         Effects::CreateArray(effects) => {
-            let mut output = Vec::new();
+            let mut output = Vec::default();
             for effect in effects {
                 output.push(verify_effect(code_verifier, variables, effect).await?);
             }

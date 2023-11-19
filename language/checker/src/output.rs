@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc; use std::sync::Mutex;
+use indexmap::IndexMap;
 use async_trait::async_trait;
 
-use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
+use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData, UnfinalizedFunction};
 use syntax::ProcessManager;
 use syntax::async_util::{HandleWrapper, NameResolver};
 use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
@@ -22,7 +23,7 @@ impl TypesChecker {
     pub fn new(runtime: Arc<Mutex<HandleWrapper>>, include_refs: bool) -> Self {
         return Self {
             runtime,
-            generics: HashMap::new(),
+            generics: HashMap::default(),
             include_refs
         };
     }
@@ -40,11 +41,11 @@ impl ProcessManager for TypesChecker {
             Err(error) => {
                 syntax.lock().unwrap().errors.push(error.clone());
                 (CodelessFinalizedFunction {
-                    generics: Default::default(),
+                    generics: IndexMap::default(),
                     arguments: vec![],
                     return_type: None,
-                    data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
-                }, CodeBody::new(Vec::new(), String::new()))
+                    data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
+                }, CodeBody::new(Vec::default(), String::default()))
             }
         }
     }
@@ -56,11 +57,11 @@ impl ProcessManager for TypesChecker {
             Err(error) => {
                 syntax.lock().unwrap().errors.push(error.clone());
                 FinalizedFunction {
-                    generics: Default::default(),
+                    generics: IndexMap::default(),
                     fields: vec![],
-                    code: Default::default(),
+                    code: FinalizedCodeBody::default(),
                     return_type: None,
-                    data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
+                    data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
                 }
             }
         }
@@ -74,9 +75,9 @@ impl ProcessManager for TypesChecker {
             Err(error) => {
                 syntax.lock().unwrap().errors.push(error.clone());
                 FinalizedStruct {
-                    generics: Default::default(),
+                    generics: IndexMap::default(),
                     fields: vec![],
-                    data: Arc::new(StructData::new(Vec::new(), Vec::new(), 0, String::new())),
+                    data: Arc::new(StructData::new(Vec::default(), Vec::default(), 0, String::default())),
                 }
             }
         }

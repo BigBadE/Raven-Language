@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use compiler_llvm::LLVMCompiler;
 use data::CompilerArguments;
@@ -15,7 +14,7 @@ use dashmap::DashMap;
 pub mod runner;
 
 pub fn get_compiler<T>(compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
-                       struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
+                       struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
                        arguments: CompilerArguments) -> Box<dyn Compiler<T> + Send + Sync> {
     return Box::new(match arguments.compiler.to_lowercase().as_str() {
         "llvm" => LLVMCompiler::new(compiling, struct_compiling, arguments),
@@ -33,7 +32,7 @@ impl Future for JoinWaiter {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.handle.lock().unwrap();
 
-        let mut removing = Vec::new();
+        let mut removing = Vec::default();
 
         let mut i = 0;
         for mut handle in &mut locked.joining {

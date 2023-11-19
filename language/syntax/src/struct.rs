@@ -146,13 +146,13 @@ impl PartialEq for FinalizedStruct {
 impl StructData {
     pub fn empty(name: String) -> Self {
         return Self {
-            attributes: Vec::new(),
+            attributes: Vec::default(),
             chalk_data: None,
             id: 0,
             modifiers: Modifier::Internal as u8,
             name,
-            functions: Vec::new(),
-            poisoned: Vec::new()
+            functions: Vec::default(),
+            poisoned: Vec::default()
         };
     }
 
@@ -164,7 +164,7 @@ impl StructData {
             modifiers,
             name,
             functions,
-            poisoned: Vec::new(),
+            poisoned: Vec::default(),
         };
     }
 
@@ -210,7 +210,7 @@ impl StructData {
     }
 
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
-        let mut output = Self::new(Vec::new(), Vec::new(), 0, name);
+        let mut output = Self::new(Vec::default(), Vec::default(), 0, name);
         output.poisoned = vec!(error);
         return output;
     }
@@ -219,8 +219,8 @@ impl StructData {
 impl FinalizedStruct {
     pub fn empty_of(data: StructData) -> Self {
         return Self {
-            generics: IndexMap::new(),
-            fields: Vec::new(),
+            generics: IndexMap::default(),
+            fields: Vec::default(),
             data: Arc::new(data),
         };
     }
@@ -295,7 +295,7 @@ impl TopElement for StructData {
     async fn verify(handle: Arc<Mutex<HandleWrapper>>, mut current: UnfinalizedStruct, syntax: Arc<Mutex<Syntax>>, resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) {
         let data = current.data.clone();
         let functions = current.functions;
-        current.functions = Vec::new();
+        current.functions = Vec::default();
         let structure = Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);
         {
             let mut locked = syntax.lock().unwrap();

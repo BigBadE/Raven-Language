@@ -42,12 +42,12 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn new(compiler: Arc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
         return Self {
             syntax,
-            vtable: Arc::new(VTableManager::new()),
+            vtable: Arc::new(VTableManager::default()),
             compiler,
-            compiling: Arc::new(Vec::new()),
-            blocks: HashMap::new(),
+            compiling: Arc::new(Vec::default()),
+            blocks: HashMap::default(),
             current_block: None,
-            variables: HashMap::new(),
+            variables: HashMap::default(),
         };
     }
 

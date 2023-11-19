@@ -15,13 +15,13 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                        -> Result<UnfinalizedStruct, ParsingError> {
     let modifiers = get_modifier(modifiers.as_slice());
 
-    let mut member_modifiers = Vec::new();
-    let mut member_attributes = Vec::new();
+    let mut member_modifiers = Vec::default();
+    let mut member_attributes = Vec::default();
 
-    let mut name = String::new();
-    let mut fields = Vec::new();
-    let mut generics = IndexMap::new();
-    let mut functions = Vec::new();
+    let mut name = String::default();
+    let mut fields = Vec::default();
+    let mut generics = IndexMap::default();
+    let mut functions = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         let token: Token = token.clone();
@@ -56,14 +56,14 @@ pub fn parse_structure(parser_utils: &mut ParserUtils, attributes: Vec<Attribute
                                               is_modifier(modifiers, Modifier::Trait), member_attributes, member_modifiers);
                 functions.push(ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function));
                 parser_utils.file = file;
-                member_attributes = Vec::new();
-                member_modifiers = Vec::new();
+                member_attributes = Vec::default();
+                member_modifiers = Vec::default();
             }
             TokenTypes::FieldName => {
                 fields.push(parse_field(parser_utils, token.to_string(parser_utils.buffer),
                                         member_attributes, member_modifiers));
-                member_attributes = Vec::new();
-                member_modifiers = Vec::new();
+                member_attributes = Vec::default();
+                member_modifiers = Vec::default();
             }
             TokenTypes::StructEnd => break,
             TokenTypes::EOF => break,
@@ -90,10 +90,10 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                          modifiers: Vec<Modifier>) -> Result<TraitImplementor, ParsingError> {
     let mut base = None;
     let mut implementor = None;
-    let mut member_attributes = Vec::new();
-    let mut member_modifiers = Vec::new();
-    let mut functions = Vec::new();
-    let mut generics = IndexMap::new();
+    let mut member_attributes = Vec::default();
+    let mut member_modifiers = Vec::default();
+    let mut functions = Vec::default();
+    let mut generics = IndexMap::default();
 
     let mut state = 0;
     while parser_utils.tokens.len() != parser_utils.index {
@@ -117,7 +117,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                     if generics.contains_key(&temp_name) {
                         parser_utils.imports.parent = Some(name);
                     } else {
-                        let mut found = String::new();
+                        let mut found = String::default();
                         for _ in 0..depth {
                             found += "[";
                         }
@@ -166,8 +166,8 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
                 let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
                 functions.push(function?);
                 parser_utils.file = file;
-                member_attributes = Vec::new();
-                member_modifiers = Vec::new();
+                member_attributes = Vec::default();
+                member_modifiers = Vec::default();
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
@@ -199,7 +199,7 @@ pub fn parse_implementor(parser_utils: &mut ParserUtils, attributes: Vec<Attribu
 }
 
 pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<UnparsedType>, ParsingError> {
-    let mut current = Vec::new();
+    let mut current = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -227,9 +227,9 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Unparse
 }
 
 pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<String, Vec<ParsingFuture<Types>>>) {
-    let mut name = String::new();
-    let mut bounds: Vec<ParsingFuture<Types>> = Vec::new();
-    let mut unparsed_bounds: Vec<UnparsedType> = Vec::new();
+    let mut name = String::default();
+    let mut bounds: Vec<ParsingFuture<Types>> = Vec::default();
+    let mut unparsed_bounds: Vec<UnparsedType> = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -244,8 +244,8 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             TokenTypes::GenericEnd => {
                 parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
                 generics.insert(name.clone(), bounds);
-                bounds = Vec::new();
-                unparsed_bounds = Vec::new();
+                bounds = Vec::default();
+                unparsed_bounds = Vec::default();
             }
             TokenTypes::GenericBound => {
                 let token = parser_utils.tokens.get(parser_utils.index-1).unwrap();
@@ -287,7 +287,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
     } else {
         return Some(UnparsedType::Basic(name));
     }
-    let mut unparsed_bounds: Vec<UnparsedType> = Vec::new();
+    let mut unparsed_bounds: Vec<UnparsedType> = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -306,7 +306,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
                 unparsed_bounds.push(unparsed);
             },
             TokenTypes::GenericsStart => {
-                if let Some(inner) = parse_bounds(String::new(), parser_utils) {
+                if let Some(inner) = parse_bounds(String::default(), parser_utils) {
                     unparsed_bounds.push(inner);
                 } else {
                     return None;

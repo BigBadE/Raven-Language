@@ -87,7 +87,7 @@ impl Types {
 
     /// Finalizes a list of types.
     async fn finalize_all(syntax: Arc<Mutex<Syntax>>, types: &Vec<Types>) -> Vec<FinalizedTypes> {
-        let mut output = Vec::new();
+        let mut output = Vec::default();
         for found in types {
             output.push(found.finalize(syntax.clone()).await);
         }
@@ -105,7 +105,7 @@ impl FinalizedTypes {
     }
 
     #[async_recursion]
-    pub async fn fix_generics(&mut self, resolver: &Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+    pub async fn fix_generics(&mut self, resolver: &dyn NameResolver, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {
             FinalizedTypes::Struct(_, inner) => {
                 if let Some(found) = inner {
@@ -205,7 +205,7 @@ impl FinalizedTypes {
             }
             FinalizedTypes::GenericType(inner, bounds) => {
                 if let TyKind::Adt(id, _) = inner.to_chalk_type(binders).data(ChalkIr).kind {
-                    let mut generic_args = Vec::new();
+                    let mut generic_args = Vec::default();
                     for arg in bounds {
                         generic_args.push(GenericArgData::Ty(arg.to_chalk_type(binders)).intern(ChalkIr));
                     }
@@ -269,7 +269,7 @@ impl FinalizedTypes {
                 }
                 FinalizedTypes::Generic(_, bounds) => {
                     // If any bounds fail, the type isn't of the generic.
-                    let mut fails = Vec::new();
+                    let mut fails = Vec::default();
                     for bound in bounds {
                         let (result, future) = self.of_type_sync(bound, syntax.clone());
                         if !result {
@@ -301,7 +301,7 @@ impl FinalizedTypes {
             },
             FinalizedTypes::GenericType(base, generics) => match other {
                 FinalizedTypes::GenericType(other_base, other_generics) => {
-                    let mut fails = Vec::new();
+                    let mut fails = Vec::default();
                     if generics.len() != other_generics.len() {
                         let (result, future) = base.of_type_sync(other_base, syntax.clone());
                         if !result {
@@ -329,7 +329,7 @@ impl FinalizedTypes {
                     (true, None)
                 }
                 FinalizedTypes::Generic(_, bounds) => {
-                    let mut fails = Vec::new();
+                    let mut fails = Vec::default();
                     // Check each bound, if any are violated it's not of the generic type.
                     for bound in bounds {
                         let (result, future) = self.of_type_sync(bound, syntax.clone());
@@ -356,10 +356,10 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(referencing) => referencing.of_type_sync(other, syntax),
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
-                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>> = Vec::new();
+                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>> = Vec::default();
                     // For two generics to be the same, each bound must match at least one other bound.
                     'outer: for bound in bounds {
-                        let mut fails = Vec::new();
+                        let mut fails = Vec::default();
                         for other_bound in other_bounds {
                             let (result, failure) = other_bound.of_type_sync(bound, syntax.clone());
                             if result {
@@ -382,7 +382,7 @@ impl FinalizedTypes {
                 }
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
                 FinalizedTypes::Struct(_, _) | FinalizedTypes::GenericType(_, _) | FinalizedTypes::Array(_) => {
-                    let mut fails = Vec::new();
+                    let mut fails = Vec::default();
                     for bound in bounds {
                         let (result, failure) = bound.of_type_sync(other, syntax.clone());
                         if result {
@@ -490,7 +490,7 @@ impl FinalizedTypes {
             }
             FinalizedTypes::GenericType(base, bounds) => {
                 base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
-                let mut found = Vec::new();
+                let mut found = Vec::default();
                 for bound in bounds {
                     bound.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
                     found.push(bound.clone());

@@ -17,7 +17,7 @@ pub async fn check_operator(code_verifier: &mut CodeVerifier<'_>, variables: &mu
         unreachable!()
     }
 
-    let error = ParsingError::new(String::new(), (0, 0), 0,
+    let error = ParsingError::new(String::default(), (0, 0), 0,
                                   (0, 0), 0, format!("Failed to find operation {} with {:?}", operation, values));
     let mut outer_operation = None;
     // Check if it's two operations that should be combined, like a list ([])
@@ -161,7 +161,7 @@ pub async fn check_operator(code_verifier: &mut CodeVerifier<'_>, variables: &mu
 
     return verify_effect(code_verifier, variables,
                   Effects::ImplementationCall(calling, operation.name.clone(),
-                                              String::new(), values, None)).await;
+                                              String::default(), values, None)).await;
 }
 
 pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut values: Vec<Effects>,

@@ -40,9 +40,9 @@ impl<'a> ParserUtils<'a> {
             Ok(adding) => adding,
             Err(error) => {
                 UnfinalizedStruct {
-                    generics: Default::default(),
-                    fields: Vec::new(),
-                    functions: Vec::new(),
+                    generics: IndexMap::default(),
+                    fields: Vec::default(),
+                    functions: Vec::default(),
                     data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
                 }
             }
@@ -81,9 +81,9 @@ impl<'a> ParserUtils<'a> {
 
     async fn add_implementation(handle: Arc<Mutex<HandleWrapper>>, syntax: Arc<Mutex<Syntax>>, implementor: TraitImplementor,
                                 resolver: Box<dyn NameResolver>, process_manager: Box<dyn ProcessManager>) -> Result<(), ParsingError> {
-        let mut generics = IndexMap::new();
+        let mut generics = IndexMap::default();
         for (generic, bounds) in implementor.generics {
-            let mut final_bounds = Vec::new();
+            let mut final_bounds = Vec::default();
             for bound in bounds {
                 final_bounds.push(bound.await?.finalize(syntax.clone()).await);
             }
@@ -99,7 +99,7 @@ impl<'a> ParserUtils<'a> {
         let chalk_type = Arc::new(Syntax::make_impldatum(&generics,
                                                          &target, &base));
 
-        let mut functions = Vec::new();
+        let mut functions = Vec::default();
         for function in &implementor.functions {
             functions.push(function.data.clone());
         }
@@ -138,9 +138,9 @@ impl<'a> ParserUtils<'a> {
             Ok(adding) => adding,
             Err(error) => {
                 UnfinalizedFunction {
-                    generics: Default::default(),
-                    fields: Vec::new(),
-                    code: CodeBody::new(Vec::new(), "empty".to_string()),
+                    generics: IndexMap::default(),
+                    fields: Vec::default(),
+                    code: CodeBody::new(Vec::default(), "empty".to_string()),
                     return_type: None,
                     data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
                 }
@@ -154,8 +154,8 @@ impl<'a> ParserUtils<'a> {
 }
 
 pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {
-    let mut generics: Vec<ParsingFuture<Types>> = Vec::new();
-    let mut unparsed_generics = Vec::new();
+    let mut generics: Vec<ParsingFuture<Types>> = Vec::default();
+    let mut unparsed_generics = Vec::default();
     let mut last: Option<(UnparsedType, ParsingFuture<Types>)> = None;
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -190,7 +190,7 @@ pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedT
 }
 
 async fn to_generic(name: String, generics: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
-    let mut output = Vec::new();
+    let mut output = Vec::default();
     for generic in generics {
         output.push(generic.await?.clone());
     }
@@ -199,8 +199,8 @@ async fn to_generic(name: String, generics: Vec<ParsingFuture<Types>>) -> Result
 }
 
 fn inner_generic(unparsed: UnparsedType, outer: ParsingFuture<Types>, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {
-    let mut values: Vec<ParsingFuture<Types>> = Vec::new();
-    let mut unparsed_values = Vec::new();
+    let mut values: Vec<ParsingFuture<Types>> = Vec::default();
+    let mut unparsed_values = Vec::default();
     let mut last: Option<(UnparsedType, ParsingFuture<Types>)> = None;
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -239,7 +239,7 @@ fn inner_generic(unparsed: UnparsedType, outer: ParsingFuture<Types>, parser_uti
 }
 
 async fn async_to_generic(outer: ParsingFuture<Types>, bounds: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
-    let mut new_bounds = Vec::new();
+    let mut new_bounds = Vec::default();
     for bound in bounds {
         new_bounds.push(bound.await?);
     }

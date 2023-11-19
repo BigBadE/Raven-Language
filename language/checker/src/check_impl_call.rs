@@ -12,7 +12,7 @@ use crate::CodeVerifier;
 
 pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &mut SimpleVariableManager, effect: Effects)
                              -> Result<FinalizedEffects, ParsingError> {
-    let mut finalized_effects = Vec::new();
+    let mut finalized_effects = Vec::default();
     let calling;
     let traits;
     let method;
@@ -36,7 +36,7 @@ pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &m
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
         finding_return_type = found.get_return(variables).unwrap();
-        finding_return_type.fix_generics(&code_verifier.resolver, &code_verifier.syntax).await?;
+        finding_return_type.fix_generics(&*code_verifier.resolver, &code_verifier.syntax).await?;
         finalized_effects.insert(0, found);
     }
 
@@ -109,7 +109,7 @@ pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &m
 
                     match check_method(&code_verifier.process_manager, method.clone(),
                                        finalized_effects.clone(), &code_verifier.syntax,
-                                       &variables, &code_verifier.resolver, returning).await {
+                                       &variables, &*code_verifier.resolver, returning).await {
                         Ok(found) => return Ok(Some(found)),
                         Err(_error) => {}
                     };

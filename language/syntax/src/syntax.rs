@@ -1,30 +1,30 @@
 use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::{Arc, RwLock};
-use std::task::Waker;
 use std::mem;
+use std::ops::DerefMut;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::task::Waker;
+
 use chalk_ir::{Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause};
 use chalk_recursive::RecursiveSolver;
+use chalk_solve::ext::GoalExt;
 use chalk_solve::rust_ir::{ImplDatum, ImplDatumBound, ImplType, Polarity};
 use chalk_solve::Solver;
-use chalk_solve::ext::GoalExt;
-use indexmap::IndexMap;
-use std::sync::Mutex;
 use dashmap::DashMap;
+use indexmap::IndexMap;
 use tokio::sync::mpsc::Receiver;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-
 // Re-export main
 pub use data::Main;
 
 use crate::{Attribute, FinishedTraitImplementor, is_modifier, Modifier, ParsingError, ProcessManager, TopElement, Types};
-use crate::top_element_manager::{TopElementManager, GetterManager};
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{BOOL, F32, F64, FinalizedStruct, I16, I32, I64, I8, STR, StructData, U16, U32, U64, U8};
+use crate::top_element_manager::{GetterManager, TopElementManager};
 use crate::types::FinalizedTypes;
 
 /// The entire program's syntax. Contains all the data passed to every step of the program.
@@ -37,7 +37,7 @@ pub struct Syntax {
     // Compiling wakers
     pub compiling_wakers: Vec<Waker>,
     // The compiling structs, accessed from the compiler..
-    pub strut_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
+    pub strut_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
     // All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
     // All structures in the program
@@ -61,19 +61,19 @@ impl Syntax {
     /// Constructs a new syntax with internal types.
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
-            compiling: Arc::new(DashMap::new()),
-            compiling_wakers: Vec::new(),
-            strut_compiling: Arc::new(RwLock::new(HashMap::new())),
-            errors: Vec::new(),
-            functions: TopElementManager::new(),
+            compiling: Arc::new(DashMap::default()),
+            compiling_wakers: Vec::default(),
+            strut_compiling: Arc::new(DashMap::default()),
+            errors: Vec::default(),
+            functions: TopElementManager::default(),
             structures: TopElementManager::with_sorted(
                 vec!(I64.data.clone(), I32.data.clone(), I16.data.clone(), I8.data.clone(),
                      F64.data.clone(), F32.data.clone(), U64.data.clone(), U32.data.clone(), U16.data.clone(), U8.data.clone(),
                      BOOL.data.clone(), STR.data.clone())),
-            implementations: Vec::new(),
+            implementations: Vec::default(),
             async_manager: GetterManager::default(),
-            operations: HashMap::new(),
-            operation_wakers: HashMap::new(),
+            operations: HashMap::default(),
+            operation_wakers: HashMap::default(),
             process_manager,
         };
     }
@@ -90,7 +90,7 @@ impl Syntax {
         }
         self.async_manager.finished = true;
 
-        let mut keys = Vec::new();
+        let mut keys = Vec::default();
         self.structures.wakers.keys().for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.structures.wakers.remove(key).unwrap() {
@@ -121,7 +121,7 @@ impl Syntax {
                           first: &FinalizedTypes, second: &FinalizedTypes) -> ImplDatum<ChalkIr> {
         let vec_generics = generics.keys().collect::<Vec<_>>();
         let first = first.to_chalk_trait(&vec_generics);
-        let mut binders: Vec<VariableKind<ChalkIr>> = Vec::new();
+        let mut binders: Vec<VariableKind<ChalkIr>> = Vec::default();
         // We resolve generics ourselves, but Chalk needs to know about them.
         for _value in generics.values() {
             binders.push(VariableKind::Ty(TyVariableKind::General));
@@ -142,7 +142,7 @@ impl Syntax {
     /// Finds an implementation method for the given trait.
     pub fn get_implementation_methods(&self, implementing_trait: &FinalizedTypes, implementor_struct: &FinalizedTypes)
                                       -> Option<Vec<Arc<FunctionData>>> {
-        let mut output = Vec::new();
+        let mut output = Vec::default();
         for implementation in &self.implementations {
             if implementation.target.inner_struct().data == implementor_struct.inner_struct().data &&
                 (implementing_trait.of_type_sync(&implementation.base, None).0 ||
@@ -341,7 +341,7 @@ impl Syntax {
 
         // Checks if the type is a generic type
         if let Some(found) = name_resolver.generic(&getting) {
-            let mut bounds = Vec::new();
+            let mut bounds = Vec::default();
             // Get all the generic's bounds.
             if !resolved_generics.contains(&getting) {
                 resolved_generics.push(getting.clone());
@@ -355,16 +355,16 @@ impl Syntax {
         }
 
         if getting.contains('<') {
-            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &name_resolver).await?.1.remove(0));
+            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver).await?.1.remove(0));
         }
         return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
     }
 
     #[async_recursion]
     async fn parse_bounds(input: &[u8], syntax: &Arc<Mutex<Syntax>>, error: &ParsingError,
-                          name_resolver: &Box<dyn NameResolver>) -> Result<(usize, Vec<Types>), ParsingError> {
+                          name_resolver: &dyn NameResolver) -> Result<(usize, Vec<Types>), ParsingError> {
         let mut last = 0;
-        let mut found = Vec::new();
+        let mut found = Vec::default();
         let mut i = 0;
         while i < input.len() {
             match input[i] {
@@ -405,7 +405,7 @@ impl Syntax {
             UnparsedType::Basic(name) =>
                 Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver, resolved_generics).await,
             UnparsedType::Generic(name, args) => {
-                let mut generics = Vec::new();
+                let mut generics = Vec::default();
                 for arg in args {
                     generics.push(Self::parse_type(syntax.clone(),
                                                    error.clone(), resolver.boxed_clone(), arg, resolved_generics.clone()).await?);

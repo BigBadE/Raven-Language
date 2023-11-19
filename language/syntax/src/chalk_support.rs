@@ -20,7 +20,7 @@ impl Debug for Syntax {
 impl RustIrDatabase<ChalkIr> for Syntax {
     /// Most of these are features not used by Raven, so they're empty.
     fn custom_clauses(&self) -> Vec<ProgramClause<ChalkIr>> {
-        return Vec::new();
+        return Vec::default();
     }
 
     fn associated_ty_data(&self, _ty: chalk_ir::AssocTypeId<ChalkIr>) -> Arc<AssociatedTyDatum<ChalkIr>> {
@@ -84,7 +84,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     /// Finds all the implementations of a specific trait.
     fn impls_for_trait(&self, trait_id: chalk_ir::TraitId<ChalkIr>, _parameters: &[chalk_ir::GenericArg<ChalkIr>],
                        _binders: &chalk_ir::CanonicalVarKinds<ChalkIr>) -> Vec<ImplId<ChalkIr>> {
-        let mut output = Vec::new();
+        let mut output = Vec::default();
         let mut i = 0;
         for implementation in &self.implementations {
             if implementation.target.inner_struct().data.id as u32 == trait_id.0 {

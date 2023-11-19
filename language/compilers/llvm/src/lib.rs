@@ -1,12 +1,12 @@
 #![feature(get_mut_unchecked, box_into_inner)]
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::sync::Mutex;
-use dashmap::DashMap;
 
+use dashmap::DashMap;
 use inkwell::context::Context;
 use tokio::sync::mpsc::Receiver;
+
 use async_trait::async_trait;
 use data::CompilerArguments;
 use syntax::function::FinalizedFunction;
@@ -26,7 +26,7 @@ pub mod vtable_manager;
 
 pub struct LLVMCompiler {
     compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
-    struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>,
+    struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
     arguments: CompilerArguments,
     context: Context,
 }
@@ -41,7 +41,7 @@ unsafe impl Send for LLVMCompiler {
 
 impl LLVMCompiler {
     pub fn new(compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
-               struct_compiling: Arc<RwLock<HashMap<String, Arc<FinalizedStruct>>>>, arguments: CompilerArguments) -> Self {
+               struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>, arguments: CompilerArguments) -> Self {
         return Self {
             compiling,
             struct_compiling,

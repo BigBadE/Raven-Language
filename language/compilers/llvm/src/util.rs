@@ -8,7 +8,7 @@ use syntax::types::FinalizedTypes;
 use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
-    let mut output = String::new();
+    let mut output = String::default();
     let mut special = false;
     for char in input.chars() {
         if char == '\\' {
@@ -32,7 +32,7 @@ pub fn print_formatted(input: String) {
 
 pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>,
                                    linkage: Option<Linkage>) -> FunctionValue<'ctx> {
-    let mut params = Vec::new();
+    let mut params = Vec::default();
 
     for param in &function.arguments {
         params.push(From::from(type_getter.get_type(&param.field.field_type)));

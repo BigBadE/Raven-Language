@@ -178,7 +178,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         }
         //Calling function, function arguments
         FinalizedEffects::MethodCall(pointer, calling_function, arguments) => {
-            let mut final_arguments = Vec::new();
+            let mut final_arguments = Vec::default();
 
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
@@ -395,7 +395,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
         FinalizedEffects::VirtualCall(func_offset, method, args) => {
             let table = compile_effect(type_getter, function, &args[0], id).unwrap();
 
-            let mut compiled_args = Vec::new();
+            let mut compiled_args = Vec::default();
             let calling = compile_effect(type_getter, function, &args[0], id).unwrap();
             let calling = type_getter.compiler.builder.build_load(calling.into_pointer_value(), &id.to_string());
             compiled_args.push(BasicMetadataValueEnum::from(calling));
@@ -403,7 +403,7 @@ pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function
             for i in 1..args.len() {
                 compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, function, &args[i], id).unwrap()));
             }
-            let mut struct_type = Vec::new();
+            let mut struct_type = Vec::default();
             for _ in 0..=*func_offset {
                 struct_type.push(type_getter.get_function(method).get_type().ptr_type(AddressSpace::default()).as_basic_type_enum());
             }

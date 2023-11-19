@@ -142,7 +142,7 @@ impl SourceSet for InnerSourceSet {
         return output;
     }
 
-    fn relative(&self, other: &Box<dyn Readable>) -> String {
+    fn relative(&self, other: &dyn Readable) -> String {
         let name = other.path()
             .replace(path::MAIN_SEPARATOR, "::");
         return name[0..name.len() - 3].to_string();

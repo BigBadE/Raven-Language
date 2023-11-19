@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Error;
@@ -22,7 +23,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
     let handle = Arc::new(Mutex::new(HandleWrapper {
         handle: settings.cpu_runtime.handle().clone(),
         joining: vec!(),
-        names: Default::default(),
+        names: HashMap::default(),
         waker: None
     }));
     let mut syntax = Syntax::new(Box::new(
@@ -36,7 +37,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
 
     settings.cpu_runtime.spawn(start(settings.runner_settings.compiler_arguments.clone(), sender, go_receiver, syntax.clone()));
 
-    let mut handles = Vec::new();
+    let mut handles = Vec::default();
     for source_set in &settings.runner_settings.sources {
         for file in source_set.get_files() {
             if !file.path().ends_with("rv") {
@@ -46,12 +47,12 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
             handles.push(
                 settings.io_runtime.as_ref().map(|inner| inner.handle().clone()).unwrap_or_else(|| settings.cpu_runtime.handle().clone())
                     .spawn(parse(syntax.clone(), handle.clone(),
-                                 source_set.relative(&file).clone(),
+                                 source_set.relative(&*file).clone(),
                                  file.read())));
         }
     }
 
-    let mut errors = Vec::new();
+    let mut errors = Vec::default();
     //Join any compilers errors
     for handle in handles {
         match handle.await {

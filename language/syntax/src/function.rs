@@ -31,14 +31,14 @@ impl FunctionData {
             attributes,
             modifiers,
             name,
-            poisoned: Vec::new(),
+            poisoned: Vec::default(),
         };
     }
 
     /// Creates an empty function data that errored while parsing.
     pub fn poisoned(name: String, error: ParsingError) -> Self {
         return Self {
-            attributes: Vec::new(),
+            attributes: Vec::default(),
             modifiers: 0,
             name,
             poisoned: vec!(error),
@@ -160,7 +160,7 @@ impl CodelessFinalizedFunction {
     /// The VariableManager here is for the arguments to the function, and not for the function itself.
     pub async fn degeneric(method: Arc<CodelessFinalizedFunction>, mut manager: Box<dyn ProcessManager>,
                            arguments: &Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                           variables: &SimpleVariableManager, resolver: &Box<dyn NameResolver>,
+                           variables: &SimpleVariableManager, resolver: &dyn NameResolver,
                            returning: Option<FinalizedTypes>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
@@ -242,7 +242,7 @@ impl CodelessFinalizedFunction {
 
 /// A placeholder error until the actual tokens are passed.
 fn placeholder_error(error: String) -> ParsingError {
-    return ParsingError::new(String::new(), (0, 0), 0, (0, 0), 0, error);
+    return ParsingError::new(String::default(), (0, 0), 0, (0, 0), 0, error);
 }
 
 struct GenericWaiter { syntax: Arc<Mutex<Syntax>>, name: String }
@@ -271,7 +271,7 @@ async fn degeneric_code(syntax: Arc<Mutex<Syntax>>, original: Arc<CodelessFinali
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
     // Degenerics the code body.
-    let code = match code.degeneric(&manager, &resolver, &mut variables, &syntax).await {
+    let code = match code.degeneric(&*manager, &*resolver, &mut variables, &syntax).await {
         Ok(inner) => inner,
         Err(error) => panic!("Error degenericing code: {}", error)
     };
@@ -346,7 +346,7 @@ impl FinalizedCodeBody {
     }
 
     /// Degenerics every effect inside the body of code.
-    pub async fn degeneric(mut self, process_manager: &Box<dyn ProcessManager>, resolver: &Box<dyn NameResolver>,
+    pub async fn degeneric(mut self, process_manager: &dyn ProcessManager, resolver: &dyn NameResolver,
                            variables: &mut SimpleVariableManager, syntax: &Arc<Mutex<Syntax>>)
         -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
@@ -363,7 +363,7 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
         return "()".to_string();
     }
 
-    let mut output = String::new();
+    let mut output = String::default();
     for element in input {
         output += &*format!("{}{}", element, deliminator);
     }
@@ -373,10 +373,10 @@ pub fn display<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display 
 
 pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Display {
     if input.is_empty() {
-        return String::new();
+        return String::default();
     }
 
-    let mut output = String::new();
+    let mut output = String::default();
     for element in input {
         output += &*format!("{}{}", element, deliminator);
     }
@@ -386,10 +386,10 @@ pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T
 
 pub fn debug_parenless<T>(input: &Vec<T>, deliminator: &str) -> String where T: Debug {
     if input.is_empty() {
-        return String::new();
+        return String::default();
     }
 
-    let mut output = String::new();
+    let mut output = String::default();
     for element in input {
         output += &*format!("{:?}{}", element, deliminator);
     }

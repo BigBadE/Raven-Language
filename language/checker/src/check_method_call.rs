@@ -12,7 +12,7 @@ use crate::output::TypesChecker;
 
 pub async fn check_method_call(code_verifier: &mut CodeVerifier<'_>, variables: &mut SimpleVariableManager, effect: Effects)
                                -> Result<FinalizedEffects, ParsingError> {
-    let mut finalized_effects = Vec::new();
+    let mut finalized_effects = Vec::default();
     let calling;
     let method;
     let returning;
@@ -69,7 +69,7 @@ pub async fn check_method_call(code_verifier: &mut CodeVerifier<'_>, variables: 
                                               format!("{}::{}", return_type.inner_struct().data.name, method), code_verifier.resolver.boxed_clone(), false).await?;
             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
-            if !check_args(&method, &code_verifier.resolver, &mut finalized_effects, &code_verifier.syntax, variables).await {
+            if !check_args(&method, &*code_verifier.resolver, &mut finalized_effects, &code_verifier.syntax, variables).await {
                 return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                      method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                      finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
@@ -81,7 +81,7 @@ pub async fn check_method_call(code_verifier: &mut CodeVerifier<'_>, variables: 
         }
 
         finalized_effects.insert(0, calling);
-        if let Ok(value) = Syntax::get_function(code_verifier.syntax.clone(), placeholder_error(String::new()),
+        if let Ok(value) = Syntax::get_function(code_verifier.syntax.clone(), placeholder_error(String::default()),
                                                 method.clone(), code_verifier.resolver.boxed_clone(), true).await {
             value
         } else {
@@ -94,7 +94,7 @@ pub async fn check_method_call(code_verifier: &mut CodeVerifier<'_>, variables: 
 
             let effects = &finalized_effects;
             let variables = &variables;
-            let resolver_ref  = &code_verifier.resolver;
+            let resolver_ref  = &*code_verifier.resolver;
             let returning = &returning;
             let process_manager = code_verifier.process_manager;
             let syntax = &code_verifier.syntax;
@@ -124,13 +124,13 @@ pub async fn check_method_call(code_verifier: &mut CodeVerifier<'_>, variables: 
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
-    return check_method(&code_verifier.process_manager, method, finalized_effects, &code_verifier.syntax, variables, &code_verifier.resolver, returning).await;
+    return check_method(&code_verifier.process_manager, method, finalized_effects, &code_verifier.syntax, variables, &*code_verifier.resolver, returning).await;
 }
 
 //The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                           mut effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
-                          variables: &SimpleVariableManager, resolver: &Box<dyn NameResolver>,
+                          variables: &SimpleVariableManager, resolver: &dyn NameResolver,
                           returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
@@ -160,7 +160,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
     });
 }
 
-pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, resolver: &Box<dyn NameResolver>,
+pub async fn check_args(function: &Arc<CodelessFinalizedFunction>, resolver: &dyn NameResolver,
                         args: &mut Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                         variables: &SimpleVariableManager) -> bool {
     if function.arguments.len() != args.len() {

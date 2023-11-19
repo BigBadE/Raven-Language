@@ -12,7 +12,7 @@ use crate::output::TypesChecker;
 
 pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
-    let mut fields = Vec::new();
+    let mut fields = Vec::default();
     for argument in &mut function.fields {
         let field = argument.await?;
         let mut field = FinalizedMemberField {
@@ -60,7 +60,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     //Internal/external/trait functions verify everything but the code.
     if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
-        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::new(), String::new(), true)));
+        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::default(), String::default(), true)));
     }
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);

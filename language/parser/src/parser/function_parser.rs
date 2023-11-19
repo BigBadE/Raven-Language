@@ -14,14 +14,14 @@ use crate::tokens::tokens::TokenTypes;
 
 pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
                       -> Result<UnfinalizedFunction, ParsingError> {
-    let mut name = String::new();
-    let mut generics = IndexMap::new();
-    let mut fields: Vec<ParsingFuture<MemberField>> = Vec::new();
+    let mut name = String::default();
+    let mut generics = IndexMap::default();
+    let mut fields: Vec<ParsingFuture<MemberField>> = Vec::default();
     let mut code = None;
     let mut return_type = None;
 
-    let mut last_arg = String::new();
-    let mut last_arg_type = String::new();
+    let mut last_arg = String::default();
+    let mut last_arg_type = String::default();
 
     while !parser_utils.tokens.is_empty() {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -40,13 +40,13 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
 
                     fields.push(Box::pin(to_field(parser_utils.get_struct(token,
                                                                                            parser_utils.imports.parent.as_ref().unwrap().clone()),
-                                                                   Vec::new(), 0, last_arg)));
+                                                                   Vec::default(), 0, last_arg)));
                 } else {
                     fields.push(Box::pin(to_field(parser_utils.get_struct(token, last_arg_type),
-                                                                   Vec::new(), 0, last_arg)));
-                    last_arg_type = String::new();
+                                                                   Vec::default(), 0, last_arg)));
+                    last_arg_type = String::default();
                 }
-                last_arg = String::new();
+                last_arg = String::default();
             }
             TokenTypes::ArgumentsEnd | TokenTypes::ReturnTypeArrow => {}
             TokenTypes::ReturnType => {
@@ -78,7 +78,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
     }
 
     for (key, generic) in &parser_utils.imports.generics {
-        let mut bounds = Vec::new();
+        let mut bounds = Vec::default();
         for bound in generic {
             bounds.push(Syntax::parse_type(parser_utils.syntax.clone(), ParsingError::empty(),
                                            parser_utils.imports.boxed_clone(), bound.clone(), vec!()));
@@ -89,7 +89,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
     return Ok(UnfinalizedFunction {
         generics,
         fields,
-        code: code.unwrap_or_else(|| CodeBody::new(Vec::new(), "empty".to_string())),
+        code: code.unwrap_or_else(|| CodeBody::new(Vec::default(), "empty".to_string())),
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name)),
     });
@@ -97,9 +97,9 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
 
 pub async fn get_generics(generics: IndexMap<String, Vec<ParsingFuture<Types>>>)
                           -> Result<IndexMap<String, Types>, ParsingError> {
-    let mut done_generics = IndexMap::new();
+    let mut done_generics = IndexMap::default();
     for (name, generic) in generics {
-        let mut generics = Vec::new();
+        let mut generics = Vec::default();
         for found in generic {
             generics.push(found.await?);
         }

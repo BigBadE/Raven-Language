@@ -123,7 +123,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
         // Check if an element directly referenced with that name exists.
         if let Some(output) = self.get_types(&mut locked,
-                                             String::new(), cx.waker().clone(), not_trait) {
+                                             String::default(), cx.waker().clone(), not_trait) {
             self.clean_up(&mut locked, self.name_resolver.imports());
             return Poll::Ready(output);
         }
@@ -208,8 +208,7 @@ pub trait NameResolver: Send + Sync {
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }
 
-
-static EMPTY: Vec<String> = Vec::new();
+static EMPTY: Vec<String> = vec!();
 
 pub struct EmptyNameResolver {}
 

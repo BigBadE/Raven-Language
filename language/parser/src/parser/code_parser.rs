@@ -9,7 +9,7 @@ use crate::tokens::tokens::{Token, TokenTypes};
 
 /// Parsers a block of code into its return type (if all code paths lead to a single type, or else a line) and the code body.
 pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, CodeBody), ParsingError> {
-    let mut lines = Vec::new();
+    let mut lines = Vec::default();
     let mut types = ExpressionType::Line;
     while let Some(expression) =
         parse_line(parser_utils, ParseState::None)? {
@@ -58,7 +58,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
                 match last.token_type {
                     TokenTypes::Variable | TokenTypes::CallingType => {
-                        let mut effects = Vec::new();
+                        let mut effects = Vec::default();
                         if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
                             // If there are arguments to the method, parse them
                             while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
@@ -293,12 +293,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
         }
     }
 
-    return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP()))));
+    return Ok(Some(Expression::new(expression_type, effect.unwrap_or_else(|| Effects::NOP()))));
 }
 
 ///Parses tokens from the Raven code into a string
 fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
-    let mut string = String::new(); //the string from the Raven code
+    let mut string = String::default(); //the string from the Raven code
 
     loop { //loop through the tokens until a StringEnd is reached
 
@@ -368,7 +368,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
                         -> Result<Effects, ParsingError> {
     let name = parser_utils.tokens.get(parser_utils.index - 2).unwrap().to_string(parser_utils.buffer);
     // Get the type being expressed. Should only be one type.
-    let returning: Option<UnparsedType> = if let UnparsedType::Generic(_, bounds) = add_generics(String::new(), parser_utils).0 {
+    let returning: Option<UnparsedType> = if let UnparsedType::Generic(_, bounds) = add_generics(String::default(), parser_utils).0 {
         if bounds.len() != 1 {
             parser_utils.tokens.get(parser_utils.index - 1).unwrap().make_error(parser_utils.file.clone(),
                                                                                 format!("Expected one generic argument!"));
@@ -380,7 +380,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     };
 
     parser_utils.index += 1;
-    let mut effects = Vec::new();
+    let mut effects = Vec::default();
     // Parse the method call arguments
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
         while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
@@ -451,8 +451,8 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
 }
 
 fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects)>, ParsingError> {
-    let mut values = Vec::new();
-    let mut name = String::new();
+    let mut values = Vec::default();
+    let mut name = String::default();
     loop {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -469,7 +469,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
                     Effects::LoadVariable(name.clone())
                 };
                 values.push((name, effect));
-                name = String::new();
+                name = String::default();
             }
             TokenTypes::BlockEnd => break,
             TokenTypes::LineEnd => {

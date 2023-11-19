@@ -6,7 +6,7 @@ use syntax::r#struct::StructData;
 use syntax::types::FinalizedTypes;
 use crate::type_getter::CompilerTypeGetter;
 
-
+#[derive(Default)]
 pub struct VTableManager<'ctx> {
     data: HashMap<(Arc<StructData>, Arc<StructData>), GlobalValue<'ctx>>,
 }
@@ -14,7 +14,7 @@ pub struct VTableManager<'ctx> {
 impl<'ctx> VTableManager<'ctx> {
     pub fn new() -> Self {
         return VTableManager {
-            data: HashMap::new()
+            data: HashMap::default()
         };
     }
 
@@ -22,7 +22,7 @@ impl<'ctx> VTableManager<'ctx> {
         if let Some(found) = self.data.get(&(structure.inner_struct().data.clone(), target.inner_struct().data.clone())) {
             return found.clone();
         }
-        let mut values = Vec::new();
+        let mut values = Vec::default();
         {
             let locked = type_getter.syntax.clone();
             let locked = locked.lock().unwrap();

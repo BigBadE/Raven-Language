@@ -66,7 +66,7 @@ pub trait Readable {
 pub trait SourceSet: Debug + Send + Sync {
     fn get_files(&self) -> Vec<Box<dyn Readable>>;
 
-    fn relative(&self, other: &Box<dyn Readable>) -> String;
+    fn relative(&self, other: &dyn Readable) -> String;
 
     fn cloned(&self) -> Box<dyn SourceSet>;
 }
@@ -89,13 +89,13 @@ impl Readable for PathBuf {
 
 impl SourceSet for FileSourceSet {
     fn get_files(&self) -> Vec<Box<dyn Readable>> {
-        let mut output = Vec::new();
+        let mut output = Vec::default();
         read_recursive(self.root.clone(), &mut output)
             .unwrap_or_else(|_| panic!("Failed to read source files! Make sure {:?} exists", self.root));
         return output;
     }
 
-    fn relative(&self, other: &Box<dyn Readable>) -> String {
+    fn relative(&self, other: &dyn Readable) -> String {
         let name = other.path()
             .replace(self.root.to_str().unwrap(), "")
             .replace(path::MAIN_SEPARATOR, "::");
@@ -142,7 +142,7 @@ impl ParsingError {
     // An empty error, used for places where errors are ignored
     pub fn empty() -> Self {
         return ParsingError {
-            file: String::new(),
+            file: String::default(),
             start: (0, 0),
             start_offset: 0,
             end: (0, 0),
@@ -167,7 +167,7 @@ impl ParsingError {
         let mut file = None;
         'outer: for source in sources {
             for readable in source.get_files() {
-                if source.relative(&readable) == self.file {
+                if source.relative(&*readable) == self.file {
                     file = Some(readable);
                     break 'outer
                 }

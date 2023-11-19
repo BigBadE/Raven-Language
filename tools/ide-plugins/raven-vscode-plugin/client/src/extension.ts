@@ -3,7 +3,7 @@
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 
-import * as path from 'path';
+import { join } from 'path';
 import { ExtensionContext } from 'vscode';
 
 import {
@@ -22,10 +22,11 @@ import {
 
 let client: LanguageClient;
 
+// noinspection JSUnusedGlobalSymbols
 export function activate(context: ExtensionContext) {
 	// The server is implemented in Rust
 	const serverModule = context.asAbsolutePath(
-		path.join('server', 'raven-language-server')
+		join('server', 'raven-language-server')
 	);
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
@@ -53,7 +54,7 @@ export function activate(context: ExtensionContext) {
 
     client.registerFeature(new OverrideFeatures());
 	// Start the client. This will also launch the server
-	client.start();
+	client.start().then(_ => {});
 }
 
 class OverrideFeatures implements StaticFeature {
@@ -71,11 +72,15 @@ class OverrideFeatures implements StaticFeature {
     initialize(
         _capabilities: ServerCapabilities,
         _documentSelector: DocumentSelector | undefined,
-    ): void {}
-    dispose(): void {}
-    clear(): void {}
+    ): void {
+		// Not required
+	}
+	clear(): void {
+		// Not required
+	}
 }
 
+// noinspection JSUnusedGlobalSymbols
 export function deactivate(): Thenable<void> | undefined {
 	if (!client) {
 		return undefined;

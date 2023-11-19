@@ -65,7 +65,7 @@ impl<T: Future<Output=Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<Functio
     type Output = Result<FinalizedEffects, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return match pin!(find_trait_implementation(&self.syntax, &self.resolver, &self.method, &self.return_type)).poll(cx) {
+        return match pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx) {
             Poll::Ready(inner) => match inner {
                 Ok(inner) => match inner {
                     Some(found) => {
@@ -95,9 +95,9 @@ impl<T: Future<Output=Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<Functio
     }
 }
 
-pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &Box<dyn NameResolver>,
+pub async fn find_trait_implementation(syntax: &Arc<Mutex<Syntax>>, resolver: &dyn NameResolver,
                                        method: &String, return_type: &FinalizedTypes) -> Result<Option<Vec<Arc<FunctionData>>>, ParsingError> {
-    let mut output = Vec::new();
+    let mut output = Vec::default();
 
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(syntax.clone(), ParsingError::empty(),
@@ -159,23 +159,25 @@ pub struct TopElementManager<T> where T: TopElement {
     pub wakers: HashMap<String, Vec<Waker>>,
 }
 
-impl<T> TopElementManager<T> where T: TopElement {
-    pub fn new() -> Self {
+impl<T: TopElement> Default for TopElementManager<T> {
+    fn default() -> Self {
         return Self {
-            types: HashMap::new(),
-            sorted: Vec::new(),
-            data: HashMap::new(),
-            wakers: HashMap::new(),
-        };
+            types: HashMap::default(),
+            sorted: Vec::default(),
+            data: HashMap::default(),
+            wakers: HashMap::default()
+        }
     }
+}
 
+impl<T> TopElementManager<T> where T: TopElement {
     //Creates the getter with a list of sorted types already, used for internal types declared in the compiler
     pub fn with_sorted(sorted: Vec<Arc<T>>) -> Self {
         return Self {
-            types: HashMap::new(),
+            types: HashMap::default(),
             sorted,
-            data: HashMap::new(),
-            wakers: HashMap::new(),
+            data: HashMap::default(),
+            wakers: HashMap::default(),
         };
     }
 }

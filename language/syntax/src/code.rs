@@ -262,8 +262,8 @@ impl FinalizedEffects {
     /// Degenericing replaces every instance of a generic function with its actual type.
     /// This mostly targets FinalizedTypes or function calls and calls the degeneric function on them.
     #[async_recursion]
-    pub async fn degeneric(&mut self, process_manager: &Box<dyn ProcessManager>, variables: &mut SimpleVariableManager,
-                           resolver: &Box<dyn NameResolver>, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+    pub async fn degeneric(&mut self, process_manager: &dyn ProcessManager, variables: &mut SimpleVariableManager,
+                           resolver: &dyn NameResolver, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {
             // Recursively searches nested effects for method calls.
             FinalizedEffects::NOP() => {}
@@ -452,5 +452,5 @@ pub async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<Function
 }
 
 fn placeholder_error(error: String) -> ParsingError {
-    return ParsingError::new(String::new(), (0, 0), 0, (0, 0), 0, error);
+    return ParsingError::new(String::default(), (0, 0), 0, (0, 0), 0, error);
 }

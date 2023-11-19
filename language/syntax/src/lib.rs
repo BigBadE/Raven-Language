@@ -93,7 +93,7 @@ pub fn is_modifier(modifiers: u8, target: Modifier) -> bool {
 
 /// Converts the numerical form of modifiers to list form
 pub fn to_modifiers(from: u8) -> Vec<Modifier> {
-    let mut modifiers = Vec::new();
+    let mut modifiers = Vec::default();
     for modifier in MODIFIERS {
         if from & (modifier as u8) != 0 {
             modifiers.push(modifier)
@@ -174,7 +174,7 @@ pub struct SimpleVariableManager {
 
 impl SimpleVariableManager {
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
-        let mut variable_manager = SimpleVariableManager { variables: HashMap::new() };
+        let mut variable_manager = SimpleVariableManager { variables: HashMap::default() };
 
         for field in &codeless.arguments {
             variable_manager.variables.insert(field.field.name.clone(),

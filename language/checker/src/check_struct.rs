@@ -10,7 +10,7 @@ use crate::output::TypesChecker;
 
 pub async fn verify_struct(_process_manager: &TypesChecker, structure: UnfinalizedStruct,
                            syntax: &Arc<Mutex<Syntax>>, include_refs: bool) -> Result<FinalizedStruct, ParsingError> {
-    let mut finalized_fields = Vec::new();
+    let mut finalized_fields = Vec::default();
     for field in structure.fields {
         let field = field.await?;
         let mut field_type = field.field.field_type.finalize(syntax.clone()).await;
