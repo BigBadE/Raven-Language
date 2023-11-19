@@ -1,6 +1,8 @@
 use crate::tokens::code_tokenizer::next_code_token;
 use crate::tokens::tokens::{Token, TokenCodeData, TokenTypes};
-use crate::tokens::top_tokenizer::{next_func_token, next_implementation_token, next_struct_token, next_top_token};
+use crate::tokens::top_tokenizer::{
+    next_func_token, next_implementation_token, next_struct_token, next_top_token,
+};
 use crate::tokens::util::{next_generic, parse_string};
 
 /// This structure keeps track of the variables required for the tokenizing.
@@ -25,7 +27,7 @@ pub struct Tokenizer<'a> {
     // A buffer of all characters in the file
     pub buffer: &'a [u8],
     // Data for token errors
-    pub code_data: Option<TokenCodeData>
+    pub code_data: Option<TokenCodeData>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -40,7 +42,7 @@ impl<'a> Tokenizer<'a> {
             last: Token::new(TokenTypes::Start, None, (1, 0), 0, (1, 0), 0),
             len: buffer.len(),
             buffer,
-            code_data: None
+            code_data: None,
         };
     }
 
@@ -78,15 +80,23 @@ impl<'a> Tokenizer<'a> {
         }
 
         self.last = match self.state {
-            TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => next_top_token(self),
-            TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => next_func_token(self),
+            TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => {
+                next_top_token(self)
+            }
+            TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => {
+                next_func_token(self)
+            }
             TokenizerState::STRUCTURE => next_struct_token(self),
             TokenizerState::IMPLEMENTATION => next_implementation_token(self),
-            TokenizerState::STRING | TokenizerState::STRING_TO_CODE_STRUCT_TOP => parse_string(self),
+            TokenizerState::STRING | TokenizerState::STRING_TO_CODE_STRUCT_TOP => {
+                parse_string(self)
+            }
             TokenizerState::CODE | TokenizerState::CODE_TO_STRUCT_TOP => next_code_token(self),
-            TokenizerState::GENERIC_TO_IMPL | TokenizerState::GENERIC_TO_FUNC |
-            TokenizerState::GENERIC_TO_STRUCT | TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => next_generic(self),
-            _ => panic!("Unknown state {}!", self.state)
+            TokenizerState::GENERIC_TO_IMPL
+            | TokenizerState::GENERIC_TO_FUNC
+            | TokenizerState::GENERIC_TO_STRUCT
+            | TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => next_generic(self),
+            _ => panic!("Unknown state {}!", self.state),
         };
         return self.last.clone();
     }
@@ -96,8 +106,14 @@ impl<'a> Tokenizer<'a> {
     pub fn next_included(&mut self) -> Result<u8, Token> {
         loop {
             if self.index == self.len {
-                return Err(Token::new(TokenTypes::EOF, None, self.last.end, self.last.end_offset,
-                                      (self.line, self.index as u32 - self.line_index), self.index));
+                return Err(Token::new(
+                    TokenTypes::EOF,
+                    None,
+                    self.last.end,
+                    self.last.end_offset,
+                    (self.line, self.index as u32 - self.line_index),
+                    self.index,
+                ));
             }
             let character = self.buffer[self.index];
             self.index += 1;
@@ -109,7 +125,7 @@ impl<'a> Tokenizer<'a> {
                 }
                 b'\r' => {}
                 b'\t' => {}
-                _ => return Ok(character)
+                _ => return Ok(character),
             }
         }
     }
@@ -142,24 +158,39 @@ impl<'a> Tokenizer<'a> {
         } else {
             self.load(&state);
             false
-        }
+        };
     }
 
     /// Parse ahead to the first occurrence of whichever token occurs first
     pub fn parse_to_first(&mut self, token: TokenTypes, first: u8, second: u8) -> Token {
-        while self.index != self.len && self.buffer[self.index] != first && self.buffer[self.index] != second {
+        while self.index != self.len
+            && self.buffer[self.index] != first
+            && self.buffer[self.index] != second
+        {
             self.index += 1;
         }
 
-        return Token::new(token, self.code_data.clone(), self.last.end, self.last.end_offset,
-                          (self.line, self.index as u32 - self.line_index), self.index);
+        return Token::new(
+            token,
+            self.code_data.clone(),
+            self.last.end,
+            self.last.end_offset,
+            (self.line, self.index as u32 - self.line_index),
+            self.index,
+        );
     }
 
     /// Parse ahead to the end of the current line
     pub fn parse_to_line_end(&mut self, types: TokenTypes) -> Token {
         if self.index == self.len {
-            return Token::new(TokenTypes::EOF, self.code_data.clone(), self.last.end, self.last.end_offset,
-                              (self.line, self.index as u32 - self.line_index), self.index);
+            return Token::new(
+                TokenTypes::EOF,
+                self.code_data.clone(),
+                self.last.end,
+                self.last.end_offset,
+                (self.line, self.index as u32 - self.line_index),
+                self.index,
+            );
         }
 
         loop {
@@ -169,8 +200,14 @@ impl<'a> Tokenizer<'a> {
             }
         }
 
-        return Token::new(types, self.code_data.clone(), self.last.end, self.last.end_offset,
-                          (self.line, self.index as u32 - self.line_index), self.index - 1);
+        return Token::new(
+            types,
+            self.code_data.clone(),
+            self.last.end,
+            self.last.end_offset,
+            (self.line, self.index as u32 - self.line_index),
+            self.index - 1,
+        );
     }
 
     /// Creates an InvalidCharacters token, used for debugging (you can put a breakpoint here)
@@ -180,8 +217,14 @@ impl<'a> Tokenizer<'a> {
 
     /// Creates a token between the last token and the current position
     pub fn make_token(&self, token_type: TokenTypes) -> Token {
-        return Token::new(token_type, self.code_data.clone(), self.last.end, self.last.end_offset,
-                          (self.line, self.index as u32 - self.line_index), self.index);
+        return Token::new(
+            token_type,
+            self.code_data.clone(),
+            self.last.end,
+            self.last.end_offset,
+            (self.line, self.index as u32 - self.line_index),
+            self.index,
+        );
     }
 }
 
@@ -191,7 +234,7 @@ pub struct ParserState {
     pub index: usize,
     pub line_index: u32,
     pub line: u32,
-    pub last: Token
+    pub last: Token,
 }
 
 #[non_exhaustive]
