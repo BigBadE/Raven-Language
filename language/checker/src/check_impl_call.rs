@@ -46,7 +46,9 @@ pub async fn check_impl_call(
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
         finding_return_type = found.get_return(variables).unwrap();
-        finding_return_type.fix_generics(&*code_verifier.resolver, &code_verifier.syntax).await?;
+        finding_return_type
+            .fix_generics(&*code_verifier.resolver, &code_verifier.syntax)
+            .await?;
         finalized_effects.insert(0, found);
     }
 
@@ -88,7 +90,11 @@ pub async fn check_impl_call(
         }
         return Ok(output.unwrap());
     } else {
-        panic!("Screwed up trait! {} for {:?}", traits, code_verifier.resolver.imports());
+        panic!(
+            "Screwed up trait! {} for {:?}",
+            traits,
+            code_verifier.resolver.imports()
+        );
     }
 }
 
@@ -119,14 +125,22 @@ async fn check_virtual_type(
             } else if found.name.split("::").last().unwrap() == data.method {
                 let mut target = data.finding_return_type.find_method(&data.method).unwrap();
                 if target.len() > 1 {
-                    return Err(placeholder_error(format!("Ambiguous function {}", data.method)));
+                    return Err(placeholder_error(format!(
+                        "Ambiguous function {}",
+                        data.method
+                    )));
                 } else if target.is_empty() {
-                    return Err(placeholder_error(format!("Unknown function {}", data.method)));
+                    return Err(placeholder_error(format!(
+                        "Unknown function {}",
+                        data.method
+                    )));
                 }
                 let (_, target) = target.pop().unwrap();
 
-                let return_type =
-                    data.finalized_effects[0].get_return(data.variables).unwrap().unflatten();
+                let return_type = data.finalized_effects[0]
+                    .get_return(data.variables)
+                    .unwrap()
+                    .unflatten();
                 if matches!(return_type, FinalizedTypes::Generic(_, _)) {
                     let mut temp = vec![];
                     mem::swap(&mut temp, data.finalized_effects);
