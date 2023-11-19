@@ -194,27 +194,24 @@ impl FinalizedEffects {
     /// any variables from, or None if the effect has no return type.
     pub fn get_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
         let temp = match self {
-            FinalizedEffects::NOP => None,
-            FinalizedEffects::Jump(_) => None,
-            FinalizedEffects::CompareJump(_, _, _) => None,
-            FinalizedEffects::CodeBody(_) => None,
-            FinalizedEffects::CreateVariable(_, _, types) => Some(types.clone()),
-            FinalizedEffects::MethodCall(_, function, _) => function
+            FinalizedEffects::NOP
+            | FinalizedEffects::Jump(_)
+            | FinalizedEffects::CompareJump(_, _, _)
+            | FinalizedEffects::CodeBody(_) => None,
+            // Downcasts simply return the downcasting target.
+            FinalizedEffects::CreateVariable(_, _, types)
+            | FinalizedEffects::Downcast(_, target) => Some(types.clone()),
+            FinalizedEffects::MethodCall(_, function, _)
+            | FinalizedEffects::GenericMethodCall(function, _, _)
+            | FinalizedEffects::VirtualCall(_, function, _)
+            | FinalizedEffects::GenericVirtualCall(_, _, function, _) => function
                 .return_type
                 .as_ref()
                 .map(|inner| FinalizedTypes::Reference(Box::new(inner.clone()))),
-            FinalizedEffects::VirtualCall(_, function, _) => function
-                .return_type
-                .as_ref()
-                .map(|inner| FinalizedTypes::Reference(Box::new(inner.clone()))),
-            FinalizedEffects::Set(_, to) => to.get_return(variables),
             FinalizedEffects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
-                if let Some(found) = variable {
-                    match found {
-                        // Generics must be resolved to get a concrete type, so this is a sanity check.
-                        _ => return Some(found),
-                    }
+                if variable.is_some() {
+                    return variable;
                 }
                 // Failed to find a variable with that name.
                 panic!("Unresolved variable {} from {:?}", name, variables);
@@ -236,8 +233,9 @@ impl FinalizedEffects {
             FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone(), None)),
             FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone(), None)),
             // Stores just return their inner type.
-            FinalizedEffects::HeapStore(inner) => inner.get_return(variables),
-            FinalizedEffects::StackStore(inner) => inner.get_return(variables),
+            FinalizedEffects::HeapStore(inner)
+            | FinalizedEffects::StackStore(inner)
+            | FinalizedEffects::Set(_, inner) => inner.get_return(variables),
             // References return their inner type as well.
             FinalizedEffects::ReferenceLoad(inner) => match inner.get_return(variables).unwrap() {
                 FinalizedTypes::Reference(inner) => Some(*inner),
@@ -249,13 +247,6 @@ impl FinalizedEffects {
             FinalizedEffects::CreateArray(types, _) => {
                 types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner)))
             }
-            // Downcasts simply return the downcasting target.
-            FinalizedEffects::Downcast(_, target) => Some(target.clone()),
-            FinalizedEffects::GenericMethodCall(function, _, _) => function
-                .return_type
-                .as_ref()
-                .map(|inner| FinalizedTypes::Reference(Box::new(inner.clone()))),
-            FinalizedEffects::GenericVirtualCall(_, _, function, _) => function.return_type.clone(),
         };
         return temp;
     }

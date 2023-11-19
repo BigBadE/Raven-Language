@@ -28,60 +28,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         }
         TokenTypes::AttributeStart => parse_attribute_val(tokenizer, TokenTypes::Attribute),
         // Check for chained modifiers
-        TokenTypes::ModifiersStart | TokenTypes::Modifier => {
-            if let Some(modifier) = parse_modifier(tokenizer) {
-                modifier
-            } else if tokenizer.matches("fn") {
-                // Find the correct function state
-                if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
-                    tokenizer.state = TokenizerState::FUNCTION_TO_STRUCT_TOP;
-                } else {
-                    tokenizer.state = TokenizerState::FUNCTION;
-                }
-                tokenizer.make_token(TokenTypes::FunctionStart)
-            } else if tokenizer.matches("struct") {
-                // Structs can't be inside structures
-                if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
-                    tokenizer.handle_invalid()
-                } else {
-                    tokenizer.state = TokenizerState::STRUCTURE;
-                    tokenizer.make_token(TokenTypes::StructStart)
-                }
-            } else if tokenizer.matches("trait") {
-                // Traits can't be inside structures
-                if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
-                    tokenizer.handle_invalid()
-                } else {
-                    tokenizer.state = TokenizerState::STRUCTURE;
-                    tokenizer.make_token(TokenTypes::TraitStart)
-                }
-            } else if tokenizer.matches("impl") {
-                // What is being implemented is next, so whitespace is skipped.
-                tokenizer.next_included().unwrap_or(0);
-                tokenizer.index -= 1;
-
-                if tokenizer.buffer[tokenizer.index] == b' ' {
-                    tokenizer.index += 1;
-                }
-
-                // Impls can't be inside structures
-                if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
-                    tokenizer.handle_invalid()
-                } else {
-                    tokenizer.state = TokenizerState::IMPLEMENTATION;
-                    tokenizer.make_token(TokenTypes::ImplStart)
-                }
-            } else if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
-                // Looking for a field name inside a struct
-                parse_to_character(tokenizer, TokenTypes::FieldName, &[b':', b'='])
-            } else if tokenizer.state == TokenizerState::TOP_ELEMENT && tokenizer.matches("") {
-                // If there are blank lines after all of the modifiers at the EOF, ignore them
-                tokenizer.index += 1;
-                tokenizer.make_token(TokenTypes::BlankLine)
-            } else {
-                tokenizer.handle_invalid()
-            }
-        }
+        TokenTypes::ModifiersStart | TokenTypes::Modifier => get_top_element(tokenizer),
         TokenTypes::FieldName => {
             if tokenizer.matches(":") {
                 tokenizer.make_token(TokenTypes::FieldSeparator)
@@ -127,6 +74,61 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.make_token(TokenTypes::AttributesStart)
             }
         }
+    };
+}
+
+fn get_top_element(tokenizer: &mut Tokenizer) -> Token {
+    return if let Some(modifier) = parse_modifier(tokenizer) {
+        modifier
+    } else if tokenizer.matches("fn") {
+        // Find the correct function state
+        if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+            tokenizer.state = TokenizerState::FUNCTION_TO_STRUCT_TOP;
+        } else {
+            tokenizer.state = TokenizerState::FUNCTION;
+        }
+        tokenizer.make_token(TokenTypes::FunctionStart)
+    } else if tokenizer.matches("struct") {
+        // Structs can't be inside structures
+        if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+            tokenizer.handle_invalid()
+        } else {
+            tokenizer.state = TokenizerState::STRUCTURE;
+            tokenizer.make_token(TokenTypes::StructStart)
+        }
+    } else if tokenizer.matches("trait") {
+        // Traits can't be inside structures
+        if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+            tokenizer.handle_invalid()
+        } else {
+            tokenizer.state = TokenizerState::STRUCTURE;
+            tokenizer.make_token(TokenTypes::TraitStart)
+        }
+    } else if tokenizer.matches("impl") {
+        // What is being implemented is next, so whitespace is skipped.
+        tokenizer.next_included().unwrap_or(0);
+        tokenizer.index -= 1;
+
+        if tokenizer.buffer[tokenizer.index] == b' ' {
+            tokenizer.index += 1;
+        }
+
+        // Impls can't be inside structures
+        if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+            tokenizer.handle_invalid()
+        } else {
+            tokenizer.state = TokenizerState::IMPLEMENTATION;
+            tokenizer.make_token(TokenTypes::ImplStart)
+        }
+    } else if tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
+        // Looking for a field name inside a struct
+        parse_to_character(tokenizer, TokenTypes::FieldName, &[b':', b'='])
+    } else if tokenizer.state == TokenizerState::TOP_ELEMENT && tokenizer.matches("") {
+        // If there are blank lines after all of the modifiers at the EOF, ignore them
+        tokenizer.index += 1;
+        tokenizer.make_token(TokenTypes::BlankLine)
+    } else {
+        tokenizer.handle_invalid()
     };
 }
 
@@ -196,31 +198,33 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
         TokenTypes::ReturnTypeArrow => {
             parse_to_character(tokenizer, TokenTypes::ReturnType, &[b';', b'{'])
         }
-        TokenTypes::ArgumentsEnd | TokenTypes::ReturnType => {
-            if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
-                tokenizer.make_token(TokenTypes::ReturnTypeArrow)
-            } else if tokenizer.matches("{") {
-                if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
-                    tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP;
-                } else {
-                    tokenizer.state = TokenizerState::CODE;
-                }
-                tokenizer.make_token(TokenTypes::CodeStart)
-            } else if tokenizer.matches(";") {
-                if tokenizer.state == TokenizerState::FUNCTION {
-                    tokenizer.state = TokenizerState::TOP_ELEMENT;
-                } else if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
-                    tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
-                }
-                tokenizer.make_token(TokenTypes::CodeEnd)
-            } else {
-                tokenizer.handle_invalid()
-            }
-        }
+        TokenTypes::ArgumentsEnd | TokenTypes::ReturnType => get_return_token(tokenizer),
         token => {
             panic!("How'd you get here? {:?}", token);
         }
     };
+}
+
+pub fn get_return_token(tokenizer: &mut Tokenizer) -> Token {
+    if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
+        tokenizer.make_token(TokenTypes::ReturnTypeArrow)
+    } else if tokenizer.matches("{") {
+        if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
+            tokenizer.state = TokenizerState::CODE_TO_STRUCT_TOP;
+        } else {
+            tokenizer.state = TokenizerState::CODE;
+        }
+        tokenizer.make_token(TokenTypes::CodeStart)
+    } else if tokenizer.matches(";") {
+        if tokenizer.state == TokenizerState::FUNCTION {
+            tokenizer.state = TokenizerState::TOP_ELEMENT;
+        } else if tokenizer.state == TokenizerState::FUNCTION_TO_STRUCT_TOP {
+            tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
+        }
+        tokenizer.make_token(TokenTypes::CodeEnd)
+    } else {
+        tokenizer.handle_invalid()
+    }
 }
 
 /// Finds the next token in the struct header. This only handles generics, implemented types,
