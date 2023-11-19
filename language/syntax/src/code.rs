@@ -263,7 +263,14 @@ impl FinalizedEffects {
     ) -> Result<(), ParsingError> {
         match self {
             // Recursively searches nested effects for method calls.
-            FinalizedEffects::NOP => {}
+            FinalizedEffects::NOP
+            | FinalizedEffects::Jump(_)
+            | FinalizedEffects::LoadVariable(_)
+            | FinalizedEffects::Float(_)
+            | FinalizedEffects::UInt(_)
+            | FinalizedEffects::Bool(_)
+            | FinalizedEffects::String(_)
+            | FinalizedEffects::Char(_) => {}
             FinalizedEffects::CreateVariable(_, first, other) => {
                 first.degeneric(process_manager, variables, resolver, syntax).await?;
                 other
@@ -275,8 +282,11 @@ impl FinalizedEffects {
                     )
                     .await?;
             }
-            FinalizedEffects::Jump(_) => {}
-            FinalizedEffects::CompareJump(comparing, _, _) => {
+            FinalizedEffects::CompareJump(comparing, _, _)
+            | FinalizedEffects::Load(effect, _, _)
+            | FinalizedEffects::HeapStore(storing)
+            | FinalizedEffects::ReferenceLoad(loading)
+            | FinalizedEffects::StackStore(storing) => {
                 comparing.degeneric(process_manager, variables, resolver, syntax).await?
             }
             FinalizedEffects::CodeBody(body) => {
@@ -352,10 +362,6 @@ impl FinalizedEffects {
                 setting.degeneric(process_manager, variables, resolver, syntax).await?;
                 value.degeneric(process_manager, variables, resolver, syntax).await?;
             }
-            FinalizedEffects::LoadVariable(_) => {}
-            FinalizedEffects::Load(effect, _, _) => {
-                effect.degeneric(process_manager, variables, resolver, syntax).await?
-            }
             FinalizedEffects::CreateStruct(target, types, effects) => {
                 if let Some(found) = target {
                     found.degeneric(process_manager, variables, resolver, syntax).await?;
@@ -387,31 +393,7 @@ impl FinalizedEffects {
                     effect.degeneric(process_manager, variables, resolver, syntax).await?;
                 }
             }
-            FinalizedEffects::Float(_) => {}
-            FinalizedEffects::UInt(_) => {}
-            FinalizedEffects::Bool(_) => {}
-            FinalizedEffects::String(_) => {}
-            FinalizedEffects::Char(_) => {}
-            FinalizedEffects::HeapStore(storing) => {
-                storing.degeneric(process_manager, variables, resolver, syntax).await?
-            }
-            FinalizedEffects::HeapAllocate(other) => {
-                other
-                    .degeneric(
-                        process_manager.generics(),
-                        syntax,
-                        ParsingError::empty(),
-                        ParsingError::empty(),
-                    )
-                    .await?
-            }
-            FinalizedEffects::ReferenceLoad(loading) => {
-                loading.degeneric(process_manager, variables, resolver, syntax).await?
-            }
-            FinalizedEffects::StackStore(storing) => {
-                storing.degeneric(process_manager, variables, resolver, syntax).await?
-            }
-            FinalizedEffects::Downcast(_, target) => {
+            FinalizedEffects::HeapAllocate(target) | FinalizedEffects::Downcast(_, target) => {
                 target
                     .degeneric(
                         process_manager.generics(),

@@ -1,5 +1,6 @@
 use crate::check_code::verify_effect;
 use crate::CodeVerifier;
+use std::mem;
 use std::sync::Arc;
 use syntax::code::{Effects, FinalizedEffects};
 use syntax::operation_util::OperationGetter;
@@ -20,6 +21,54 @@ pub async fn check_operator(
         unreachable!()
     }
 
+    let mut outer_operation = None;
+    // Check if it's two operations that should be combined, like a list ([])
+
+    let operation = if let Some(found) = outer_operation {
+        found
+    } else {
+        OperationGetter { syntax: code_verifier.syntax.clone(), operation: vec![operation], error }
+            .await?
+    };
+
+    if Attribute::find_attribute("operation", &operation.attributes)
+        .unwrap()
+        .as_string_attribute()
+        .unwrap()
+        .contains("{+}")
+    {
+        if !matches!(values.first().unwrap(), Effects::CreateArray(_)) {
+            let effect = Effects::CreateArray(vec![values.remove(0)]);
+            values.push(effect);
+        }
+    }
+
+    let calling;
+    if values.len() > 0 {
+        calling = Box::new(values.remove(0));
+    } else {
+        calling = Box::new(Effects::NOP);
+    }
+
+    return verify_effect(
+        code_verifier,
+        variables,
+        Effects::ImplementationCall(
+            calling,
+            operation.name.clone(),
+            String::default(),
+            values,
+            None,
+        ),
+    )
+    .await;
+}
+
+async fn combine_operation(
+    operation: &String,
+    values: &mut Vec<Effects>,
+    code_verifier: &mut CodeVerifier,
+) -> Option<Arc<StructData>> {
     let error = ParsingError::new(
         String::default(),
         (0, 0),
@@ -28,8 +77,7 @@ pub async fn check_operator(
         0,
         format!("Failed to find operation {} with {:?}", operation, values),
     );
-    let mut outer_operation = None;
-    // Check if it's two operations that should be combined, like a list ([])
+
     if values.len() > 0 {
         let mut reading_array = None;
         let mut last = values.pop().unwrap();
@@ -87,7 +135,7 @@ pub async fn check_operator(
                                 values.push(effect);
                             }
                         }
-                        outer_operation = Some(found);
+                        return Some(found);
                     } else {
                         let new_inner = "{}".to_string()
                             + &combined[new_operation.replace("{+}", "{}").len()..];
@@ -99,7 +147,7 @@ pub async fn check_operator(
                         }
                         .await?;
 
-                        (outer_operation, values) = assign_with_priority(
+                        return assign_with_priority(
                             new_operation.clone(),
                             &found,
                             values,
@@ -110,13 +158,7 @@ pub async fn check_operator(
                         );
                     }
                 } else {
-                    if let Some(mut found) = reading_array {
-                        if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                            inner.push(Effects::Operation(inner_operation, effects));
-                        } else {
-                            panic!("Expected array!");
-                        }
-                    } else {
+                    if reading_array.is_none() {
                         let outer_data = OperationGetter {
                             syntax: code_verifier.syntax.clone(),
                             operation: vec![operation.clone()],
@@ -130,7 +172,7 @@ pub async fn check_operator(
                         }
                         .await?;
 
-                        (outer_operation, values) = assign_with_priority(
+                        return assign_with_priority(
                             operation.clone(),
                             &outer_data,
                             values,
@@ -141,79 +183,32 @@ pub async fn check_operator(
                         );
                     }
                 }
+            }
+            last = Effects::Operation(inner_operation, effects)
+        }
+
+        if let Some(mut found) = reading_array {
+            if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
+                inner.push(last);
             } else {
-                if let Some(mut found) = reading_array {
-                    if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                        inner.push(Effects::Operation(inner_operation, effects));
-                    } else {
-                        panic!("Expected array!");
-                    }
-                } else {
-                    values.push(Effects::Operation(inner_operation, effects));
-                }
+                panic!("Expected array!");
             }
         } else {
-            if let Some(mut found) = reading_array {
-                if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                    inner.push(last);
-                } else {
-                    panic!("Expected array!");
-                }
-            } else {
-                values.push(last);
-            }
+            values.push(last);
         }
     }
-
-    let operation = if let Some(found) = outer_operation {
-        found
-    } else {
-        OperationGetter { syntax: code_verifier.syntax.clone(), operation: vec![operation], error }
-            .await?
-    };
-
-    if Attribute::find_attribute("operation", &operation.attributes)
-        .unwrap()
-        .as_string_attribute()
-        .unwrap()
-        .contains("{+}")
-    {
-        if !matches!(values.first().unwrap(), Effects::CreateArray(_)) {
-            let effect = Effects::CreateArray(vec![values.remove(0)]);
-            values.push(effect);
-        }
-    }
-
-    let calling;
-    if values.len() > 0 {
-        calling = Box::new(values.remove(0));
-    } else {
-        calling = Box::new(Effects::NOP);
-    }
-
-    return verify_effect(
-        code_verifier,
-        variables,
-        Effects::ImplementationCall(
-            calling,
-            operation.name.clone(),
-            String::default(),
-            values,
-            None,
-        ),
-    )
-    .await;
+    return None;
 }
 
 pub fn assign_with_priority(
     operation: String,
     found: &Arc<StructData>,
-    mut values: Vec<Effects>,
+    values: &mut Vec<Effects>,
     inner_operator: String,
     inner_data: &Arc<StructData>,
     mut inner_effects: Vec<Effects>,
     inner_array: bool,
-) -> (Option<Arc<StructData>>, Vec<Effects>) {
+) -> Option<Arc<StructData>> {
     let op_priority = Attribute::find_attribute("priority", &found.attributes)
         .map(|inner| inner.as_int_attribute().unwrap_or(0))
         .unwrap_or(0);
@@ -234,10 +229,12 @@ pub fn assign_with_priority(
         } else {
             values.push(inner_effects.remove(0));
         }
-        inner_effects.insert(0, Effects::Operation(operation, values));
-        (Some(inner_data.clone()), inner_effects)
+        mem::swap(&mut inner_effects, values);
+        inner_effects.insert(0, Effects::Operation(operation, inner_effects));
+
+        Some(inner_data.clone())
     } else {
         values.push(Effects::Operation(inner_operator, inner_effects));
-        (Some(found.clone()), values)
+        Some(found.clone())
     };
 }
