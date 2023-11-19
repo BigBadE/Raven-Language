@@ -45,6 +45,7 @@ pub enum ParseState {
     New,
 }
 
+// skipcq: RS-R1000
 pub fn parse_line(
     parser_utils: &mut ParserUtils,
     state: ParseState,
@@ -227,6 +228,7 @@ enum ControlFlow {
     Returning(Expression),
 }
 
+// skipcq: RS-R1000
 fn parse_basic_line(
     parser_utils: &mut ParserUtils,
     expression_type: &mut ExpressionType,

@@ -184,6 +184,7 @@ pub fn compile_block<'ctx>(
     return None;
 }
 
+// skipcq: RS-R1000
 pub fn compile_effect<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     function: FunctionValue<'ctx>,

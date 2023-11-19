@@ -254,6 +254,7 @@ impl FinalizedEffects {
     /// Degenericing replaces every instance of a generic function with its actual type.
     /// This mostly targets FinalizedTypes or function calls and calls the degeneric function on them.
     #[async_recursion]
+    // skipcq: RS-R1000
     pub async fn degeneric(
         &mut self,
         process_manager: &dyn ProcessManager,

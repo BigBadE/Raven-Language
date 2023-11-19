@@ -86,8 +86,8 @@ async fn check_return_type(
     };
 }
 
-// skipcq: RS-R1000
 #[async_recursion]
+// skipcq: RS-R1000
 pub async fn verify_effect(
     code_verifier: &mut CodeVerifier<'_>,
     variables: &mut SimpleVariableManager,

@@ -265,6 +265,7 @@ impl FinalizedTypes {
 
     /// This method doesn't block, instead it returns a future which can be waited on if a blocking
     /// result is wanted. This waiter is only there is syntax is Some.
+    // skipcq: RS-R1000
     pub fn of_type_sync(
         &self,
         other: &FinalizedTypes,
