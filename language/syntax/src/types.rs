@@ -190,8 +190,8 @@ impl FinalizedTypes {
     pub fn to_chalk_type(&self, binders: &Vec<&String>) -> Ty<ChalkIr> {
         return match self {
             FinalizedTypes::Struct(structure, _) => match &structure.data.chalk_data.as_ref().unwrap() {
-                ChalkData::Struct(types, _) => types.clone(),
-                ChalkData::Trait(types, _, _) => types.clone()
+                ChalkData::Struct(types, _) => types.clone(), // skipcq: RS-W1110
+                ChalkData::Trait(types, _, _) => types.clone() // skipcq: RS-W1110
             },
             FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
             FinalizedTypes::Array(inner) =>
@@ -642,7 +642,7 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name_safe().map_or_else(|| false, |inner| other.name_safe()
-            .map_or_else(|| false, |other| inner == other));
+        return self.name_safe().map_or(false, |inner| other.name_safe()
+            .map_or(false, |other| inner == other));
     }
 }

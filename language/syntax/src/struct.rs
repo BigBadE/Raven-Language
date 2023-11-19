@@ -237,7 +237,7 @@ impl FinalizedStruct {
                             panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
                         }
                     }
-                    *generic = temp.clone();
+                    generic.clone_from(temp);
                     i += 1;
                 } else {
                     panic!("Guhh?????");

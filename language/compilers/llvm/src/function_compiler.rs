@@ -85,7 +85,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
                     broke = true;
                 }
 
-                if let FinalizedEffects::NOP() = &line.effect {
+                if let FinalizedEffects::NOP = &line.effect {
                     if !broke {
                         type_getter.compiler.builder.build_return(None);
                     }
@@ -147,7 +147,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
 pub fn compile_effect<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>, function: FunctionValue<'ctx>,
                             effect: &FinalizedEffects, id: &mut u64) -> Option<BasicValueEnum<'ctx>> {
     return match effect {
-        FinalizedEffects::NOP() => panic!("Tried to compile a NOP! For {}", function.get_name().to_str().unwrap()),
+        FinalizedEffects::NOP => panic!("Tried to compile a NOP! For {}", function.get_name().to_str().unwrap()),
         FinalizedEffects::CreateVariable(name, inner, types) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));

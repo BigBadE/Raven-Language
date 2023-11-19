@@ -28,7 +28,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments)
     }));
     let mut syntax = Syntax::new(Box::new(
         TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
-    syntax.async_manager.target = settings.runner_settings.compiler_arguments.target.clone();
+    syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
 
     let syntax = Arc::new(Mutex::new(syntax));
 

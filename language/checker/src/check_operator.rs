@@ -146,7 +146,7 @@ pub async fn check_operator(code_verifier: &mut CodeVerifier<'_>, variables: &mu
     };
 
     if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}") {
-        if let Effects::CreateArray(_) = values.get(0).unwrap() {} else {
+        if let Effects::CreateArray(_) = values.first().unwrap() {} else {
             let effect = Effects::CreateArray(vec!(values.remove(0)));
             values.push(effect);
         }
@@ -156,7 +156,7 @@ pub async fn check_operator(code_verifier: &mut CodeVerifier<'_>, variables: &mu
     if values.len() > 0 {
         calling = Box::new(values.remove(0));
     } else {
-        calling = Box::new(Effects::NOP());
+        calling = Box::new(Effects::NOP);
     }
 
     return verify_effect(code_verifier, variables,

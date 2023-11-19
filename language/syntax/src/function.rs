@@ -200,7 +200,7 @@ impl CodelessFinalizedFunction {
             // Delete the generics because now they are all solidified.
             new_method.generics.clear();
             let mut method_data = FunctionData::clone(&method.data);
-            method_data.name = name.clone();
+            method_data.name.clone_from(&name);
             new_method.data = Arc::new(method_data);
             // Degeneric the arguments.
             for arguments in &mut new_method.arguments {

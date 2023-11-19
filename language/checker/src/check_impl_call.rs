@@ -31,7 +31,7 @@ pub async fn check_impl_call(code_verifier: &mut CodeVerifier<'_>, variables: &m
     }
 
     let mut finding_return_type;
-    if let Effects::NOP() = *calling {
+    if let Effects::NOP = *calling {
         finding_return_type = FinalizedTypes::Struct(VOID.clone(), None);
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;

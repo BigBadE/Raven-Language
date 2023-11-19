@@ -62,7 +62,7 @@ impl NameResolver for ImportNameResolver {
     }
 
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>> {
-        return self.generics.get(name).map(|types| types.clone());
+        return self.generics.get(name).cloned();
     }
 
     fn generics(&self) -> &HashMap<String, Vec<UnparsedType>> {

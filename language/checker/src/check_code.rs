@@ -134,7 +134,7 @@ pub async fn verify_effect(code_verifier: &mut CodeVerifier<'_>, variables: &mut
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
         }
-        Effects::NOP() => panic!("Tried to compile a NOP!"),
+        Effects::NOP => panic!("Tried to compile a NOP!"),
         Effects::Jump(jumping) => FinalizedEffects::Jump(jumping),
         Effects::LoadVariable(variable) => FinalizedEffects::LoadVariable(variable),
         Effects::Float(float) => store(FinalizedEffects::Float(float)),
@@ -149,7 +149,7 @@ pub async fn verify_effect(code_verifier: &mut CodeVerifier<'_>, variables: &mut
                 output.push(verify_effect(code_verifier, variables, effect).await?);
             }
 
-            let types = output.get(0).map(|found| found.get_return(variables).unwrap());
+            let types = output.first().map(|found| found.get_return(variables).unwrap());
             check_type(&types, &output, variables, code_verifier).await?;
 
             store(FinalizedEffects::CreateArray(types, output))

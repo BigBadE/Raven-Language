@@ -11,11 +11,11 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     compiler.builder.position_at_end(block);
     let params = value.get_params();
     if name.starts_with("numbers::Cast") {
-        build_cast(value.get_params().get(0).unwrap(), value.get_type().get_return_type().unwrap(), compiler);
+        build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), compiler);
     } else if name.starts_with("string::Cast") {
-        type_getter.compiler.builder.build_return(Some(value.get_params().get(0).unwrap()));
+        type_getter.compiler.builder.build_return(Some(value.get_params().first().unwrap()));
     } else if name.starts_with("string::Add<char + u64>_char::add") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let pointer_type = compiler.builder.build_bitcast(pointer_type,
                                                           compiler.context.i64_type().ptr_type(AddressSpace::default()), "1").into_pointer_value();
@@ -26,7 +26,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     } else if name.starts_with("string::Add<str + str>_str::add") {
         let length = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strlen")
                                                                  .unwrap_or_else(|| compile_llvm_intrinsics("strlen", type_getter)),
-                                                             &[BasicMetadataValueEnum::PointerValue(value.get_params().get(0).unwrap().into_pointer_value())],
+                                                             &[BasicMetadataValueEnum::PointerValue(value.get_params().first().unwrap().into_pointer_value())],
                                                              "0").try_as_basic_value().unwrap_left().into_int_value();
         let second_length = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strlen")
                                                                  .unwrap_or_else(|| compile_llvm_intrinsics("strlen", type_getter)),
@@ -40,7 +40,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strcpy")
                                                     .unwrap_or_else(|| compile_llvm_intrinsics("strcpy", type_getter)),
                                                 &[BasicMetadataValueEnum::PointerValue(malloc),
-                                                    BasicMetadataValueEnum::PointerValue(value.get_params().get(0).unwrap().into_pointer_value())],
+                                                    BasicMetadataValueEnum::PointerValue(value.get_params().first().unwrap().into_pointer_value())],
                                                 "6").try_as_basic_value().unwrap_left().into_pointer_value();
         type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strcat")
                                                     .unwrap_or_else(|| compile_llvm_intrinsics("strcat", type_getter)),
@@ -52,7 +52,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
     } else if name.starts_with("string::Add<str + char>_str::add") {
         let length = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strlen")
                                                                  .unwrap_or_else(|| compile_llvm_intrinsics("strlen", type_getter)),
-                                                             &[BasicMetadataValueEnum::PointerValue(value.get_params().get(0).unwrap().into_pointer_value())],
+                                                             &[BasicMetadataValueEnum::PointerValue(value.get_params().first().unwrap().into_pointer_value())],
                                                              "0").try_as_basic_value().unwrap_left().into_int_value();
         let total = type_getter.compiler.builder.build_int_add(length, type_getter.compiler.context.i64_type().const_int(1, false), "4");
         let malloc = type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("malloc")
@@ -62,7 +62,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         type_getter.compiler.builder.build_call(type_getter.compiler.module.get_function("strcpy")
                                                     .unwrap_or_else(|| compile_llvm_intrinsics("strcpy", type_getter)),
                                                 &[BasicMetadataValueEnum::PointerValue(malloc),
-                                                    BasicMetadataValueEnum::PointerValue(value.get_params().get(0).unwrap().into_pointer_value())],
+                                                    BasicMetadataValueEnum::PointerValue(value.get_params().first().unwrap().into_pointer_value())],
                                                 "6").try_as_basic_value().unwrap_left().into_pointer_value();
         type_getter.compiler.builder.build_store(unsafe { type_getter.compiler.builder.build_in_bounds_gep(malloc,
         &[length], "7") }, type_getter.compiler.builder.build_load(value.get_params().get(1).unwrap().into_pointer_value(), "8"));
@@ -72,7 +72,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
                                                  type_getter.compiler.context.i8_type().const_zero());
         type_getter.compiler.builder.build_return(Some(&malloc.as_basic_value_enum()));
     } else if name.starts_with("math::Add") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_int_add(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -80,7 +80,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }  else if name.starts_with("math::RightShift") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_right_shift(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -88,7 +88,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }  else if name.starts_with("math::LogicRightShift") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_right_shift(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -96,7 +96,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }   else if name.starts_with("math::LeftShift") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_left_shift(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -104,39 +104,39 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::Subtract") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
-        let returning = compiler.builder.build_int_sub(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+        let returning = compiler.builder.build_int_sub(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::Multiply") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
-        let returning = compiler.builder.build_int_mul(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+        let returning = compiler.builder.build_int_mul(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
                                                        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::Divide") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = if name.ends_with("u64") {
-            compiler.builder.build_int_unsigned_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+            compiler.builder.build_int_unsigned_div(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
                                                     compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
         } else {
-            compiler.builder.build_int_signed_div(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+            compiler.builder.build_int_signed_div(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
                                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
         };
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::Remainder") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = if name.ends_with("u64") {
-            compiler.builder.build_int_unsigned_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+            compiler.builder.build_int_unsigned_rem(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
                                                     compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
         } else {
-            compiler.builder.build_int_signed_rem(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+            compiler.builder.build_int_signed_rem(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
                                                   compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1")
         };
         compiler.builder.build_store(malloc, returning);
@@ -164,7 +164,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         let gep;
         unsafe {
             gep = compiler.builder
-                .build_in_bounds_gep(params.get(0).unwrap().into_pointer_value(),
+                .build_in_bounds_gep(params.first().unwrap().into_pointer_value(),
                                      &[offset], "1");
         }
 
@@ -189,18 +189,18 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         let malloc = malloc_type(type_getter,
                                  type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
         let returning = compiler.builder
-            .build_not(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "1").into_int_value(), "0");
+            .build_not(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "1").into_int_value(), "0");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }else if name.starts_with("math::BitInvert") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = compiler.builder
-            .build_not(compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "1").into_int_value(), "0");
+            .build_not(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "1").into_int_value(), "0");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }  else if name.starts_with("math::BitXOR") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_xor(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -208,7 +208,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }  else if name.starts_with("math::BitOr") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_or(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -216,7 +216,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }   else if name.starts_with("math::BitAnd") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_and(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -224,7 +224,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::BitXOR") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
 
         let returning = compiler.builder.build_xor(compiler.builder.build_load(pointer_type, "2").into_int_value(),
@@ -232,7 +232,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }  else if name.starts_with("math::And") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter,
                                  type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
 
@@ -241,7 +241,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }   else if name.starts_with("math::XOR") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter,
                                  type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
 
@@ -250,7 +250,7 @@ pub fn compile_internal<'ctx>(type_getter: &CompilerTypeGetter<'ctx>, compiler: 
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     }   else if name.starts_with("math::Or") {
-        let pointer_type = params.get(0).unwrap().into_pointer_value();
+        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter,
                                  type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
 
@@ -306,7 +306,7 @@ fn compile_relational_op(op: IntPredicate, compiler: &CompilerImpl, params: &Vec
     let malloc = malloc_type(type_getter,
         type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(), &mut 0);
     let returning = compiler.builder
-    .build_int_compare(op, compiler.builder.build_load(params.get(0).unwrap().into_pointer_value(), "2").into_int_value(),
+    .build_int_compare(op, compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
         compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(), "1");
     compiler.builder.build_store(malloc, returning);
     compiler.builder.build_return(Some(&malloc));

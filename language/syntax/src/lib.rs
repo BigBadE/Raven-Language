@@ -79,7 +79,7 @@ impl Display for Modifier {
 pub fn get_modifier(modifiers: &[Modifier]) -> u8 {
     let mut sum = 0;
     for modifier in modifiers {
-        sum += modifier.clone() as u8;
+        sum += *modifier as u8;
     }
 
     return sum;
@@ -187,7 +187,7 @@ impl SimpleVariableManager {
 
 impl VariableManager for SimpleVariableManager {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes> {
-        return self.variables.get(name).map(|inner| inner.clone());
+        return self.variables.get(name).cloned();
     }
 }
 

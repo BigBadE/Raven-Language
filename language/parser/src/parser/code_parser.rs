@@ -293,7 +293,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
         }
     }
 
-    return Ok(Some(Expression::new(expression_type, effect.unwrap_or_else(|| Effects::NOP()))));
+    return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP))));
 }
 
 ///Parses tokens from the Raven code into a string
@@ -373,7 +373,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
             parser_utils.tokens.get(parser_utils.index - 1).unwrap().make_error(parser_utils.file.clone(),
                                                                                 format!("Expected one generic argument!"));
         }
-        let types: &UnparsedType = bounds.get(0).unwrap();
+        let types: &UnparsedType = bounds.first().unwrap();
         Some(types.clone())
     } else {
         None

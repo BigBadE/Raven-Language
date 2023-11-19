@@ -21,16 +21,16 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
             token.start_offset = token.end_offset - token.end.1 as usize;
             token.start = (token.end.0, 0);
         }
-        let delta_line = (token.start.0 - 1) - last.clone().map(|inner| inner.start.0 - 1).unwrap_or(0);
+        let delta_line = (token.start.0 - 1) - last.clone().map_or(0, |inner| inner.start.0 - 1);
         let temp = SemanticToken {
             delta_line,
             delta_start: if delta_line == 0 {
-                token.start_offset - last.clone().map_or_else(|inner| inner.start_offset, 0)
+                token.start_offset - last.clone().map_or(0, |inner| inner.start_offset)
             } else {
                 0
             } as u32,
             length: (token.end_offset - token.start_offset) as u32,
-            token_type: get_token(last.as_ref().map_or_else(|inner| &inner.token_type, &TokenTypes::EOF), &token.token_type),
+            token_type: get_token(last.as_ref().map_or(&TokenTypes::EOF, |inner| &inner.token_type), &token.token_type),
             token_modifiers_bitset: 0,
         };
         //eprintln!("Line ({}, {}) to ({}, {}) for {:?} ({:?})", token.start.0, token.start.1, token.end.0, token.end.1, token.token_type,temp);

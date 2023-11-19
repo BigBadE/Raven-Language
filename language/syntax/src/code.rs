@@ -106,7 +106,7 @@ impl Field {
 #[derive(Clone, Debug)]
 pub enum Effects {
     // A placeholder of no operation, which should be resolved before finalizing.
-    NOP(),
+    NOP,
     // An effect wrapped in parenthesis, just a wrapper around the effect to prevent issues with operator merging.
     Paren(Box<Effects>),
     // Creates a variable with the given name and value.
@@ -147,7 +147,7 @@ pub enum Effects {
 #[derive(Clone, Debug)]
 pub enum FinalizedEffects {
     //  Exclusively used for void returns. Will make the compiler panic.
-    NOP(),
+    NOP,
     //  Creates a variable.
     CreateVariable(String, Box<FinalizedEffects>, FinalizedTypes),
     // Jumps to the given label.
@@ -198,7 +198,7 @@ impl FinalizedEffects {
     /// any variables from, or None if the effect has no return type.
     pub fn get_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
         let temp = match self {
-            FinalizedEffects::NOP() => None,
+            FinalizedEffects::NOP => None,
             FinalizedEffects::Jump(_) => None,
             FinalizedEffects::CompareJump(_, _, _) => None,
             FinalizedEffects::CodeBody(_) => None,
@@ -266,7 +266,7 @@ impl FinalizedEffects {
                            resolver: &dyn NameResolver, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {
             // Recursively searches nested effects for method calls.
-            FinalizedEffects::NOP() => {}
+            FinalizedEffects::NOP => {}
             FinalizedEffects::CreateVariable(_, first, other) => {
                 first.degeneric(process_manager, variables, resolver, syntax).await?;
                 other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;

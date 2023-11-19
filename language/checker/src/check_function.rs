@@ -74,7 +74,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     if !code.returns {
         if codeless.return_type.is_none() {
-            code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
+            code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(placeholder_error(format!("Function {} returns void instead of a {}!", codeless.data.name,
                                                  codeless.return_type.as_ref().unwrap())));

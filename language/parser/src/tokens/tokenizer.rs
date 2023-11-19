@@ -57,11 +57,11 @@ impl<'a> Tokenizer<'a> {
 
     /// Loads the state from a ParserState
     pub fn load(&mut self, state: &ParserState) {
-        self.state = state.state.clone();
-        self.index = state.index.clone();
-        self.line_index = state.line_index.clone();
-        self.line = state.line.clone();
-        self.last = state.last.clone();
+        self.state.clone_from(&state.state);
+        self.index.clone_from(&state.index);
+        self.line_index = state.line_index;
+        self.line = state.line;
+        self.last.clone_from(&state.last);
     }
 
     pub fn next(&mut self) -> Token {
