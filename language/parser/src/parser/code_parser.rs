@@ -570,11 +570,12 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             ));
         }
 
-        if TokenTypes::Equals != parser_utils
-            .tokens
-            .get(parser_utils.index + 1)
-            .unwrap()
-            .token_type
+        if TokenTypes::Equals
+            != parser_utils
+                .tokens
+                .get(parser_utils.index + 1)
+                .unwrap()
+                .token_type
         {
         } else {
             return Err(next.make_error(
