@@ -109,7 +109,10 @@ impl Syntax {
         self.async_manager.finished = true;
 
         let mut keys = Vec::default();
-        self.structures.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        self.structures
+            .wakers
+            .keys()
+            .for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.structures.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
@@ -117,7 +120,10 @@ impl Syntax {
         }
 
         keys.clear();
-        self.functions.wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        self.functions
+            .wakers
+            .keys()
+            .for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.functions.wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
@@ -125,7 +131,9 @@ impl Syntax {
         }
 
         keys.clear();
-        self.operation_wakers.keys().for_each(|inner| keys.push(inner.clone()));
+        self.operation_wakers
+            .keys()
+            .for_each(|inner| keys.push(inner.clone()));
         for key in &keys {
             for waker in self.operation_wakers.remove(key).unwrap() {
                 waker.wake_by_ref();
@@ -176,7 +184,9 @@ impl Syntax {
         let mut output = Vec::default();
         for implementation in &self.implementations {
             if implementation.target.inner_struct().data == implementor_struct.inner_struct().data
-                && (implementing_trait.of_type_sync(&implementation.base, None).0
+                && (implementing_trait
+                    .of_type_sync(&implementation.base, None)
+                    .0
                     || self.solve(&implementing_trait, &implementation.base))
             {
                 for function in &implementation.functions {
@@ -184,7 +194,11 @@ impl Syntax {
                 }
             }
         }
-        return if output.is_empty() { None } else { Some(output) };
+        return if output.is_empty() {
+            None
+        } else {
+            Some(output)
+        };
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
@@ -243,7 +257,14 @@ impl Syntax {
         if !is_modifier(second_ty.modifiers, Modifier::Trait) {
             return false;
         }
-        let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
+        let first_ty = first
+            .inner_struct()
+            .data
+            .chalk_data
+            .as_ref()
+            .unwrap()
+            .get_ty()
+            .clone();
 
         let elements: &[GenericArg<ChalkIr>] =
             &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
@@ -290,8 +311,10 @@ impl Syntax {
         }
 
         // Checks if a type with the same name is already in the async manager.
-        if let Some(mut old) =
-            T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned()
+        if let Some(mut old) = T::get_manager(locked.deref_mut())
+            .types
+            .get_mut(adding.name())
+            .cloned()
         {
             if adding.errors().is_empty() && adding.errors().is_empty() {
                 // Add a duplication error to the original type.
@@ -307,7 +330,9 @@ impl Syntax {
                 manager.sorted.push(Arc::clone(adding));
             }
 
-            manager.types.insert(adding.name().clone(), Arc::clone(adding));
+            manager
+                .types
+                .insert(adding.name().clone(), Arc::clone(adding));
         }
 
         let name = adding.name().clone();
@@ -430,10 +455,12 @@ impl Syntax {
         }
 
         if getting.contains('<') {
-            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver)
-                .await?
-                .1
-                .remove(0));
+            return Ok(
+                Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver)
+                    .await?
+                    .1
+                    .remove(0),
+            );
         }
         return Ok(Types::Struct(
             AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?,

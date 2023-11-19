@@ -106,7 +106,14 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         name_resolver: Box<dyn NameResolver>,
         not_trait: bool,
     ) -> Self {
-        return Self { syntax, error, getting, name_resolver, finished: None, not_trait };
+        return Self {
+            syntax,
+            error,
+            getting,
+            name_resolver,
+            finished: None,
+            not_trait,
+        };
     }
 }
 
@@ -125,9 +132,12 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         let mut locked = locked.lock().unwrap();
 
         // Check if an element directly referenced with that name exists.
-        if let Some(output) =
-            self.get_types(&mut locked, String::default(), cx.waker().clone(), not_trait)
-        {
+        if let Some(output) = self.get_types(
+            &mut locked,
+            String::default(),
+            cx.waker().clone(),
+            not_trait,
+        ) {
             self.clean_up(&mut locked, self.name_resolver.imports());
             return Poll::Ready(output);
         }

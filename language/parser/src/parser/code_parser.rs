@@ -20,7 +20,10 @@ pub fn parse_code(
         lines.push(expression);
     }
     parser_utils.imports.last_id += 1;
-    return Ok((types, CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string())));
+    return Ok((
+        types,
+        CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string()),
+    ));
 }
 
 #[derive(PartialEq, Clone)]
@@ -81,7 +84,11 @@ pub fn parse_line(
         }
         match token.token_type {
             TokenTypes::ParenOpen => {
-                let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
+                let last = parser_utils
+                    .tokens
+                    .get(parser_utils.index - 2)
+                    .unwrap()
+                    .clone();
                 match last.token_type {
                     TokenTypes::Variable | TokenTypes::CallingType => {
                         // Name of the method = the last token
@@ -106,14 +113,19 @@ pub fn parse_line(
                 }
             }
             TokenTypes::Float => {
-                effect = Some(Effects::Float(token.to_string(parser_utils.buffer).parse().unwrap()))
+                effect = Some(Effects::Float(
+                    token.to_string(parser_utils.buffer).parse().unwrap(),
+                ))
             }
             TokenTypes::Integer => {
-                effect = Some(Effects::Int(token.to_string(parser_utils.buffer).parse().unwrap()))
+                effect = Some(Effects::Int(
+                    token.to_string(parser_utils.buffer).parse().unwrap(),
+                ))
             }
             TokenTypes::Char => {
-                effect =
-                    Some(Effects::Char(token.to_string(parser_utils.buffer).as_bytes()[1] as char))
+                effect = Some(Effects::Char(
+                    token.to_string(parser_utils.buffer).as_bytes()[1] as char,
+                ))
             }
             TokenTypes::True => effect = Some(Effects::Bool(true)),
             TokenTypes::False => effect = Some(Effects::Bool(false)),
@@ -178,7 +190,10 @@ pub fn parse_line(
                 }
             }
             TokenTypes::Let => {
-                return Ok(Some(Expression::new(expression_type, parse_let(parser_utils)?)));
+                return Ok(Some(Expression::new(
+                    expression_type,
+                    parse_let(parser_utils)?,
+                )));
             }
             TokenTypes::If => {
                 let expression = parse_if(parser_utils)?;
@@ -189,23 +204,39 @@ pub fn parse_line(
                 return Ok(Some(Expression::new(expression_type, expression.effect)));
             }
             TokenTypes::For => {
-                return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)));
+                return Ok(Some(Expression::new(
+                    expression_type,
+                    parse_for(parser_utils)?,
+                )));
             }
             TokenTypes::While => {
-                return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)));
+                return Ok(Some(Expression::new(
+                    expression_type,
+                    parse_while(parser_utils)?,
+                )));
             }
             TokenTypes::Do => {
-                return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)));
+                return Ok(Some(Expression::new(
+                    expression_type,
+                    parse_do_while(parser_utils)?,
+                )));
             }
             TokenTypes::Equals => {
-                let other = parser_utils.tokens.get(parser_utils.index).unwrap().token_type.clone();
+                let other = parser_utils
+                    .tokens
+                    .get(parser_utils.index)
+                    .unwrap()
+                    .token_type
+                    .clone();
                 // Check to make sure this isn't an operation like == or +=
                 if effect.is_some() && other != TokenTypes::Operator && other != TokenTypes::Equals
                 {
                     let value = parse_line(parser_utils, ParseState::None)?;
                     if let Some(value) = value {
-                        effect =
-                            Some(Effects::Set(Box::new(effect.unwrap()), Box::new(value.effect)));
+                        effect = Some(Effects::Set(
+                            Box::new(effect.unwrap()),
+                            Box::new(value.effect),
+                        ));
                     } else {
                         return Err(token.make_error(
                             parser_utils.file.clone(),
@@ -288,7 +319,10 @@ pub fn parse_line(
         }
     }
 
-    return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP))));
+    return Ok(Some(Expression::new(
+        expression_type,
+        effect.unwrap_or(Effects::NOP),
+    )));
 }
 
 ///Parses tokens from the Raven code into a string
@@ -323,7 +357,11 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
                 string += &found[0..string_end];
 
                 // match the character after the \ to see what type of escape character it is
-                let index = if is_hex { found.len() - 3 } else { found.len() - 1 };
+                let index = if is_hex {
+                    found.len() - 3
+                } else {
+                    found.len() - 1
+                };
                 match &found[index..=index] {
                     "n" => {
                         string += "\n";
@@ -370,16 +408,23 @@ fn parse_generic_method(
     effect: Option<Effects>,
     parser_utils: &mut ParserUtils,
 ) -> Result<Effects, ParsingError> {
-    let name =
-        parser_utils.tokens.get(parser_utils.index - 2).unwrap().to_string(parser_utils.buffer);
+    let name = parser_utils
+        .tokens
+        .get(parser_utils.index - 2)
+        .unwrap()
+        .to_string(parser_utils.buffer);
     // Get the type being expressed. Should only be one type.
     let returning: Option<UnparsedType> =
         if let UnparsedType::Generic(_, bounds) = add_generics(String::default(), parser_utils).0 {
             if bounds.len() != 1 {
-                parser_utils.tokens.get(parser_utils.index - 1).unwrap().make_error(
-                    parser_utils.file.clone(),
-                    format!("Expected one generic argument!"),
-                );
+                parser_utils
+                    .tokens
+                    .get(parser_utils.index - 1)
+                    .unwrap()
+                    .make_error(
+                        parser_utils.file.clone(),
+                        format!("Expected one generic argument!"),
+                    );
             }
             let types: &UnparsedType = bounds.first().unwrap();
             Some(types.clone())
@@ -399,10 +444,20 @@ fn parse_generic_method(
 fn get_effects(parser_utils: &mut ParserUtils) -> Result<Vec<Effects>, ParsingError> {
     let mut effects = Vec::default();
     // Parse the method call arguments
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::ParenClose {
+    if parser_utils
+        .tokens
+        .get(parser_utils.index)
+        .unwrap()
+        .token_type
+        != TokenTypes::ParenClose
+    {
         while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
             effects.push(expression.effect);
-            if parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type
+            if parser_utils
+                .tokens
+                .get(parser_utils.index - 1)
+                .unwrap()
+                .token_type
                 == TokenTypes::ArgumentEnd
             {
             } else {
@@ -428,7 +483,12 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             ));
         }
 
-        if TokenTypes::Equals != parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type
+        if TokenTypes::Equals
+            != parser_utils
+                .tokens
+                .get(parser_utils.index + 1)
+                .unwrap()
+                .token_type
         {
             return Err(next.make_error(
                 parser_utils.file.clone(),
@@ -445,7 +505,10 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             .tokens
             .get(parser_utils.index)
             .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected value, found void!".to_string())),
+            .make_error(
+                parser_utils.file.clone(),
+                "Expected value, found void!".to_string(),
+            )),
     };
 }
 
@@ -505,7 +568,11 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
             }
             TokenTypes::BlockEnd => break,
             TokenTypes::LineEnd => {
-                if parser_utils.tokens.get(parser_utils.index - 2).unwrap().token_type
+                if parser_utils
+                    .tokens
+                    .get(parser_utils.index - 2)
+                    .unwrap()
+                    .token_type
                     == TokenTypes::BlockEnd
                 {
                     parser_utils.index -= 1;
