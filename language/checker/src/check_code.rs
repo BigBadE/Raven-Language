@@ -1,4 +1,5 @@
 use async_recursion::async_recursion;
+use syntax::async_util::UnparsedType;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody};
 use syntax::syntax::Syntax;
@@ -116,39 +117,7 @@ pub async fn verify_effect(
             second,
         ),
         Effects::CreateStruct(target, effects) => {
-            let target = Syntax::parse_type(
-                code_verifier.syntax.clone(),
-                placeholder_error(format!("Test")),
-                code_verifier.resolver.boxed_clone(),
-                target,
-                vec![],
-            )
-            .await?
-            .finalize(code_verifier.syntax.clone())
-            .await;
-            let mut final_effects = Vec::default();
-            for (field_name, effect) in effects {
-                let mut i = 0;
-                let fields = target.get_fields();
-                for field in fields {
-                    if field.field.name == field_name {
-                        break;
-                    }
-                    i += 1;
-                }
-
-                if i == fields.len() {
-                    return Err(placeholder_error(format!("Unknown field {}!", field_name)));
-                }
-
-                final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));
-            }
-
-            FinalizedEffects::CreateStruct(
-                Some(Box::new(FinalizedEffects::HeapAllocate(target.clone()))),
-                target,
-                final_effects,
-            )
+            verify_create_struct(code_verifier, target, effects, variables)
         }
         Effects::Load(effect, target) => {
             let output = verify_effect(code_verifier, variables, *effect).await?;
@@ -196,6 +165,47 @@ async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
         Effects::Char(char) => store(FinalizedEffects::Char(*char)),
         _ => return None,
     });
+}
+
+async fn verify_create_struct(
+    code_verifier: &mut CodeVerifier,
+    target: UnparsedType,
+    effects: Vec<(String, Effects)>,
+    variables: &mut SimpleVariableManager,
+) -> Result<FinalizedEffects, ParsingError> {
+    let target = Syntax::parse_type(
+        code_verifier.syntax.clone(),
+        placeholder_error(format!("Test")),
+        code_verifier.resolver.boxed_clone(),
+        target,
+        vec![],
+    )
+    .await?
+    .finalize(code_verifier.syntax.clone())
+    .await;
+    let mut final_effects = Vec::default();
+    for (field_name, effect) in effects {
+        let mut i = 0;
+        let fields = target.get_fields();
+        for field in fields {
+            if field.field.name == field_name {
+                break;
+            }
+            i += 1;
+        }
+
+        if i == fields.len() {
+            return Err(placeholder_error(format!("Unknown field {}!", field_name)));
+        }
+
+        final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));
+    }
+
+    return Ok(FinalizedEffects::CreateStruct(
+        Some(Box::new(FinalizedEffects::HeapAllocate(target.clone()))),
+        target,
+        final_effects,
+    ));
 }
 
 async fn check_type(

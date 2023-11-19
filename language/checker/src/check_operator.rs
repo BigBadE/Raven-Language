@@ -22,7 +22,7 @@ pub async fn check_operator(
     }
 
     let error = ParsingError::new(
-        String::new(),
+        String::default(),
         (0, 0),
         0,
         (0, 0),
