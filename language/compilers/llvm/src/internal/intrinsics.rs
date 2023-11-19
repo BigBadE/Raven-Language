@@ -15,20 +15,35 @@ pub fn compile_llvm_intrinsics<'ctx>(
         match name {
             "printf" => type_getter.compiler.context.i32_type().fn_type(
                 &[BasicMetadataTypeEnum::from(
-                    type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()),
+                    type_getter
+                        .compiler
+                        .context
+                        .i8_type()
+                        .ptr_type(AddressSpace::default()),
                 )],
                 true,
             ),
-            "malloc" => {
-                type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()).fn_type(
+            "malloc" => type_getter
+                .compiler
+                .context
+                .i8_type()
+                .ptr_type(AddressSpace::default())
+                .fn_type(
                     &[BasicMetadataTypeEnum::from(
-                        type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()),
+                        type_getter
+                            .compiler
+                            .context
+                            .i64_type()
+                            .ptr_type(AddressSpace::default()),
                     )],
                     false,
-                )
-            }
-            "strcat" => {
-                type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()).fn_type(
+                ),
+            "strcat" => type_getter
+                .compiler
+                .context
+                .i8_type()
+                .ptr_type(AddressSpace::default())
+                .fn_type(
                     &[
                         BasicMetadataTypeEnum::from(
                             type_getter
@@ -46,10 +61,13 @@ pub fn compile_llvm_intrinsics<'ctx>(
                         ),
                     ],
                     false,
-                )
-            }
-            "strcpy" => {
-                type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()).fn_type(
+                ),
+            "strcpy" => type_getter
+                .compiler
+                .context
+                .i8_type()
+                .ptr_type(AddressSpace::default())
+                .fn_type(
                     &[
                         BasicMetadataTypeEnum::from(
                             type_getter
@@ -67,21 +85,32 @@ pub fn compile_llvm_intrinsics<'ctx>(
                         ),
                     ],
                     false,
-                )
-            }
+                ),
             "strlen" => type_getter.compiler.context.i64_type().fn_type(
                 &[BasicMetadataTypeEnum::from(
-                    type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()),
+                    type_getter
+                        .compiler
+                        .context
+                        .i8_type()
+                        .ptr_type(AddressSpace::default()),
                 )],
                 false,
             ),
             "strcmp" => type_getter.compiler.context.i64_type().fn_type(
                 &[
                     BasicMetadataTypeEnum::from(
-                        type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()),
+                        type_getter
+                            .compiler
+                            .context
+                            .i8_type()
+                            .ptr_type(AddressSpace::default()),
                     ),
                     BasicMetadataTypeEnum::from(
-                        type_getter.compiler.context.i8_type().ptr_type(AddressSpace::default()),
+                        type_getter
+                            .compiler
+                            .context
+                            .i8_type()
+                            .ptr_type(AddressSpace::default()),
                     ),
                 ],
                 false,

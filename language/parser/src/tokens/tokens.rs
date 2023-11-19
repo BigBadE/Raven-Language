@@ -29,7 +29,14 @@ impl Token {
         end: (u32, u32),
         end_offset: usize,
     ) -> Self {
-        return Self { token_type, start, start_offset, end, end_offset, code_data };
+        return Self {
+            token_type,
+            start,
+            start_offset,
+            end,
+            end_offset,
+            code_data,
+        };
     }
 
     /// Creates an error for this part of the file.

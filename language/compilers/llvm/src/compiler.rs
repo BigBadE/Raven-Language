@@ -36,9 +36,16 @@ unsafe impl Sync for CompilerImpl<'_> {}
 impl<'ctx> CompilerImpl<'ctx> {
     pub fn new(context: &'ctx Context) -> Self {
         let module = context.create_module("main");
-        let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
+        let execution_engine = module
+            .create_jit_execution_engine(OptimizationLevel::None)
+            .unwrap();
 
-        return Self { module, context, builder: context.create_builder(), execution_engine };
+        return Self {
+            module,
+            context,
+            builder: context.create_builder(),
+            execution_engine,
+        };
     }
 
     pub async fn compile(
@@ -61,7 +68,10 @@ impl<'ctx> CompilerImpl<'ctx> {
             Err(_) => return false,
         };
 
-        let function = MainFuture { syntax: syntax.clone() }.await;
+        let function = MainFuture {
+            syntax: syntax.clone(),
+        }
+        .await;
         instance_function(Arc::new(function.to_codeless()), type_getter);
 
         while !type_getter.compiling.is_empty() {

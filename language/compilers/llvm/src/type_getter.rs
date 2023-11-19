@@ -58,7 +58,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             let field = &function.fields.get(i + offset as usize).unwrap().field;
             variables.insert(
                 field.name.clone(),
-                (field.field_type.clone(), llvm_function.get_nth_param(i as u32).unwrap()),
+                (
+                    field.field_type.clone(),
+                    llvm_function.get_nth_param(i as u32).unwrap(),
+                ),
             );
         }
         return Self {

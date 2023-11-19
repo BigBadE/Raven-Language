@@ -45,7 +45,9 @@ pub async fn check_impl_call(
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
         finding_return_type = found.get_return(variables).unwrap();
-        finding_return_type.fix_generics(&*code_verifier.resolver, &code_verifier.syntax).await?;
+        finding_return_type
+            .fix_generics(&*code_verifier.resolver, &code_verifier.syntax)
+            .await?;
         finalized_effects.insert(0, found);
     }
 
@@ -77,8 +79,10 @@ pub async fn check_impl_call(
                     }
                     let (_, target) = target.pop().unwrap();
 
-                    let return_type =
-                        finalized_effects[0].get_return(variables).unwrap().unflatten();
+                    let return_type = finalized_effects[0]
+                        .get_return(variables)
+                        .unwrap()
+                        .unflatten();
                     if matches!(return_type, FinalizedTypes::Generic(_, _)) {
                         return Ok(FinalizedEffects::GenericVirtualCall(
                             i,
@@ -116,7 +120,10 @@ pub async fn check_impl_call(
             }
 
             if !method.is_empty() {
-                return Err(placeholder_error(format!("Unknown method {} in {}", method, data)));
+                return Err(placeholder_error(format!(
+                    "Unknown method {} in {}",
+                    method, data
+                )));
             }
         }
 
@@ -186,6 +193,10 @@ pub async fn check_impl_call(
         }
         return Ok(output.unwrap());
     } else {
-        panic!("Screwed up trait! {} for {:?}", traits, code_verifier.resolver.imports());
+        panic!(
+            "Screwed up trait! {} for {:?}",
+            traits,
+            code_verifier.resolver.imports()
+        );
     }
 }

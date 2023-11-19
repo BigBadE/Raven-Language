@@ -45,9 +45,17 @@ fn main() {
 
         println!(
             "Building and running {}...",
-            args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")
+            args[1]
+                .clone()
+                .split(path::MAIN_SEPARATOR)
+                .last()
+                .unwrap()
+                .replace(".rv", "")
         );
-        match build::<()>(&mut arguments, vec![Box::new(FileSourceSet { root: target })]) {
+        match build::<()>(
+            &mut arguments,
+            vec![Box::new(FileSourceSet { root: target })],
+        ) {
             _ => return,
         }
     } else if args.len() > 2 {
@@ -96,7 +104,10 @@ fn main() {
     }
 
     println!("Building and running project...");
-    match build::<()>(&mut arguments, vec![Box::new(FileSourceSet { root: source })]) {
+    match build::<()>(
+        &mut arguments,
+        vec![Box::new(FileSourceSet { root: source })],
+    ) {
         _ => {}
     }
 }
@@ -112,12 +123,16 @@ pub fn build<T: Send + 'static>(
         _ => panic!("Unsupported platform {}!", env::consts::OS),
     };
 
-    source.push(Box::new(InnerSourceSet { set: &STD_UNIVERSAL }));
+    source.push(Box::new(InnerSourceSet {
+        set: &STD_UNIVERSAL,
+    }));
     source.push(Box::new(InnerSourceSet { set: platform_std }));
     source.push(Box::new(InnerSourceSet { set: &CORE }));
 
-    arguments.runner_settings.sources =
-        source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
+    arguments.runner_settings.sources = source
+        .iter()
+        .map(|inner| inner.cloned())
+        .collect::<Vec<_>>();
 
     let value = run::<T>(&arguments);
     return match value {
@@ -133,7 +148,9 @@ pub fn build<T: Send + 'static>(
 }
 
 fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = arguments.cpu_runtime.block_on(runner::runner::run::<AtomicPtr<T>>(&arguments))?;
+    let result = arguments
+        .cpu_runtime
+        .block_on(runner::runner::run::<AtomicPtr<T>>(&arguments))?;
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 

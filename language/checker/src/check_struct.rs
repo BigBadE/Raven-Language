@@ -24,7 +24,10 @@ pub async fn verify_struct(
         finalized_fields.push(FinalizedMemberField {
             modifiers: field.modifiers,
             attributes: field.attributes,
-            field: FinalizedField { field_type, name: field.field.name },
+            field: FinalizedField {
+                field_type,
+                name: field.field.name,
+            },
         })
     }
 

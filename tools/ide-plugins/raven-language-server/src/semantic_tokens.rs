@@ -34,7 +34,8 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
                 } as u32,
                 length: (token.end_offset - token.start_offset) as u32,
                 token_type: get_token(
-                    last.as_ref().map_or(&TokenTypes::EOF, |inner| &inner.token_type),
+                    last.as_ref()
+                        .map_or(&TokenTypes::EOF, |inner| &inner.token_type),
                     &token.token_type,
                 ),
                 token_modifiers_bitset: 0,
@@ -44,9 +45,16 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
             temp
         })
         .collect::<Vec<_>>();
-    let result = Some(SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data }));
+    let result = Some(SemanticTokensResult::Tokens(SemanticTokens {
+        result_id: None,
+        data,
+    }));
     let result = serde_json::to_value(&result).unwrap();
-    let resp = Response { id, result: Some(result), error: None };
+    let resp = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
     sender.send(Message::Response(resp)).unwrap();
 }
 

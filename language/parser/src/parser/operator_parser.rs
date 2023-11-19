@@ -45,7 +45,11 @@ pub fn parse_operator(
     };
 
     if right.is_some() {
-        while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type
+        while parser_utils
+            .tokens
+            .get(parser_utils.index - 1)
+            .unwrap()
+            .token_type
             == TokenTypes::ArgumentEnd
         {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
@@ -95,7 +99,12 @@ pub fn parse_operator(
         effects.push(found);
     }
 
-    let mut last = parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type.clone();
+    let mut last = parser_utils
+        .tokens
+        .get(parser_utils.index - 1)
+        .unwrap()
+        .token_type
+        .clone();
     while TokenTypes::BlockStart == last
         || TokenTypes::LineEnd == last
         || TokenTypes::BlockEnd == last
@@ -103,7 +112,13 @@ pub fn parse_operator(
         || TokenTypes::ParenClose == last
     {
         parser_utils.index -= 1;
-        last.clone_from(&parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type);
+        last.clone_from(
+            &parser_utils
+                .tokens
+                .get(parser_utils.index - 1)
+                .unwrap()
+                .token_type,
+        );
     }
 
     return Ok(Effects::Operation(operation, effects));

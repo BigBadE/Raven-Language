@@ -34,7 +34,10 @@ impl<'a> ParserUtils<'a> {
 
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(),
-            token.make_error(self.file.clone(), format!("Failed to find type named {}", &name)),
+            token.make_error(
+                self.file.clone(),
+                format!("Failed to find type named {}", &name),
+            ),
             name,
             Box::new(self.imports.clone()),
             vec![],
@@ -251,7 +254,10 @@ pub fn add_generics(
         }
     }
     return (
-        UnparsedType::Generic(Box::new(UnparsedType::Basic(input.clone())), unparsed_generics),
+        UnparsedType::Generic(
+            Box::new(UnparsedType::Basic(input.clone())),
+            unparsed_generics,
+        ),
         Box::pin(to_generic(input, generics)),
     );
 }

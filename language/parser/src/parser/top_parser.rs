@@ -17,10 +17,17 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         match token.token_type {
             TokenTypes::Start | TokenTypes::AttributeEnd => {}
             TokenTypes::InvalidCharacters => {
-                parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
-                    format!("${}", parser_utils.file),
-                    token.make_error(parser_utils.file.clone(), "Invalid top element!".to_string()),
-                )))
+                parser_utils
+                    .syntax
+                    .lock()
+                    .unwrap()
+                    .add_poison(Arc::new(StructData::new_poisoned(
+                        format!("${}", parser_utils.file),
+                        token.make_error(
+                            parser_utils.file.clone(),
+                            "Invalid top element!".to_string(),
+                        ),
+                    )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
@@ -117,7 +124,13 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
         }
     }
 
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type == TokenTypes::ImportEnd {
+    if parser_utils
+        .tokens
+        .get(parser_utils.index)
+        .unwrap()
+        .token_type
+        == TokenTypes::ImportEnd
+    {
         parser_utils.index += 1;
     }
 }

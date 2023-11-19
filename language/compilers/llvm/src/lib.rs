@@ -41,7 +41,12 @@ impl LLVMCompiler {
         struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
         arguments: CompilerArguments,
     ) -> Self {
-        return Self { compiling, struct_compiling, arguments, context: Context::create() };
+        return Self {
+            compiling,
+            struct_compiling,
+            arguments,
+            context: Context::create(),
+        };
     }
 }
 

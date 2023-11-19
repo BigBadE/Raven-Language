@@ -22,7 +22,11 @@ mod test {
         for entry in dir.entries() {
             match entry {
                 DirEntry::File(file) => {
-                    let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
+                    let path = file
+                        .path()
+                        .to_str()
+                        .unwrap()
+                        .replace(path::MAIN_SEPARATOR, "::");
                     println!("Running {}", path);
                     if !path.ends_with(".rv") {
                         println!("File {} doesn't have the right file extension!", path);

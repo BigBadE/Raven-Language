@@ -61,7 +61,10 @@ pub async fn check_method_call(
                         method
                     )));
                 } else if output.is_empty() {
-                    return Err(placeholder_error(format!("No method {} for generic!", method)));
+                    return Err(placeholder_error(format!(
+                        "No method {} for generic!",
+                        method
+                    )));
                 }
 
                 let (found_trait, found) = output.pop().unwrap();
@@ -124,7 +127,11 @@ pub async fn check_method_call(
                 .position(|found| *found == method.data)
                 .unwrap();
 
-            return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
+            return Ok(FinalizedEffects::VirtualCall(
+                index,
+                method,
+                finalized_effects,
+            ));
         }
 
         finalized_effects.insert(0, calling);
@@ -263,8 +270,15 @@ pub async fn check_method(
         return Err(placeholder_error(format!(
             "Incorrect args to method {}: {:?} vs {:?}",
             method.data.name,
-            method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
-            effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>()
+            method
+                .arguments
+                .iter()
+                .map(|field| &field.field.field_type)
+                .collect::<Vec<_>>(),
+            effects
+                .iter()
+                .map(|effect| effect.get_return(variables).unwrap())
+                .collect::<Vec<_>>()
         )));
     }
 

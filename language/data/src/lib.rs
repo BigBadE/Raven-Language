@@ -99,7 +99,10 @@ impl SourceSet for FileSourceSet {
     fn get_files(&self) -> Vec<Box<dyn Readable>> {
         let mut output = Vec::default();
         read_recursive(self.root.clone(), &mut output).unwrap_or_else(|_| {
-            panic!("Failed to read source files! Make sure {:?} exists", self.root)
+            panic!(
+                "Failed to read source files! Make sure {:?} exists",
+                self.root
+            )
         });
         return output;
     }
@@ -169,7 +172,14 @@ impl ParsingError {
         end_offset: usize,
         message: String,
     ) -> Self {
-        return Self { file, start, start_offset, end, end_offset, message };
+        return Self {
+            file,
+            start,
+            start_offset,
+            end,
+            end_offset,
+            message,
+        };
     }
 
     pub fn print(&self, sources: &Vec<Box<dyn SourceSet>>) {
@@ -188,13 +198,20 @@ impl ParsingError {
         }
         let file = file.unwrap();
         let contents = file.read();
-        let line = contents.lines().nth((self.start.0 as usize).max(1) - 1).unwrap_or("???");
+        let line = contents
+            .lines()
+            .nth((self.start.0 as usize).max(1) - 1)
+            .unwrap_or("???");
         println!("{}", self.message.bright_red());
         println!(
             "{}",
             format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red()
         );
-        println!("{} {}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan());
+        println!(
+            "{} {}",
+            " ".repeat(self.start.0.to_string().len()),
+            "|".bright_cyan()
+        );
         println!(
             "{} {} {}",
             self.start.0.to_string().bright_cyan(),

@@ -121,7 +121,7 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
                     tokenizer.make_token(TokenTypes::StringEnd)
                 } else {
                     tokenizer.make_token(TokenTypes::StringStart)
-                }
+                };
             }
             b'\\' => {
                 // if it is a hex value, then increment the tokenizer by an extra 2 because
@@ -152,7 +152,11 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
         //GenericsStart Generic GenericBound GenericsStart Generic GenericsStart Generic GenericBoundEnd GenericBoundEnd GenericEnd Generic GenericBound
         TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericBoundEnd => {
             if tokenizer.matches(":") || tokenizer.matches("+") {
-                parse_to_character(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
+                parse_to_character(
+                    tokenizer,
+                    TokenTypes::GenericBound,
+                    &[b',', b'+', b'>', b'<'],
+                )
             } else if tokenizer.matches("<") {
                 tokenizer.generic_depth += 1;
                 tokenizer.make_token(TokenTypes::GenericsStart)

@@ -25,7 +25,11 @@ pub struct TypesChecker {
 
 impl TypesChecker {
     pub fn new(runtime: Arc<Mutex<HandleWrapper>>, include_refs: bool) -> Self {
-        return Self { runtime, generics: HashMap::default(), include_refs };
+        return Self {
+            runtime,
+            generics: HashMap::default(),
+            include_refs,
+        };
     }
 }
 

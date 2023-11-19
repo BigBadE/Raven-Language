@@ -88,10 +88,14 @@ pub fn parse_function(
 
     if trait_function {
         if is_modifier(modifiers, Modifier::Internal) || is_modifier(modifiers, Modifier::Extern) {
-            return Err(parser_utils.tokens.get(parser_utils.index - 1).unwrap().make_error(
-                parser_utils.file.clone(),
-                "Traits can't be internal/external!".to_string(),
-            ));
+            return Err(parser_utils
+                .tokens
+                .get(parser_utils.index - 1)
+                .unwrap()
+                .make_error(
+                    parser_utils.file.clone(),
+                    "Traits can't be internal/external!".to_string(),
+                ));
         } else {
             modifiers += Modifier::Trait as u8;
         }

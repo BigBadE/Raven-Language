@@ -58,8 +58,15 @@ pub fn create_function_value<'ctx>(
             types.fn_type(params.as_slice(), false)
             //}
         }
-        None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false),
+        None => type_getter
+            .compiler
+            .context
+            .void_type()
+            .fn_type(params.as_slice(), false),
     };
 
-    return type_getter.compiler.module.add_function(&function.data.name, llvm_function, linkage);
+    return type_getter
+        .compiler
+        .module
+        .add_function(&function.data.name, llvm_function, linkage);
 }

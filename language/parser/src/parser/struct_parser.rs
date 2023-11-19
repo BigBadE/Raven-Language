@@ -39,13 +39,17 @@ pub fn parse_structure(
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::InvalidCharacters => {
-                parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
-                    format!("{}", parser_utils.file),
-                    token.make_error(
-                        parser_utils.file.clone(),
-                        "Unexpected top element!".to_string(),
-                    ),
-                )))
+                parser_utils
+                    .syntax
+                    .lock()
+                    .unwrap()
+                    .add_poison(Arc::new(StructData::new_poisoned(
+                        format!("{}", parser_utils.file),
+                        token.make_error(
+                            parser_utils.file.clone(),
+                            "Unexpected top element!".to_string(),
+                        ),
+                    )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
@@ -100,13 +104,21 @@ pub fn parse_structure(
             let name = format!("{}::{}", parser_utils.file, name);
             Arc::new(StructData::new(
                 attributes,
-                functions.iter().map(|inner| inner.data.clone()).collect::<Vec<_>>(),
+                functions
+                    .iter()
+                    .map(|inner| inner.data.clone())
+                    .collect::<Vec<_>>(),
                 modifiers,
                 name,
             ))
         };
 
-    return Ok(UnfinalizedStruct { generics, fields, functions, data });
+    return Ok(UnfinalizedStruct {
+        generics,
+        fields,
+        functions,
+        data,
+    });
 }
 
 pub fn parse_implementor(
@@ -236,7 +248,13 @@ pub fn parse_implementor(
         vec![],
     ));
 
-    return Ok(TraitImplementor { base, generics, implementor, functions, attributes });
+    return Ok(TraitImplementor {
+        base,
+        generics,
+        implementor,
+        functions,
+        attributes,
+    });
 }
 
 pub fn parse_type_generics(
@@ -290,7 +308,10 @@ pub fn parse_generics(
                 name = name.trim().to_string();
             }
             TokenTypes::GenericEnd => {
-                parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
+                parser_utils
+                    .imports
+                    .generics
+                    .insert(name.clone(), unparsed_bounds);
                 generics.insert(name.clone(), bounds);
                 bounds = Vec::default();
                 unparsed_bounds = Vec::default();
@@ -322,7 +343,10 @@ pub fn parse_generics(
             }
             TokenTypes::GenericsEnd => {
                 if !name.is_empty() {
-                    parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
+                    parser_utils
+                        .imports
+                        .generics
+                        .insert(name.clone(), unparsed_bounds);
                     generics.insert(name.clone(), bounds);
                 }
 
@@ -433,5 +457,9 @@ pub async fn to_field(
     modifier: u8,
     name: String,
 ) -> Result<MemberField, ParsingError> {
-    return Ok(MemberField::new(modifier, attributes, Field::new(name, types.await?)));
+    return Ok(MemberField::new(
+        modifier,
+        attributes,
+        Field::new(name, types.await?),
+    ));
 }

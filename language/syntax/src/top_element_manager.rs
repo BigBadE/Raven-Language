@@ -137,8 +137,10 @@ pub async fn find_trait_implementation(
         .await
         {
             let value = value.finalize(syntax.clone()).await;
-            if let Some(value) =
-                syntax.lock().unwrap().get_implementation_methods(&return_type, &value)
+            if let Some(value) = syntax
+                .lock()
+                .unwrap()
+                .get_implementation_methods(&return_type, &value)
             {
                 for temp in &value {
                     if &temp.name.split("::").last().unwrap() == method {

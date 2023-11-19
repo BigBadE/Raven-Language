@@ -78,7 +78,12 @@ impl RustIrDatabase<ChalkIr> for Syntax {
 
     /// Gets an implementation given the ID.
     fn impl_datum(&self, impl_id: ImplId<ChalkIr>) -> Arc<ImplDatum<ChalkIr>> {
-        return self.implementations.get(impl_id.0 as usize).unwrap().chalk_type.clone();
+        return self
+            .implementations
+            .get(impl_id.0 as usize)
+            .unwrap()
+            .chalk_type
+            .clone();
     }
 
     fn associated_ty_value(
