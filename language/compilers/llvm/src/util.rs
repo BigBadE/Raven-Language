@@ -1,11 +1,11 @@
-use std::ops::Deref;
-use std::sync::Arc;
+use crate::type_getter::CompilerTypeGetter;
 use inkwell::module::Linkage;
 use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
+use std::ops::Deref;
+use std::sync::Arc;
 use syntax::function::CodelessFinalizedFunction;
 use syntax::types::FinalizedTypes;
-use crate::type_getter::CompilerTypeGetter;
 
 pub fn print_formatted(input: String) {
     let mut output = String::default();
@@ -30,8 +30,11 @@ pub fn print_formatted(input: String) {
     println!("{}", output);
 }
 
-pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, type_getter: &mut CompilerTypeGetter<'ctx>,
-                                   linkage: Option<Linkage>) -> FunctionValue<'ctx> {
+pub fn create_function_value<'ctx>(
+    function: &Arc<CodelessFinalizedFunction>,
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    linkage: Option<Linkage>,
+) -> FunctionValue<'ctx> {
     let mut params = Vec::default();
 
     for param in &function.arguments {
@@ -44,17 +47,18 @@ pub fn create_function_value<'ctx>(function: &Arc<CodelessFinalizedFunction>, ty
             if let FinalizedTypes::Reference(inner) = returning {
                 returning = inner.deref();
             }
-            let types = type_getter.get_type(&FinalizedTypes::Reference(Box::new(returning.clone())));
+            let types =
+                type_getter.get_type(&FinalizedTypes::Reference(Box::new(returning.clone())));
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             //TODO not used for now cause malloc is used, but for future speed ups will be needed
             /*if types.is_struct_type() {
                 params.insert(0, From::from(types.ptr_type(AddressSpace::default())));
                 type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
             } else {*/
-                types.fn_type(params.as_slice(), false)
+            types.fn_type(params.as_slice(), false)
             //}
         }
-        None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false)
+        None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false),
     };
 
     return type_getter.compiler.module.add_function(&function.data.name, llvm_function, linkage);

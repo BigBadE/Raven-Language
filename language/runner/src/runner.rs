@@ -29,10 +29,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
         handle.clone(),
         settings.runner_settings.include_references(),
     )));
-    syntax
-        .async_manager
-        .target
-        .clone_from(&settings.runner_settings.compiler_arguments.target);
+    syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
 
     let syntax = Arc::new(Mutex::new(syntax));
 
@@ -87,14 +84,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
 
     syntax.lock().unwrap().finish();
 
-    match time::timeout(
-        Duration::from_secs(5),
-        JoinWaiter {
-            handle: handle.clone(),
-        },
-    )
-    .await
-    {
+    match time::timeout(Duration::from_secs(5), JoinWaiter { handle: handle.clone() }).await {
         Ok(_) => {}
         Err(_) => {
             for (name, _) in &handle.lock().unwrap().names {
@@ -129,7 +119,5 @@ pub async fn start<T>(
         );
     }
 
-    let _ = sender
-        .send(code_compiler.compile(receiver, &syntax).await)
-        .await;
+    let _ = sender.send(code_compiler.compile(receiver, &syntax).await).await;
 }

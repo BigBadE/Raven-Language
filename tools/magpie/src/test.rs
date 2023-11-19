@@ -1,15 +1,15 @@
-use std::path;
-use include_dir::File;
-use data::{Readable, SourceSet};
 use crate::FileWrapper;
+use data::{Readable, SourceSet};
+use include_dir::File;
+use std::path;
 
 #[cfg(test)]
 mod test {
-    use std::{env, path};
-    use include_dir::{Dir, DirEntry, include_dir};
-    use data::{Arguments, CompilerArguments, RunnerSettings};
     use crate::build;
     use crate::test::InnerFileSourceSet;
+    use data::{Arguments, CompilerArguments, RunnerSettings};
+    use include_dir::{include_dir, Dir, DirEntry};
+    use std::{env, path};
 
     static TESTS: Dir = include_dir!("lib/test/test");
 
@@ -26,29 +26,35 @@ mod test {
                     println!("Running {}", path);
                     if !path.ends_with(".rv") {
                         println!("File {} doesn't have the right file extension!", path);
-                        continue
+                        continue;
                     }
                     let path = format!("{}::test", &path[0..path.len() - 3]);
-                    let mut arguments = Arguments::build_args(false, RunnerSettings {
-                        sources: vec!(),
-                        debug: false,
-                        compiler_arguments: CompilerArguments {
-                            compiler: "llvm".to_string(),
-                            target: path.clone(),
-                            temp_folder: env::current_dir().unwrap().join("target")
-                        }
-                    });
-
-                    match build::<bool>(&mut arguments, vec!(Box::new(InnerFileSourceSet {
-                        set: file
-                    }))) {
-                        Ok(inner) => match inner {
-                            Some(found) => if !found {
-                                assert!(false, "Failed test {}!", path)
+                    let mut arguments = Arguments::build_args(
+                        false,
+                        RunnerSettings {
+                            sources: vec![],
+                            debug: false,
+                            compiler_arguments: CompilerArguments {
+                                compiler: "llvm".to_string(),
+                                target: path.clone(),
+                                temp_folder: env::current_dir().unwrap().join("target"),
                             },
-                            None => assert!(false, "Failed to find method test in test {}", path)
                         },
-                        Err(()) => assert!(false, "Failed to compile test {}!", path)
+                    );
+
+                    match build::<bool>(
+                        &mut arguments,
+                        vec![Box::new(InnerFileSourceSet { set: file })],
+                    ) {
+                        Ok(inner) => match inner {
+                            Some(found) => {
+                                if !found {
+                                    assert!(false, "Failed test {}!", path)
+                                }
+                            }
+                            None => assert!(false, "Failed to find method test in test {}", path),
+                        },
+                        Err(()) => assert!(false, "Failed to compile test {}!", path),
                     }
                 }
                 DirEntry::Dir(dir) => {
@@ -59,7 +65,6 @@ mod test {
     }
 }
 
-
 #[derive(Clone, Debug)]
 pub struct InnerFileSourceSet {
     set: &'static File<'static>,
@@ -67,12 +72,11 @@ pub struct InnerFileSourceSet {
 
 impl SourceSet for InnerFileSourceSet {
     fn get_files(&self) -> Vec<Box<dyn Readable>> {
-        return vec!(Box::new(FileWrapper { file: self.set }));
+        return vec![Box::new(FileWrapper { file: self.set })];
     }
 
     fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path()
-            .replace(path::MAIN_SEPARATOR, "::");
+        let name = other.path().replace(path::MAIN_SEPARATOR, "::");
         return name[0..name.len() - 3].to_string();
     }
 

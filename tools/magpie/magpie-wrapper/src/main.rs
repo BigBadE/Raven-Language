@@ -1,7 +1,7 @@
-use std::{env, fs};
-use std::process::{Command, Stdio};
 use json::JsonValue;
 use reqwest::blocking::Client;
+use std::process::{Command, Stdio};
+use std::{env, fs};
 
 static URL: &str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
 
@@ -20,8 +20,10 @@ fn main() {
     // Find the latest artifacts
     let mut highest: Option<&JsonValue> = None;
     for artifact in parsed.members() {
-        if artifact["name"].as_str().unwrap() != format!("Magpie-{}{}", env::consts::OS, env::consts::EXE_SUFFIX) {
-            continue
+        if artifact["name"].as_str().unwrap()
+            != format!("Magpie-{}{}", env::consts::OS, env::consts::EXE_SUFFIX)
+        {
+            continue;
         }
         if let Some(found) = &highest {
             if artifact["id"].as_u64() > found["id"].as_u64() {
@@ -38,7 +40,8 @@ fn main() {
 
     let highest = highest.unwrap();
 
-    let running = env::temp_dir().join(format!("magpie-{}.{}", highest["id"], env::consts::EXE_EXTENSION));
+    let running =
+        env::temp_dir().join(format!("magpie-{}.{}", highest["id"], env::consts::EXE_EXTENSION));
 
     // If latest is not already downloaded, download it.
     if !running.exists() {
@@ -54,7 +57,11 @@ fn main() {
         fs::write(running.clone(), client.get(download).send().unwrap().bytes().unwrap()).unwrap();
     }
 
-    Command::new(running).args(env::args().into_iter().skip(1).collect::<Vec<_>>())
-        .stdout(Stdio::inherit()).stdin(Stdio::inherit()).stderr(Stdio::inherit())
-        .output().unwrap();
+    Command::new(running)
+        .args(env::args().into_iter().skip(1).collect::<Vec<_>>())
+        .stdout(Stdio::inherit())
+        .stdin(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output()
+        .unwrap();
 }

@@ -6,14 +6,14 @@ use std::mem;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
 use std::sync::Mutex;
+use std::task::{Context, Poll, Waker};
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, JoinHandle};
 
-use crate::{ParsingError, TopElement};
 use crate::function::display_parenless;
 use crate::syntax::Syntax;
+use crate::{ParsingError, TopElement};
 
 /// A future that asynchronously gets a type from its respective AsyncGetter.
 /// Will never deadlock because types are added to the AsyncGetter before being finalized.
@@ -35,8 +35,13 @@ pub struct AsyncDataGetter<T: TopElement> {
 
 impl<T: TopElement> AsyncTypesGetter<T> {
     /// Helper method to try a get a type with the given prefix, and adding a waker if not.
-    fn get_types(&mut self, locked: &mut Syntax, prefix: String, waker: Waker, not_trait: bool)
-                 -> Option<Result<Arc<T>, ParsingError>> {
+    fn get_types(
+        &mut self,
+        locked: &mut Syntax,
+        prefix: String,
+        waker: Waker,
+        not_trait: bool,
+    ) -> Option<Result<Arc<T>, ParsingError>> {
         // Add the prefix to the name, if any.
         let name = if prefix.is_empty() {
             self.getting.clone()
@@ -59,7 +64,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         if let Some(vectors) = getting.wakers.get_mut(&name) {
             vectors.push(waker);
         } else {
-            getting.wakers.insert(name, vec!(waker));
+            getting.wakers.insert(name, vec![waker]);
         }
 
         return None;
@@ -94,16 +99,14 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
-    pub fn new(syntax: Arc<Mutex<Syntax>>, error: ParsingError, getting: String,
-               name_resolver: Box<dyn NameResolver>, not_trait: bool) -> Self {
-        return Self {
-            syntax,
-            error,
-            getting,
-            name_resolver,
-            finished: None,
-            not_trait,
-        };
+    pub fn new(
+        syntax: Arc<Mutex<Syntax>>,
+        error: ParsingError,
+        getting: String,
+        name_resolver: Box<dyn NameResolver>,
+        not_trait: bool,
+    ) -> Self {
+        return Self { syntax, error, getting, name_resolver, finished: None, not_trait };
     }
 }
 
@@ -122,16 +125,17 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         let mut locked = locked.lock().unwrap();
 
         // Check if an element directly referenced with that name exists.
-        if let Some(output) = self.get_types(&mut locked,
-                                             String::default(), cx.waker().clone(), not_trait) {
+        if let Some(output) =
+            self.get_types(&mut locked, String::default(), cx.waker().clone(), not_trait)
+        {
             self.clean_up(&mut locked, self.name_resolver.imports());
             return Poll::Ready(output);
         }
 
         // Check each import if the element is in those files.
         for import in self.name_resolver.imports().clone() {
-            if let Some(output) = self.get_types(&mut locked,
-                                                 import, cx.waker().clone(), not_trait) {
+            if let Some(output) = self.get_types(&mut locked, import, cx.waker().clone(), not_trait)
+            {
                 self.clean_up(&mut locked, self.name_resolver.imports());
                 return Poll::Ready(output);
             }
@@ -149,14 +153,14 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
 impl<T: TopElement> AsyncDataGetter<T> {
     pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
-        return AsyncDataGetter {
-            syntax,
-            getting,
-        };
+        return AsyncDataGetter { syntax, getting };
     }
 }
 
-impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
+impl<T> Future for AsyncDataGetter<T>
+where
+    T: TopElement + Hash + Eq + Debug,
+{
     type Output = Arc<T::Finalized>;
 
     /// Look for the finalized element given the data.
@@ -172,7 +176,11 @@ impl<T> Future for AsyncDataGetter<T> where T: TopElement + Hash + Eq + Debug {
         }
 
         // The finalized element doesn't exist, sleep.
-        manager.wakers.entry(self.getting.name().clone()).or_insert(vec!()).push(cx.waker().clone());
+        manager
+            .wakers
+            .entry(self.getting.name().clone())
+            .or_insert(vec![])
+            .push(cx.waker().clone());
 
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
@@ -190,8 +198,9 @@ impl Display for UnparsedType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return match self {
             UnparsedType::Basic(name) => write!(f, "{}", name),
-            UnparsedType::Generic(base, bounds) =>
+            UnparsedType::Generic(base, bounds) => {
                 write!(f, "{}<{}>", base, display_parenless(bounds, " + "))
+            }
         };
     }
 }
@@ -208,7 +217,7 @@ pub trait NameResolver: Send + Sync {
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }
 
-static EMPTY: Vec<String> = vec!();
+static EMPTY: Vec<String> = vec![];
 
 pub struct EmptyNameResolver {}
 
@@ -238,7 +247,11 @@ pub struct HandleWrapper {
 }
 
 impl HandleWrapper {
-    pub fn spawn<T: Send + 'static, F: Future<Output=T> + Send + 'static>(&mut self, name: String, future: F) {
+    pub fn spawn<T: Send + 'static, F: Future<Output = T> + Send + 'static>(
+        &mut self,
+        name: String,
+        future: F,
+    ) {
         let handle = self.handle.spawn(future);
         self.names.insert(name, handle.abort_handle());
         self.joining.push(unsafe { mem::transmute(handle) });

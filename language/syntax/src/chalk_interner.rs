@@ -43,19 +43,31 @@ impl Interner for ChalkIr {
     type FnAbi = ();
 
     /// Unused debug functions.
-    fn debug_adt_id(_type_kind_id: AdtId<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_adt_id(
+        _type_kind_id: AdtId<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_trait_id(_type_kind_id: TraitId<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_trait_id(
+        _type_kind_id: TraitId<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_assoc_type_id(_id: AssocTypeId<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_assoc_type_id(
+        _id: AssocTypeId<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_opaque_ty_id(_id: OpaqueTyId<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_opaque_ty_id(
+        _id: OpaqueTyId<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
@@ -63,15 +75,24 @@ impl Interner for ChalkIr {
         unreachable!()
     }
 
-    fn debug_alias(_alias: &AliasTy<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_alias(
+        _alias: &AliasTy<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_projection_ty(_proj: &ProjectionTy<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_projection_ty(
+        _proj: &ProjectionTy<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_opaque_ty(_opaque_ty: &OpaqueTy<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_opaque_ty(
+        _opaque_ty: &OpaqueTy<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
@@ -79,23 +100,38 @@ impl Interner for ChalkIr {
         unreachable!()
     }
 
-    fn debug_lifetime(_lifetime: &Lifetime<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_lifetime(
+        _lifetime: &Lifetime<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_generic_arg(_generic_arg: &GenericArg<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_generic_arg(
+        _generic_arg: &GenericArg<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_variable_kinds(_variable_kinds: &VariableKinds<Self>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_variable_kinds(
+        _variable_kinds: &VariableKinds<Self>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_variable_kinds_with_angles(_variable_kinds: &VariableKinds<Self>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_variable_kinds_with_angles(
+        _variable_kinds: &VariableKinds<Self>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_canonical_var_kinds(_canonical_var_kinds: &CanonicalVarKinds<Self>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_canonical_var_kinds(
+        _canonical_var_kinds: &CanonicalVarKinds<Self>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
@@ -107,35 +143,59 @@ impl Interner for ChalkIr {
         unreachable!()
     }
 
-    fn debug_program_clause_implication(_pci: &ProgramClauseImplication<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_program_clause_implication(
+        _pci: &ProgramClauseImplication<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_program_clause(_clause: &ProgramClause<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_program_clause(
+        _clause: &ProgramClause<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_program_clauses(_clause: &ProgramClauses<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_program_clauses(
+        _clause: &ProgramClauses<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_substitution(_substitution: &Substitution<ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_substitution(
+        _substitution: &Substitution<ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_separator_trait_ref(_separator_trait_ref: &SeparatorTraitRef<'_, ChalkIr>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_separator_trait_ref(
+        _separator_trait_ref: &SeparatorTraitRef<'_, ChalkIr>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_quantified_where_clauses(_clauses: &QuantifiedWhereClauses<Self>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_quantified_where_clauses(
+        _clauses: &QuantifiedWhereClauses<Self>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_constraints(_constraints: &Constraints<Self>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_constraints(
+        _constraints: &Constraints<Self>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
-    fn debug_variances(_variances: &Variances<Self>, _fmt: &mut fmt::Formatter<'_>) -> Option<fmt::Result> {
+    fn debug_variances(
+        _variances: &Variances<Self>,
+        _fmt: &mut fmt::Formatter<'_>,
+    ) -> Option<fmt::Result> {
         unreachable!()
     }
 
@@ -186,7 +246,10 @@ impl Interner for ChalkIr {
         goal
     }
 
-    fn intern_goals<E>(self, data: impl IntoIterator<Item = Result<Goal<ChalkIr>, E>>) -> Result<Vec<Goal<ChalkIr>>, E> {
+    fn intern_goals<E>(
+        self,
+        data: impl IntoIterator<Item = Result<Goal<ChalkIr>, E>>,
+    ) -> Result<Vec<Goal<ChalkIr>>, E> {
         data.into_iter().collect()
     }
 
@@ -194,7 +257,10 @@ impl Interner for ChalkIr {
         goals
     }
 
-    fn intern_substitution<E>(self, data: impl IntoIterator<Item = Result<GenericArg<ChalkIr>, E>>) -> Result<Vec<GenericArg<ChalkIr>>, E> {
+    fn intern_substitution<E>(
+        self,
+        data: impl IntoIterator<Item = Result<GenericArg<ChalkIr>, E>>,
+    ) -> Result<Vec<GenericArg<ChalkIr>>, E> {
         data.into_iter().collect()
     }
 
@@ -210,7 +276,10 @@ impl Interner for ChalkIr {
         clause
     }
 
-    fn intern_program_clauses<E>(self, data: impl IntoIterator<Item = Result<ProgramClause<Self>, E>>) -> Result<Vec<ProgramClause<Self>>, E> {
+    fn intern_program_clauses<E>(
+        self,
+        data: impl IntoIterator<Item = Result<ProgramClause<Self>, E>>,
+    ) -> Result<Vec<ProgramClause<Self>>, E> {
         data.into_iter().collect()
     }
 
@@ -218,39 +287,66 @@ impl Interner for ChalkIr {
         clauses
     }
 
-    fn intern_quantified_where_clauses<E>(self, data: impl IntoIterator<Item = Result<QuantifiedWhereClause<Self>, E>>) -> Result<Self::InternedQuantifiedWhereClauses, E> {
+    fn intern_quantified_where_clauses<E>(
+        self,
+        data: impl IntoIterator<Item = Result<QuantifiedWhereClause<Self>, E>>,
+    ) -> Result<Self::InternedQuantifiedWhereClauses, E> {
         data.into_iter().collect()
     }
 
-    fn quantified_where_clauses_data(self, clauses: &Self::InternedQuantifiedWhereClauses) -> &[QuantifiedWhereClause<Self>] {
+    fn quantified_where_clauses_data(
+        self,
+        clauses: &Self::InternedQuantifiedWhereClauses,
+    ) -> &[QuantifiedWhereClause<Self>] {
         clauses
     }
 
-    fn intern_generic_arg_kinds<E>(self, data: impl IntoIterator<Item = Result<VariableKind<ChalkIr>, E>>) -> Result<Self::InternedVariableKinds, E> {
+    fn intern_generic_arg_kinds<E>(
+        self,
+        data: impl IntoIterator<Item = Result<VariableKind<ChalkIr>, E>>,
+    ) -> Result<Self::InternedVariableKinds, E> {
         data.into_iter().collect()
     }
 
-    fn variable_kinds_data(self, variable_kinds: &Self::InternedVariableKinds) -> &[VariableKind<ChalkIr>] {
+    fn variable_kinds_data(
+        self,
+        variable_kinds: &Self::InternedVariableKinds,
+    ) -> &[VariableKind<ChalkIr>] {
         variable_kinds
     }
 
-    fn intern_canonical_var_kinds<E>(self, data: impl IntoIterator<Item = Result<CanonicalVarKind<ChalkIr>, E>>) -> Result<Self::InternedCanonicalVarKinds, E> {
+    fn intern_canonical_var_kinds<E>(
+        self,
+        data: impl IntoIterator<Item = Result<CanonicalVarKind<ChalkIr>, E>>,
+    ) -> Result<Self::InternedCanonicalVarKinds, E> {
         data.into_iter().collect()
     }
 
-    fn canonical_var_kinds_data(self, canonical_var_kinds: &Self::InternedCanonicalVarKinds) -> &[CanonicalVarKind<ChalkIr>] {
+    fn canonical_var_kinds_data(
+        self,
+        canonical_var_kinds: &Self::InternedCanonicalVarKinds,
+    ) -> &[CanonicalVarKind<ChalkIr>] {
         canonical_var_kinds
     }
 
-    fn intern_constraints<E>(self, data: impl IntoIterator<Item = Result<InEnvironment<Constraint<Self>>, E>>) -> Result<Self::InternedConstraints, E> {
+    fn intern_constraints<E>(
+        self,
+        data: impl IntoIterator<Item = Result<InEnvironment<Constraint<Self>>, E>>,
+    ) -> Result<Self::InternedConstraints, E> {
         data.into_iter().collect()
     }
 
-    fn constraints_data(self, constraints: &Self::InternedConstraints) -> &[InEnvironment<Constraint<Self>>] {
+    fn constraints_data(
+        self,
+        constraints: &Self::InternedConstraints,
+    ) -> &[InEnvironment<Constraint<Self>>] {
         constraints
     }
 
-    fn intern_variances<E>(self, data: impl IntoIterator<Item = Result<Variance, E>>) -> Result<Self::InternedVariances, E> {
+    fn intern_variances<E>(
+        self,
+        data: impl IntoIterator<Item = Result<Variance, E>>,
+    ) -> Result<Self::InternedVariances, E> {
         data.into_iter().collect()
     }
 

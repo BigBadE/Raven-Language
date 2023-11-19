@@ -19,7 +19,7 @@ impl Future for MainFuture {
         locked.async_manager.target_waker = Some(cx.waker().clone());
         return match locked.compiling.get(&locked.async_manager.target) {
             Some(found) => Poll::Ready(found.clone()),
-            None => Poll::Pending
+            None => Poll::Pending,
         };
     }
 }

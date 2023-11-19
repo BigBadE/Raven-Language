@@ -1,14 +1,17 @@
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
-use chalk_solve::rust_ir::{AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum,
-                           AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
-                           FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum,
-                           ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait};
-use chalk_solve::RustIrDatabase;
 use crate::chalk_interner::ChalkIr;
 use crate::r#struct::ChalkData;
 use crate::syntax::Syntax;
+use chalk_ir::{
+    AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances,
+};
+use chalk_solve::rust_ir::{
+    AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum, AssociatedTyValue, AssociatedTyValueId,
+    ClosureKind, FnDefDatum, FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum,
+    ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait,
+};
+use chalk_solve::RustIrDatabase;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 impl Debug for Syntax {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -23,7 +26,10 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         return Vec::default();
     }
 
-    fn associated_ty_data(&self, _ty: chalk_ir::AssocTypeId<ChalkIr>) -> Arc<AssociatedTyDatum<ChalkIr>> {
+    fn associated_ty_data(
+        &self,
+        _ty: chalk_ir::AssocTypeId<ChalkIr>,
+    ) -> Arc<AssociatedTyDatum<ChalkIr>> {
         unreachable!()
     }
 
@@ -44,11 +50,17 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         return Arc::new(found.chalk_data.as_ref().unwrap().get_adt().clone());
     }
 
-    fn generator_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorDatum<ChalkIr>> {
+    fn generator_datum(
+        &self,
+        _generator_id: chalk_ir::GeneratorId<ChalkIr>,
+    ) -> Arc<GeneratorDatum<ChalkIr>> {
         unreachable!()
     }
 
-    fn generator_witness_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorWitnessDatum<ChalkIr>> {
+    fn generator_witness_datum(
+        &self,
+        _generator_id: chalk_ir::GeneratorId<ChalkIr>,
+    ) -> Arc<GeneratorWitnessDatum<ChalkIr>> {
         unreachable!()
     }
 
@@ -69,7 +81,10 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         return self.implementations.get(impl_id.0 as usize).unwrap().chalk_type.clone();
     }
 
-    fn associated_ty_value(&self, _id: AssociatedTyValueId<ChalkIr>) -> Arc<AssociatedTyValue<ChalkIr>> {
+    fn associated_ty_value(
+        &self,
+        _id: AssociatedTyValueId<ChalkIr>,
+    ) -> Arc<AssociatedTyValue<ChalkIr>> {
         unreachable!()
     }
 
@@ -82,8 +97,12 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     }
 
     /// Finds all the implementations of a specific trait.
-    fn impls_for_trait(&self, trait_id: chalk_ir::TraitId<ChalkIr>, _parameters: &[chalk_ir::GenericArg<ChalkIr>],
-                       _binders: &chalk_ir::CanonicalVarKinds<ChalkIr>) -> Vec<ImplId<ChalkIr>> {
+    fn impls_for_trait(
+        &self,
+        trait_id: chalk_ir::TraitId<ChalkIr>,
+        _parameters: &[chalk_ir::GenericArg<ChalkIr>],
+        _binders: &chalk_ir::CanonicalVarKinds<ChalkIr>,
+    ) -> Vec<ImplId<ChalkIr>> {
         let mut output = Vec::default();
         let mut i = 0;
         for implementation in &self.implementations {
@@ -95,20 +114,33 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         output
     }
 
-    fn local_impls_to_coherence_check(&self, _trait_id: chalk_ir::TraitId<ChalkIr>) -> Vec<ImplId<ChalkIr>> {
+    fn local_impls_to_coherence_check(
+        &self,
+        _trait_id: chalk_ir::TraitId<ChalkIr>,
+    ) -> Vec<ImplId<ChalkIr>> {
         unreachable!()
     }
 
-    fn impl_provided_for(&self, _auto_trait_id: chalk_ir::TraitId<ChalkIr>, _ty: &chalk_ir::TyKind<ChalkIr>) -> bool {
+    fn impl_provided_for(
+        &self,
+        _auto_trait_id: chalk_ir::TraitId<ChalkIr>,
+        _ty: &chalk_ir::TyKind<ChalkIr>,
+    ) -> bool {
         unreachable!()
     }
 
-    fn well_known_trait_id(&self, _well_known_trait: WellKnownTrait) -> Option<chalk_ir::TraitId<ChalkIr>> {
+    fn well_known_trait_id(
+        &self,
+        _well_known_trait: WellKnownTrait,
+    ) -> Option<chalk_ir::TraitId<ChalkIr>> {
         unreachable!()
     }
 
     /// Copied from Chalk
-    fn program_clauses_for_env(&self, environment: &chalk_ir::Environment<ChalkIr>) -> ProgramClauses<ChalkIr> {
+    fn program_clauses_for_env(
+        &self,
+        environment: &chalk_ir::Environment<ChalkIr>,
+    ) -> ProgramClauses<ChalkIr> {
         chalk_solve::program_clauses_for_env(self, environment)
     }
 
@@ -120,19 +152,35 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         unreachable!()
     }
 
-    fn closure_kind(&self, _closure_id: chalk_ir::ClosureId<ChalkIr>, _substs: &chalk_ir::Substitution<ChalkIr>) -> ClosureKind {
+    fn closure_kind(
+        &self,
+        _closure_id: chalk_ir::ClosureId<ChalkIr>,
+        _substs: &chalk_ir::Substitution<ChalkIr>,
+    ) -> ClosureKind {
         unreachable!()
     }
 
-    fn closure_inputs_and_output(&self, _closure_id: chalk_ir::ClosureId<ChalkIr>, _substs: &chalk_ir::Substitution<ChalkIr>) -> chalk_ir::Binders<FnDefInputsAndOutputDatum<ChalkIr>> {
+    fn closure_inputs_and_output(
+        &self,
+        _closure_id: chalk_ir::ClosureId<ChalkIr>,
+        _substs: &chalk_ir::Substitution<ChalkIr>,
+    ) -> chalk_ir::Binders<FnDefInputsAndOutputDatum<ChalkIr>> {
         unreachable!()
     }
 
-    fn closure_upvars(&self, _closure_id: chalk_ir::ClosureId<ChalkIr>, _substs: &chalk_ir::Substitution<ChalkIr>) -> chalk_ir::Binders<chalk_ir::Ty<ChalkIr>> {
+    fn closure_upvars(
+        &self,
+        _closure_id: chalk_ir::ClosureId<ChalkIr>,
+        _substs: &chalk_ir::Substitution<ChalkIr>,
+    ) -> chalk_ir::Binders<chalk_ir::Ty<ChalkIr>> {
         unreachable!()
     }
 
-    fn closure_fn_substitution(&self, _closure_id: chalk_ir::ClosureId<ChalkIr>, _substs: &chalk_ir::Substitution<ChalkIr>) -> chalk_ir::Substitution<ChalkIr> {
+    fn closure_fn_substitution(
+        &self,
+        _closure_id: chalk_ir::ClosureId<ChalkIr>,
+        _substs: &chalk_ir::Substitution<ChalkIr>,
+    ) -> chalk_ir::Substitution<ChalkIr> {
         unreachable!()
     }
 

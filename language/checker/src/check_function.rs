@@ -68,10 +68,7 @@ pub async fn verify_function_code(
             }
         }
 
-        locked
-            .functions
-            .data
-            .insert(codeless.data.clone(), Arc::new(codeless.clone()));
+        locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 
     //Internal/external/trait functions verify everything but the code.
@@ -96,10 +93,8 @@ pub async fn verify_function_code(
 
     if !code.returns {
         if codeless.return_type.is_none() {
-            code.expressions.push(FinalizedExpression::new(
-                ExpressionType::Return,
-                FinalizedEffects::NOP,
-            ));
+            code.expressions
+                .push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(placeholder_error(format!(
                 "Function {} returns void instead of a {}!",

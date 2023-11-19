@@ -19,48 +19,34 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 lazy_static! {
-    pub static ref I64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("i64".to_string())
-    ));
-    pub static ref I32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("i32".to_string())
-    ));
-    pub static ref I16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("i16".to_string())
-    ));
-    pub static ref I8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("i8".to_string())
-    ));
-    pub static ref F64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("f64".to_string())
-    ));
-    pub static ref F32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("f32".to_string())
-    ));
-    pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("u64".to_string())
-    ));
-    pub static ref U32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("u32".to_string())
-    ));
-    pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("u16".to_string())
-    ));
-    pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("u8".to_string())
-    ));
-    pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("bool".to_string())
-    ));
-    pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("str".to_string())
-    ));
-    pub static ref CHAR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("char".to_string())
-    ));
-    pub static ref VOID: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(
-        StructData::empty("()".to_string())
-    ));
+    pub static ref I64: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("i64".to_string())));
+    pub static ref I32: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("i32".to_string())));
+    pub static ref I16: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("i16".to_string())));
+    pub static ref I8: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("i8".to_string())));
+    pub static ref F64: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("f64".to_string())));
+    pub static ref F32: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("f32".to_string())));
+    pub static ref U64: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("u64".to_string())));
+    pub static ref U32: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("u32".to_string())));
+    pub static ref U16: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("u16".to_string())));
+    pub static ref U8: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("u8".to_string())));
+    pub static ref BOOL: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("bool".to_string())));
+    pub static ref STR: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("str".to_string())));
+    pub static ref CHAR: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("char".to_string())));
+    pub static ref VOID: Arc<FinalizedStruct> =
+        Arc::new(FinalizedStruct::empty_of(StructData::empty("()".to_string())));
 }
 
 pub fn get_internal(name: String) -> Arc<StructData> {
@@ -211,17 +197,10 @@ impl StructData {
         let adt_data = AdtDatum {
             binders: Binders::empty(
                 ChalkIr,
-                AdtDatumBound {
-                    variants: vec![],
-                    where_clauses: vec![],
-                },
+                AdtDatumBound { variants: vec![], where_clauses: vec![] },
             ),
             id: adt_id,
-            flags: AdtFlags {
-                upstream: false,
-                fundamental: false,
-                phantom_data: false,
-            },
+            flags: AdtFlags { upstream: false, fundamental: false, phantom_data: false },
             kind: AdtKind::Struct,
         };
         if is_modifier(self.modifiers, Modifier::Trait) {
@@ -231,12 +210,7 @@ impl StructData {
                 adt_data,
                 TraitDatum {
                     id: trait_id,
-                    binders: Binders::empty(
-                        ChalkIr,
-                        TraitDatumBound {
-                            where_clauses: vec![],
-                        },
-                    ),
+                    binders: Binders::empty(ChalkIr, TraitDatumBound { where_clauses: vec![] }),
                     flags: TraitFlags {
                         auto: false,
                         marker: false,
@@ -302,11 +276,8 @@ impl FinalizedStruct {
         for field in &mut self.fields {
             let types = &mut field.field.field_type;
             if let FinalizedTypes::Generic(name, _) = types {
-                let index = self
-                    .generics
-                    .iter()
-                    .position(|(other_name, _)| name == other_name)
-                    .unwrap();
+                let index =
+                    self.generics.iter().position(|(other_name, _)| name == other_name).unwrap();
                 let generic: &FinalizedTypes = generics.get(index).unwrap();
                 types.clone_from(generic);
             }
@@ -361,11 +332,8 @@ impl TopElement for StructData {
         let data = current.data.clone();
         let functions = current.functions;
         current.functions = Vec::default();
-        let structure = Arc::new(
-            process_manager
-                .verify_struct(current, resolver.boxed_clone(), &syntax)
-                .await,
-        );
+        let structure =
+            Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);
         {
             let mut locked = syntax.lock().unwrap();
             if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
@@ -374,10 +342,7 @@ impl TopElement for StructData {
                 }
             }
 
-            locked
-                .structures
-                .data
-                .insert(data.clone(), structure.clone());
+            locked.structures.data.insert(data.clone(), structure.clone());
         }
 
         for function in functions {
@@ -387,14 +352,11 @@ impl TopElement for StructData {
                 function.generics.insert(name.clone(), bounds.clone());
             }
 
-            let function = process_manager
-                .verify_code(function, code, resolver.boxed_clone(), &syntax)
-                .await;
+            let function =
+                process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
 
             let mut locked = syntax.lock().unwrap();
-            locked
-                .compiling
-                .insert(function.data.name.clone(), Arc::new(function));
+            locked.compiling.insert(function.data.name.clone(), Arc::new(function));
             for waker in &locked.compiling_wakers {
                 waker.wake_by_ref();
             }

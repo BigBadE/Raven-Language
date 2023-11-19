@@ -197,9 +197,7 @@ pub struct SimpleVariableManager {
 
 impl SimpleVariableManager {
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
-        let mut variable_manager = SimpleVariableManager {
-            variables: HashMap::default(),
-        };
+        let mut variable_manager = SimpleVariableManager { variables: HashMap::default() };
 
         for field in &codeless.arguments {
             variable_manager

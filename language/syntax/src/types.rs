@@ -219,11 +219,8 @@ impl FinalizedTypes {
             }
             FinalizedTypes::Generic(name, _bounds) => {
                 let index = binders.iter().position(|found| *found == name).unwrap();
-                TyKind::BoundVar(BoundVar {
-                    debruijn: DebruijnIndex::INNERMOST,
-                    index,
-                })
-                .intern(ChalkIr)
+                TyKind::BoundVar(BoundVar { debruijn: DebruijnIndex::INNERMOST, index })
+                    .intern(ChalkIr)
             }
             FinalizedTypes::GenericType(inner, bounds) => {
                 if let TyKind::Adt(id, _) = inner.to_chalk_type(binders).data(ChalkIr).kind {
@@ -272,10 +269,7 @@ impl FinalizedTypes {
         &self,
         other: &FinalizedTypes,
         syntax: Option<Arc<Mutex<Syntax>>>,
-    ) -> (
-        bool,
-        Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>,
-    ) {
+    ) -> (bool, Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) {
         return match self {
             FinalizedTypes::Struct(found, _original) => match other {
                 FinalizedTypes::Struct(other_struct, _) => {
@@ -498,9 +492,7 @@ impl FinalizedTypes {
             }
             // Ignore references.
             FinalizedTypes::Reference(inner) => {
-                return inner
-                    .resolve_generic(other, syntax, generics, bounds_error)
-                    .await;
+                return inner.resolve_generic(other, syntax, generics, bounds_error).await;
             }
             FinalizedTypes::Array(inner) => {
                 let mut other = other;
@@ -510,9 +502,7 @@ impl FinalizedTypes {
                 }
                 // Check on the inner type.
                 if let FinalizedTypes::Array(other) = other {
-                    return inner
-                        .resolve_generic(other, syntax, generics, bounds_error)
-                        .await;
+                    return inner.resolve_generic(other, syntax, generics, bounds_error).await;
                 }
                 return Err(bounds_error);
             }
@@ -552,8 +542,7 @@ impl FinalizedTypes {
                 }
             }
             FinalizedTypes::GenericType(base, bounds) => {
-                base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone())
-                    .await?;
+                base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
                 let mut found = Vec::default();
                 for bound in bounds {
                     bound
@@ -565,14 +554,10 @@ impl FinalizedTypes {
                 Ok(())
             }
             FinalizedTypes::Reference(inner) => {
-                inner
-                    .degeneric(generics, syntax, none_error, bounds_error)
-                    .await
+                inner.degeneric(generics, syntax, none_error, bounds_error).await
             }
             FinalizedTypes::Array(inner) => {
-                inner
-                    .degeneric(generics, syntax, none_error, bounds_error)
-                    .await
+                inner.degeneric(generics, syntax, none_error, bounds_error).await
             }
             _ => Ok(()),
         };
@@ -580,9 +565,9 @@ impl FinalizedTypes {
 
     pub fn unflatten(&self) -> FinalizedTypes {
         return match self {
-            FinalizedTypes::Struct(_, original) => original
-                .clone()
-                .map_or_else(|| self.clone(), |inner| *inner),
+            FinalizedTypes::Struct(_, original) => {
+                original.clone().map_or_else(|| self.clone(), |inner| *inner)
+            }
             FinalizedTypes::Reference(inner) => inner.unflatten(),
             _ => self.clone(),
         };
@@ -607,7 +592,8 @@ impl FinalizedTypes {
                     let data;
                     {
                         let locked = syntax.lock().unwrap();
-                        data = locked.structures.types.get(&name).unwrap().clone(); // skipcq: RS-W1070
+                        data = locked.structures.types.get(&name).unwrap().clone();
+                        // skipcq: RS-W1070
                     }
                     let base = AsyncDataGetter::new(syntax.clone(), data).await;
                     Ok(FinalizedTypes::Struct(
@@ -635,17 +621,12 @@ impl FinalizedTypes {
                         let mut locked = syntax.lock().unwrap();
                         other.set_id(locked.structures.sorted.len() as u64);
                         arc_other = Arc::new(other);
-                        locked
-                            .structures
-                            .types
-                            .insert(name.clone(), arc_other.clone());
+                        locked.structures.types.insert(name.clone(), arc_other.clone());
                         locked.structures.sorted.push(arc_other.clone());
                     }
                     // Get the FinalizedStruct and degeneric it.
                     let mut data = FinalizedStruct::clone(
-                        AsyncDataGetter::new(syntax.clone(), found.data.clone())
-                            .await
-                            .deref(),
+                        AsyncDataGetter::new(syntax.clone(), found.data.clone()).await.deref(),
                     );
                     data.data.clone_from(&arc_other);
                     data.degeneric(generics, syntax).await?;
@@ -730,8 +711,8 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name_safe().map_or(false, |inner| {
-            other.name_safe().map_or(false, |other| inner == other)
-        });
+        return self
+            .name_safe()
+            .map_or(false, |inner| other.name_safe().map_or(false, |other| inner == other));
     }
 }
