@@ -1,38 +1,56 @@
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use chalk_ir::{AdtId, Binders, GenericArg, Substitution, TraitId, Ty, TyKind};
+use chalk_solve::rust_ir::{AdtDatum, AdtDatumBound, AdtFlags, AdtKind, TraitDatum, TraitDatumBound, TraitFlags};
+use indexmap::map::IndexMap;
+use lazy_static::lazy_static;
+
+use async_trait::async_trait;
+
+use crate::{DataType, is_modifier, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
+use crate::{Attribute, ParsingError};
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
 use crate::code::{FinalizedMemberField, MemberField};
 use crate::function::{FunctionData, UnfinalizedFunction};
 use crate::top_element_manager::TopElementManager;
 use crate::types::{FinalizedTypes, Types};
-use crate::{is_modifier, DataType, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
-use crate::{Attribute, ParsingError};
-use async_trait::async_trait;
-use chalk_ir::{AdtId, Binders, GenericArg, Substitution, TraitId, Ty, TyKind};
-use chalk_solve::rust_ir::{AdtDatum, AdtDatumBound, AdtFlags, AdtKind, TraitDatum, TraitDatumBound, TraitFlags};
-use indexmap::map::IndexMap;
-use lazy_static::lazy_static;
-use std::fmt::{Debug, Formatter};
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
-use std::sync::Mutex;
 
 lazy_static! {
+    /// 64-bit integer type
     pub static ref I64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i64".to_string())));
+    /// 32-bit integer type
     pub static ref I32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i32".to_string())));
+    /// 16-bit integer type
     pub static ref I16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i16".to_string())));
+    /// 8-bit integer type
     pub static ref I8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("i8".to_string())));
+    /// 64-bit float type
     pub static ref F64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("f64".to_string())));
+    /// 32-bit float type
     pub static ref F32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("f32".to_string())));
+    /// 64-bit unsigned integer type
     pub static ref U64: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u64".to_string())));
+    /// 32-bit unsigned integer type
     pub static ref U32: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u32".to_string())));
+    /// 16-bit unsigned integer type
     pub static ref U16: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u16".to_string())));
+    /// 8-bit unsigned integer type
     pub static ref U8: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("u8".to_string())));
+    /// Boolean type
     pub static ref BOOL: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("bool".to_string())));
+    /// String type
     pub static ref STR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("str".to_string())));
+    /// Character type
     pub static ref CHAR: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("char".to_string())));
+    /// Void type
     pub static ref VOID: Arc<FinalizedStruct> = Arc::new(FinalizedStruct::empty_of(StructData::empty("()".to_string())));
 }
 
+/// Gets the internal struct from its name
 pub fn get_internal(name: String) -> Arc<StructData> {
     return match name.as_str() {
         "i64" => I64.data.clone(),
@@ -52,13 +70,17 @@ pub fn get_internal(name: String) -> Arc<StructData> {
     };
 }
 
+/// The chalk data of the two different types
 #[derive(Clone, Debug)]
 pub enum ChalkData {
+    /// Chalk data for traits
     Trait(Ty<ChalkIr>, AdtDatum<ChalkIr>, TraitDatum<ChalkIr>),
+    /// Chalk data for structs
     Struct(Ty<ChalkIr>, AdtDatum<ChalkIr>),
 }
 
 impl ChalkData {
+    /// Gets the Ty from the data
     pub fn get_ty(&self) -> &Ty<ChalkIr> {
         return match self {
             ChalkData::Trait(first, _, _) => &first,
@@ -66,43 +88,43 @@ impl ChalkData {
         };
     }
 
+    /// Gets the ADT from the data
     pub fn get_adt(&self) -> &AdtDatum<ChalkIr> {
         return match self {
             ChalkData::Trait(_, first, _) => &first,
             ChalkData::Struct(_, first) => &first,
         };
     }
-
-    pub fn to_trait(&self) -> (&Ty<ChalkIr>, &AdtDatum<ChalkIr>, &TraitDatum<ChalkIr>) {
-        return match self {
-            ChalkData::Trait(inner, data, other) => (inner, data, other),
-            _ => panic!("Expected struct, found trait"),
-        };
-    }
-
-    pub fn to_struct(&self) -> (&Ty<ChalkIr>, &AdtDatum<ChalkIr>) {
-        return match self {
-            ChalkData::Struct(types, inner) => (types, inner),
-            _ => panic!("Expected struct, found trait"),
-        };
-    }
 }
 
+/// The static data of a structure.
 #[derive(Clone)]
 pub struct StructData {
+    /// The structure's modifiers
     pub modifiers: u8,
+    /// The structure's chalk data
     pub chalk_data: Option<ChalkData>,
+    /// The structure's numerical ID, each struct has a unique ID that starts at 0 and increments by 1
     pub id: u64,
+    /// The structure's name
     pub name: String,
+    /// The structure's attributes
     pub attributes: Vec<Attribute>,
+    /// The structure's functions, if it's a trait
     pub functions: Vec<Arc<FunctionData>>,
+    /// The structure's errors
     pub poisoned: Vec<ParsingError>,
 }
 
+/// An unfinalized struct
 pub struct UnfinalizedStruct {
+    /// The structure's generics
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    /// The structure's fields
     pub fields: Vec<ParsingFuture<MemberField>>,
+    /// The structure's functions
     pub functions: Vec<UnfinalizedFunction>,
+    /// The structure's data
     pub data: Arc<StructData>,
 }
 
@@ -112,10 +134,14 @@ impl DataType<StructData> for UnfinalizedStruct {
     }
 }
 
+/// A finalized struct
 #[derive(Clone, Debug)]
 pub struct FinalizedStruct {
+    /// The structure's generics
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    /// The structure's fields
     pub fields: Vec<FinalizedMemberField>,
+    /// The structure's data
     pub data: Arc<StructData>,
 }
 
@@ -144,6 +170,7 @@ impl PartialEq for FinalizedStruct {
 }
 
 impl StructData {
+    /// creates an empty struct data, usually for internal structs
     pub fn empty(name: String) -> Self {
         return Self {
             attributes: Vec::default(),
@@ -156,10 +183,12 @@ impl StructData {
         };
     }
 
+    /// Creates a new struct data with the given args
     pub fn new(attributes: Vec<Attribute>, functions: Vec<Arc<FunctionData>>, modifiers: u8, name: String) -> Self {
         return Self { attributes, chalk_data: None, id: 0, modifiers, name, functions, poisoned: Vec::default() };
     }
 
+    /// Sets the internal chalk data, used to make sure all ids are unique and incremental in an async environment
     pub fn set_chalk_data(&mut self) {
         let temp: &[GenericArg<ChalkIr>] = &[];
         let adt_id = AdtId(self.id as u32);
@@ -195,6 +224,7 @@ impl StructData {
         }
     }
 
+    /// Creates a new poison'd struct data
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
         let mut output = Self::new(Vec::default(), Vec::default(), 0, name);
         output.poisoned = vec![error];
@@ -203,10 +233,12 @@ impl StructData {
 }
 
 impl FinalizedStruct {
+    /// Creates an empty struct from the data, usually for internal structs
     pub fn empty_of(data: StructData) -> Self {
         return Self { generics: IndexMap::default(), fields: Vec::default(), data: Arc::new(data) };
     }
 
+    /// Degenerics a finalized struct
     pub async fn degeneric(
         &mut self,
         generics: &Vec<FinalizedTypes>,
@@ -226,7 +258,7 @@ impl FinalizedStruct {
                     generic.clone_from(temp);
                     i += 1;
                 } else {
-                    panic!("Guhh?????");
+                    unreachable!();
                 }
             }
         }

@@ -18,11 +18,17 @@ use crate::{ParsingError, TopElement};
 /// A future that asynchronously gets a type from its respective AsyncGetter.
 /// Will never deadlock because types are added to the AsyncGetter before being finalized.
 pub struct AsyncTypesGetter<T: TopElement> {
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// The error to return on fail
     pub error: ParsingError,
+    /// The type being gotten
     pub getting: String,
+    /// The name resolver, used to get imports
     pub name_resolver: Box<dyn NameResolver>,
+    /// Whether to ignore traits
     pub not_trait: bool,
+    /// The finished value, if this has finished already
     pub finished: Option<Arc<T>>,
 }
 
@@ -70,6 +76,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         return None;
     }
 
+    /// Cleans up extra implementation waiters made by this type, to preserve memory
     fn clean_up(&self, syntax: &mut Syntax, imports: &Vec<String>) {
         // Can't clean till parsing is over
         if !syntax.async_manager.finished {
@@ -96,6 +103,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 }
 
 impl<T: TopElement> AsyncTypesGetter<T> {
+    /// Creates a new types getter
     pub fn new(
         syntax: Arc<Mutex<Syntax>>,
         error: ParsingError,
@@ -146,6 +154,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 }
 
 impl<T: TopElement> AsyncDataGetter<T> {
+    /// Creates a new data getter
     pub fn new(syntax: Arc<Mutex<Syntax>>, getting: Arc<T>) -> Self {
         return AsyncDataGetter { syntax, getting };
     }
@@ -177,10 +186,12 @@ where
     }
 }
 
-// A type that hasn't been parsed yet, used for types that need to be clonable before they're finalized.
+/// A type that hasn't been parsed yet, used for types that need to be clonable before they're finalized.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum UnparsedType {
+    /// Basic types are just a string
     Basic(String),
+    /// A generic-bound type, with a base type and bounds
     Generic(Box<UnparsedType>, Vec<UnparsedType>),
 }
 
@@ -197,18 +208,23 @@ impl Display for UnparsedType {
 
 /// A name resolver gives the async utils generic access to data used by later compilation steps.
 pub trait NameResolver: Send + Sync {
+    /// This function's imports
     fn imports(&self) -> &Vec<String>;
 
+    /// Finds the generic given the name
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
 
+    /// All of this function's generics
     fn generics(&self) -> &HashMap<String, Vec<UnparsedType>>;
 
     /// Clones the name resolver in a box, because it's a trait it can't be directly cloned.
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
 }
 
+/// An empty vec
 static EMPTY: Vec<String> = vec![];
 
+/// An empty name resolver, for after finalization
 pub struct EmptyNameResolver {}
 
 impl NameResolver for EmptyNameResolver {
@@ -229,21 +245,36 @@ impl NameResolver for EmptyNameResolver {
     }
 }
 
+/// Wraps around a Handle, allowing the program to wait for all spawned tasks to finish
 pub struct HandleWrapper {
-    pub handle: Handle,
+    /// The inner handle
+    handle: Handle,
+    /// Tasks to join to finish
     pub joining: Vec<JoinHandle<()>>,
+    /// The names of running tasks and a handle to abort them
     pub names: HashMap<String, AbortHandle>,
+    /// A waker to wake when finished with a task
     pub waker: Option<Waker>,
 }
 
 impl HandleWrapper {
+    pub fn new(handle: Handle) -> HandleWrapper {
+        return HandleWrapper {
+            handle,
+            joining: vec![],
+            names: HashMap::default(),
+            waker: None,
+        };
+    }
+    /// Spawns a task and adds it to the joining vec
     pub fn spawn<T: Send + 'static, F: Future<Output = T> + Send + 'static>(&mut self, name: String, future: F) {
         let handle = self.handle.spawn(future);
         self.names.insert(name, handle.abort_handle());
-        // skipcq: RS-W1117
+        // skipcq: RS-W1117 Generic types are detected incorrectly
         self.joining.push(unsafe { mem::transmute(handle) });
     }
 
+    /// Tells the wrapper that a task finished, the waker will remove the handle from the handles vec
     pub fn finish_task(&mut self, name: &String) {
         self.names.remove(name);
         if let Some(found) = &self.waker {

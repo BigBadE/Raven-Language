@@ -53,24 +53,27 @@ pub mod types;
 use crate::chalk_interner::ChalkIr;
 pub use data::ParsingError;
 
-// An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
-// for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.
+/// An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
+/// for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.
 pub type ParsingFuture<T> = Pin<Box<dyn Future<Output = Result<T, ParsingError>> + Send + Sync>>;
 
-// All the modifiers, used for modifier parsing and debug output.
-pub static MODIFIERS: [Modifier; 5] =
-    [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal, Modifier::Operation];
+/// All the modifiers, used for modifier parsing and debug output.
+pub static MODIFIERS: [Modifier; 4] =
+    [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal];
 
-// All the modifiers structures/functions/fields can have
+/// All the modifiers structures/functions/fields can have
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Modifier {
+    /// Public can be accessed from anywhere
     Public = 0b1,
+    /// Protected can only be accessed from the same project
     Protected = 0b10,
+    /// Extern is linked to an external binary
     Extern = 0b100,
+    /// Internal is implemented by the compiler
     Internal = 0b1000,
-    Operation = 0b1_0000,
-    // Hidden from the user, only used internally
-    Trait = 0b10_0000,
+    /// Hidden from the user, only used internally
+    Trait = 0b1_0000,
 }
 
 impl Display for Modifier {
@@ -80,7 +83,6 @@ impl Display for Modifier {
             Modifier::Protected => write!(f, "pub(proj)"),
             Modifier::Extern => write!(f, "extern"),
             Modifier::Internal => write!(f, "internal"),
-            Modifier::Operation => write!(f, "operation"),
             Modifier::Trait => panic!("Shouldn't display trait modifier!"),
         };
     }
@@ -114,15 +116,20 @@ pub fn to_modifiers(from: u8) -> Vec<Modifier> {
     return modifiers;
 }
 
-// A simple attribute over structures or functions, potentially used later in the process
+/// A simple attribute over structures or functions, potentially used later in the process
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Attribute {
+    /// #[my_attribute]
     Basic(String),
+    /// #[my_attribute(2)]
     Integer(String, i64),
+    /// #[my_attribute(false)]
     Bool(String, bool),
+    /// #[my_attribute(Some Text)]
     String(String, String),
 }
 
+/// An attribute can be added to a struct/func to pass extra data to the compiler
 impl Attribute {
     /// Finds the attribute given the name
     pub fn find_attribute<'a>(name: &str, attributes: &'a Vec<Attribute>) -> Option<&'a Attribute> {
@@ -139,6 +146,7 @@ impl Attribute {
         return None;
     }
 
+    /// Converts the attribute to a string attribute or returns None if it's a different type
     pub fn as_string_attribute(&self) -> Option<&String> {
         match self {
             Attribute::String(_, value) => Some(value),
@@ -146,6 +154,7 @@ impl Attribute {
         }
     }
 
+    /// Converts the attribute to an int attribute or returns None if it's a different type
     pub fn as_int_attribute(&self) -> Option<i64> {
         match self {
             Attribute::Integer(_, value) => Some(*value),
@@ -153,6 +162,7 @@ impl Attribute {
         }
     }
 
+    /// Converts the attribute to a bool attribute or returns None if it's a different type
     pub fn as_bool_attribute(&self) -> Option<bool> {
         match self {
             Attribute::Bool(_, value) => Some(*value),
@@ -161,16 +171,20 @@ impl Attribute {
     }
 }
 
+/// The ProcessManager is used to send data to later steps of compilation
 #[async_trait]
 pub trait ProcessManager: Send + Sync {
+    /// The handle can be used to spawn async tasks
     fn handle(&self) -> &Arc<Mutex<HandleWrapper>>;
 
+    /// Verifies a function, returning its codeless verified form and the code
     async fn verify_func(
         &self,
         function: UnfinalizedFunction,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody);
 
+    /// Verifies the code of a function, returning the finalized type
     async fn verify_code(
         &self,
         function: CodelessFinalizedFunction,
@@ -179,6 +193,7 @@ pub trait ProcessManager: Send + Sync {
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedFunction;
 
+    /// Verifies a struct, returning the finalized type
     async fn verify_struct(
         &self,
         structure: UnfinalizedStruct,
@@ -186,19 +201,25 @@ pub trait ProcessManager: Send + Sync {
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedStruct;
 
+    /// Gets the current function generics
     fn generics(&self) -> &HashMap<String, FinalizedTypes>;
 
+    /// Gets the current function generics mutably
     fn mut_generics(&mut self) -> &mut HashMap<String, FinalizedTypes>;
 
+    /// Clones the process manager, generally pretty fast because most data is Arc'd
     fn cloned(&self) -> Box<dyn ProcessManager>;
 }
 
+/// A simple manager for variables in a function
 #[derive(Debug, Clone)]
 pub struct SimpleVariableManager {
+    /// The variables and their type
     pub variables: HashMap<String, FinalizedTypes>,
 }
 
 impl SimpleVariableManager {
+    /// Gets the variable manager for the function, filling in the function parameters
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
         let mut variable_manager = SimpleVariableManager { variables: HashMap::default() };
 
@@ -216,47 +237,50 @@ impl VariableManager for SimpleVariableManager {
     }
 }
 
-// A variable manager used for getting return types from effects
+/// A variable manager used for getting return types from effects
 pub trait VariableManager: Debug {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes>;
 }
 
+/// Something that has an inner immutable data type (either FunctionData or StructData)
 pub trait DataType<T: TopElement> {
-    // The element's data
+    /// The element's data
     fn data(&self) -> &Arc<T>;
 }
 
-// Top elements are structures or functions
+/// Top elements are structures or functions
 #[async_trait]
 pub trait TopElement
 where
     Self: Sized,
 {
+    /// The unfinalized type of this top element
     type Unfinalized: DataType<Self>;
+    /// The finalized type of this top element
     type Finalized;
 
-    // Element id
+    /// Element id
     fn set_id(&mut self, id: u64);
 
-    // Poisons the element, adding an error to it and forcing users to ignore issues with it
+    /// Poisons the element, adding an error to it and forcing users to ignore issues with it
     fn poison(&mut self, error: ParsingError);
 
-    // Whether the top element is a function and has the operator modifier
+    /// Whether the top element is a function and has the operator modifier
     fn is_operator(&self) -> bool;
 
-    // Whether the top element is a trait or trait member
+    /// Whether the top element is a trait or trait member
     fn is_trait(&self) -> bool;
 
-    // All errors on the element
+    /// All errors on the element
     fn errors(&self) -> &Vec<ParsingError>;
 
-    // Name of the element
+    /// Name of the element
     fn name(&self) -> &String;
 
-    // Creates a new poisoned structure of the element
+    /// Creates a new poisoned structure of the element
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
-    // Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
+    /// Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
     async fn verify(
         handle: Arc<Mutex<HandleWrapper>>,
         current: Self::Unfinalized,
@@ -265,11 +289,11 @@ where
         process_manager: Box<dyn ProcessManager>,
     );
 
-    // Gets the getter for that type on the syntax
+    /// Gets the getter for that type on the syntax
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self>;
 }
 
-// An impl block for a type
+/// An impl block for a type
 pub struct TraitImplementor {
     pub base: ParsingFuture<Types>,
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
@@ -278,16 +302,20 @@ pub struct TraitImplementor {
     pub functions: Vec<UnfinalizedFunction>,
 }
 
-// Finished impl block for a type.
-// Ex: impl<T> Iter<T> for NumberIter<T>
+/// Finished impl block for a type.
+/// Ex: impl<T> Iter<T> for NumberIter<T>
 #[derive(Clone)]
 pub struct FinishedTraitImplementor {
-    //Would be Iter<T>
+    /// Would be Iter<T>
     pub target: FinalizedTypes,
-    //Would be NumberIter<T>
+    /// Would be NumberIter<T>
     pub base: FinalizedTypes,
+    /// The implementation as a chalk type
     pub chalk_type: Arc<ImplDatum<ChalkIr>>,
+    /// The generics declared by this implementor
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    /// The attributes on this implementor
     pub attributes: Vec<Attribute>,
+    /// All ths functions in this implementor
     pub functions: Vec<Arc<FunctionData>>,
 }

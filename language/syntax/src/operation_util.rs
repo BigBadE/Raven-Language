@@ -9,8 +9,11 @@ use std::task::{Context, Poll};
 
 /// An asynchronous getter for operations given the operation.
 pub struct OperationGetter {
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// The operations to get, returns when one is found
     pub operation: Vec<String>,
+    /// The error if none is found
     pub error: ParsingError,
 }
 

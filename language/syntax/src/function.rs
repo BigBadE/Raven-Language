@@ -22,13 +22,18 @@ use crate::{
 /// Generics will copy this and change the name and types, but never modify the original.
 #[derive(Clone, Debug)]
 pub struct FunctionData {
+    /// The function's attributes
     pub attributes: Vec<Attribute>,
+    /// The function's modifiers
     pub modifiers: u8,
+    /// The function's name
     pub name: String,
+    /// The function's errors if it has been poison'd
     pub poisoned: Vec<ParsingError>,
 }
 
 impl FunctionData {
+    /// Creates a new function
     pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
         return Self { attributes, modifiers, name, poisoned: Vec::default() };
     }
@@ -112,10 +117,15 @@ impl TopElement for FunctionData {
 /// An unfinalized function is the unlinked function directly after parsing, with no code.
 /// Code is finalizied separately and combined with this to make a FinalizedFunction.
 pub struct UnfinalizedFunction {
+    /// The ordered generics of the function
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    /// The function's fields
     pub fields: Vec<ParsingFuture<MemberField>>,
+    /// The function's code
     pub code: CodeBody,
+    /// The function's return type
     pub return_type: Option<ParsingFuture<Types>>,
+    /// The function's data
     pub data: Arc<FunctionData>,
 }
 
@@ -132,9 +142,13 @@ impl DataType<FunctionData> for UnfinalizedFunction {
 /// (see add_code below)
 #[derive(Clone, Debug)]
 pub struct CodelessFinalizedFunction {
+    /// The function's generics
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    /// The function's arguments
     pub arguments: Vec<FinalizedMemberField>,
+    /// The function's return type
     pub return_type: Option<FinalizedTypes>,
+    /// The function's data
     pub data: Arc<FunctionData>,
 }
 
@@ -278,8 +292,12 @@ fn placeholder_error(error: String) -> ParsingError {
     return ParsingError::new(String::default(), (0, 0), 0, (0, 0), 0, error);
 }
 
+/// A waiter used by generics trying to degeneric a function that returns when the target function's
+/// code is in the compiling list
 struct GenericWaiter {
+    /// The program
     syntax: Arc<Mutex<Syntax>>,
+    /// Name of the function to wait for
     name: String,
 }
 
@@ -332,10 +350,15 @@ async fn degeneric_code(
 /// A finalized function, which is ready to be compiled and has been checked of any errors.
 #[derive(Clone, Debug)]
 pub struct FinalizedFunction {
+    /// The function's generics
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    /// The function's fields
     pub fields: Vec<FinalizedMemberField>,
+    /// The function's code
     pub code: FinalizedCodeBody,
+    /// The function's return type
     pub return_type: Option<FinalizedTypes>,
+    /// The function's data
     pub data: Arc<FunctionData>,
 }
 
@@ -355,25 +378,32 @@ impl FinalizedFunction {
 /// ! Each nested CodeBody MUST have a jump or return or else the compiler will error !
 #[derive(Clone, Default, Debug)]
 pub struct CodeBody {
+    /// A unique label for this code body, never shown to the user but used by the compiler for jumps
     pub label: String,
+    /// The code in this code body
     pub expressions: Vec<Expression>,
 }
 
 /// A finalized body of code.
 #[derive(Clone, Default, Debug)]
 pub struct FinalizedCodeBody {
+    /// A unique label for this code body, never shown to the user but used by the compiler for jumps
     pub label: String,
+    /// The code in this code body
     pub expressions: Vec<FinalizedExpression>,
+    /// Whether every code path in this code body returns
     pub returns: bool,
 }
 
 impl CodeBody {
+    /// Creates a new code body
     pub fn new(expressions: Vec<Expression>, label: String) -> Self {
         return Self { label, expressions };
     }
 }
 
 impl FinalizedCodeBody {
+    /// Creates a new code body
     pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: bool) -> Self {
         return Self { label, expressions, returns };
     }
@@ -411,6 +441,7 @@ where
     return format!("({})", (&output[..output.len() - deliminator.len()]).to_string());
 }
 
+/// Helper functions to display types without parenthesis.
 pub fn display_parenless<T>(input: &Vec<T>, deliminator: &str) -> String
 where
     T: Display,
@@ -422,22 +453,6 @@ where
     let mut output = String::default();
     for element in input {
         output += &*format!("{}{}", element, deliminator);
-    }
-
-    return (&output[..output.len() - deliminator.len()]).to_string();
-}
-
-pub fn debug_parenless<T>(input: &Vec<T>, deliminator: &str) -> String
-where
-    T: Debug,
-{
-    if input.is_empty() {
-        return String::default();
-    }
-
-    let mut output = String::default();
-    for element in input {
-        output += &*format!("{:?}{}", element, deliminator);
     }
 
     return (&output[..output.len() - deliminator.len()]).to_string();

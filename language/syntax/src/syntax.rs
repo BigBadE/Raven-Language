@@ -35,28 +35,28 @@ use crate::{is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingE
 /// to it at the same time.
 /// This is done so that the whole compiler can safely run multithreaded.
 pub struct Syntax {
-    // The compiling functions, accessed from the compiler.
+    /// The compiling functions, accessed from the compiler.
     pub compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
-    // Compiling wakers
+    /// Compiling wakers
     pub compiling_wakers: Vec<Waker>,
-    // The compiling structs, accessed from the compiler..
+    /// The compiling structs, accessed from the compiler.
     pub strut_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
-    // All parsing errors on the entire program
+    /// All parsing errors on the entire program
     pub errors: Vec<ParsingError>,
-    // All structures in the program
+    /// All structures in the program
     pub structures: TopElementManager<StructData>,
-    // All functions in the program
+    /// All functions in the program
     pub functions: TopElementManager<FunctionData>,
-    // All implementations in the program
+    /// All implementations in the program
     pub implementations: Vec<FinishedTraitImplementor>,
-    // The parsing state
+    /// The parsing state
     pub async_manager: GetterManager,
-    // All operations, for example Add or Multiply.
+    /// All operations, for example Add or Multiply.
     pub operations: HashMap<String, Arc<StructData>>,
-    // Wakers waiting for a specific operation to be finished parsing. Will never deadlock
-    // because types are added before they're finalized.
+    /// Wakers waiting for a specific operation to be finished parsing. Will never deadlock
+    /// because types are added before they're finalized.
     pub operation_wakers: HashMap<String, Vec<Waker>>,
-    // Manages the next steps of compilation after parsing
+    /// Manages the next steps of compilation after parsing
     pub process_manager: Box<dyn ProcessManager>,
 }
 
@@ -293,7 +293,7 @@ impl Syntax {
             //Downcasts the generic type to be a StructData.
             //Only traits can be operators. This will break if something else is.
             //These is no better way to do this because Rust doesn't allow downcasting generics.
-            // skipcq: RS-W1117
+            // skipcq: RS-W1117 Generic types are detected incorrectly
             let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
             // Gets the name of the operation, or errors if there isn't one.
@@ -406,6 +406,8 @@ impl Syntax {
         return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
     }
 
+    /// Parses generic bounds on a type, returning the length parsed and the types found.
+    /// TODO should probably be mostly moved to the tokenizer
     #[async_recursion]
     async fn parse_bounds(
         input: &[u8],
@@ -504,6 +506,7 @@ impl Syntax {
         return temp;
     }
 
+    /// Adds extra data to an error
     fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {
         let mut error = error.clone();
         error.message = format!("Unknown type {}!", new_type);
@@ -511,6 +514,7 @@ impl Syntax {
     }
 }
 
+/// The compiler
 #[async_trait]
 pub trait Compiler<T> {
     /// Compiles the target function and returns the main runner.

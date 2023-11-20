@@ -43,7 +43,7 @@ pub enum ParseState {
     New,
 }
 
-// skipcq: RS-R1000
+// skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<Option<Expression>, ParsingError> {
     // The current effect
     let mut effect: Option<Effects> = None;
@@ -205,7 +205,7 @@ enum ControlFlow {
     Returning(Expression),
 }
 
-// skipcq: RS-R1000
+// skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 fn parse_basic_line(
     parser_utils: &mut ParserUtils,
     expression_type: &mut ExpressionType,

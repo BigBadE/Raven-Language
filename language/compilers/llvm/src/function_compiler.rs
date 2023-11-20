@@ -163,7 +163,7 @@ pub fn compile_block<'ctx>(
 }
 
 /// Compiles a single effect
-// skipcq: RS-R1000
+// skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub fn compile_effect<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     function: FunctionValue<'ctx>,

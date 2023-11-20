@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::sync::Arc;
-
-use anyhow::Error;
 use std::sync::Mutex;
 use std::time::Duration;
+
+use anyhow::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time;
@@ -12,20 +11,15 @@ use checker::output::TypesChecker;
 use data::{Arguments, CompilerArguments};
 use parser::parse;
 use syntax::async_util::HandleWrapper;
-use syntax::syntax::Syntax;
 use syntax::ParsingError;
+use syntax::syntax::Syntax;
 
 use crate::{get_compiler, JoinWaiter};
 
 /// Runs Raven to completion with the given arguments
 pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     //Parse source, getting handles and building into the unresolved syntax.
-    let handle = Arc::new(Mutex::new(HandleWrapper {
-        handle: settings.cpu_runtime.handle().clone(),
-        joining: vec![],
-        names: HashMap::default(),
-        waker: None,
-    }));
+    let handle = Arc::new(Mutex::new(HandleWrapper::new(settings.cpu_runtime.handle().clone())));
     let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
     syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
 

@@ -81,6 +81,7 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
 
 /// The integer ids of the semantic tokens along with the VSCode color
 #[allow(dead_code)]
+// skipq: RS-D1001 For some reason the comments aren't detected
 pub enum SemanticTokenTypes {
     Namespace = 0,     /// Same as Type
     Type = 1,          /// Blue-green color

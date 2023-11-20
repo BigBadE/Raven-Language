@@ -18,38 +18,38 @@ use crate::code::FinalizedMemberField;
 use crate::function::{display, display_parenless, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
-use crate::top_element_manager::TypeWaiter;
+use crate::top_element_manager::TypeImplementsTypeWaiter;
 use crate::{is_modifier, Modifier, ParsingError, StructData, TopElement};
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
 /// For example, "test" is a Struct called str, which is an internal type.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Types {
-    // A basic struct
+    /// A basic struct
     Struct(Arc<StructData>),
-    // A type with generic types. For example, List<T> is GenericType with a base struct (List) and bounds T.
-    // This List<T> will be degeneric'd into a type (for example, List<String>) then solidified.
+    /// A type with generic types. For example, List<T> is GenericType with a base struct (List) and bounds T.
+    /// This List<T> will be degeneric'd into a type (for example, List<String>) then solidified.
     GenericType(Box<Types>, Vec<Types>),
-    // A reference to a type
+    /// A reference to a type
     Reference(Box<Types>),
-    // A generic with bounds
+    /// A generic with bounds
     Generic(String, Vec<Types>),
-    // An array
+    /// An array
     Array(Box<Types>),
 }
 
 ///A type with a reference to the finalized structure instead of the data.
 #[derive(Clone, Debug, Eq, Hash)]
 pub enum FinalizedTypes {
-    //A basic struct and the original type (if it was flattened)
+    /// A basic struct and the original type (if it was flattened)
     Struct(Arc<FinalizedStruct>, Option<Box<FinalizedTypes>>),
-    //A type with generic types
+    /// A type with generic types
     GenericType(Box<FinalizedTypes>, Vec<FinalizedTypes>),
-    //A reference to a type
+    /// A reference to a type
     Reference(Box<FinalizedTypes>),
-    //A generic with bounds
+    /// A generic with bounds
     Generic(String, Vec<FinalizedTypes>),
-    //An array
+    /// An array
     Array(Box<FinalizedTypes>),
 }
 
@@ -91,6 +91,7 @@ impl Types {
 }
 
 impl FinalizedTypes {
+    /// The ID of the type
     pub fn id(&self) -> u64 {
         return match self {
             FinalizedTypes::Struct(structure, _) => structure.data.id,
@@ -99,6 +100,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Fixes generics by replacing any generic references lacking bounds with their bounds
     #[async_recursion]
     pub async fn fix_generics(
         &mut self,
@@ -151,6 +153,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Finds all methods with the name from the type
     pub fn find_method(&self, name: &String) -> Option<Vec<(FinalizedTypes, Arc<FunctionData>)>> {
         return match self {
             FinalizedTypes::Struct(inner, _) => inner
@@ -203,8 +206,8 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structure, _) => {
                 match &structure.data.chalk_data.as_ref().unwrap() {
-                    ChalkData::Struct(types, _) => types.clone(),   // skipcq: RS-W1110
-                    ChalkData::Trait(types, _, _) => types.clone(), // skipcq: RS-W1110
+                    ChalkData::Struct(types, _) => types.clone(),   // skipcq: RS-W1110 types isn't Copy
+                    ChalkData::Trait(types, _, _) => types.clone(), // skipcq: RS-W1110 types isn't Copy
                 }
             }
             FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
@@ -254,7 +257,7 @@ impl FinalizedTypes {
 
     /// This method doesn't block, instead it returns a future which can be waited on if a blocking
     /// result is wanted. This waiter is only there is syntax is Some.
-    // skipcq: RS-R1000
+    // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
     pub fn of_type_sync(
         &self,
         other: &FinalizedTypes,
@@ -275,7 +278,7 @@ impl FinalizedTypes {
                         }
                         return (
                             false,
-                            Some(Box::pin(TypeWaiter {
+                            Some(Box::pin(TypeImplementsTypeWaiter {
                                 syntax: syntax.unwrap().clone(),
                                 current: self.clone(),
                                 other: other.clone(),
@@ -416,6 +419,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Joins a vec of futures, waiting for all to finish and returning true if they all returned true
     pub async fn join(joining: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) -> bool {
         for temp in joining {
             if !temp.await {
@@ -527,6 +531,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Unflattens a flattened GenericType, used for some type checking after finalization
     pub fn unflatten(&self) -> FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(_, original) => original.clone().map_or_else(|| self.clone(), |inner| *inner),
@@ -554,7 +559,7 @@ impl FinalizedTypes {
                     let data;
                     {
                         let locked = syntax.lock().unwrap();
-                        // skipcq: RS-W1070
+                        // skipcq: RS-W1070 Initialization of a value can't use clone_from
                         data = locked.structures.types.get(&name).unwrap().clone();
                     }
                     let base = AsyncDataGetter::new(syntax.clone(), data).await;
@@ -617,6 +622,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// The name of the function
     pub fn name(&self) -> String {
         return match self {
             FinalizedTypes::Struct(structs, _) => structs.data.name.clone(),
@@ -629,6 +635,8 @@ impl FinalizedTypes {
         };
     }
 
+    /// The name of the function, not erroring if the name can't be gotten
+    /// Can be used to check if a type is generic or not
     pub fn name_safe(&self) -> Option<String> {
         return match self {
             FinalizedTypes::Struct(structs, _) => Some(structs.data.name.clone()),

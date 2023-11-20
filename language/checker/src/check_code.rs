@@ -90,7 +90,7 @@ async fn check_return_type(
 
 /// Verifies a single effect
 #[async_recursion]
-// skipcq: RS-R1000
+// skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub async fn verify_effect(
     code_verifier: &mut CodeVerifier<'_>,
     variables: &mut SimpleVariableManager,

@@ -17,21 +17,26 @@ use crate::TopElement;
 /// The async manager, just stores basic information about the current parsing state.
 #[derive(Default)]
 pub struct GetterManager {
-    //If parsing non-impls is finished
+    /// If parsing non-impls is finished
     pub finished: bool,
-    //How many impls are still being parsed, which is done async and not tied to finished
+    /// How many impls are still being parsed, which is done async and not tied to finished
     pub parsing_impls: u32,
-    //Impl waiters, which are woken whenever an impl finishes parsing.
+    /// Impl waiters, which are woken whenever an impl finishes parsing.
     pub impl_waiters: Vec<Waker>,
-
+    /// The target method to compile
     pub target: String,
+    /// Waker to wake when the target method is found
     pub target_waker: Option<Waker>,
 }
 
 pub struct ImplWaiter {
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// The type being checked
     pub return_type: FinalizedTypes,
+    /// The base type
     pub data: FinalizedTypes,
+    /// Error if the type isn't found
     pub error: ParsingError,
 }
 
@@ -54,12 +59,19 @@ impl Future for ImplWaiter {
     }
 }
 
+/// Waits for an implementation of the triat matching the constraints
 pub struct TraitImplWaiter<F> {
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// Name resolver and its imports
     pub resolver: Box<dyn NameResolver>,
+    /// Name of the method
     pub method: String,
+    /// The type being checked
     pub return_type: FinalizedTypes,
+    /// A future that checks if the function is valid
     pub checker: F,
+    /// Error to return if none is found
     pub error: ParsingError,
 }
 
@@ -102,6 +114,7 @@ impl<T: Future<Output = Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<Funct
     }
 }
 
+/// Finds all the implementations of the type
 pub async fn find_trait_implementation(
     syntax: &Arc<Mutex<Syntax>>,
     resolver: &dyn NameResolver,
@@ -137,13 +150,14 @@ pub async fn find_trait_implementation(
     }
 }
 
-pub struct TypeWaiter {
+/// Tries to solve if a type implements another type
+pub struct TypeImplementsTypeWaiter {
     pub syntax: Arc<Mutex<Syntax>>,
     pub current: FinalizedTypes,
     pub other: FinalizedTypes,
 }
 
-impl Future for TypeWaiter {
+impl Future for TypeImplementsTypeWaiter {
     type Output = bool;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -163,7 +177,8 @@ impl Future for TypeWaiter {
         return Poll::Ready(false);
     }
 }
-/// top element manager, holds the top elements and the wakers requiring those elements.
+
+/// Holds the top elements and the wakers requiring those elements.
 /// Wakers are used to allow tasks to wait for an element to be parsed and added
 pub struct TopElementManager<T>
 where
@@ -179,6 +194,7 @@ where
     pub wakers: HashMap<String, Vec<Waker>>,
 }
 
+/// Rust's derive breaks this for some reason so it's manually implemented
 impl<T: TopElement> Default for TopElementManager<T> {
     fn default() -> Self {
         return Self {
@@ -194,7 +210,7 @@ impl<T> TopElementManager<T>
 where
     T: TopElement,
 {
-    //Creates the getter with a list of sorted types already, used for internal types declared in the compiler
+    /// Creates the getter with a list of sorted types already, used for internal types declared in the compiler
     pub fn with_sorted(sorted: Vec<Arc<T>>) -> Self {
         return Self { types: HashMap::default(), sorted, data: HashMap::default(), wakers: HashMap::default() };
     }
