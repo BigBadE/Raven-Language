@@ -6,16 +6,15 @@ use std::sync::Arc;
 use syntax::r#struct::StructData;
 use syntax::types::FinalizedTypes;
 
+/// A struct to manage Virtual Tables
 #[derive(Default)]
 pub struct VTableManager<'ctx> {
+    // All the current generated VTables sorted by the parent type and the implemented trait
     data: HashMap<(Arc<StructData>, Arc<StructData>), GlobalValue<'ctx>>,
 }
 
 impl<'ctx> VTableManager<'ctx> {
-    pub fn new() -> Self {
-        return VTableManager { data: HashMap::default() };
-    }
-
+    /// Gets a vtable for the given structure and target trait, generating one if it doesn't exist
     pub fn get_vtable(
         &mut self,
         type_getter: &mut CompilerTypeGetter<'ctx>,

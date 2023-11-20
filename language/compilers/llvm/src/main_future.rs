@@ -9,6 +9,7 @@ use syntax::function::FinalizedFunction;
 
 /// Future for finding the main function
 pub struct MainFuture {
+    // Program syntax
     pub syntax: Arc<Mutex<Syntax>>,
 }
 

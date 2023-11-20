@@ -7,6 +7,7 @@ use std::sync::Arc;
 use syntax::function::CodelessFinalizedFunction;
 use syntax::types::FinalizedTypes;
 
+/// Prints an unformatted string (like the one returned by LLVM's to_string method
 pub fn print_formatted(input: String) {
     let mut output = String::default();
     let mut special = false;
@@ -30,6 +31,7 @@ pub fn print_formatted(input: String) {
     println!("{}", output);
 }
 
+/// Creates a LLVM function from its normal type
 pub fn create_function_value<'ctx>(
     function: &Arc<CodelessFinalizedFunction>,
     type_getter: &mut CompilerTypeGetter<'ctx>,

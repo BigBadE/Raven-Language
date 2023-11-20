@@ -16,12 +16,19 @@ use syntax::syntax::{Compiler, Syntax};
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;
 
+/// The compiler that compiles a syntax
 pub mod compiler;
+/// Compiles a function to LLVM
 pub mod function_compiler;
+/// Implementations of internal types
 pub mod internal;
+/// A future that waits on main to finish verifying
 pub mod main_future;
+/// Handles translating Raven types into LLVM
 pub mod type_getter;
+/// Utility functions used in other files
 pub mod util;
+/// Handles Virtual Tables
 pub mod vtable_manager;
 
 /// An LLVM compiler and the data it requires

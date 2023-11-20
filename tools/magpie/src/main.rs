@@ -24,7 +24,6 @@ fn main() {
             false,
             RunnerSettings {
                 sources: vec![],
-                debug: false,
                 compiler_arguments: CompilerArguments {
                     target: format!(
                         "{}::main",
@@ -58,7 +57,6 @@ fn main() {
         false,
         RunnerSettings {
             sources: vec![],
-            debug: false,
             compiler_arguments: CompilerArguments {
                 target: "build::project".to_string(),
                 compiler: "llvm".to_string(),

@@ -14,12 +14,19 @@ use syntax::{ParsingError, ParsingFuture};
 
 use crate::output::TypesChecker;
 
+/// Checks code to perform internal linking and find any errors
 pub mod check_code;
+/// Checks functions
 pub mod check_function;
+/// Checks the impl call effect
 pub mod check_impl_call;
+/// Checks the method call effect
 pub mod check_method_call;
+/// Checks the operator effect
 pub mod check_operator;
+/// Checks structs
 pub mod check_struct;
+/// Used to send data to be checked by the checker and then send the result to the compiler
 pub mod output;
 
 /// Finalizes an IndexMap of generics into FinalizedTypes

@@ -12,7 +12,9 @@ use std::sync::Mutex;
 use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use syntax::syntax::Syntax;
 
+/// The Raven parser
 pub mod parser;
+/// The Raven tokenizer
 pub mod tokens;
 
 pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Arc<Mutex<HandleWrapper>>, name: String, file: String) {

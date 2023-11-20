@@ -28,15 +28,25 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+/// Utility async functions for things like getting types
 pub mod async_util;
+/// The interner required to use chalk
 pub mod chalk_interner;
+/// Implements the chalk types for Syntax
 pub mod chalk_support;
+/// Types used to represent code
 pub mod code;
+/// Types used to represent functions
 pub mod function;
+/// Utility functions for operations
 pub mod operation_util;
+/// Types used to represent structs
 pub mod r#struct;
+/// The syntax type, used to represent the entire program
 pub mod syntax;
+/// Top element manager is a utility type used to manage top elements like funcs or structs
 pub mod top_element_manager;
+/// Types used to represent types
 pub mod types;
 
 //Re-export ParsingError

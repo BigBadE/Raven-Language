@@ -17,6 +17,7 @@ use syntax::ParsingError;
 
 use crate::{get_compiler, JoinWaiter};
 
+/// Runs Raven to completion with the given arguments
 pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     //Parse source, getting handles and building into the unresolved syntax.
     let handle = Arc::new(Mutex::new(HandleWrapper {
@@ -95,6 +96,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     };
 }
 
+/// Runs the compiler, waiting for the receiver before running the main function then sending the result on the sender.
 pub async fn start<T>(
     compiler_arguments: CompilerArguments,
     sender: Sender<Option<T>>,

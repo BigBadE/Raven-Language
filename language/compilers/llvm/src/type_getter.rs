@@ -19,12 +19,19 @@ use syntax::VariableManager;
 
 /// Data used when compiling a function
 pub struct CompilerTypeGetter<'ctx> {
+    // Program syntax
     pub syntax: Arc<Mutex<Syntax>>,
+    // All generated VTables
     pub vtable: Arc<VTableManager<'ctx>>,
+    // The compiler
     pub compiler: Arc<CompilerImpl<'ctx>>,
+    // Functions being compiled
     pub compiling: Arc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
+    // Current function's code blocks
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
+    // The current block
     pub current_block: Option<BasicBlock<'ctx>>,
+    // Current function's variables
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
 }
 

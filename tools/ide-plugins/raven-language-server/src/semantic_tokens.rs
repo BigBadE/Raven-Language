@@ -105,5 +105,5 @@ pub enum SemanticTokenTypes {
     Regexp = 20,       // Dark blue color
     Operator = 21,     // White
     Decorator = 22,    // Same color as Function
-    None = 100,
+    None = 100,        // No color
 }

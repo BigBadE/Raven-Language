@@ -33,7 +33,6 @@ mod test {
                         false,
                         RunnerSettings {
                             sources: vec![],
-                            debug: false,
                             compiler_arguments: CompilerArguments {
                                 compiler: "llvm".to_string(),
                                 target: path.clone(),

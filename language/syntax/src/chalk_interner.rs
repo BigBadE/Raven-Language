@@ -29,8 +29,8 @@ impl Interner for ChalkIr {
     type InternedGoal = Arc<GoalData<ChalkIr>>;
     type InternedGoals = Vec<Goal<ChalkIr>>;
     type InternedSubstitution = Vec<GenericArg<ChalkIr>>;
-    type InternedProgramClause = ProgramClauseData<ChalkIr>;
     type InternedProgramClauses = Vec<ProgramClause<ChalkIr>>;
+    type InternedProgramClause = ProgramClauseData<ChalkIr>;
     type InternedQuantifiedWhereClauses = Vec<QuantifiedWhereClause<ChalkIr>>;
     type InternedVariableKinds = Vec<VariableKind<ChalkIr>>;
     type InternedCanonicalVarKinds = Vec<CanonicalVarKind<ChalkIr>>;

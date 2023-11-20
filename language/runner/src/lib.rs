@@ -11,8 +11,10 @@ use syntax::function::FinalizedFunction;
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::Compiler;
 
+/// The main Raven runner
 pub mod runner;
 
+/// Gets the compiler given the name and the compiling Arcs (so they can be passed to the compiler)
 pub fn get_compiler<T>(
     compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
     struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
@@ -24,7 +26,9 @@ pub fn get_compiler<T>(
     });
 }
 
+/// A future used to wait for the handle to finish
 pub struct JoinWaiter {
+    /// The handle to wait on
     handle: Arc<Mutex<HandleWrapper>>,
 }
 

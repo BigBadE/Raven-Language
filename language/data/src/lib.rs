@@ -5,28 +5,40 @@ use std::path::PathBuf;
 use std::{fs, path};
 use tokio::runtime::{Builder, Runtime};
 
+/// The type of the main LLVM function called by the program
 pub type Main<T> = unsafe extern "C" fn() -> T;
 
+/// Settings used in configuring the runner
 pub struct RunnerSettings {
+    /// Sources to pull source raven files from
     pub sources: Vec<Box<dyn SourceSet>>,
-    pub debug: bool,
+    /// Arguments for the compiler
     pub compiler_arguments: CompilerArguments,
 }
 
+/// Arguments used when configuring the compiler
 #[derive(Clone)]
 pub struct CompilerArguments {
+    /// Which compiler to use, defaults to LLVM
     pub compiler: String,
+    /// Target method to return as the main method, usually main::main or (name)::test
     pub target: String,
+    /// The temp folder to use while compiling
     pub temp_folder: PathBuf,
 }
 
+/// Arguments for running Raven
 pub struct Arguments {
+    /// The IO runtime, defaults to cpu_runtime if None. Can be set to None in single-threaded environments
     pub io_runtime: Option<Runtime>,
+    /// The CPU runtime, which is used for CPU-intense tasks
     pub cpu_runtime: Runtime,
+    /// The settings for the runner running Raven
     pub runner_settings: RunnerSettings,
 }
 
 impl Arguments {
+    /// Builds the arguments with the runner settings
     pub fn build_args(single_threaded: bool, runner_settings: RunnerSettings) -> Arguments {
         let (mut io_runtime, mut cpu_runtime) = if single_threaded {
             (Builder::new_current_thread(), Builder::new_current_thread())
@@ -47,6 +59,7 @@ impl Arguments {
 }
 
 impl RunnerSettings {
+    /// Whether to include references, LLVM requires it but runtimes like the JVM doesn't
     pub fn include_references(&self) -> bool {
         return match self.compiler_arguments.compiler.to_lowercase().as_str() {
             "llvm" => true,
@@ -55,22 +68,31 @@ impl RunnerSettings {
     }
 }
 
+/// A readable type
 pub trait Readable {
+    /// Reads the readable to a string
     fn read(&self) -> String;
 
+    /// Gets the path of the readable
     fn path(&self) -> String;
 }
 
+/// A set of Raven sources
 pub trait SourceSet: Debug + Send + Sync {
+    /// Returns all of the contained sources
     fn get_files(&self) -> Vec<Box<dyn Readable>>;
 
+    /// Gets the relative path in folder/file format, with no extension
     fn relative(&self, other: &dyn Readable) -> String;
 
+    /// Clones the source set and boxes it
     fn cloned(&self) -> Box<dyn SourceSet>;
 }
 
+/// A simple source set of a single file/folder
 #[derive(Clone, Debug)]
 pub struct FileSourceSet {
+    /// The path of the file/folder
     pub root: PathBuf,
 }
 
@@ -108,6 +130,7 @@ impl SourceSet for FileSourceSet {
     }
 }
 
+/// Recursively reads a folder/file into the list of files
 fn read_recursive(base: PathBuf, output: &mut Vec<Box<dyn Readable>>) -> Result<(), Error> {
     if fs::metadata(&base)?.file_type().is_dir() {
         for file in fs::read_dir(&base)? {
@@ -120,22 +143,25 @@ fn read_recursive(base: PathBuf, output: &mut Vec<Box<dyn Readable>>) -> Result<
     return Ok(());
 }
 
-// An error somewhere in a source file, with exact location.
+/// An error somewhere in a source file, with exact location.
 #[derive(Clone, Debug)]
 pub struct ParsingError {
-    // Name of the file this error is in
+    /// Name of the file this error is in
     pub file: String,
-    // The line number and index from that line
+    /// The line number and index from that line
     pub start: (u32, u32),
-    //
+    /// Offset from the start of the file
     pub start_offset: usize,
+    /// The line number and index from that line
     pub end: (u32, u32),
+    /// Offset from the start of the file
     pub end_offset: usize,
+    /// The error message
     pub message: String,
 }
 
 impl ParsingError {
-    // An empty error, used for places where errors are ignored
+    /// An empty error, used for places where errors are ignored
     pub fn empty() -> Self {
         return ParsingError {
             file: String::default(),
@@ -147,6 +173,7 @@ impl ParsingError {
         };
     }
 
+    /// Creates a new error
     pub fn new(
         file: String,
         start: (u32, u32),
@@ -158,6 +185,7 @@ impl ParsingError {
         return Self { file, start, start_offset, end, end_offset, message };
     }
 
+    /// Prints the error to console
     pub fn print(&self, sources: &Vec<Box<dyn SourceSet>>) {
         let mut file = None;
         'outer: for source in sources {
