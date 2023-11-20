@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use std::task::{Context, Poll};
 use syntax::function::FinalizedFunction;
 
+/// Future for finding the main function
 pub struct MainFuture {
     pub syntax: Arc<Mutex<Syntax>>,
 }

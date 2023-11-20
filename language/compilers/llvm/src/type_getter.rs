@@ -17,6 +17,7 @@ use syntax::syntax::{Main, Syntax};
 use syntax::types::FinalizedTypes;
 use syntax::VariableManager;
 
+/// Data used when compiling a function
 pub struct CompilerTypeGetter<'ctx> {
     pub syntax: Arc<Mutex<Syntax>>,
     pub vtable: Arc<VTableManager<'ctx>>,
@@ -35,6 +36,7 @@ unsafe impl Send for CompilerTypeGetter<'_> {}
 unsafe impl Sync for CompilerTypeGetter<'_> {}
 
 impl<'ctx> CompilerTypeGetter<'ctx> {
+    /// Creates a new CompilerTypeGetter
     pub fn new(compiler: Arc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
         return Self {
             syntax,
@@ -47,6 +49,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
+    /// Adds the FinalizedFunction's fields to the CompilerTypeGetter
     pub fn for_function(&self, function: &Arc<FinalizedFunction>, llvm_function: FunctionValue<'ctx>) -> Self {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
@@ -65,6 +68,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
+    /// Gets the LLVM version of the function
     pub fn get_function(&mut self, function: &Arc<CodelessFinalizedFunction>) -> FunctionValue<'ctx> {
         match self.compiler.module.get_function(&function.data.name) {
             Some(found) => found,
@@ -74,6 +78,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         }
     }
 
+    /// Gets the LLVM version of the type
     pub fn get_type(&mut self, types: &FinalizedTypes) -> BasicTypeEnum<'ctx> {
         let found = match self.compiler.module.get_struct_type(&types.name()) {
             Some(found) => found.as_basic_type_enum(),
@@ -87,6 +92,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
+    /// Gets the target function that can be called directly from Rust
     pub(crate) fn get_target<T>(&self, target: &str) -> Option<JitFunction<'_, Main<T>>> {
         return unsafe {
             match self.compiler.execution_engine.get_function(target) {

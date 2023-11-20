@@ -24,6 +24,7 @@ pub mod type_getter;
 pub mod util;
 pub mod vtable_manager;
 
+/// An LLVM compiler and the data it requires
 pub struct LLVMCompiler {
     compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
     struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
@@ -31,11 +32,14 @@ pub struct LLVMCompiler {
     context: Context,
 }
 
+/// SAFETY: LLVMCompiler isn't actually multi-threaded, so this is safe
 unsafe impl Sync for LLVMCompiler {}
 
+/// SAFETY: LLVMCompiler isn't actually multi-threaded, so this is safe
 unsafe impl Send for LLVMCompiler {}
 
 impl LLVMCompiler {
+    /// Creates a new LLVM compiler
     pub fn new(
         compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
         struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
@@ -47,6 +51,7 @@ impl LLVMCompiler {
 
 #[async_trait]
 impl<T> Compiler<T> for LLVMCompiler {
+    /// Compiles a syntax, with a receiver that is used to wait for verification before running
     async fn compile(&self, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
         let mut binding = CompilerTypeGetter::new(Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
 

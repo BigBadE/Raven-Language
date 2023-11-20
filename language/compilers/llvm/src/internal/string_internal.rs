@@ -5,6 +5,7 @@ use crate::type_getter::CompilerTypeGetter;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, FunctionValue};
 use inkwell::AddressSpace;
 
+/// Compiles internal string methods
 pub fn string_internal<'ctx>(
     type_getter: &CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,

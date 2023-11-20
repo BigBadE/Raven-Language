@@ -1,6 +1,7 @@
 use inkwell::context::Context;
 use inkwell::types::{BasicType, BasicTypeEnum};
 
+/// Gets an internal struct from its name
 pub fn get_internal_struct<'ctx>(context: &'ctx Context, name: &str) -> Option<BasicTypeEnum<'ctx>> {
     return match name {
         "i64" => Some(context.i64_type().as_basic_type_enum()),

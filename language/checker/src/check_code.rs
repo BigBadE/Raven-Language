@@ -12,6 +12,7 @@ use crate::check_method_call::check_method_call;
 use crate::check_operator::check_operator;
 use crate::CodeVerifier;
 
+/// Verifies a block of code, linking all method calls and types, and making sure the code is ready to compile.
 pub async fn verify_code(
     code_verifier: &mut CodeVerifier<'_>,
     variables: &mut SimpleVariableManager,
@@ -44,6 +45,7 @@ pub async fn verify_code(
     return Ok(FinalizedCodeBody::new(body, code.label.clone(), false));
 }
 
+/// Checks to make sure the return type matches in the code block.
 async fn check_return_type(
     line: ExpressionType,
     code_verifier: &CodeVerifier<'_>,
@@ -86,6 +88,7 @@ async fn check_return_type(
     };
 }
 
+/// Verifies a single effect
 #[async_recursion]
 // skipcq: RS-R1000
 pub async fn verify_effect(
@@ -93,6 +96,7 @@ pub async fn verify_effect(
     variables: &mut SimpleVariableManager,
     effect: Effects,
 ) -> Result<FinalizedEffects, ParsingError> {
+    // Some basic effects are handled in finalize_basic
     if let Some(found) = finalize_basic(&effect).await {
         return Ok(found);
     }
@@ -145,6 +149,7 @@ pub async fn verify_effect(
     return Ok(output);
 }
 
+/// Separately handles a few basic effects to declutter the main function
 async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
     return Some(match effects {
         Effects::NOP => panic!("Tried to compile a NOP!"),
@@ -160,6 +165,7 @@ async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
     });
 }
 
+/// Verifies a CreateStruct call
 async fn verify_create_struct(
     code_verifier: &mut CodeVerifier<'_>,
     target: UnparsedType,
@@ -176,6 +182,7 @@ async fn verify_create_struct(
     .await?
     .finalize(code_verifier.syntax.clone())
     .await;
+
     let mut final_effects = Vec::default();
     for (field_name, effect) in effects {
         let mut i = 0;
@@ -201,6 +208,7 @@ async fn verify_create_struct(
     ));
 }
 
+/// Checks if two types are the same
 async fn check_type(
     types: &Option<FinalizedTypes>,
     output: &Vec<FinalizedEffects>,
@@ -218,10 +226,12 @@ async fn check_type(
     return Ok(());
 }
 
+/// Shorthand for storing an effect on the heap
 fn store(effect: FinalizedEffects) -> FinalizedEffects {
     return FinalizedEffects::HeapStore(Box::new(effect));
 }
 
+/// Creates a placeholder error with the given message
 pub fn placeholder_error(message: String) -> ParsingError {
     return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }

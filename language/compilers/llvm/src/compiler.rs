@@ -19,6 +19,7 @@ use crate::function_compiler::{compile_block, instance_function};
 use crate::main_future::MainFuture;
 use crate::type_getter::CompilerTypeGetter;
 
+/// A compiler implementation which must wrap the context
 pub struct CompilerImpl<'ctx> {
     pub context: &'ctx Context,
     pub module: Module<'ctx>,
@@ -34,6 +35,7 @@ unsafe impl Send for CompilerImpl<'_> {}
 unsafe impl Sync for CompilerImpl<'_> {}
 
 impl<'ctx> CompilerImpl<'ctx> {
+    /// Creates a new CompilerImpl from the context
     pub fn new(context: &'ctx Context) -> Self {
         let module = context.create_module("main");
         let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
@@ -41,6 +43,7 @@ impl<'ctx> CompilerImpl<'ctx> {
         return Self { module, context, builder: context.create_builder(), execution_engine };
     }
 
+    /// Compiles a syntax with the required data and returns if the required function is found
     pub async fn compile(
         type_getter: &mut CompilerTypeGetter<'ctx>,
         arguments: &CompilerArguments,

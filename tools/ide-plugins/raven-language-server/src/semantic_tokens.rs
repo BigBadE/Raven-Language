@@ -5,7 +5,9 @@ use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult};
 use parser::tokens::tokenizer::Tokenizer;
 use parser::tokens::tokens::{Token, TokenTypes};
 
+/// Parses the semantic tokens from the file and sends it to the IDE
 pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<Message>) {
+    // Gets the tokens
     let mut tokenizer = Tokenizer::new(file.as_bytes());
     let mut tokens = Vec::new();
     loop {
@@ -15,14 +17,18 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
         }
     }
 
+    // Converts the tokens into semantic tokens
     let mut last: Option<Token> = None;
     let data = tokens
         .into_iter()
         .map(|mut token| {
+            // Multi-line tokens aren't supported, set the end to the start
             if token.start.0 != token.end.0 {
                 token.start_offset = token.end_offset - token.end.1 as usize;
                 token.start = (token.end.0, 0);
             }
+
+            // Calculate the semantic token data as the LSP protocol requires
             let delta_line = (token.start.0 - 1) - last.clone().map_or(0, |inner| inner.start.0 - 1);
             let temp = SemanticToken {
                 delta_line,
@@ -35,17 +41,20 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
                 token_type: get_token(last.as_ref().map_or(&TokenTypes::EOF, |inner| &inner.token_type), &token.token_type),
                 token_modifiers_bitset: 0,
             };
-            //eprintln!("Line ({}, {}) to ({}, {}) for {:?} ({:?})", token.start.0, token.start.1, token.end.0, token.end.1, token.token_type,temp);
+
             last = Some(token);
             temp
         })
         .collect::<Vec<_>>();
+
+    // Send the response back to the IDE
     let result = Some(SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data }));
     let result = serde_json::to_value(&result).unwrap();
     let resp = Response { id, result: Some(result), error: None };
     sender.send(Message::Response(resp)).unwrap();
 }
 
+/// Gets the token's type from the last token and the current token
 fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
     match *last {
         TokenTypes::FunctionStart => {
@@ -70,6 +79,7 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
     return temp;
 }
 
+/// The integer ids of the semantic tokens along with the VSCode color
 #[allow(dead_code)]
 pub enum SemanticTokenTypes {
     Namespace = 0,     // Same as type

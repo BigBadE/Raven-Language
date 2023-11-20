@@ -4,6 +4,7 @@ use crate::type_getter::CompilerTypeGetter;
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use inkwell::{AddressSpace, IntPredicate};
 
+/// Compiles internal math functions
 pub fn math_internal<'ctx>(
     type_getter: &CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
@@ -206,6 +207,7 @@ pub fn math_internal<'ctx>(
     return true;
 }
 
+/// Compiles relational operators
 fn compile_relational_op(
     op: IntPredicate,
     compiler: &CompilerImpl,
@@ -227,6 +229,7 @@ fn compile_relational_op(
     compiler.builder.build_return(Some(&malloc));
 }
 
+/// Returns true if a number is unsigned
 fn is_unsigned(name: &String) -> bool {
     if name.ends_with("u64") || name.ends_with("u32") || name.ends_with("u16") || name.ends_with("u8") {
         return true;

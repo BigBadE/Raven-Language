@@ -10,6 +10,7 @@ use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
 use syntax::{is_modifier, Modifier, ParsingError, SimpleVariableManager};
 
+/// Checks a method call to make sure it's valid
 pub async fn check_method_call(
     code_verifier: &mut CodeVerifier<'_>,
     variables: &mut SimpleVariableManager,
@@ -188,7 +189,8 @@ pub async fn check_method_call(
     .await;
 }
 
-//The CheckerVariableManager here is used for the effects calling the method
+/// Checks if a method call is valid
+/// The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(
     process_manager: &TypesChecker,
     mut method: Arc<CodelessFinalizedFunction>,
@@ -241,6 +243,7 @@ pub async fn check_method(
     });
 }
 
+/// Checks to see if arguments are valid
 pub async fn check_args(
     function: &Arc<CodelessFinalizedFunction>,
     resolver: &dyn NameResolver,

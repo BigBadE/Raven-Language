@@ -22,12 +22,14 @@ import {
 
 let client: LanguageClient;
 
+// The main function for the VSCode extension
 // noinspection JSUnusedGlobalSymbols
 export function activate(context: ExtensionContext) {
 	// The server is implemented in Rust
 	const serverModule = context.asAbsolutePath(
 		join('server', 'raven-language-server')
 	);
+
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	const serverOptions: ServerOptions = {
@@ -52,6 +54,7 @@ export function activate(context: ExtensionContext) {
 		clientOptions
 	);
 
+	// Add the features the Raven LSP needs
     client.registerFeature(new OverrideFeatures());
 	// Start the client. This will also launch the server
 	client.start().then(_ => {
@@ -60,32 +63,37 @@ export function activate(context: ExtensionContext) {
 }
 
 class OverrideFeatures implements StaticFeature {
+	// State is always static
     getState(): FeatureState {
         return { kind: "static" };
     }
+	// Adds the capabilities to the client LSP capabilities
     fillClientCapabilities(capabilities: ClientCapabilities): void {
-        // Force disable `augmentsSyntaxTokens`, VSCode's textmate grammar is somewhat incomplete
-        // making the experience generally worse
+        // Force disable `augmentsSyntaxTokens`, using the LSP's grammars
         const caps = capabilities.textDocument?.semanticTokens;
         if (caps) {
             caps.augmentsSyntaxTokens = false;
         }
     }
+	// Initializes the feature
     initialize(
         _capabilities: ServerCapabilities,
         _documentSelector: DocumentSelector | undefined,
     ): void {
 		// Not required
 	}
+	// Clears the feature
 	clear(): void {
 		// Not required
 	}
 }
 
+// Deactivates the VSCode plugin
 // noinspection JSUnusedGlobalSymbols
 export function deactivate(): Thenable<void> | undefined {
 	if (!client) {
 		return undefined;
 	}
+	// Stops the server
 	return client.stop();
 }

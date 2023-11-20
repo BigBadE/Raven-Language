@@ -10,12 +10,14 @@ use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use syntax::{is_modifier, Modifier, ParsingError, SimpleVariableManager};
 
+/// Verifies a function and returns its code, which is verified seperate to prevent deadlocks
 pub async fn verify_function(
     mut function: UnfinalizedFunction,
     syntax: &Arc<Mutex<Syntax>>,
     include_refs: bool,
 ) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
     let mut fields = Vec::default();
+    // Verify arguments
     for argument in &mut function.fields {
         let field = argument.await?;
         let mut field = FinalizedMemberField {
@@ -33,12 +35,14 @@ pub async fn verify_function(
         fields.push(field);
     }
 
+    // Verify return type
     let return_type = if let Some(return_type) = function.return_type.as_mut() {
         Some(return_type.await?.finalize(syntax.clone()).await)
     } else {
         None
     };
 
+    // Return the codeless finalized function
     let codeless = CodelessFinalizedFunction {
         generics: finalize_generics(syntax, function.generics).await?,
         arguments: fields,
@@ -49,6 +53,7 @@ pub async fn verify_function(
     return Ok((codeless, function.code));
 }
 
+/// Verifies the code of a function
 pub async fn verify_function_code(
     process_manager: &TypesChecker,
     resolver: Box<dyn NameResolver>,
@@ -77,6 +82,7 @@ pub async fn verify_function_code(
         CodeVerifier { process_manager, resolver, return_type: codeless.return_type.clone(), syntax: syntax.clone() };
     let mut code = verify_code(&mut code_verifier, &mut variable_manager, code, true).await?;
 
+    // Checks the return type exists
     if !code.returns {
         if codeless.return_type.is_none() {
             code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP));

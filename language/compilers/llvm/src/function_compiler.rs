@@ -18,6 +18,7 @@ use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
 use crate::util::create_function_value;
 
+/// Instances a FunctionValue from its CodelessFinalizedFunction
 pub fn instance_function<'a, 'ctx>(
     function: Arc<CodelessFinalizedFunction>,
     type_getter: &mut CompilerTypeGetter<'ctx>,
@@ -43,6 +44,7 @@ pub fn instance_function<'a, 'ctx>(
     return value;
 }
 
+/// Instances a type from its FinalizedTypes
 pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTypeGetter<'ctx>) -> BasicTypeEnum<'ctx> {
     return match types {
         FinalizedTypes::Reference(inner) => type_getter.get_type(inner),
@@ -72,6 +74,7 @@ pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTy
     };
 }
 
+/// Compiles a FinalizedCodeBody
 pub fn compile_block<'ctx>(
     code: &FinalizedCodeBody,
     function: FunctionValue<'ctx>,
@@ -95,7 +98,7 @@ pub fn compile_block<'ctx>(
             ExpressionType::Return => {
                 if let FinalizedEffects::CodeBody(body) = &line.effect {
                     if !broke {
-                        let destination = unwrap_or_create(&body.label, function, type_getter);
+                        let destination = get_block_or_create(&body.label, function, type_getter);
                         type_getter.compiler.builder.build_unconditional_branch(destination);
                     }
                     compile_effect(type_getter, function, &line.effect, id);
@@ -123,7 +126,7 @@ pub fn compile_block<'ctx>(
                 } else {
                     match &line.effect {
                         FinalizedEffects::CodeBody(body) => {
-                            let destination = unwrap_or_create(&body.label, function, type_getter);
+                            let destination = get_block_or_create(&body.label, function, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(destination);
 
                             compile_effect(type_getter, function, &line.effect, id);
@@ -159,6 +162,7 @@ pub fn compile_block<'ctx>(
     return None;
 }
 
+/// Compiles a single effect
 // skipcq: RS-R1000
 pub fn compile_effect<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
@@ -177,7 +181,7 @@ pub fn compile_effect<'ctx>(
         }
         //Label of jumping to body
         FinalizedEffects::Jump(label) => {
-            let destination = unwrap_or_create(label, function, type_getter);
+            let destination = get_block_or_create(label, function, type_getter);
             type_getter.compiler.builder.build_unconditional_branch(destination);
             None
         }
@@ -190,8 +194,8 @@ pub fn compile_effect<'ctx>(
             } else {
                 effect.into_int_value()
             };
-            let then = unwrap_or_create(then_body, function, type_getter);
-            let else_block = unwrap_or_create(else_body, function, type_getter);
+            let then = get_block_or_create(then_body, function, type_getter);
+            let else_block = get_block_or_create(else_body, function, type_getter);
             type_getter.compiler.builder.build_conditional_branch(effect, then, else_block);
             None
         }
@@ -572,6 +576,7 @@ pub fn compile_effect<'ctx>(
     };
 }
 
+/// Stores a value and then loads it
 fn store_and_load<'ctx, T: BasicType<'ctx>>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     types: T,
@@ -584,6 +589,7 @@ fn store_and_load<'ctx, T: BasicType<'ctx>>(
     return Some(pointer.as_basic_value_enum());
 }
 
+/// Adds the arguments to final_arguments
 fn add_args<'ctx, 'a>(
     final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>,
     type_getter: &mut CompilerTypeGetter<'ctx>,
@@ -600,7 +606,8 @@ fn add_args<'ctx, 'a>(
     }
 }
 
-fn unwrap_or_create<'ctx>(
+/// Gets a block with the given name, and if it's not found, create it
+fn get_block_or_create<'ctx>(
     name: &String,
     function: FunctionValue<'ctx>,
     type_getter: &mut CompilerTypeGetter<'ctx>,

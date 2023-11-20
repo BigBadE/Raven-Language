@@ -13,8 +13,10 @@ use tokio::runtime::Builder;
 
 use crate::semantic_tokens::parse_semantic_tokens;
 
+/// This file is templated from Rust's LSP example.
 mod semantic_tokens;
 
+/// The main function, which sets up the server and starts the main loop
 pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
@@ -22,6 +24,7 @@ pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
+        // Semantic tokens provider gives the coloring of tokens
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
             work_done_progress_options: WorkDoneProgressOptions::default(),
             legend: SemanticTokensLegend {
@@ -66,12 +69,14 @@ pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             range: None,
             full: Some(SemanticTokensFullOptions::Bool(true)),
         })),
+        // Text document sync synchronizes the documents between the LSP and the IDE
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         ..Default::default()
     })
     .unwrap();
     let initialization_params = connection.initialize(server_capabilities)?;
     main_loop(connection, initialization_params)?;
+    // Wait for everything to finish before ending
     io_threads.join()?;
     Ok(())
 }
@@ -80,8 +85,10 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
     let pool = Builder::new_multi_thread().build().unwrap();
     let mut documents: HashMap<Url, String> = HashMap::new();
     let params: InitializeParams = serde_json::from_value(params).unwrap();
+
+    // If augments_syntax_tokens is true, the IDE screws up handling semantic tokens
     if params.capabilities.text_document.clone().unwrap().semantic_tokens.unwrap().augments_syntax_tokens.unwrap() {
-        panic!("Augmenting syntax tokens!")
+        panic!("Augmenting syntax tokens! Incompatible IDE!")
     }
 
     for msg in &connection.receiver {
@@ -90,6 +97,8 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                 if connection.handle_shutdown(&req)? {
                     return Ok(());
                 }
+
+                // Parse semantic tokens on another thread
                 match cast::<SemanticTokensFullRequest>(req) {
                     Ok((id, params)) => {
                         pool.spawn(parse_semantic_tokens(
@@ -105,6 +114,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
             }
             Message::Response(_resp) => {}
             Message::Notification(not) => {
+                // Syncing is done on the main thread
                 let not = match cast_not::<DidOpenTextDocument>(not) {
                     Ok(params) => {
                         documents.insert(params.text_document.uri, params.text_document.text);
@@ -128,6 +138,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
     Ok(())
 }
 
+/// Tries to cast a general request into a single request
 fn cast<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
 where
     R: lsp_types::request::Request,
@@ -136,6 +147,7 @@ where
     req.extract(R::METHOD)
 }
 
+/// Tries to cast a general notification into a single notification
 fn cast_not<R>(req: Notification) -> Result<R::Params, ExtractError<Notification>>
 where
     R: lsp_types::notification::Notification,

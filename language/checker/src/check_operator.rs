@@ -7,6 +7,7 @@ use syntax::operation_util::OperationGetter;
 use syntax::r#struct::StructData;
 use syntax::{Attribute, ParsingError, SimpleVariableManager};
 
+/// Checks if an operator call is valid
 pub async fn check_operator(
     code_verifier: &mut CodeVerifier<'_>,
     variables: &mut SimpleVariableManager,
@@ -61,6 +62,7 @@ pub async fn check_operator(
     .await;
 }
 
+/// Checks if two operations can be combined
 async fn combine_operation(
     operation: &String,
     values: &mut Vec<Effects>,
@@ -140,7 +142,7 @@ async fn combine_operation(
                         }
                         .await?;
 
-                        return Ok(assign_with_priority(
+                        return Ok(operator_pratt_parsing(
                             new_operation.clone(),
                             &found,
                             values,
@@ -165,7 +167,7 @@ async fn combine_operation(
                         }
                         .await?;
 
-                        return Ok(assign_with_priority(
+                        return Ok(operator_pratt_parsing(
                             operation.clone(),
                             &outer_data,
                             values,
@@ -193,7 +195,8 @@ async fn combine_operation(
     return Ok(None);
 }
 
-pub fn assign_with_priority(
+/// Uses pratt parsing to make sure operator calls follow the priorities assigned by the attributes.
+pub fn operator_pratt_parsing(
     operation: String,
     found: &Arc<StructData>,
     values: &mut Vec<Effects>,

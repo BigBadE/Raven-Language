@@ -8,6 +8,7 @@ use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use syntax::ParsingError;
 
+/// Verifies if a struct is valid
 pub async fn verify_struct(
     _process_manager: &TypesChecker,
     structure: UnfinalizedStruct,

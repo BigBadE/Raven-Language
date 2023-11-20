@@ -15,6 +15,7 @@ use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use syntax::ProcessManager;
 
+/// Wrapper around data used by checkers
 #[derive(Clone)]
 pub struct TypesChecker {
     runtime: Arc<Mutex<HandleWrapper>>,
@@ -23,6 +24,7 @@ pub struct TypesChecker {
 }
 
 impl TypesChecker {
+    /// Makes a new TypesChecker
     pub fn new(runtime: Arc<Mutex<HandleWrapper>>, include_refs: bool) -> Self {
         return Self { runtime, generics: HashMap::default(), include_refs };
     }

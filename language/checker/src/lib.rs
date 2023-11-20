@@ -22,6 +22,7 @@ pub mod check_operator;
 pub mod check_struct;
 pub mod output;
 
+/// Finalizes an IndexMap of generics into FinalizedTypes
 pub async fn finalize_generics(
     syntax: &Arc<Mutex<Syntax>>,
     generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
@@ -37,6 +38,7 @@ pub async fn finalize_generics(
     return Ok(output);
 }
 
+/// Simple wrapper structure for the types used in code verification
 pub struct CodeVerifier<'a> {
     process_manager: &'a TypesChecker,
     resolver: Box<dyn NameResolver>,

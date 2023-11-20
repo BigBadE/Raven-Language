@@ -8,6 +8,7 @@ use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::AddressSpace;
 
+/// Compiles a method with the internal keyword
 pub fn compile_internal<'ctx>(
     type_getter: &CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
@@ -95,6 +96,7 @@ pub fn compile_internal<'ctx>(
     }
 }
 
+/// Creates a malloc for the type
 pub fn malloc_type<'a>(
     type_getter: &CompilerTypeGetter<'a>,
     pointer_type: PointerValue<'a>,
@@ -140,6 +142,7 @@ pub fn malloc_type<'a>(
     return malloc.into_pointer_value();
 }
 
+/// Loads the type if it's a pointer
 fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
     if value.is_pointer_value() {
         return compiler.build_load(value.into_pointer_value(), "0");
@@ -147,6 +150,7 @@ fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> B
     return *value;
 }
 
+/// Casts a number from one type to another
 fn build_cast(first: &BasicValueEnum, _second: BasicTypeEnum, compiler: &CompilerImpl) {
     //TODO float casting
     compiler.builder.build_return(Some(&compiler.builder.build_load(first.into_pointer_value(), "1")));

@@ -3,6 +3,7 @@ use inkwell::types::BasicMetadataTypeEnum;
 use inkwell::values::FunctionValue;
 use inkwell::AddressSpace;
 
+/// Compiles a method with the attribute #[llvm_intrinsic]
 pub fn compile_llvm_intrinsics<'ctx>(name: &str, type_getter: &CompilerTypeGetter<'ctx>) -> FunctionValue<'ctx> {
     if let Some(func) = type_getter.compiler.module.get_function(&name) {
         return func;

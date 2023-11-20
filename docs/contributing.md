@@ -14,10 +14,12 @@ All contributors without direct write access must make contributions to their ow
 All contributions will automatically be checked by the CI. This will let you know if anything is broken, but you should test all code you write.
 
 # Style
+Rustfmt is used for formatting, if you break formatting you may be asked to fix it using ```cargo fmt```.
 
-The repository follows the Rust style, with: 
-- snake_case method, file, variable, and folder names
-- CamelCase structure names 
+A few repository tools are used to keep the code clean and perform static analysis,
+```skipcg``` is used to disable certain checks that make false positives.
+
+The repository follows the Rust style, with the following additional rules: 
 - All unsafe code must have a SAFETY comment above them
 
 When in doubt, follow the established code style found in the source.
