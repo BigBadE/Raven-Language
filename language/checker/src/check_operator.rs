@@ -35,8 +35,12 @@ pub async fn check_operator(
     let operation = if let Some(found) = outer_operation {
         found
     } else {
-        OperationGetter { syntax: code_verifier.syntax.clone(), operation: vec![operation], error }
-            .await?
+        OperationGetter {
+            syntax: code_verifier.syntax.clone(),
+            operation: vec![operation],
+            error,
+        }
+        .await?
     };
 
     if Attribute::find_attribute("operation", &operation.attributes)
