@@ -47,12 +47,22 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn for_function(&self, function: &Arc<FinalizedFunction>, llvm_function: FunctionValue<'ctx>) -> Self {
+    pub fn for_function(
+        &self,
+        function: &Arc<FinalizedFunction>,
+        llvm_function: FunctionValue<'ctx>,
+    ) -> Self {
         let mut variables = self.variables.clone();
         let offset = function.fields.len() != llvm_function.count_params() as usize;
         for i in offset as usize..llvm_function.count_params() as usize {
             let field = &function.fields.get(i + offset as usize).unwrap().field;
-            variables.insert(field.name.clone(), (field.field_type.clone(), llvm_function.get_nth_param(i as u32).unwrap()));
+            variables.insert(
+                field.name.clone(),
+                (
+                    field.field_type.clone(),
+                    llvm_function.get_nth_param(i as u32).unwrap(),
+                ),
+            );
         }
         return Self {
             syntax: self.syntax.clone(),
@@ -65,7 +75,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         };
     }
 
-    pub fn get_function(&mut self, function: &Arc<CodelessFinalizedFunction>) -> FunctionValue<'ctx> {
+    pub fn get_function(
+        &mut self,
+        function: &Arc<CodelessFinalizedFunction>,
+    ) -> FunctionValue<'ctx> {
         match self.compiler.module.get_function(&function.data.name) {
             Some(found) => found,
             None => {
@@ -77,12 +90,15 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn get_type(&mut self, types: &FinalizedTypes) -> BasicTypeEnum<'ctx> {
         let found = match self.compiler.module.get_struct_type(&types.name()) {
             Some(found) => found.as_basic_type_enum(),
-            None => get_internal_struct(self.compiler.context, &types.name()).unwrap_or_else(|| instance_types(types, self)),
+            None => get_internal_struct(self.compiler.context, &types.name())
+                .unwrap_or_else(|| instance_types(types, self)),
         }
         .as_basic_type_enum();
         return match types {
             FinalizedTypes::Struct(_, _) | FinalizedTypes::Array(_) => found,
-            FinalizedTypes::Reference(_) => found.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+            FinalizedTypes::Reference(_) => {
+                found.ptr_type(AddressSpace::default()).as_basic_type_enum()
+            }
             _ => panic!("Can't compile a generic! {:?}", found),
         };
     }

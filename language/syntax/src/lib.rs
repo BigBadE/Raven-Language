@@ -3,7 +3,9 @@
 #![feature(fn_traits)]
 
 use crate::async_util::{HandleWrapper, NameResolver};
-use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
+use crate::function::{
+    CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction,
+};
 use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use crate::syntax::Syntax;
 use crate::top_element_manager::TopElementManager;
@@ -48,8 +50,13 @@ pub use data::ParsingError;
 pub type ParsingFuture<T> = Pin<Box<dyn Future<Output = Result<T, ParsingError>> + Send + Sync>>;
 
 // All the modifiers, used for modifier parsing and debug output.
-pub static MODIFIERS: [Modifier; 5] =
-    [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal, Modifier::Operation];
+pub static MODIFIERS: [Modifier; 5] = [
+    Modifier::Public,
+    Modifier::Protected,
+    Modifier::Extern,
+    Modifier::Internal,
+    Modifier::Operation,
+];
 
 // All the modifiers structures/functions/fields can have
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -190,10 +197,14 @@ pub struct SimpleVariableManager {
 
 impl SimpleVariableManager {
     pub fn for_function(codeless: &CodelessFinalizedFunction) -> Self {
-        let mut variable_manager = SimpleVariableManager { variables: HashMap::default() };
+        let mut variable_manager = SimpleVariableManager {
+            variables: HashMap::default(),
+        };
 
         for field in &codeless.arguments {
-            variable_manager.variables.insert(field.field.name.clone(), field.field.field_type.clone());
+            variable_manager
+                .variables
+                .insert(field.field.name.clone(), field.field.field_type.clone());
         }
 
         return variable_manager;

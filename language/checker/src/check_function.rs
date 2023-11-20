@@ -4,8 +4,12 @@ use crate::{finalize_generics, CodeVerifier};
 use std::sync::Arc;
 use std::sync::Mutex;
 use syntax::async_util::NameResolver;
-use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
-use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
+use syntax::code::{
+    ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField,
+};
+use syntax::function::{
+    CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction,
+};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use syntax::{is_modifier, Modifier, ParsingError, SimpleVariableManager};
@@ -64,22 +68,38 @@ pub async fn verify_function_code(
             }
         }
 
-        locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
+        locked
+            .functions
+            .data
+            .insert(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 
     //Internal/external/trait functions verify everything but the code.
-    if is_modifier(codeless.data.modifiers, Modifier::Internal) || is_modifier(codeless.data.modifiers, Modifier::Extern) {
-        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(Vec::default(), String::default(), true)));
+    if is_modifier(codeless.data.modifiers, Modifier::Internal)
+        || is_modifier(codeless.data.modifiers, Modifier::Extern)
+    {
+        return Ok(codeless.clone().add_code(FinalizedCodeBody::new(
+            Vec::default(),
+            String::default(),
+            true,
+        )));
     }
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
-    let mut code_verifier =
-        CodeVerifier { process_manager, resolver, return_type: codeless.return_type.clone(), syntax: syntax.clone() };
+    let mut code_verifier = CodeVerifier {
+        process_manager,
+        resolver,
+        return_type: codeless.return_type.clone(),
+        syntax: syntax.clone(),
+    };
     let mut code = verify_code(&mut code_verifier, &mut variable_manager, code, true).await?;
 
     if !code.returns {
         if codeless.return_type.is_none() {
-            code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP));
+            code.expressions.push(FinalizedExpression::new(
+                ExpressionType::Return,
+                FinalizedEffects::NOP,
+            ));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(placeholder_error(format!(
                 "Function {} returns void instead of a {}!",

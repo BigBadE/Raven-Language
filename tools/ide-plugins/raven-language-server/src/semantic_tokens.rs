@@ -23,7 +23,8 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
                 token.start_offset = token.end_offset - token.end.1 as usize;
                 token.start = (token.end.0, 0);
             }
-            let delta_line = (token.start.0 - 1) - last.clone().map_or(0, |inner| inner.start.0 - 1);
+            let delta_line =
+                (token.start.0 - 1) - last.clone().map_or(0, |inner| inner.start.0 - 1);
             let temp = SemanticToken {
                 delta_line,
                 delta_start: if delta_line == 0 {
@@ -32,7 +33,11 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
                     0
                 } as u32,
                 length: (token.end_offset - token.start_offset) as u32,
-                token_type: get_token(last.as_ref().map_or(&TokenTypes::EOF, |inner| &inner.token_type), &token.token_type),
+                token_type: get_token(
+                    last.as_ref()
+                        .map_or(&TokenTypes::EOF, |inner| &inner.token_type),
+                    &token.token_type,
+                ),
                 token_modifiers_bitset: 0,
             };
             //eprintln!("Line ({}, {}) to ({}, {}) for {:?} ({:?})", token.start.0, token.start.1, token.end.0, token.end.1, token.token_type,temp);
@@ -40,9 +45,16 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
             temp
         })
         .collect::<Vec<_>>();
-    let result = Some(SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data }));
+    let result = Some(SemanticTokensResult::Tokens(SemanticTokens {
+        result_id: None,
+        data,
+    }));
     let result = serde_json::to_value(&result).unwrap();
-    let resp = Response { id, result: Some(result), error: None };
+    let resp = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
     sender.send(Message::Response(resp)).unwrap();
 }
 
@@ -61,10 +73,13 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
         TokenTypes::Variable => SemanticTokenTypes::Property,
         TokenTypes::Modifier => SemanticTokenTypes::Keyword,
         TokenTypes::Comment => SemanticTokenTypes::Comment,
-        TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New | TokenTypes::FunctionStart => {
-            SemanticTokenTypes::Keyword
+        TokenTypes::ImportStart
+        | TokenTypes::Return
+        | TokenTypes::New
+        | TokenTypes::FunctionStart => SemanticTokenTypes::Keyword,
+        TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => {
+            SemanticTokenTypes::String
         }
-        TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => SemanticTokenTypes::String,
         _ => SemanticTokenTypes::None,
     } as u32;
     return temp;

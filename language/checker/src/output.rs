@@ -8,7 +8,8 @@ use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
 use syntax::async_util::{HandleWrapper, NameResolver};
 use syntax::function::{
-    CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData, UnfinalizedFunction,
+    CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData,
+    UnfinalizedFunction,
 };
 use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
@@ -24,7 +25,11 @@ pub struct TypesChecker {
 
 impl TypesChecker {
     pub fn new(runtime: Arc<Mutex<HandleWrapper>>, include_refs: bool) -> Self {
-        return Self { runtime, generics: HashMap::default(), include_refs };
+        return Self {
+            runtime,
+            generics: HashMap::default(),
+            include_refs,
+        };
     }
 }
 
@@ -91,7 +96,12 @@ impl ProcessManager for TypesChecker {
                 FinalizedStruct {
                     generics: IndexMap::default(),
                     fields: vec![],
-                    data: Arc::new(StructData::new(Vec::default(), Vec::default(), 0, String::default())),
+                    data: Arc::new(StructData::new(
+                        Vec::default(),
+                        Vec::default(),
+                        0,
+                        String::default(),
+                    )),
                 }
             }
         }

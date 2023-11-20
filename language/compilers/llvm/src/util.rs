@@ -47,7 +47,8 @@ pub fn create_function_value<'ctx>(
             if let FinalizedTypes::Reference(inner) = returning {
                 returning = inner.deref();
             }
-            let types = type_getter.get_type(&FinalizedTypes::Reference(Box::new(returning.clone())));
+            let types =
+                type_getter.get_type(&FinalizedTypes::Reference(Box::new(returning.clone())));
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             //TODO not used for now cause malloc is used, but for future speed ups will be needed
             /*if types.is_struct_type() {
@@ -57,8 +58,15 @@ pub fn create_function_value<'ctx>(
             types.fn_type(params.as_slice(), false)
             //}
         }
-        None => type_getter.compiler.context.void_type().fn_type(params.as_slice(), false),
+        None => type_getter
+            .compiler
+            .context
+            .void_type()
+            .fn_type(params.as_slice(), false),
     };
 
-    return type_getter.compiler.module.add_function(&function.data.name, llvm_function, linkage);
+    return type_getter
+        .compiler
+        .module
+        .add_function(&function.data.name, llvm_function, linkage);
 }

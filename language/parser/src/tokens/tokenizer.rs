@@ -1,6 +1,8 @@
 use crate::tokens::code_tokenizer::next_code_token;
 use crate::tokens::tokens::{Token, TokenCodeData, TokenTypes};
-use crate::tokens::top_tokenizer::{next_func_token, next_implementation_token, next_struct_token, next_top_token};
+use crate::tokens::top_tokenizer::{
+    next_func_token, next_implementation_token, next_struct_token, next_top_token,
+};
 use crate::tokens::util::{next_generic, parse_string};
 
 /// This structure keeps track of the variables required for the tokenizing.
@@ -78,11 +80,17 @@ impl<'a> Tokenizer<'a> {
         }
 
         self.last = match self.state {
-            TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => next_top_token(self),
-            TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => next_func_token(self),
+            TokenizerState::TOP_ELEMENT | TokenizerState::TOP_ELEMENT_TO_STRUCT => {
+                next_top_token(self)
+            }
+            TokenizerState::FUNCTION | TokenizerState::FUNCTION_TO_STRUCT_TOP => {
+                next_func_token(self)
+            }
             TokenizerState::STRUCTURE => next_struct_token(self),
             TokenizerState::IMPLEMENTATION => next_implementation_token(self),
-            TokenizerState::STRING | TokenizerState::STRING_TO_CODE_STRUCT_TOP => parse_string(self),
+            TokenizerState::STRING | TokenizerState::STRING_TO_CODE_STRUCT_TOP => {
+                parse_string(self)
+            }
             TokenizerState::CODE | TokenizerState::CODE_TO_STRUCT_TOP => next_code_token(self),
             TokenizerState::GENERIC_TO_IMPL
             | TokenizerState::GENERIC_TO_FUNC
@@ -155,7 +163,10 @@ impl<'a> Tokenizer<'a> {
 
     /// Parse ahead to the first occurrence of whichever token occurs first
     pub fn parse_to_first(&mut self, token: TokenTypes, first: u8, second: u8) -> Token {
-        while self.index != self.len && self.buffer[self.index] != first && self.buffer[self.index] != second {
+        while self.index != self.len
+            && self.buffer[self.index] != first
+            && self.buffer[self.index] != second
+        {
             self.index += 1;
         }
 

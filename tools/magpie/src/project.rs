@@ -50,7 +50,10 @@ impl From<RawRavenProject> for RavenProject {
     fn from(value: RawRavenProject) -> Self {
         unsafe {
             return Self {
-                name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string(),
+                name: CString::from_raw(value.name.load(Ordering::Relaxed))
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
                 dependencies: load_array(value.dependencies)
                     .into_iter()
                     .map(|inner: RawDependency| Dependency::from(inner))
@@ -63,7 +66,12 @@ impl From<RawRavenProject> for RavenProject {
 impl From<RawDependency> for Dependency {
     fn from(value: RawDependency) -> Self {
         unsafe {
-            return Self { name: CString::from_raw(value.name.load(Ordering::Relaxed)).to_str().unwrap().to_string() };
+            return Self {
+                name: CString::from_raw(value.name.load(Ordering::Relaxed))
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            };
         }
     }
 }

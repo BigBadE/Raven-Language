@@ -17,17 +17,28 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         match token.token_type {
             TokenTypes::Start | TokenTypes::AttributeEnd => {}
             TokenTypes::InvalidCharacters => {
-                parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
-                    format!("${}", parser_utils.file),
-                    token.make_error(parser_utils.file.clone(), "Invalid top element!".to_string()),
-                )))
+                parser_utils
+                    .syntax
+                    .lock()
+                    .unwrap()
+                    .add_poison(Arc::new(StructData::new_poisoned(
+                        format!("${}", parser_utils.file),
+                        token.make_error(
+                            parser_utils.file.clone(),
+                            "Invalid top element!".to_string(),
+                        ),
+                    )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, false, attributes, modifiers);
-                let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
+                let function = ParserUtils::add_function(
+                    &parser_utils.syntax,
+                    parser_utils.file.clone(),
+                    function,
+                );
                 let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
                 parser_utils.handle.lock().unwrap().spawn(
                     function.data.name.clone(),
@@ -51,15 +62,16 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 modifiers = vec![];
             }
             TokenTypes::TraitStart => {
-                if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern) {
-                    let error =
-                        token.make_error(parser_utils.file.clone(), "Traits can't be internal/external!".to_string());
+                if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern)
+                {
+                    let error = token.make_error(
+                        parser_utils.file.clone(),
+                        "Traits can't be internal/external!".to_string(),
+                    );
                     drop(parse_structure(parser_utils, attributes, modifiers));
-                    parser_utils
-                        .syntax
-                        .lock()
-                        .unwrap()
-                        .add_poison(Arc::new(StructData::new_poisoned(format!("${}", parser_utils.file), error)));
+                    parser_utils.syntax.lock().unwrap().add_poison(Arc::new(
+                        StructData::new_poisoned(format!("${}", parser_utils.file), error),
+                    ));
                     break;
                 }
                 modifiers.push(Modifier::Trait);
@@ -112,7 +124,13 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
         }
     }
 
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type == TokenTypes::ImportEnd {
+    if parser_utils
+        .tokens
+        .get(parser_utils.index)
+        .unwrap()
+        .token_type
+        == TokenTypes::ImportEnd
+    {
         parser_utils.index += 1;
     }
 }
@@ -162,7 +180,12 @@ pub fn parse_modifier(parser_utils: &mut ParserUtils, modifiers: &mut Vec<Modifi
             MODIFIERS
                 .iter()
                 .find(|modifier| modifier.to_string() == name)
-                .unwrap_or_else(|| panic!("Failed to find modifier {} ({}-{})", name, next.start_offset, next.end_offset))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Failed to find modifier {} ({}-{})",
+                        name, next.start_offset, next.end_offset
+                    )
+                })
                 .clone(),
         );
     }

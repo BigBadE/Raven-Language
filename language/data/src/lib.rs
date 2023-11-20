@@ -38,9 +38,19 @@ impl Arguments {
             io_runtime: if single_threaded {
                 None
             } else {
-                Some(io_runtime.enable_time().thread_name("io-runtime").build().expect("Failed to build I/O runtime"))
+                Some(
+                    io_runtime
+                        .enable_time()
+                        .thread_name("io-runtime")
+                        .build()
+                        .expect("Failed to build I/O runtime"),
+                )
             },
-            cpu_runtime: cpu_runtime.enable_time().thread_name("cpu-runtime").build().expect("Failed to build CPU runtime"),
+            cpu_runtime: cpu_runtime
+                .enable_time()
+                .thread_name("cpu-runtime")
+                .build()
+                .expect("Failed to build CPU runtime"),
             runner_settings,
         };
     }
@@ -88,13 +98,20 @@ impl Readable for PathBuf {
 impl SourceSet for FileSourceSet {
     fn get_files(&self) -> Vec<Box<dyn Readable>> {
         let mut output = Vec::default();
-        read_recursive(self.root.clone(), &mut output)
-            .unwrap_or_else(|_| panic!("Failed to read source files! Make sure {:?} exists", self.root));
+        read_recursive(self.root.clone(), &mut output).unwrap_or_else(|_| {
+            panic!(
+                "Failed to read source files! Make sure {:?} exists",
+                self.root
+            )
+        });
         return output;
     }
 
     fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path().replace(self.root.to_str().unwrap(), "").replace(path::MAIN_SEPARATOR, "::");
+        let name = other
+            .path()
+            .replace(self.root.to_str().unwrap(), "")
+            .replace(path::MAIN_SEPARATOR, "::");
         if name.len() == 0 {
             let path = other.path();
             let name: &str = path.split(path::MAIN_SEPARATOR).last().unwrap();
@@ -155,7 +172,14 @@ impl ParsingError {
         end_offset: usize,
         message: String,
     ) -> Self {
-        return Self { file, start, start_offset, end, end_offset, message };
+        return Self {
+            file,
+            start,
+            start_offset,
+            end,
+            end_offset,
+            message,
+        };
     }
 
     pub fn print(&self, sources: &Vec<Box<dyn SourceSet>>) {
@@ -174,11 +198,26 @@ impl ParsingError {
         }
         let file = file.unwrap();
         let contents = file.read();
-        let line = contents.lines().nth((self.start.0 as usize).max(1) - 1).unwrap_or("???");
+        let line = contents
+            .lines()
+            .nth((self.start.0 as usize).max(1) - 1)
+            .unwrap_or("???");
         println!("{}", self.message.bright_red());
-        println!("{}", format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red());
-        println!("{} {}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan());
-        println!("{} {} {}", self.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
+        println!(
+            "{}",
+            format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red()
+        );
+        println!(
+            "{} {}",
+            " ".repeat(self.start.0.to_string().len()),
+            "|".bright_cyan()
+        );
+        println!(
+            "{} {} {}",
+            self.start.0.to_string().bright_cyan(),
+            "|".bright_cyan(),
+            line.bright_red()
+        );
         println!(
             "{} {} {}{}",
             " ".repeat(self.start.0.to_string().len()),
@@ -191,6 +230,10 @@ impl ParsingError {
 
 impl Display for ParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "Error at {} ({}:{}):\n{}", self.file, self.start.0, self.start.1, self.message);
+        return write!(
+            f,
+            "Error at {} ({}:{}):\n{}",
+            self.file, self.start.0, self.start.1, self.message
+        );
     }
 }

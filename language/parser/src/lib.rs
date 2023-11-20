@@ -15,7 +15,12 @@ use syntax::syntax::Syntax;
 pub mod parser;
 pub mod tokens;
 
-pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Arc<Mutex<HandleWrapper>>, name: String, file: String) {
+pub async fn parse(
+    syntax: Arc<Mutex<Syntax>>,
+    handle: Arc<Mutex<HandleWrapper>>,
+    name: String,
+    file: String,
+) {
     let mut tokenizer = Tokenizer::new(file.as_bytes());
     let mut tokens = Vec::default();
     loop {
@@ -48,7 +53,12 @@ pub struct ImportNameResolver {
 
 impl ImportNameResolver {
     pub fn new(base: String) -> Self {
-        return Self { imports: vec![base], generics: HashMap::default(), parent: None, last_id: 0 };
+        return Self {
+            imports: vec![base],
+            generics: HashMap::default(),
+            parent: None,
+            last_id: 0,
+        };
     }
 }
 

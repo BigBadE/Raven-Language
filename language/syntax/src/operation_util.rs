@@ -24,7 +24,10 @@ impl Future for OperationGetter {
         for operation in &self.operation {
             if let Some(output) = locked.operations.get(operation) {
                 return Poll::Ready(Ok(output.clone()));
-            } else if let Some(output) = locked.operations.get(&operation.replace("{}", "{+}").to_string()) {
+            } else if let Some(output) = locked
+                .operations
+                .get(&operation.replace("{}", "{+}").to_string())
+            {
                 return Poll::Ready(Ok(output.clone()));
             }
         }
@@ -37,7 +40,9 @@ impl Future for OperationGetter {
             if let Some(found) = locked.operation_wakers.get_mut(operation) {
                 found.push(cx.waker().clone());
             } else {
-                locked.operation_wakers.insert(operation.clone(), vec![cx.waker().clone()]);
+                locked
+                    .operation_wakers
+                    .insert(operation.clone(), vec![cx.waker().clone()]);
             }
         }
 

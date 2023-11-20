@@ -69,10 +69,16 @@ impl Types {
     #[async_recursion]
     pub async fn finalize(&self, syntax: Arc<Mutex<Syntax>>) -> FinalizedTypes {
         return match self {
-            Types::Struct(structs) => FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await, None),
-            Types::Reference(structs) => FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
+            Types::Struct(structs) => {
+                FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await, None)
+            }
+            Types::Reference(structs) => {
+                FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await))
+            }
             Types::Array(inner) => FinalizedTypes::Array(Box::new(inner.finalize(syntax).await)),
-            Types::Generic(name, bounds) => FinalizedTypes::Generic(name.clone(), Self::finalize_all(syntax, bounds).await),
+            Types::Generic(name, bounds) => {
+                FinalizedTypes::Generic(name.clone(), Self::finalize_all(syntax, bounds).await)
+            }
             Types::GenericType(base, bounds) => FinalizedTypes::GenericType(
                 Box::new(base.finalize(syntax.clone()).await),
                 Self::finalize_all(syntax, bounds).await,
@@ -203,24 +209,32 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structure, _) => {
                 match &structure.data.chalk_data.as_ref().unwrap() {
-                    ChalkData::Struct(types, _) => types.clone(),   // skipcq: RS-W1110
+                    ChalkData::Struct(types, _) => types.clone(), // skipcq: RS-W1110
                     ChalkData::Trait(types, _, _) => types.clone(), // skipcq: RS-W1110
                 }
             }
             FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
-            FinalizedTypes::Array(inner) => TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
+            FinalizedTypes::Array(inner) => {
+                TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr)
+            }
             FinalizedTypes::Generic(name, _bounds) => {
                 let index = binders.iter().position(|found| *found == name).unwrap();
-                TyKind::BoundVar(BoundVar { debruijn: DebruijnIndex::INNERMOST, index }).intern(ChalkIr)
+                TyKind::BoundVar(BoundVar {
+                    debruijn: DebruijnIndex::INNERMOST,
+                    index,
+                })
+                .intern(ChalkIr)
             }
             FinalizedTypes::GenericType(inner, bounds) => {
                 if let TyKind::Adt(id, _) = inner.to_chalk_type(binders).data(ChalkIr).kind {
                     let mut generic_args = Vec::default();
                     for arg in bounds {
-                        generic_args.push(GenericArgData::Ty(arg.to_chalk_type(binders)).intern(ChalkIr));
+                        generic_args
+                            .push(GenericArgData::Ty(arg.to_chalk_type(binders)).intern(ChalkIr));
                     }
                     // Returns the structure with the correct substitutions from bounds for generic types.
-                    return TyKind::Adt(id, Substitution::from_iter(ChalkIr, generic_args)).intern(ChalkIr);
+                    return TyKind::Adt(id, Substitution::from_iter(ChalkIr, generic_args))
+                        .intern(ChalkIr);
                 } else {
                     unreachable!()
                 }
@@ -259,7 +273,10 @@ impl FinalizedTypes {
         &self,
         other: &FinalizedTypes,
         syntax: Option<Arc<Mutex<Syntax>>>,
-    ) -> (bool, Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) {
+    ) -> (
+        bool,
+        Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>,
+    ) {
         return match self {
             FinalizedTypes::Struct(found, _original) => match other {
                 FinalizedTypes::Struct(other_struct, _) => {
@@ -332,7 +349,8 @@ impl FinalizedTypes {
                     }
 
                     for i in 0..generics.len() {
-                        let (result, future) = generics[i].of_type_sync(&other_generics[i], syntax.clone());
+                        let (result, future) =
+                            generics[i].of_type_sync(&other_generics[i], syntax.clone());
                         if !result {
                             if let Some(found) = future {
                                 fails.push(found);
@@ -374,7 +392,8 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(referencing) => referencing.of_type_sync(other, syntax),
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
-                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>> = Vec::default();
+                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>> =
+                        Vec::default();
                     // For two generics to be the same, each bound must match at least one other bound.
                     'outer: for bound in bounds {
                         let mut fails = Vec::default();
@@ -399,7 +418,9 @@ impl FinalizedTypes {
                     (true, None)
                 }
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
-                FinalizedTypes::Struct(_, _) | FinalizedTypes::GenericType(_, _) | FinalizedTypes::Array(_) => {
+                FinalizedTypes::Struct(_, _)
+                | FinalizedTypes::GenericType(_, _)
+                | FinalizedTypes::Array(_) => {
                     let mut fails = Vec::default();
                     for bound in bounds {
                         let (result, failure) = bound.of_type_sync(other, syntax.clone());
@@ -409,7 +430,11 @@ impl FinalizedTypes {
                             fails.push(found);
                         }
                     }
-                    return if !fails.is_empty() { (false, Some(Box::pin(Self::join(fails)))) } else { (false, None) };
+                    return if !fails.is_empty() {
+                        (false, Some(Box::pin(Self::join(fails))))
+                    } else {
+                        (false, None)
+                    };
                 } //T: u64 is Number
                   //Number is T: u64
             },
@@ -457,16 +482,26 @@ impl FinalizedTypes {
                     if other_bounds.len() != bounds.len() {
                         return Err(bounds_error);
                     }
-                    base.resolve_generic(other_base, syntax, generics, bounds_error.clone()).await?;
+                    base.resolve_generic(other_base, syntax, generics, bounds_error.clone())
+                        .await?;
 
                     for i in 0..bounds.len() {
-                        bounds[i].resolve_generic(&other_bounds[i], syntax, generics, bounds_error.clone()).await?;
+                        bounds[i]
+                            .resolve_generic(
+                                &other_bounds[i],
+                                syntax,
+                                generics,
+                                bounds_error.clone(),
+                            )
+                            .await?;
                     }
                 }
             }
             // Ignore references.
             FinalizedTypes::Reference(inner) => {
-                return inner.resolve_generic(other, syntax, generics, bounds_error).await;
+                return inner
+                    .resolve_generic(other, syntax, generics, bounds_error)
+                    .await;
             }
             FinalizedTypes::Array(inner) => {
                 let mut other = other;
@@ -476,7 +511,9 @@ impl FinalizedTypes {
                 }
                 // Check on the inner type.
                 if let FinalizedTypes::Array(other) = other {
-                    return inner.resolve_generic(other, syntax, generics, bounds_error).await;
+                    return inner
+                        .resolve_generic(other, syntax, generics, bounds_error)
+                        .await;
                 }
                 return Err(bounds_error);
             }
@@ -506,30 +543,47 @@ impl FinalizedTypes {
                     self.clone_from(found);
                     Ok(())
                 } else {
-                    none_error.message =
-                        format!("{}: {} and {:?}", none_error.message, self, generics.keys().collect::<Vec<_>>());
+                    none_error.message = format!(
+                        "{}: {} and {:?}",
+                        none_error.message,
+                        self,
+                        generics.keys().collect::<Vec<_>>()
+                    );
                     Err(none_error)
                 }
             }
             FinalizedTypes::GenericType(base, bounds) => {
-                base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
+                base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone())
+                    .await?;
                 let mut found = Vec::default();
                 for bound in bounds {
-                    bound.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
+                    bound
+                        .degeneric(generics, syntax, none_error.clone(), bounds_error.clone())
+                        .await?;
                     found.push(bound.clone());
                 }
                 *self = base.flatten(&mut found, syntax).await?;
                 Ok(())
             }
-            FinalizedTypes::Reference(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
-            FinalizedTypes::Array(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
+            FinalizedTypes::Reference(inner) => {
+                inner
+                    .degeneric(generics, syntax, none_error, bounds_error)
+                    .await
+            }
+            FinalizedTypes::Array(inner) => {
+                inner
+                    .degeneric(generics, syntax, none_error, bounds_error)
+                    .await
+            }
             _ => Ok(()),
         };
     }
 
     pub fn unflatten(&self) -> FinalizedTypes {
         return match self {
-            FinalizedTypes::Struct(_, original) => original.clone().map_or_else(|| self.clone(), |inner| *inner),
+            FinalizedTypes::Struct(_, original) => original
+                .clone()
+                .map_or_else(|| self.clone(), |inner| *inner),
             FinalizedTypes::Reference(inner) => inner.unflatten(),
             _ => self.clone(),
         };
@@ -583,12 +637,18 @@ impl FinalizedTypes {
                         let mut locked = syntax.lock().unwrap();
                         other.set_id(locked.structures.sorted.len() as u64);
                         arc_other = Arc::new(other);
-                        locked.structures.types.insert(name.clone(), arc_other.clone());
+                        locked
+                            .structures
+                            .types
+                            .insert(name.clone(), arc_other.clone());
                         locked.structures.sorted.push(arc_other.clone());
                     }
                     // Get the FinalizedStruct and degeneric it.
-                    let mut data =
-                        FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), found.data.clone()).await.deref());
+                    let mut data = FinalizedStruct::clone(
+                        AsyncDataGetter::new(syntax.clone(), found.data.clone())
+                            .await
+                            .deref(),
+                    );
                     data.data.clone_from(&arc_other);
                     data.degeneric(generics, syntax).await?;
                     let data = Arc::new(data);
@@ -672,6 +732,8 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name_safe().map_or(false, |inner| other.name_safe().map_or(false, |other| inner == other));
+        return self.name_safe().map_or(false, |inner| {
+            other.name_safe().map_or(false, |other| inner == other)
+        });
     }
 }

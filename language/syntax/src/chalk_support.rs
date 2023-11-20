@@ -1,10 +1,13 @@
 use crate::chalk_interner::ChalkIr;
 use crate::r#struct::ChalkData;
 use crate::syntax::Syntax;
-use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
+use chalk_ir::{
+    AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances,
+};
 use chalk_solve::rust_ir::{
-    AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum, AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
-    FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum, ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait,
+    AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum, AssociatedTyValue, AssociatedTyValueId,
+    ClosureKind, FnDefDatum, FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum,
+    ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait,
 };
 use chalk_solve::RustIrDatabase;
 use std::fmt::{Debug, Formatter};
@@ -23,7 +26,10 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         return Vec::default();
     }
 
-    fn associated_ty_data(&self, _ty: chalk_ir::AssocTypeId<ChalkIr>) -> Arc<AssociatedTyDatum<ChalkIr>> {
+    fn associated_ty_data(
+        &self,
+        _ty: chalk_ir::AssocTypeId<ChalkIr>,
+    ) -> Arc<AssociatedTyDatum<ChalkIr>> {
         unreachable!()
     }
 
@@ -44,11 +50,17 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         return Arc::new(found.chalk_data.as_ref().unwrap().get_adt().clone());
     }
 
-    fn generator_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorDatum<ChalkIr>> {
+    fn generator_datum(
+        &self,
+        _generator_id: chalk_ir::GeneratorId<ChalkIr>,
+    ) -> Arc<GeneratorDatum<ChalkIr>> {
         unreachable!()
     }
 
-    fn generator_witness_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorWitnessDatum<ChalkIr>> {
+    fn generator_witness_datum(
+        &self,
+        _generator_id: chalk_ir::GeneratorId<ChalkIr>,
+    ) -> Arc<GeneratorWitnessDatum<ChalkIr>> {
         unreachable!()
     }
 
@@ -66,10 +78,18 @@ impl RustIrDatabase<ChalkIr> for Syntax {
 
     /// Gets an implementation given the ID.
     fn impl_datum(&self, impl_id: ImplId<ChalkIr>) -> Arc<ImplDatum<ChalkIr>> {
-        return self.implementations.get(impl_id.0 as usize).unwrap().chalk_type.clone();
+        return self
+            .implementations
+            .get(impl_id.0 as usize)
+            .unwrap()
+            .chalk_type
+            .clone();
     }
 
-    fn associated_ty_value(&self, _id: AssociatedTyValueId<ChalkIr>) -> Arc<AssociatedTyValue<ChalkIr>> {
+    fn associated_ty_value(
+        &self,
+        _id: AssociatedTyValueId<ChalkIr>,
+    ) -> Arc<AssociatedTyValue<ChalkIr>> {
         unreachable!()
     }
 
@@ -99,20 +119,33 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         output
     }
 
-    fn local_impls_to_coherence_check(&self, _trait_id: chalk_ir::TraitId<ChalkIr>) -> Vec<ImplId<ChalkIr>> {
+    fn local_impls_to_coherence_check(
+        &self,
+        _trait_id: chalk_ir::TraitId<ChalkIr>,
+    ) -> Vec<ImplId<ChalkIr>> {
         unreachable!()
     }
 
-    fn impl_provided_for(&self, _auto_trait_id: chalk_ir::TraitId<ChalkIr>, _ty: &chalk_ir::TyKind<ChalkIr>) -> bool {
+    fn impl_provided_for(
+        &self,
+        _auto_trait_id: chalk_ir::TraitId<ChalkIr>,
+        _ty: &chalk_ir::TyKind<ChalkIr>,
+    ) -> bool {
         unreachable!()
     }
 
-    fn well_known_trait_id(&self, _well_known_trait: WellKnownTrait) -> Option<chalk_ir::TraitId<ChalkIr>> {
+    fn well_known_trait_id(
+        &self,
+        _well_known_trait: WellKnownTrait,
+    ) -> Option<chalk_ir::TraitId<ChalkIr>> {
         unreachable!()
     }
 
     /// Copied from Chalk
-    fn program_clauses_for_env(&self, environment: &chalk_ir::Environment<ChalkIr>) -> ProgramClauses<ChalkIr> {
+    fn program_clauses_for_env(
+        &self,
+        environment: &chalk_ir::Environment<ChalkIr>,
+    ) -> ProgramClauses<ChalkIr> {
         chalk_solve::program_clauses_for_env(self, environment)
     }
 

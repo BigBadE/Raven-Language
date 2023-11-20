@@ -66,19 +66,29 @@ pub struct FinalizedMemberField {
 
 impl MemberField {
     pub fn new(modifiers: u8, attributes: Vec<Attribute>, field: Field) -> Self {
-        return Self { modifiers, attributes, field };
+        return Self {
+            modifiers,
+            attributes,
+            field,
+        };
     }
 }
 
 impl Expression {
     pub fn new(expression_type: ExpressionType, effect: Effects) -> Self {
-        return Self { expression_type, effect };
+        return Self {
+            expression_type,
+            effect,
+        };
     }
 }
 
 impl FinalizedExpression {
     pub fn new(expression_type: ExpressionType, effect: FinalizedEffects) -> Self {
-        return Self { expression_type, effect };
+        return Self {
+            expression_type,
+            effect,
+        };
     }
 }
 
@@ -106,10 +116,21 @@ pub enum Effects {
     CodeBody(CodeBody),
     // Finds the implementation of the given trait for the given calling type, and calls the given method.
     // Calling, trait to call, function name, args, and return type (if explicitly required)
-    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
+    ImplementationCall(
+        Box<Effects>,
+        String,
+        String,
+        Vec<Effects>,
+        Option<UnparsedType>,
+    ),
     // Finds the method with the name and calls it with those arguments.
     // Calling, calling function, function arguments, and return type (if explicitly required, see CodelessFinalizedFunction::degeneric)
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>),
+    MethodCall(
+        Option<Box<Effects>>,
+        String,
+        Vec<Effects>,
+        Option<UnparsedType>,
+    ),
     // Sets the variable to a value.
     Set(Box<Effects>, Box<Effects>),
     // Loads variable with the given name.
@@ -144,9 +165,17 @@ pub enum FinalizedEffects {
     // Nested code body.
     CodeBody(FinalizedCodeBody),
     // Calls the function on the given value (if any) with the given arguments.
-    MethodCall(Option<Box<FinalizedEffects>>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    MethodCall(
+        Option<Box<FinalizedEffects>>,
+        Arc<CodelessFinalizedFunction>,
+        Vec<FinalizedEffects>,
+    ),
     // Calls the trait's function with the given arguments.
-    GenericMethodCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
+    GenericMethodCall(
+        Arc<CodelessFinalizedFunction>,
+        FinalizedTypes,
+        Vec<FinalizedEffects>,
+    ),
     // Sets given reference to given value.
     Set(Box<FinalizedEffects>, Box<FinalizedEffects>),
     // Loads variable with the given name.
@@ -154,7 +183,11 @@ pub enum FinalizedEffects {
     // Loads a field reference from the given struct with the given type.
     Load(Box<FinalizedEffects>, String, Arc<FinalizedStruct>),
     // Creates a struct at the given reference, of the given type with a tuple of the index of the argument and the argument.
-    CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
+    CreateStruct(
+        Option<Box<FinalizedEffects>>,
+        FinalizedTypes,
+        Vec<(usize, FinalizedEffects)>,
+    ),
     // Create an array with the type and values
     CreateArray(Option<FinalizedTypes>, Vec<FinalizedEffects>),
     // Creates the given constant
@@ -167,7 +200,12 @@ pub enum FinalizedEffects {
     // and on the given arguments (first argument must be the downcased trait).
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     // Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
-    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    GenericVirtualCall(
+        usize,
+        Arc<FunctionData>,
+        Arc<CodelessFinalizedFunction>,
+        Vec<FinalizedEffects>,
+    ),
     // Downcasts a structure into its trait, which can only be used in a VirtualCall.
     Downcast(Box<FinalizedEffects>, FinalizedTypes),
     // Internally used by low-level verifier to store a type on the heap.
@@ -190,13 +228,15 @@ impl FinalizedEffects {
             | FinalizedEffects::CompareJump(_, _, _)
             | FinalizedEffects::CodeBody(_) => None,
             // Downcasts simply return the downcasting target.
-            FinalizedEffects::CreateVariable(_, _, types) | FinalizedEffects::Downcast(_, types) => Some(types.clone()),
+            FinalizedEffects::CreateVariable(_, _, types)
+            | FinalizedEffects::Downcast(_, types) => Some(types.clone()),
             FinalizedEffects::MethodCall(_, function, _)
             | FinalizedEffects::GenericMethodCall(function, _, _)
             | FinalizedEffects::VirtualCall(_, function, _)
-            | FinalizedEffects::GenericVirtualCall(_, _, function, _) => {
-                function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
-            }
+            | FinalizedEffects::GenericVirtualCall(_, _, function, _) => function
+                .return_type
+                .as_ref()
+                .map(|inner| FinalizedTypes::Reference(Box::new(inner.clone()))),
             FinalizedEffects::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
                 if variable.is_some() {
@@ -206,11 +246,15 @@ impl FinalizedEffects {
                 panic!("Unresolved variable {} from {:?}", name, variables);
             }
             // Gets the type of the field in the structure with that name.
-            FinalizedEffects::Load(_, name, loading) => {
-                loading.fields.iter().find(|field| &field.field.name == name).map(|field| field.field.field_type.clone())
-            }
+            FinalizedEffects::Load(_, name, loading) => loading
+                .fields
+                .iter()
+                .find(|field| &field.field.name == name)
+                .map(|field| field.field.field_type.clone()),
             // Returns the structure type.
-            FinalizedEffects::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
+            FinalizedEffects::CreateStruct(_, types, _) => {
+                Some(FinalizedTypes::Reference(Box::new(types.clone())))
+            }
             // Returns the internal constant type.
             FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone(), None)),
             FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone(), None)),
@@ -218,9 +262,9 @@ impl FinalizedEffects {
             FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone(), None)),
             FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone(), None)),
             // Stores just return their inner type.
-            FinalizedEffects::HeapStore(inner) | FinalizedEffects::StackStore(inner) | FinalizedEffects::Set(_, inner) => {
-                inner.get_return(variables)
-            }
+            FinalizedEffects::HeapStore(inner)
+            | FinalizedEffects::StackStore(inner)
+            | FinalizedEffects::Set(_, inner) => inner.get_return(variables),
             // References return their inner type as well.
             FinalizedEffects::ReferenceLoad(inner) => match inner.get_return(variables).unwrap() {
                 FinalizedTypes::Reference(inner) => Some(*inner),
@@ -229,7 +273,9 @@ impl FinalizedEffects {
             // Heap allocations shouldn't get return type checked, even though they have a type.
             FinalizedEffects::HeapAllocate(_) => panic!("Tried to return type a heap allocation!"),
             // Returns the target type as an array type.
-            FinalizedEffects::CreateArray(types, _) => types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner))),
+            FinalizedEffects::CreateArray(types, _) => types
+                .clone()
+                .map(|inner| FinalizedTypes::Array(Box::new(inner))),
         };
         return temp;
     }
@@ -256,25 +302,45 @@ impl FinalizedEffects {
             | FinalizedEffects::String(_)
             | FinalizedEffects::Char(_) => {}
             FinalizedEffects::CreateVariable(_, first, other) => {
-                first.degeneric(process_manager, variables, resolver, syntax).await?;
-                other.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
+                first
+                    .degeneric(process_manager, variables, resolver, syntax)
+                    .await?;
+                other
+                    .degeneric(
+                        process_manager.generics(),
+                        syntax,
+                        ParsingError::empty(),
+                        ParsingError::empty(),
+                    )
+                    .await?;
             }
             FinalizedEffects::CompareJump(effect, _, _)
             | FinalizedEffects::Load(effect, _, _)
             | FinalizedEffects::HeapStore(effect)
             | FinalizedEffects::ReferenceLoad(effect)
-            | FinalizedEffects::StackStore(effect) => effect.degeneric(process_manager, variables, resolver, syntax).await?,
+            | FinalizedEffects::StackStore(effect) => {
+                effect
+                    .degeneric(process_manager, variables, resolver, syntax)
+                    .await?
+            }
             FinalizedEffects::CodeBody(body) => {
                 for statement in &mut body.expressions {
-                    statement.effect.degeneric(process_manager, variables, resolver, syntax).await?;
+                    statement
+                        .effect
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
             }
             FinalizedEffects::MethodCall(calling, method, effects) => {
                 if let Some(inner) = calling {
-                    inner.degeneric(process_manager, variables, resolver, syntax).await?;
+                    inner
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
                 for effect in &mut *effects {
-                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
+                    effect
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
                 let manager: Box<dyn ProcessManager> = process_manager.cloned();
                 // Calls the degeneric method on the method.
@@ -291,7 +357,9 @@ impl FinalizedEffects {
             }
             FinalizedEffects::GenericMethodCall(function, found_trait, effects) => {
                 let mut calling = effects.remove(0);
-                calling.degeneric(process_manager, variables, resolver, syntax).await?;
+                calling
+                    .degeneric(process_manager, variables, resolver, syntax)
+                    .await?;
 
                 let implementor = calling.get_return(variables).unwrap();
                 let implementation = ImplWaiter {
@@ -303,10 +371,15 @@ impl FinalizedEffects {
                 .await?;
 
                 let name = function.data.name.split("::").last().unwrap();
-                let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
+                let function = implementation
+                    .iter()
+                    .find(|inner| inner.name.ends_with(&name))
+                    .unwrap();
 
                 for effect in &mut *effects {
-                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
+                    effect
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
                 let mut effects = effects.clone();
                 effects.insert(0, calling.clone());
@@ -326,47 +399,85 @@ impl FinalizedEffects {
             // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
             FinalizedEffects::VirtualCall(_, _, effects) => {
                 for effect in &mut *effects {
-                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
+                    effect
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
             }
             FinalizedEffects::Set(setting, value) => {
-                setting.degeneric(process_manager, variables, resolver, syntax).await?;
-                value.degeneric(process_manager, variables, resolver, syntax).await?;
+                setting
+                    .degeneric(process_manager, variables, resolver, syntax)
+                    .await?;
+                value
+                    .degeneric(process_manager, variables, resolver, syntax)
+                    .await?;
             }
             FinalizedEffects::CreateStruct(target, types, effects) => {
                 if let Some(found) = target {
-                    found.degeneric(process_manager, variables, resolver, syntax).await?;
+                    found
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
-                types.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?;
+                types
+                    .degeneric(
+                        process_manager.generics(),
+                        syntax,
+                        ParsingError::empty(),
+                        ParsingError::empty(),
+                    )
+                    .await?;
                 for (_, effect) in effects {
-                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
+                    effect
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
             }
             FinalizedEffects::CreateArray(other, effects) => {
                 if let Some(inner) = other {
                     inner
-                        .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty())
+                        .degeneric(
+                            process_manager.generics(),
+                            syntax,
+                            ParsingError::empty(),
+                            ParsingError::empty(),
+                        )
                         .await?;
                 }
                 for effect in effects {
-                    effect.degeneric(process_manager, variables, resolver, syntax).await?;
+                    effect
+                        .degeneric(process_manager, variables, resolver, syntax)
+                        .await?;
                 }
             }
             FinalizedEffects::HeapAllocate(target) | FinalizedEffects::Downcast(_, target) => {
-                target.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?
+                target
+                    .degeneric(
+                        process_manager.generics(),
+                        syntax,
+                        ParsingError::empty(),
+                        ParsingError::empty(),
+                    )
+                    .await?
             }
             FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {
-                syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
-                    target.name.clone(),
-                    degeneric_header(
-                        target.clone(),
-                        found.data.clone(),
-                        syntax.clone(),
-                        process_manager.cloned(),
-                        effects.clone(),
-                        variables.clone(),
-                    ),
-                );
+                syntax
+                    .lock()
+                    .unwrap()
+                    .process_manager
+                    .handle()
+                    .lock()
+                    .unwrap()
+                    .spawn(
+                        target.name.clone(),
+                        degeneric_header(
+                            target.clone(),
+                            found.data.clone(),
+                            syntax.clone(),
+                            process_manager.cloned(),
+                            effects.clone(),
+                            variables.clone(),
+                        ),
+                    );
 
                 let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
                 let mut temp = vec![];
@@ -386,7 +497,11 @@ pub async fn degeneric_header(
     arguments: Vec<FinalizedEffects>,
     variables: SimpleVariableManager,
 ) -> Result<(), ParsingError> {
-    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
+    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter {
+        getting: base,
+        syntax: syntax.clone(),
+    }
+    .await;
 
     let return_type = arguments[0].get_return(&variables).unwrap().unflatten();
     if let FinalizedTypes::GenericType(_, generics) = return_type {
@@ -403,7 +518,10 @@ pub async fn degeneric_header(
             manager.mut_generics().insert(name.clone(), generic);
         }
     } else {
-        panic!("Wrong type! {:?}", arguments[0].get_return(&variables).unwrap().unflatten())
+        panic!(
+            "Wrong type! {:?}",
+            arguments[0].get_return(&variables).unwrap().unflatten()
+        )
     }
 
     // Copy the method and degeneric every type inside of it.
@@ -439,9 +557,15 @@ pub async fn degeneric_header(
     }
 
     let mut locked = syntax.lock().unwrap();
-    locked.functions.types.insert(new_method.data.name.clone(), new_method.data.clone());
+    locked
+        .functions
+        .types
+        .insert(new_method.data.name.clone(), new_method.data.clone());
     let new_method = Arc::new(new_method);
-    locked.functions.data.insert(new_method.data.clone(), new_method.clone());
+    locked
+        .functions
+        .data
+        .insert(new_method.data.clone(), new_method.clone());
 
     if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
         for waker in wakers {
@@ -453,11 +577,13 @@ pub async fn degeneric_header(
     // Give the compiler the empty body
     locked.compiling.insert(
         new_method.data.name.clone(),
-        Arc::new(CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(
-            vec![],
-            "empty".to_string(),
-            true,
-        ))),
+        Arc::new(
+            CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(
+                vec![],
+                "empty".to_string(),
+                true,
+            )),
+        ),
     );
     for waker in &locked.compiling_wakers {
         waker.wake_by_ref();

@@ -41,18 +41,34 @@ impl LLVMCompiler {
         struct_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
         arguments: CompilerArguments,
     ) -> Self {
-        return Self { compiling, struct_compiling, arguments, context: Context::create() };
+        return Self {
+            compiling,
+            struct_compiling,
+            arguments,
+            context: Context::create(),
+        };
     }
 }
 
 #[async_trait]
 impl<T> Compiler<T> for LLVMCompiler {
     async fn compile(&self, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
-        let mut binding = CompilerTypeGetter::new(Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
+        let mut binding =
+            CompilerTypeGetter::new(Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        if CompilerImpl::compile(&mut binding, &self.arguments, syntax, &self.compiling, &self.struct_compiling).await {
+        if CompilerImpl::compile(
+            &mut binding,
+            &self.arguments,
+            syntax,
+            &self.compiling,
+            &self.struct_compiling,
+        )
+        .await
+        {
             if receiver.recv().await.is_some() {
-                return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
+                return binding
+                    .get_target(&self.arguments.target)
+                    .map(|inner| unsafe { inner.call() });
             }
         } else {
             receiver.recv().await;
