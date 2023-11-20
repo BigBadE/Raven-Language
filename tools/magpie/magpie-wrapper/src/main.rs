@@ -3,8 +3,10 @@ use reqwest::blocking::Client;
 use std::process::{Command, Stdio};
 use std::{env, fs};
 
+/// GitHub release URL
 static URL: &str = "https://api.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets";
 
+/// Version checks and runs Magpie
 fn main() {
     println!("Checking version...");
     let client = Client::builder().user_agent("Magpie Updater").build().unwrap();

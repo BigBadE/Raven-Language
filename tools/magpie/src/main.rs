@@ -6,15 +6,23 @@ use include_dir::{include_dir, Dir, DirEntry, File};
 
 use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
+/// The Raven project types
 pub mod project;
 mod test;
+
+/// The core Raven library
 static CORE: Dir = include_dir!("lib/core/src");
+/// The universal standard library, which calls per-platform standards
 static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
+/// The windows standard library
 static STD_WINDOWS: Dir = include_dir!("lib/std/windows");
+/// The linux standard library
 static STD_LINUX: Dir = include_dir!("lib/std/linux");
+/// The MacOS standard library
 static STD_MACOS: Dir = include_dir!("lib/std/macos");
 //static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
+/// Finds the Raven project/file and runs it
 fn main() {
     let args = env::args().collect::<Vec<_>>();
 
@@ -92,6 +100,7 @@ fn main() {
     }
 }
 
+/// Builds a Raven project, adding the needed dependencies
 pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>) -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
@@ -119,17 +128,19 @@ pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<d
     };
 }
 
+/// Runs Raven and blocks until a result is gotten
 fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
     let result = arguments.cpu_runtime.block_on(runner::runner::run::<AtomicPtr<T>>(&arguments))?;
     return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
 }
 
+/// A source set for an internal directory with the include_dir macro
 #[derive(Clone, Debug)]
 pub struct InnerSourceSet {
     set: &'static Dir<'static>,
 }
 
-// Forced to make a wrapper due to orphan rule
+/// Forced to make a wrapper to implement Readable due to orphan rule
 pub struct FileWrapper {
     file: &'static File<'static>,
 }
@@ -151,6 +162,7 @@ impl SourceSet for InnerSourceSet {
     }
 }
 
+/// Recursively reads an include_dir directory to the output
 fn read_recursive(base: &Dir<'static>, output: &mut Vec<Box<dyn Readable>>) {
     for entry in base.entries() {
         match entry {

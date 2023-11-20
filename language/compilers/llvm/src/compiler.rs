@@ -21,13 +21,13 @@ use crate::type_getter::CompilerTypeGetter;
 
 /// A compiler implementation which must wrap the context
 pub struct CompilerImpl<'ctx> {
-    // LLVM context
+    /// LLVM context
     pub context: &'ctx Context,
-    // LLVM module
+    /// LLVM module
     pub module: Module<'ctx>,
-    // LLVM builder
+    /// LLVM builder
     pub builder: Builder<'ctx>,
-    // LLVM execution engine
+    /// LLVM execution engine
     pub execution_engine: ExecutionEngine<'ctx>,
 }
 

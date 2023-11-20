@@ -18,11 +18,11 @@ use syntax::ProcessManager;
 /// Wrapper around data used by checkers
 #[derive(Clone)]
 pub struct TypesChecker {
-    // Runtime for ProcessManager
+    /// Runtime for ProcessManager
     runtime: Arc<Mutex<HandleWrapper>>,
-    // Generics in the current type
+    /// Generics in the current type
     pub generics: HashMap<String, FinalizedTypes>,
-    // Whether to include references
+    /// Whether to include references
     include_refs: bool,
 }
 

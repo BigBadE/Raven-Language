@@ -82,28 +82,28 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
 /// The integer ids of the semantic tokens along with the VSCode color
 #[allow(dead_code)]
 pub enum SemanticTokenTypes {
-    Namespace = 0,     // Same as type
-    Type = 1,          // Blue-green color
-    Class = 2,         // Same as type
-    Enum = 3,          // Same as type
-    Interface = 4,     // Same as type
-    Struct = 5,        // Same as type
-    TypeParameter = 6, // Same color as Type
-    Parameter = 7,     // Same color as Property
-    Variable = 8,      // Same color as Property
-    Property = 9,      // Light blue
-    EnumMember = 10,   // Blue
-    Event = 11,        // Same color as Property
-    Function = 12,     // Yellow
-    Method = 13,       // Same as type
-    Macro = 14,        // Same as Property
-    Keyword = 15,      // Purple
-    Modifier = 16,     // White
-    Comment = 17,      // Green
-    String = 18,       // Orange
-    Number = 19,       // Green-Yellow
-    Regexp = 20,       // Dark blue color
-    Operator = 21,     // White
-    Decorator = 22,    // Same color as Function
-    None = 100,        // No color
+    Namespace = 0,     /// Same as Type
+    Type = 1,          /// Blue-green color
+    Class = 2,         /// Same as Type
+    Enum = 3,          /// Same as Type
+    Interface = 4,     /// Same as Type
+    Struct = 5,        /// Same as Type
+    TypeParameter = 6, /// Same as Type
+    Parameter = 7,     /// Same as Property
+    Variable = 8,      /// Same as Property
+    Property = 9,      /// Light blue
+    EnumMember = 10,   /// Blue
+    Event = 11,        /// Same as Property
+    Function = 12,     /// Yellow
+    Method = 13,       /// Same as Type
+    Macro = 14,        /// Same as Property
+    Keyword = 15,      /// Purple
+    Modifier = 16,     /// White
+    Comment = 17,      /// Green
+    String = 18,       /// Orange
+    Number = 19,       /// Green-Yellow
+    Regexp = 20,       /// Dark blue color
+    Operator = 21,     /// White
+    Decorator = 22,    /// Same color as Function
+    None = 100,        /// No color
 }

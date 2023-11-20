@@ -11,13 +11,16 @@ mod test {
     use include_dir::{include_dir, Dir, DirEntry};
     use std::{env, path};
 
+    /// Tests directory
     static TESTS: Dir = include_dir!("lib/test/test");
 
+    /// Main test
     #[test]
     pub fn test_magpie() {
         test_recursive(&TESTS);
     }
 
+    /// Recursively searches for files in the test folder to run as a test
     fn test_recursive(dir: &'static Dir<'_>) {
         for entry in dir.entries() {
             match entry {
