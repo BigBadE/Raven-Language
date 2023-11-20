@@ -81,30 +81,53 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
 
 /// The integer ids of the semantic tokens along with the VSCode color
 #[allow(dead_code)]
-// skipq: RS-D1001 For some reason the comments aren't detected
 pub enum SemanticTokenTypes {
-    Namespace = 0,     /// Same as Type
-    Type = 1,          /// Blue-green color
-    Class = 2,         /// Same as Type
-    Enum = 3,          /// Same as Type
-    Interface = 4,     /// Same as Type
-    Struct = 5,        /// Same as Type
-    TypeParameter = 6, /// Same as Type
-    Parameter = 7,     /// Same as Property
-    Variable = 8,      /// Same as Property
-    Property = 9,      /// Light blue
-    EnumMember = 10,   /// Blue
-    Event = 11,        /// Same as Property
-    Function = 12,     /// Yellow
-    Method = 13,       /// Same as Type
-    Macro = 14,        /// Same as Property
-    Keyword = 15,      /// Purple
-    Modifier = 16,     /// White
-    Comment = 17,      /// Green
-    String = 18,       /// Orange
-    Number = 19,       /// Green-Yellow
-    Regexp = 20,       /// Dark blue color
-    Operator = 21,     /// White
-    Decorator = 22,    /// Same color as Function
-    None = 100,        /// No color
+    /// Same as Type
+    Namespace = 0,
+    /// Blue-green color
+    Type = 1,
+    /// Same as Type
+    Class = 2,
+    /// Same as Type
+    Enum = 3,
+    /// Same as Type
+    Interface = 4,
+    /// Same as Type
+    Struct = 5,
+    /// Same as Type
+    TypeParameter = 6,
+    /// Same as Property
+    Parameter = 7,
+    /// Same as Property
+    Variable = 8,
+    /// Light blue
+    Property = 9,
+    /// Blue
+    EnumMember = 10,
+    /// Same as Property
+    Event = 11,
+    /// Yellow
+    Function = 12,
+    /// Same as Type
+    Method = 13,
+    /// Same as Property
+    Macro = 14,
+    /// Purple
+    Keyword = 15,
+    /// White
+    Modifier = 16,
+    /// Green
+    Comment = 17,
+    /// Orange
+    String = 18,
+    /// Green-Yellow
+    Number = 19,
+    /// Dark blue color
+    Regexp = 20,
+    /// White
+    Operator = 21,
+    /// Same color as Function
+    Decorator = 22,
+    /// No color
+    None = 100,
 }

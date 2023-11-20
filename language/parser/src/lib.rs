@@ -17,6 +17,7 @@ pub mod parser;
 /// The Raven tokenizer
 pub mod tokens;
 
+/// Parses a file into the syntax
 pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Arc<Mutex<HandleWrapper>>, name: String, file: String) {
     let mut tokenizer = Tokenizer::new(file.as_bytes());
     let mut tokens = Vec::default();
@@ -40,15 +41,21 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Arc<Mutex<HandleWrapper>>
     parse_top(&mut parser_utils);
 }
 
+/// Basic name resolver implementation
 #[derive(Clone)]
 pub struct ImportNameResolver {
+    /// The current file imports
     pub imports: Vec<String>,
+    /// The current generics
     pub generics: HashMap<String, Vec<UnparsedType>>,
+    /// The parent type
     pub parent: Option<String>,
+    /// Last ID used on a code block label
     pub last_id: u32,
 }
 
 impl ImportNameResolver {
+    /// Creates a new name resolver
     pub fn new(base: String) -> Self {
         return Self { imports: vec![base], generics: HashMap::default(), parent: None, last_id: 0 };
     }

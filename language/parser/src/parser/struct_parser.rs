@@ -11,6 +11,7 @@ use syntax::syntax::Syntax;
 use syntax::types::Types;
 use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, ParsingFuture, TraitImplementor};
 
+/// Parses a structure
 pub fn parse_structure(
     parser_utils: &mut ParserUtils,
     attributes: Vec<Attribute>,
@@ -99,6 +100,7 @@ pub fn parse_structure(
     return Ok(UnfinalizedStruct { generics, fields, functions, data });
 }
 
+/// Parses an implementor
 pub fn parse_implementor(
     parser_utils: &mut ParserUtils,
     attributes: Vec<Attribute>,
@@ -218,6 +220,7 @@ pub fn parse_implementor(
     return Ok(TraitImplementor { base, generics, implementor, functions, attributes });
 }
 
+/// Parses the generic bounds on a type
 pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<UnparsedType>, ParsingError> {
     let mut current = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
@@ -245,6 +248,7 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Unparse
     return Ok(current);
 }
 
+/// Parses the generics and adds them to the generics map
 pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<String, Vec<ParsingFuture<Types>>>) {
     let mut name = String::default();
     let mut bounds: Vec<ParsingFuture<Types>> = Vec::default();
@@ -312,6 +316,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
     }
 }
 
+/// Parses the bounds of a generic
 pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
     if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::GenericsStart {
         parser_utils.index += 1;
@@ -365,6 +370,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
     return Some(unparsed);
 }
 
+/// Parses a single field
 pub fn parse_field(
     parser_utils: &mut ParserUtils,
     name: String,
@@ -389,6 +395,7 @@ pub fn parse_field(
     return Box::pin(to_field(types.unwrap(), attributes, get_modifier(modifiers.as_slice()), name));
 }
 
+/// Waits for the type to finish and converts it to a field
 pub async fn to_field(
     types: ParsingFuture<Types>,
     attributes: Vec<Attribute>,

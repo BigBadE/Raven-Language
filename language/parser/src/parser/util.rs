@@ -15,17 +15,26 @@ use std::sync::Mutex;
 use crate::tokens::tokens::Token;
 use crate::{ImportNameResolver, TokenTypes};
 
+/// A struct containing the data needed for parsing
 pub struct ParserUtils<'a> {
+    /// A buffer containing the file data
     pub buffer: &'a [u8],
+    /// Index in the tokens
     pub index: usize,
+    /// All found tokens
     pub tokens: Vec<Token>,
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// The current file
     pub file: String,
+    /// The current imports
     pub imports: ImportNameResolver,
+    /// Handle for spawning async tasks
     pub handle: Arc<Mutex<HandleWrapper>>,
 }
 
 impl<'a> ParserUtils<'a> {
+    /// Returns a future for getting a struct given its name
     pub fn get_struct(&self, token: &Token, name: String) -> ParsingFuture<Types> {
         if name.is_empty() {
             panic!("Empty name!");
@@ -40,6 +49,7 @@ impl<'a> ParserUtils<'a> {
         ));
     }
 
+    /// Adds a struct to the syntax
     pub fn add_struct(&mut self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
         let structure = match structure {
             Ok(adding) => adding,
@@ -70,6 +80,7 @@ impl<'a> ParserUtils<'a> {
         );
     }
 
+    /// Adds an implementor to the syntax, and handles the errors
     pub async fn add_implementor(
         handle: Arc<Mutex<HandleWrapper>>,
         syntax: Arc<Mutex<Syntax>>,
@@ -98,6 +109,7 @@ impl<'a> ParserUtils<'a> {
         handle.lock().unwrap().finish_task(&"temp".to_string());
     }
 
+    /// Adds an implementor to the syntax
     async fn add_implementation(
         handle: Arc<Mutex<HandleWrapper>>,
         syntax: Arc<Mutex<Syntax>>,
@@ -157,6 +169,7 @@ impl<'a> ParserUtils<'a> {
         return Ok(());
     }
 
+    /// Adds a function to the syntax
     pub fn add_function(
         syntax: &Arc<Mutex<Syntax>>,
         file: String,
@@ -182,7 +195,8 @@ impl<'a> ParserUtils<'a> {
     }
 }
 
-pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {
+/// Parses generics, returning both its unparsed form (for copying) and a future (for actually getting the generics)
+pub fn parse_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {
     let mut generics: Vec<ParsingFuture<Types>> = Vec::default();
     let mut unparsed_generics = Vec::default();
     let mut last: Option<(UnparsedType, ParsingFuture<Types>)> = None;
@@ -229,15 +243,17 @@ pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedT
     );
 }
 
-async fn to_generic(name: String, generics: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
+/// Gets the generic type from its name and bounds
+async fn to_generic(name: String, bounds: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
     let mut output = Vec::default();
-    for generic in generics {
-        output.push(generic.await?.clone());
+    for bound in bounds {
+        output.push(bound.await?.clone());
     }
 
     return Ok(Types::Generic(name, output));
 }
 
+/// Inner generic parser, for nested generic types
 fn inner_generic(
     unparsed: UnparsedType,
     outer: ParsingFuture<Types>,
@@ -291,6 +307,7 @@ fn inner_generic(
     return (UnparsedType::Generic(Box::new(unparsed), unparsed_values), Box::pin(async_to_generic(outer, values)));
 }
 
+/// Asynchronously gets a generic type from its base and bounds
 async fn async_to_generic(outer: ParsingFuture<Types>, bounds: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
     let mut new_bounds = Vec::default();
     for bound in bounds {

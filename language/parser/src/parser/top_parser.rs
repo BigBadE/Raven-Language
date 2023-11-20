@@ -8,6 +8,7 @@ use syntax::function::FunctionData;
 use syntax::r#struct::StructData;
 use syntax::{Attribute, Modifier, TopElement, MODIFIERS};
 
+/// Parses a top element
 pub fn parse_top(parser_utils: &mut ParserUtils) {
     let mut modifiers = vec![];
     let mut attributes = vec![];
@@ -98,6 +99,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
     }
 }
 
+/// Parses an import and adds it to the NameResolver
 pub fn parse_import(parser_utils: &mut ParserUtils) {
     let next = parser_utils.tokens.get(parser_utils.index).unwrap();
     parser_utils.index += 1;
@@ -117,6 +119,7 @@ pub fn parse_import(parser_utils: &mut ParserUtils) {
     }
 }
 
+/// Parses all attributes and adds them to attributes
 pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attribute>) {
     while parser_utils.index < parser_utils.tokens.len() - 1 {
         let next = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -150,6 +153,7 @@ pub fn parse_attribute(parser_utils: &mut ParserUtils, attributes: &mut Vec<Attr
     }
 }
 
+/// Parses modifiers and adds them to modifiers
 pub fn parse_modifier(parser_utils: &mut ParserUtils, modifiers: &mut Vec<Modifier>) {
     loop {
         let next = parser_utils.tokens.get(parser_utils.index).unwrap();

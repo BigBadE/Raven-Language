@@ -29,6 +29,7 @@ pub struct GetterManager {
     pub target_waker: Option<Waker>,
 }
 
+/// Waits for an implementation of the type
 pub struct ImplWaiter {
     /// The program
     pub syntax: Arc<Mutex<Syntax>>,
@@ -152,8 +153,11 @@ pub async fn find_trait_implementation(
 
 /// Tries to solve if a type implements another type
 pub struct TypeImplementsTypeWaiter {
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// Base type
     pub current: FinalizedTypes,
+    /// Other type
     pub other: FinalizedTypes,
 }
 
@@ -184,13 +188,13 @@ pub struct TopElementManager<T>
 where
     T: TopElement,
 {
-    //Types and their data, added immediately after parsing
+    /// Types and their data, added immediately after parsing
     pub types: HashMap<String, Arc<T>>,
-    //A list of data sorted by the data's ID. Guaranteed to be in ID order.
+    /// A list of data sorted by the data's ID. Guaranteed to be in ID order.
     pub sorted: Vec<Arc<T>>,
-    //Data sorted by its finalized type, which contains the finalized code. Added after finalization.
+    /// Data sorted by its finalized type, which contains the finalized code. Added after finalization.
     pub data: HashMap<Arc<T>, Arc<T::Finalized>>,
-    //Wakers waiting on a type to be added to the types hashmap, waked after the type is added to types
+    /// Wakers waiting on a type to be added to the types hashmap, waked after the type is added to types
     pub wakers: HashMap<String, Vec<Waker>>,
 }
 

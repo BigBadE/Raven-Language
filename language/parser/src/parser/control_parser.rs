@@ -102,6 +102,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     ));
 }
 
+/// Parses a for statement into a single expression
 pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let name = parser_utils.tokens.get(parser_utils.index).unwrap();
     parser_utils.index += 1;
@@ -146,6 +147,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     return create_for(name, effect.unwrap().effect, body, parser_utils.imports.last_id - 2);
 }
 
+/// Parses a while statement into a single expression
 pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
@@ -171,6 +173,7 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
     return create_while(effect.unwrap().effect, body, parser_utils.imports.last_id - 1);
 }
 
+/// Parses a do while into a single expression
 pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
         return Err(parser_utils
@@ -206,6 +209,7 @@ pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, Parsing
     return create_do_while(effect.unwrap().effect, body, parser_utils.imports.last_id - 1);
 }
 
+/// Creates a do while effect from the body and the condition
 fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
     let mut top = Vec::default();
 
@@ -217,6 +221,7 @@ fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effec
     return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
 }
 
+/// Creates a while effect from the body and the condition
 fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
     let mut top = Vec::default();
 
@@ -230,6 +235,7 @@ fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects,
     return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
 }
 
+/// Creates an if statement from the body, the effect, the else ifs, and the else body
 fn create_if(
     effect: Effects,
     body: CodeBody,
@@ -297,6 +303,7 @@ fn create_if(
     return Ok(Effects::CodeBody(top));
 }
 
+/// Creates a for loop effect from the body and iterator effect
 fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
     let mut top = Vec::default();
     let variable = format!("$iter{}", id);

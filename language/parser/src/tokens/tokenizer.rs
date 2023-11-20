@@ -5,30 +5,31 @@ use crate::tokens::util::{next_generic, parse_string};
 
 /// This structure keeps track of the variables required for the tokenizing.
 pub struct Tokenizer<'a> {
-    // The current state. This is used to determine which method will handle the next token.
-    // See TokenizerState for all the states
+    /// The current state. This is used to determine which method will handle the next token.
+    /// See TokenizerState for all the states
     pub state: u64,
-    // The depth of brackets
+    /// The depth of brackets
     pub bracket_depth: u8,
-    // The depth of generics (within a <)
+    /// The depth of generics (within a <)
     pub generic_depth: u8,
-    // The index in the character buffer
+    /// The index in the character buffer
     pub index: usize,
-    // The current line number
+    /// The current line number
     pub line: u32,
-    // The index from the beginning of the line.
+    /// The index from the beginning of the line.
     pub line_index: u32,
-    // The last token that was parsed
+    /// The last token that was parsed
     pub last: Token,
-    // The length of the file
+    /// The length of the file
     pub len: usize,
-    // A buffer of all characters in the file
+    /// A buffer of all characters in the file
     pub buffer: &'a [u8],
-    // Data for token errors
+    /// Data for token errors
     pub code_data: Option<TokenCodeData>,
 }
 
 impl<'a> Tokenizer<'a> {
+    /// Creates a new tokenizer from the buffer
     pub fn new(buffer: &'a [u8]) -> Self {
         return Tokenizer {
             state: TokenizerState::TOP_ELEMENT,
@@ -64,6 +65,7 @@ impl<'a> Tokenizer<'a> {
         self.last.clone_from(&state.last);
     }
 
+    /// Gets the next token in the file
     pub fn next(&mut self) -> Token {
         if self.matches("//") {
             self.parse_to_line_end(TokenTypes::Comment);
@@ -93,8 +95,8 @@ impl<'a> Tokenizer<'a> {
         return self.last.clone();
     }
 
-    // The next included character, or the EOF token.
-    // This allows the ? operator to automatically return if the end of the file is reached.
+    /// The next included character, or the EOF token.
+    /// This allows the ? operator to automatically return if the end of the file is reached.
     pub fn next_included(&mut self) -> Result<u8, Token> {
         loop {
             if self.index == self.len {
@@ -219,13 +221,19 @@ impl<'a> Tokenizer<'a> {
 
 /// A serialized parser state, used to save/load the state of parsing mid-file.
 pub struct ParserState {
+    /// The state number
     pub state: u64,
+    /// The index in the file
     pub index: usize,
+    /// The index in the line
     pub line_index: u32,
+    /// The line
     pub line: u32,
+    /// The last token
     pub last: Token,
 }
 
+/// Struct used to store the tokenizer state constants
 #[non_exhaustive]
 pub struct TokenizerState {}
 
@@ -233,32 +241,32 @@ pub struct TokenizerState {}
 /// Some states map to the same method, but just have
 /// different names because they return to different states.
 impl TokenizerState {
-    // Parsing a string like "Test"
+    /// Parsing a string like "Test"
     pub const STRING: u64 = 0;
-    // A string that returns to the code top. For example, in static variables.
+    /// A string that returns to the code top. For example, in static variables.
     pub const STRING_TO_CODE_STRUCT_TOP: u64 = 1;
-    // The top of the file, not inside anything.
+    /// The top of the file, not inside anything.
     pub const TOP_ELEMENT: u64 = 2;
-    // Inside a structure declaration
+    /// Inside a structure declaration
     pub const STRUCTURE: u64 = 3;
-    // Inside an implementation declaration, turns into a STRUCTURE for the body
+    /// Inside an implementation declaration, turns into a STRUCTURE for the body
     pub const IMPLEMENTATION: u64 = 4;
-    // Inside a function
+    /// Inside a function
     pub const FUNCTION: u64 = 5;
-    // Inside a function that's inside a structure or impl
+    /// Inside a function that's inside a structure or impl
     pub const FUNCTION_TO_STRUCT_TOP: u64 = 6;
-    // Inside the generic declaration of a function declaration.
+    /// Inside the generic declaration of a function declaration.
     pub const GENERIC_TO_FUNC: u64 = 0x7;
-    // Inside the generic declaration of a function declaration in a structure.
+    /// Inside the generic declaration of a function declaration in a structure.
     pub const GENERIC_TO_FUNC_TO_STRUCT_TOP: u64 = 0x8;
-    // Inside the generic declaration of a structure
+    /// Inside the generic declaration of a structure
     pub const GENERIC_TO_STRUCT: u64 = 0x9;
-    // Inside the generic declaration of an implementation
+    /// Inside the generic declaration of an implementation
     pub const GENERIC_TO_IMPL: u64 = 0xA;
-    // The inside of a structure
+    /// The inside of a structure
     pub const TOP_ELEMENT_TO_STRUCT: u64 = 0xB;
-    // A block of code
+    /// A block of code
     pub const CODE: u64 = 0xC;
-    // A block of code that returns to a structure
+    /// A block of code that returns to a structure
     pub const CODE_TO_STRUCT_TOP: u64 = 0xD;
 }

@@ -4,6 +4,7 @@ use syntax::ParsingError;
 use crate::parser::code_parser::{parse_line, ParseState};
 use crate::{ParserUtils, TokenTypes};
 
+/// Parses an operator effect naively, leaving a majority of the work for the checker
 pub fn parse_operator(
     last: Option<Effects>,
     parser_utils: &mut ParserUtils,

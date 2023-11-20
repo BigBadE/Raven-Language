@@ -1,6 +1,6 @@
 use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_while};
 use crate::parser::operator_parser::parse_operator;
-use crate::parser::util::{add_generics, ParserUtils};
+use crate::parser::util::{parse_generics, ParserUtils};
 use crate::tokens::tokens::{Token, TokenTypes};
 use std::mem;
 use syntax::async_util::UnparsedType;
@@ -22,27 +22,30 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     return Ok((types, CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string())));
 }
 
+/// The state of the parser
 #[derive(PartialEq, Clone)]
 pub enum ParseState {
+    /// No state, defaults to top elements
     None,
-    // Used when inside the variable of a control statement.
-    // Ex:
-    // if value == 2 {
-    // value == 2 would be parsed as a ControlVariable
+    /// Used when inside the variable of a control statement.
+    /// Ex:
+    /// if value == 2 {
+    /// value == 2 would be parsed as a ControlVariable
     ControlVariable,
-    // When inside the arguments of a function.
-    // Ex:
-    // printf("String");
-    // "String" would be parsed as a argument.
+    /// When inside the arguments of a function.
+    /// Ex:
+    /// printf("String");
+    /// "String" would be parsed as a argument.
     Argument,
-    // When inside of an operator, such as 1 + 2
+    /// When inside of an operator, such as 1 + 2
     InOperator,
-    // When inside both an operator and control variable.
+    /// When inside both an operator and control variable.
     ControlOperator,
-    // When inside a new expression.
+    /// When inside a new expression.
     New,
 }
 
+/// Parses a single line of code
 // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<Option<Expression>, ParsingError> {
     // The current effect
@@ -198,6 +201,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
     return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::NOP))));
 }
 
+/// Tells the function what to do after the line is parsed
 enum ControlFlow {
     NotFound,
     Skipping,
@@ -205,6 +209,7 @@ enum ControlFlow {
     Returning(Expression),
 }
 
+/// Handles some basic cases separately to reduce the complexity of the main function
 // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 fn parse_basic_line(
     parser_utils: &mut ParserUtils,
@@ -306,7 +311,7 @@ fn parse_basic_line(
     });
 }
 
-///Parses tokens from the Raven code into a string
+/// Parses tokens from the Raven code into a string
 fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let mut string = String::default(); //the string from the Raven code
 
@@ -382,7 +387,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     let name = parser_utils.tokens.get(parser_utils.index - 2).unwrap().to_string(parser_utils.buffer);
     // Get the type being expressed. Should only be one type.
     let returning: Option<UnparsedType> =
-        if let UnparsedType::Generic(_, bounds) = add_generics(String::default(), parser_utils).0 {
+        if let UnparsedType::Generic(_, bounds) = parse_generics(String::default(), parser_utils).0 {
             if bounds.len() != 1 {
                 parser_utils
                     .tokens
@@ -405,6 +410,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     ));
 }
 
+/// Gets a list of effect arguments
 fn get_effects(parser_utils: &mut ParserUtils) -> Result<Vec<Effects>, ParsingError> {
     let mut effects = Vec::default();
     // Parse the method call arguments
@@ -422,6 +428,7 @@ fn get_effects(parser_utils: &mut ParserUtils) -> Result<Vec<Effects>, ParsingEr
     return Ok(effects);
 }
 
+/// Parses a let statement
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let name;
     {
@@ -449,6 +456,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     };
 }
 
+/// Parses a new structure call
 fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let mut types: Option<UnparsedType> = None;
 
@@ -461,7 +469,7 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             TokenTypes::Variable => types = Some(UnparsedType::Basic(token.to_string(parser_utils.buffer))),
             //Handle making new structs with generics.
             TokenTypes::Operator => {
-                types = Some(add_generics(types.unwrap().to_string(), parser_utils).0);
+                types = Some(parse_generics(types.unwrap().to_string(), parser_utils).0);
             }
             TokenTypes::BlockStart => {
                 values = parse_new_args(parser_utils)?;
@@ -475,6 +483,7 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     return Ok(Effects::CreateStruct(types.unwrap(), values));
 }
 
+/// Parses the arguments to a new structure
 fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects)>, ParsingError> {
     let mut values = Vec::default();
     let mut name = String::default();
@@ -512,6 +521,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects
     return Ok(values);
 }
 
+/// Checks if a type is generic or if it's just followed by an operator
 fn is_generic(token: &Token, parser_utils: &ParserUtils) -> bool {
     let next: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
     return parser_utils.buffer[token.end_offset] != b' ' && next.to_string(parser_utils.buffer) == "<";

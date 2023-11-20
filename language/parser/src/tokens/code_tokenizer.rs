@@ -66,6 +66,7 @@ pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {
     };
 }
 
+/// Seperatae function to check basic keywords to tokenize
 pub fn check_keywords(tokenizer: &mut Tokenizer) -> Option<Token> {
     return Some(if tokenizer.matches(";") {
         tokenizer.make_token(TokenTypes::LineEnd)

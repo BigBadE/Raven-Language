@@ -295,10 +295,15 @@ where
 
 /// An impl block for a type
 pub struct TraitImplementor {
+    /// Base type
     pub base: ParsingFuture<Types>,
-    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    /// Type being implemented
     pub implementor: ParsingFuture<Types>,
+    /// The implementor's generics
+    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    /// The implementor's attributes
     pub attributes: Vec<Attribute>,
+    /// The implementor's functions
     pub functions: Vec<UnfinalizedFunction>,
 }
 

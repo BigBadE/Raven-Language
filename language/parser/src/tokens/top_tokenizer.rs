@@ -73,6 +73,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
     };
 }
 
+/// Gets the next top element token
 fn get_top_element(tokenizer: &mut Tokenizer) -> Token {
     return if let Some(modifier) = parse_modifier(tokenizer) {
         modifier
@@ -195,6 +196,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     };
 }
 
+/// Gets the next token in a return type
 pub fn get_return_token(tokenizer: &mut Tokenizer) -> Token {
     if tokenizer.last.token_type == TokenTypes::ArgumentsEnd && tokenizer.matches("->") {
         tokenizer.make_token(TokenTypes::ReturnTypeArrow)

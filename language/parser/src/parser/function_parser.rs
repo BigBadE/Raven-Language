@@ -12,6 +12,7 @@ use crate::parser::struct_parser::{parse_generics, to_field};
 use crate::parser::util::ParserUtils;
 use crate::tokens::tokens::TokenTypes;
 
+/// Parses a function
 pub fn parse_function(
     parser_utils: &mut ParserUtils,
     trait_function: bool,
@@ -114,6 +115,7 @@ pub fn parse_function(
     });
 }
 
+/// Awaits the ParsingFuture for the generics
 pub async fn get_generics(
     generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
 ) -> Result<IndexMap<String, Types>, ParsingError> {

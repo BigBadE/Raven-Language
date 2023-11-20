@@ -6,21 +6,22 @@ use syntax::ParsingError;
 /// For example, keywords, variables, etc... are a single token.
 #[derive(Clone, Debug)]
 pub struct Token {
-    // The type of the token
+    /// The type of the token
     pub token_type: TokenTypes,
-    // The starting line and index in that line of the token.
+    /// The starting line and index in that line of the token.
     pub start: (u32, u32),
-    // The offset to the start of the token
+    /// The offset to the start of the token
     pub start_offset: usize,
-    // The ending line and index in that line of the token.
+    /// The ending line and index in that line of the token.
     pub end: (u32, u32),
-    // The offset to the end of the token
+    /// The offset to the end of the token
     pub end_offset: usize,
-    // Data about the code block around this token
+    /// Data about the code block around this token
     pub code_data: Option<TokenCodeData>,
 }
 
 impl Token {
+    /// Creates a new token, usually done by the tokenizer
     pub fn new(
         token_type: TokenTypes,
         code_data: Option<TokenCodeData>,
@@ -56,7 +57,6 @@ impl Token {
 }
 
 /// This allows for Tokens to be used in the Result type.
-///
 impl Try for Token {
     type Output = Token;
     type Residual = Token;
@@ -87,7 +87,9 @@ impl FromResidual<Result<Infallible, Token>> for Token {
 /// Data about the current code block
 #[derive(Clone, Debug)]
 pub struct TokenCodeData {
+    /// Start line of the code block
     pub start_line: u32,
+    /// End line of the code block
     pub end_line: u32,
 }
 
