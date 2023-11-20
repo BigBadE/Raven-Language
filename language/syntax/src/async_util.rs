@@ -35,7 +35,9 @@ pub struct AsyncTypesGetter<T: TopElement> {
 /// A future that asynchronously gets a type's finalized type from its respective AsyncGetter.
 /// Will never deadlock as long finalized types don't depend on it.
 pub struct AsyncDataGetter<T: TopElement> {
+    /// The program
     pub syntax: Arc<Mutex<Syntax>>,
+    /// Type to get
     pub getting: Arc<T>,
 }
 
@@ -258,6 +260,7 @@ pub struct HandleWrapper {
 }
 
 impl HandleWrapper {
+    /// Creates a new handle wrapper
     pub fn new(handle: Handle) -> HandleWrapper {
         return HandleWrapper {
             handle,

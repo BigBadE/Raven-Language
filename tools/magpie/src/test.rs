@@ -64,6 +64,7 @@ mod test {
     }
 }
 
+/// A source set of an internal file
 #[derive(Clone, Debug)]
 pub struct InnerFileSourceSet {
     set: &'static File<'static>,
