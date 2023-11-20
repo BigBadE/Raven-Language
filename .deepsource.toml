@@ -5,10 +5,6 @@ exclude_patterns = [
 ]
 
 [[transformers]]
-name = "rustfmt"
-enabled = true
-
-[[transformers]]
 name = "standardjs"
 enabled = true
 
