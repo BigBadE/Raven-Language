@@ -84,11 +84,8 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         }
 
         for import in imports {
-            let import = if import.ends_with(&self.getting) {
-                import.clone()
-            } else {
-                format!("{}::{}", import, self.getting)
-            };
+            let import =
+                if import.ends_with(&self.getting) { import.clone() } else { format!("{}::{}", import, self.getting) };
             if let Some(found) = manager.wakers.remove(&import) {
                 for waker in found {
                     waker.wake();
@@ -125,17 +122,14 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
         let mut locked = locked.lock().unwrap();
 
         // Check if an element directly referenced with that name exists.
-        if let Some(output) =
-            self.get_types(&mut locked, String::default(), cx.waker().clone(), not_trait)
-        {
+        if let Some(output) = self.get_types(&mut locked, String::default(), cx.waker().clone(), not_trait) {
             self.clean_up(&mut locked, self.name_resolver.imports());
             return Poll::Ready(output);
         }
 
         // Check each import if the element is in those files.
         for import in self.name_resolver.imports().clone() {
-            if let Some(output) = self.get_types(&mut locked, import, cx.waker().clone(), not_trait)
-            {
+            if let Some(output) = self.get_types(&mut locked, import, cx.waker().clone(), not_trait) {
                 self.clean_up(&mut locked, self.name_resolver.imports());
                 return Poll::Ready(output);
             }
@@ -176,11 +170,7 @@ where
         }
 
         // The finalized element doesn't exist, sleep.
-        manager
-            .wakers
-            .entry(self.getting.name().clone())
-            .or_insert(vec![])
-            .push(cx.waker().clone());
+        manager.wakers.entry(self.getting.name().clone()).or_insert(vec![]).push(cx.waker().clone());
 
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
@@ -247,11 +237,7 @@ pub struct HandleWrapper {
 }
 
 impl HandleWrapper {
-    pub fn spawn<T: Send + 'static, F: Future<Output = T> + Send + 'static>(
-        &mut self,
-        name: String,
-        future: F,
-    ) {
+    pub fn spawn<T: Send + 'static, F: Future<Output = T> + Send + 'static>(&mut self, name: String, future: F) {
         let handle = self.handle.spawn(future);
         self.names.insert(name, handle.abort_handle());
         // skipcq: RS-W1117

@@ -21,14 +21,7 @@ pub async fn check_impl_call(
     let traits;
     let method;
     let returning;
-    if let Effects::ImplementationCall(
-        new_calling,
-        new_traits,
-        new_method,
-        effects,
-        new_returning,
-    ) = effect
-    {
+    if let Effects::ImplementationCall(new_calling, new_traits, new_method, effects, new_returning) = effect {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
         }
@@ -102,9 +95,7 @@ pub struct ImplCheckerData<'a> {
     variables: &'a SimpleVariableManager,
 }
 
-async fn check_virtual_type(
-    data: &mut ImplCheckerData<'_>,
-) -> Result<Option<FinalizedEffects>, ParsingError> {
+async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<FinalizedEffects>, ParsingError> {
     if data.finding_return_type.of_type_sync(data.data, None).0 {
         let mut i = 0;
         for found in &data.data.inner_struct().data.functions {
@@ -125,42 +116,31 @@ async fn check_virtual_type(
                 }
                 let (_, target) = target.pop().unwrap();
 
-                let return_type =
-                    data.finalized_effects[0].get_return(data.variables).unwrap().unflatten();
+                let return_type = data.finalized_effects[0].get_return(data.variables).unwrap().unflatten();
                 if matches!(return_type, FinalizedTypes::Generic(_, _)) {
                     let mut temp = vec![];
                     mem::swap(&mut temp, data.finalized_effects);
                     return Ok(Some(FinalizedEffects::GenericVirtualCall(
                         i,
                         target,
-                        AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone())
-                            .await,
+                        AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
                         temp,
                     )));
                 }
 
-                data.code_verifier
-                    .syntax
-                    .lock()
-                    .unwrap()
-                    .process_manager
-                    .handle()
-                    .lock()
-                    .unwrap()
-                    .spawn(
-                        target.name.clone(),
-                        degeneric_header(
-                            target.clone(),
-                            found.clone(),
-                            data.code_verifier.syntax.clone(),
-                            data.code_verifier.process_manager.cloned(),
-                            data.finalized_effects.clone(),
-                            data.variables.clone(),
-                        ),
-                    );
+                data.code_verifier.syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                    target.name.clone(),
+                    degeneric_header(
+                        target.clone(),
+                        found.clone(),
+                        data.code_verifier.syntax.clone(),
+                        data.code_verifier.process_manager.cloned(),
+                        data.finalized_effects.clone(),
+                        data.variables.clone(),
+                    ),
+                );
 
-                let output =
-                    AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
+                let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
                 let mut temp = vec![];
                 mem::swap(&mut temp, data.finalized_effects);
                 return Ok(Some(FinalizedEffects::VirtualCall(i, output, temp)));
@@ -169,33 +149,24 @@ async fn check_virtual_type(
         }
 
         if !data.method.is_empty() {
-            return Err(placeholder_error(format!(
-                "Unknown method {} in {}",
-                data.method, data.data
-            )));
+            return Err(placeholder_error(format!("Unknown method {} in {}", data.method, data.data)));
         }
     }
     return Ok(None);
 }
 
-async fn try_get_impl(
-    data: &ImplCheckerData<'_>,
-) -> Result<Option<FinalizedEffects>, ParsingError> {
+async fn try_get_impl(data: &ImplCheckerData<'_>) -> Result<Option<FinalizedEffects>, ParsingError> {
     let result = ImplWaiter {
         syntax: data.code_verifier.syntax.clone(),
         return_type: data.finding_return_type.clone(),
         data: data.data.clone(),
-        error: placeholder_error(format!(
-            "Nothing implements {} for {}",
-            data.data, data.finding_return_type
-        )),
+        error: placeholder_error(format!("Nothing implements {} for {}", data.data, data.finding_return_type)),
     }
     .await?;
 
     for temp in &result {
         if temp.name.split("::").last().unwrap() == data.method || data.method.is_empty() {
-            let method =
-                AsyncDataGetter::new(data.code_verifier.syntax.clone(), temp.clone()).await;
+            let method = AsyncDataGetter::new(data.code_verifier.syntax.clone(), temp.clone()).await;
 
             let returning = match &data.returning {
                 Some(inner) => Some(

@@ -65,8 +65,7 @@ impl<'ctx> CompilerImpl<'ctx> {
         instance_function(Arc::new(function.to_codeless()), type_getter);
 
         while !type_getter.compiling.is_empty() {
-            let (function_type, function) =
-                unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.remove(0);
+            let (function_type, function) = unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.remove(0);
 
             if !function.data.poisoned.is_empty() || function.data.name.is_empty() {
                 // The checker handles the poisoned functions
@@ -78,8 +77,7 @@ impl<'ctx> CompilerImpl<'ctx> {
                 finalized_function = if let Some(found) = functions.get(&function.data.name) {
                     found.clone()
                 } else {
-                    unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }
-                        .push((function_type, function));
+                    unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.push((function_type, function));
                     continue;
                 };
             }

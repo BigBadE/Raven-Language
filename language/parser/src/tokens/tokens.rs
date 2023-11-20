@@ -34,14 +34,7 @@ impl Token {
 
     /// Creates an error for this part of the file.
     pub fn make_error(&self, file: String, error: String) -> ParsingError {
-        return ParsingError::new(
-            file,
-            self.start,
-            self.start_offset,
-            self.end,
-            self.end_offset,
-            error,
-        );
+        return ParsingError::new(file, self.start, self.start_offset, self.end, self.end_offset, error);
     }
 
     /// Turns the token into the string it points to.
@@ -55,11 +48,7 @@ impl Token {
         {
             start += 1;
         }
-        while buffer[end] == b' '
-            || buffer[end] == b'\t'
-            || buffer[end] == b'\r'
-            || buffer[end] == b'\n' && start < end
-        {
+        while buffer[end] == b' ' || buffer[end] == b'\t' || buffer[end] == b'\r' || buffer[end] == b'\n' && start < end {
             end -= 1;
         }
         return String::from_utf8_lossy(&buffer[start..=end]).to_string();

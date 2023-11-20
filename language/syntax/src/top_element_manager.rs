@@ -63,19 +63,13 @@ pub struct TraitImplWaiter<F> {
     pub error: ParsingError,
 }
 
-impl<T: Future<Output = Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<FunctionData>) -> T>
-    Future for TraitImplWaiter<F>
+impl<T: Future<Output = Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<FunctionData>) -> T> Future
+    for TraitImplWaiter<F>
 {
     type Output = Result<FinalizedEffects, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return match pin!(find_trait_implementation(
-            &self.syntax,
-            &*self.resolver,
-            &self.method,
-            &self.return_type
-        ))
-        .poll(cx)
+        return match pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx)
         {
             Poll::Ready(inner) => match inner {
                 Ok(inner) => match inner {
@@ -89,24 +83,14 @@ impl<T: Future<Output = Result<FinalizedEffects, ParsingError>>, F: Fn(Arc<Funct
                                 Poll::Pending => return Poll::Pending,
                             }
                         }
-                        self.syntax
-                            .lock()
-                            .unwrap()
-                            .async_manager
-                            .impl_waiters
-                            .push(cx.waker().clone());
+                        self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
                         Poll::Pending
                     }
                     None => {
                         if self.syntax.lock().unwrap().finished_impls() {
                             Poll::Ready(Err(self.error.clone()))
                         } else {
-                            self.syntax
-                                .lock()
-                                .unwrap()
-                                .async_manager
-                                .impl_waiters
-                                .push(cx.waker().clone());
+                            self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
                             Poll::Pending
                         }
                     }
@@ -137,9 +121,7 @@ pub async fn find_trait_implementation(
         .await
         {
             let value = value.finalize(syntax.clone()).await;
-            if let Some(value) =
-                syntax.lock().unwrap().get_implementation_methods(&return_type, &value)
-            {
+            if let Some(value) = syntax.lock().unwrap().get_implementation_methods(&return_type, &value) {
                 for temp in &value {
                     if &temp.name.split("::").last().unwrap() == method {
                         output.push(temp.clone());
@@ -214,11 +196,6 @@ where
 {
     //Creates the getter with a list of sorted types already, used for internal types declared in the compiler
     pub fn with_sorted(sorted: Vec<Arc<T>>) -> Self {
-        return Self {
-            types: HashMap::default(),
-            sorted,
-            data: HashMap::default(),
-            wakers: HashMap::default(),
-        };
+        return Self { types: HashMap::default(), sorted, data: HashMap::default(), wakers: HashMap::default() };
     }
 }

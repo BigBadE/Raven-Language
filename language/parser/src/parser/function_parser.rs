@@ -31,13 +31,9 @@ pub fn parse_function(
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Identifier => {
-                name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer)
-            }
+            TokenTypes::Identifier => name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer),
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
-            TokenTypes::ArgumentsStart
-            | TokenTypes::ArgumentSeparator
-            | TokenTypes::ArgumentTypeSeparator => {}
+            TokenTypes::ArgumentsStart | TokenTypes::ArgumentSeparator | TokenTypes::ArgumentTypeSeparator => {}
             TokenTypes::ArgumentName => last_arg = token.to_string(parser_utils.buffer),
             TokenTypes::ArgumentType => last_arg_type = token.to_string(parser_utils.buffer),
             TokenTypes::ArgumentEnd => {
@@ -47,10 +43,7 @@ pub fn parse_function(
                     }
 
                     fields.push(Box::pin(to_field(
-                        parser_utils.get_struct(
-                            token,
-                            parser_utils.imports.parent.as_ref().unwrap().clone(),
-                        ),
+                        parser_utils.get_struct(token, parser_utils.imports.parent.as_ref().unwrap().clone()),
                         Vec::default(),
                         0,
                         last_arg,
@@ -88,10 +81,11 @@ pub fn parse_function(
 
     if trait_function {
         if is_modifier(modifiers, Modifier::Internal) || is_modifier(modifiers, Modifier::Extern) {
-            return Err(parser_utils.tokens.get(parser_utils.index - 1).unwrap().make_error(
-                parser_utils.file.clone(),
-                "Traits can't be internal/external!".to_string(),
-            ));
+            return Err(parser_utils
+                .tokens
+                .get(parser_utils.index - 1)
+                .unwrap()
+                .make_error(parser_utils.file.clone(), "Traits can't be internal/external!".to_string()));
         } else {
             modifiers += Modifier::Trait as u8;
         }

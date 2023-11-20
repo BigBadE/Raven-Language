@@ -4,9 +4,7 @@ use std::{env, path, ptr};
 
 use include_dir::{include_dir, Dir, DirEntry, File};
 
-use data::{
-    Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet,
-};
+use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
 
 pub mod project;
 mod test;
@@ -30,12 +28,7 @@ fn main() {
                 compiler_arguments: CompilerArguments {
                     target: format!(
                         "{}::main",
-                        args[1]
-                            .clone()
-                            .split(path::MAIN_SEPARATOR)
-                            .last()
-                            .unwrap()
-                            .replace(".rv", "")
+                        args[1].clone().split(path::MAIN_SEPARATOR).last().unwrap().replace(".rv", "")
                     ),
                     compiler: "llvm".to_string(),
                     temp_folder: env::current_dir().unwrap().join("target"),
@@ -101,10 +94,7 @@ fn main() {
     }
 }
 
-pub fn build<T: Send + 'static>(
-    arguments: &mut Arguments,
-    mut source: Vec<Box<dyn SourceSet>>,
-) -> Result<Option<T>, ()> {
+pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>) -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
         "linux" => &STD_LINUX,
@@ -116,8 +106,7 @@ pub fn build<T: Send + 'static>(
     source.push(Box::new(InnerSourceSet { set: platform_std }));
     source.push(Box::new(InnerSourceSet { set: &CORE }));
 
-    arguments.runner_settings.sources =
-        source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
+    arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
 
     let value = run::<T>(&arguments);
     return match value {

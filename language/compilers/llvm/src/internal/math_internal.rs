@@ -17,10 +17,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_int_add(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -29,14 +26,8 @@ pub fn math_internal<'ctx>(
         let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = compiler.builder.build_int_sub(
-            compiler
-                .builder
-                .build_load(params.first().unwrap().into_pointer_value(), "2")
-                .into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -45,14 +36,8 @@ pub fn math_internal<'ctx>(
         let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = compiler.builder.build_int_mul(
-            compiler
-                .builder
-                .build_load(params.first().unwrap().into_pointer_value(), "2")
-                .into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -62,26 +47,14 @@ pub fn math_internal<'ctx>(
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_div(
-                compiler
-                    .builder
-                    .build_load(params.first().unwrap().into_pointer_value(), "2")
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                    .into_int_value(),
+                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
                 "1",
             )
         } else {
             compiler.builder.build_int_signed_div(
-                compiler
-                    .builder
-                    .build_load(params.first().unwrap().into_pointer_value(), "2")
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                    .into_int_value(),
+                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
                 "1",
             )
         };
@@ -92,26 +65,14 @@ pub fn math_internal<'ctx>(
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_rem(
-                compiler
-                    .builder
-                    .build_load(params.first().unwrap().into_pointer_value(), "2")
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                    .into_int_value(),
+                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
                 "1",
             )
         } else {
             compiler.builder.build_int_signed_rem(
-                compiler
-                    .builder
-                    .build_load(params.first().unwrap().into_pointer_value(), "2")
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                    .into_int_value(),
+                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
                 "1",
             )
         };
@@ -137,25 +98,17 @@ pub fn math_internal<'ctx>(
             type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(),
             &mut 0,
         );
-        let returning = compiler.builder.build_not(
-            compiler
-                .builder
-                .build_load(params.first().unwrap().into_pointer_value(), "1")
-                .into_int_value(),
-            "0",
-        );
+        let returning = compiler
+            .builder
+            .build_not(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "1").into_int_value(), "0");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::BitInvert") {
         let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
-        let returning = compiler.builder.build_not(
-            compiler
-                .builder
-                .build_load(params.first().unwrap().into_pointer_value(), "1")
-                .into_int_value(),
-            "0",
-        );
+        let returning = compiler
+            .builder
+            .build_not(compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "1").into_int_value(), "0");
         compiler.builder.build_store(malloc, returning);
         compiler.builder.build_return(Some(&malloc));
     } else if name.starts_with("math::BitXOR") {
@@ -164,10 +117,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_xor(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -178,10 +128,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_or(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -192,10 +139,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_and(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -206,10 +150,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_xor(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -224,10 +165,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_and(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -242,10 +180,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_xor(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -260,10 +195,7 @@ pub fn math_internal<'ctx>(
 
         let returning = compiler.builder.build_or(
             compiler.builder.build_load(pointer_type, "2").into_int_value(),
-            compiler
-                .builder
-                .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-                .into_int_value(),
+            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
             "1",
         );
         compiler.builder.build_store(malloc, returning);
@@ -287,14 +219,8 @@ fn compile_relational_op(
     );
     let returning = compiler.builder.build_int_compare(
         op,
-        compiler
-            .builder
-            .build_load(params.first().unwrap().into_pointer_value(), "2")
-            .into_int_value(),
-        compiler
-            .builder
-            .build_load(params.get(1).unwrap().into_pointer_value(), "3")
-            .into_int_value(),
+        compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").into_int_value(),
+        compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").into_int_value(),
         "1",
     );
     compiler.builder.build_store(malloc, returning);
@@ -302,11 +228,7 @@ fn compile_relational_op(
 }
 
 fn is_unsigned(name: &String) -> bool {
-    if name.ends_with("u64")
-        || name.ends_with("u32")
-        || name.ends_with("u16")
-        || name.ends_with("u8")
-    {
+    if name.ends_with("u64") || name.ends_with("u32") || name.ends_with("u16") || name.ends_with("u8") {
         return true;
     }
     return false;

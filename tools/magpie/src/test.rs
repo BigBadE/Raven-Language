@@ -42,10 +42,7 @@ mod test {
                         },
                     );
 
-                    match build::<bool>(
-                        &mut arguments,
-                        vec![Box::new(InnerFileSourceSet { set: file })],
-                    ) {
+                    match build::<bool>(&mut arguments, vec![Box::new(InnerFileSourceSet { set: file })]) {
                         Ok(inner) => match inner {
                             Some(found) => {
                                 if !found {

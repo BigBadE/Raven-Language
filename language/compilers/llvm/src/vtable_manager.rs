@@ -22,10 +22,7 @@ impl<'ctx> VTableManager<'ctx> {
         structure: &FinalizedTypes,
         target: &FinalizedTypes,
     ) -> GlobalValue<'ctx> {
-        if let Some(found) = self
-            .data
-            .get(&(structure.inner_struct().data.clone(), target.inner_struct().data.clone()))
-        {
+        if let Some(found) = self.data.get(&(structure.inner_struct().data.clone(), target.inner_struct().data.clone())) {
             return *found;
         }
         let mut values = Vec::default();
@@ -33,8 +30,7 @@ impl<'ctx> VTableManager<'ctx> {
             let locked = type_getter.syntax.clone();
             let locked = locked.lock().unwrap();
 
-            for found in locked.get_implementation_methods(structure, &target.unflatten()).unwrap()
-            {
+            for found in locked.get_implementation_methods(structure, &target.unflatten()).unwrap() {
                 let func = type_getter.get_function(locked.functions.data.get(&found).unwrap());
                 values.push(func.as_global_value().as_basic_value_enum());
             }

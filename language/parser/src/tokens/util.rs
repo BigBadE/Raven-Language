@@ -112,12 +112,11 @@ pub fn parse_string(tokenizer: &mut Tokenizer) -> Token {
                 return if
                 /*tokenizer.last.token_type != TokenTypes::StringEscape*/
                 tokenizer.buffer[tokenizer.index - 1] != b'\\' {
-                    tokenizer.state =
-                        if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
-                            TokenizerState::CODE_TO_STRUCT_TOP
-                        } else {
-                            TokenizerState::CODE
-                        };
+                    tokenizer.state = if tokenizer.state == TokenizerState::STRING_TO_CODE_STRUCT_TOP {
+                        TokenizerState::CODE_TO_STRUCT_TOP
+                    } else {
+                        TokenizerState::CODE
+                    };
                     tokenizer.make_token(TokenTypes::StringEnd)
                 } else {
                     tokenizer.make_token(TokenTypes::StringStart)
@@ -164,9 +163,7 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
                     // The generics are done, break of out the generic state
                     tokenizer.state = match tokenizer.state {
                         TokenizerState::GENERIC_TO_FUNC => TokenizerState::FUNCTION,
-                        TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => {
-                            TokenizerState::FUNCTION_TO_STRUCT_TOP
-                        }
+                        TokenizerState::GENERIC_TO_FUNC_TO_STRUCT_TOP => TokenizerState::FUNCTION_TO_STRUCT_TOP,
                         TokenizerState::GENERIC_TO_STRUCT => TokenizerState::STRUCTURE,
                         TokenizerState::GENERIC_TO_IMPL => TokenizerState::IMPLEMENTATION,
                         _ => panic!("Unexpected generic state!"),

@@ -36,9 +36,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
                 tokenizer.handle_invalid()
             }
         }
-        TokenTypes::FieldSeparator => {
-            parse_to_character(tokenizer, TokenTypes::FieldType, &[b'=', b';'])
-        }
+        TokenTypes::FieldSeparator => parse_to_character(tokenizer, TokenTypes::FieldType, &[b'=', b';']),
         TokenTypes::FieldType => {
             if tokenizer.matches("=") {
                 // Handles the code for the field's value
@@ -64,9 +62,7 @@ pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {
         _ => {
             if tokenizer.matches("import") {
                 tokenizer.make_token(TokenTypes::ImportStart)
-            } else if tokenizer.matches("}")
-                && tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT
-            {
+            } else if tokenizer.matches("}") && tokenizer.state == TokenizerState::TOP_ELEMENT_TO_STRUCT {
                 // Handles the end of the struct
                 tokenizer.state = TokenizerState::TOP_ELEMENT;
                 tokenizer.make_token(TokenTypes::StructEnd)
@@ -135,9 +131,7 @@ fn get_top_element(tokenizer: &mut Tokenizer) -> Token {
 /// Handles when the tokenizer is parsing the header of a struct
 pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
     return match &tokenizer.last.token_type {
-        TokenTypes::FunctionStart => {
-            parse_to_character(tokenizer, TokenTypes::Identifier, &[b'<', b'('])
-        }
+        TokenTypes::FunctionStart => parse_to_character(tokenizer, TokenTypes::Identifier, &[b'<', b'(']),
         TokenTypes::Identifier => {
             if tokenizer.matches("<") {
                 // Handles the generics after the function's name, if it exists
@@ -183,9 +177,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
                 }
             }
         }
-        TokenTypes::ArgumentTypeSeparator => {
-            parse_to_character(tokenizer, TokenTypes::ArgumentType, &[b',', b')'])
-        }
+        TokenTypes::ArgumentTypeSeparator => parse_to_character(tokenizer, TokenTypes::ArgumentType, &[b',', b')']),
         TokenTypes::ArgumentType => {
             if tokenizer.matches(",") {
                 tokenizer.make_token(TokenTypes::ArgumentSeparator)
@@ -195,9 +187,7 @@ pub fn next_func_token(tokenizer: &mut Tokenizer) -> Token {
         }
         TokenTypes::ArgumentSeparator => tokenizer.make_token(TokenTypes::ArgumentEnd),
         // Parse the return type
-        TokenTypes::ReturnTypeArrow => {
-            parse_to_character(tokenizer, TokenTypes::ReturnType, &[b';', b'{'])
-        }
+        TokenTypes::ReturnTypeArrow => parse_to_character(tokenizer, TokenTypes::ReturnType, &[b';', b'{']),
         TokenTypes::ArgumentsEnd | TokenTypes::ReturnType => get_return_token(tokenizer),
         token => {
             panic!("How'd you get here? {:?}", token);

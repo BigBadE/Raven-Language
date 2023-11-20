@@ -6,8 +6,8 @@ use std::sync::Mutex;
 use std::task::Waker;
 
 use chalk_ir::{
-    Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId,
-    TraitRef, TyVariableKind, VariableKind, VariableKinds, WhereClause,
+    Binders, DomainGoal, GenericArg, GenericArgData, Goal, GoalData, Substitution, TraitId, TraitRef, TyVariableKind,
+    VariableKind, VariableKinds, WhereClause,
 };
 use chalk_recursive::RecursiveSolver;
 use chalk_solve::ext::GoalExt;
@@ -25,15 +25,10 @@ pub use data::Main;
 use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
 use crate::function::{FinalizedFunction, FunctionData};
-use crate::r#struct::{
-    FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8,
-};
+use crate::r#struct::{FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8};
 use crate::top_element_manager::{GetterManager, TopElementManager};
 use crate::types::FinalizedTypes;
-use crate::{
-    is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager,
-    TopElement, Types,
-};
+use crate::{is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager, TopElement, Types};
 
 /// The entire program's syntax. Contains all the data passed to every step of the program.
 /// This structure is usually in a mutex lock, which prevents multiple functions from reading/writing
@@ -148,17 +143,13 @@ impl Syntax {
             binders.push(VariableKind::Ty(TyVariableKind::General));
         }
         let second = second.to_chalk_type(&vec_generics);
-        let data: &[GenericArg<ChalkIr>] =
-            &[GenericArg::new(ChalkIr, GenericArgData::Ty(second.clone()))];
+        let data: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(second.clone()))];
         return ImplDatum {
             polarity: Polarity::Positive,
             binders: Binders::new(
                 VariableKinds::from_iter(ChalkIr, binders),
                 ImplDatumBound {
-                    trait_ref: TraitRef {
-                        trait_id: first.id.clone(),
-                        substitution: Substitution::from_iter(ChalkIr, data),
-                    },
+                    trait_ref: TraitRef { trait_id: first.id.clone(), substitution: Substitution::from_iter(ChalkIr, data) },
                     where_clauses: vec![],
                 },
             ),
@@ -188,11 +179,7 @@ impl Syntax {
     }
 
     /// Recursively solves if a type is a generic type by checking if the target type matches all the bounds.
-    fn solve_nonstruct_types(
-        &self,
-        target_type: &FinalizedTypes,
-        checking: &FinalizedTypes,
-    ) -> Option<bool> {
+    fn solve_nonstruct_types(&self, target_type: &FinalizedTypes, checking: &FinalizedTypes) -> Option<bool> {
         return match target_type {
             FinalizedTypes::Generic(_, bounds) => {
                 // If a single bound fails, than the type isn't of the generic type.
@@ -245,8 +232,7 @@ impl Syntax {
         }
         let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
 
-        let elements: &[GenericArg<ChalkIr>] =
-            &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
+        let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
         // Construct a goal asking if the first type is implemented by the second type.
         let goal = Goal::new(
             ChalkIr,
@@ -258,18 +244,12 @@ impl Syntax {
 
         // Tell Chalk to solve it, ignoring any overflows.
         // TODO add a cache for speed?
-        let value = RecursiveSolver::new(30, 3000, None)
-            .solve(self, &goal.into_closed_goal(ChalkIr))
-            .is_some();
+        let value = RecursiveSolver::new(30, 3000, None).solve(self, &goal.into_closed_goal(ChalkIr)).is_some();
         return value;
     }
 
     /// Adds the element to the syntax
-    pub fn add<T: TopElement + Eq + 'static>(
-        syntax: &Arc<Mutex<Syntax>>,
-        dupe_error: ParsingError,
-        adding: &Arc<T>,
-    ) {
+    pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
         let mut locked = syntax.lock().unwrap();
         unsafe {
             // Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
@@ -290,9 +270,7 @@ impl Syntax {
         }
 
         // Checks if a type with the same name is already in the async manager.
-        if let Some(mut old) =
-            T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned()
-        {
+        if let Some(mut old) = T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned() {
             if adding.errors().is_empty() && adding.errors().is_empty() {
                 // Add a duplication error to the original type.
                 locked.errors.push(dupe_error.clone());
@@ -319,16 +297,15 @@ impl Syntax {
             let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
 
             // Gets the name of the operation, or errors if there isn't one.
-            let name = if let Attribute::String(_, name) =
-                Attribute::find_attribute("operation", &adding.attributes).unwrap()
-            {
-                name.replace("{+}", "{}").clone()
-            } else {
-                let mut error = ParsingError::empty();
-                error.message = format!("Expected a string with attribute operator!");
-                locked.errors.push(error);
-                return;
-            };
+            let name =
+                if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
+                    name.replace("{+}", "{}").clone()
+                } else {
+                    let mut error = ParsingError::empty();
+                    error.message = format!("Expected a string with attribute operator!");
+                    locked.errors.push(error);
+                    return;
+                };
 
             // Checks if there is a duplicate of that operation.
             if locked.operations.contains_key(&name) {
@@ -395,14 +372,8 @@ impl Syntax {
         // Handles arrays by removing the brackets and getting the inner type
         if getting.as_bytes()[0] == b'[' {
             return Ok(Types::Array(Box::new(
-                Self::get_struct(
-                    syntax,
-                    error,
-                    getting[1..getting.len() - 1].to_string(),
-                    name_resolver,
-                    resolved_generics,
-                )
-                .await?,
+                Self::get_struct(syntax, error, getting[1..getting.len() - 1].to_string(), name_resolver, resolved_generics)
+                    .await?,
             )));
         }
 
@@ -430,14 +401,9 @@ impl Syntax {
         }
 
         if getting.contains('<') {
-            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver)
-                .await?
-                .1
-                .remove(0));
+            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver).await?.1.remove(0));
         }
-        return Ok(Types::Struct(
-            AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?,
-        ));
+        return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
     }
 
     #[async_recursion]
@@ -454,8 +420,7 @@ impl Syntax {
             match input[i] {
                 b'<' => {
                     let first = String::from_utf8_lossy(&input[last..i]);
-                    let (size, bounds) =
-                        Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
+                    let (size, bounds) = Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
                     let first = Self::get_struct(
                         syntax.clone(),
                         error.clone(),
@@ -514,14 +479,7 @@ impl Syntax {
     ) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
             UnparsedType::Basic(name) => {
-                Syntax::get_struct(
-                    syntax,
-                    Self::swap_error(error, &name),
-                    name,
-                    resolver,
-                    resolved_generics,
-                )
-                .await
+                Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver, resolved_generics).await
             }
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::default();
@@ -538,9 +496,7 @@ impl Syntax {
                     );
                 }
                 Ok(Types::GenericType(
-                    Box::new(
-                        Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?,
-                    ),
+                    Box::new(Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?),
                     generics,
                 ))
             }

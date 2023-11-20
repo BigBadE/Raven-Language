@@ -34,9 +34,7 @@ pub fn parse_operator(
     let mut right = match parse_line(
         parser_utils,
         match state {
-            ParseState::ControlVariable | ParseState::ControlOperator => {
-                ParseState::ControlOperator
-            }
+            ParseState::ControlVariable | ParseState::ControlOperator => ParseState::ControlOperator,
             _ => ParseState::InOperator,
         },
     ) {
@@ -45,9 +43,7 @@ pub fn parse_operator(
     };
 
     if right.is_some() {
-        while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type
-            == TokenTypes::ArgumentEnd
-        {
+        while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             if let Some(found) = next {

@@ -20,9 +20,7 @@ fn main() {
     // Find the latest artifacts
     let mut highest: Option<&JsonValue> = None;
     for artifact in parsed.members() {
-        if artifact["name"].as_str().unwrap()
-            != format!("Magpie-{}{}", env::consts::OS, env::consts::EXE_SUFFIX)
-        {
+        if artifact["name"].as_str().unwrap() != format!("Magpie-{}{}", env::consts::OS, env::consts::EXE_SUFFIX) {
             continue;
         }
         if let Some(found) = &highest {
@@ -35,13 +33,15 @@ fn main() {
     }
 
     if highest.is_none() {
-        panic!("No Magpie version found! Make sure your OS is supported ({} must be linux, macos, or windows).", env::consts::OS)
+        panic!(
+            "No Magpie version found! Make sure your OS is supported ({} must be linux, macos, or windows).",
+            env::consts::OS
+        )
     }
 
     let highest = highest.unwrap();
 
-    let running =
-        env::temp_dir().join(format!("magpie-{}.{}", highest["id"], env::consts::EXE_EXTENSION));
+    let running = env::temp_dir().join(format!("magpie-{}.{}", highest["id"], env::consts::EXE_EXTENSION));
 
     // If latest is not already downloaded, download it.
     if !running.exists() {

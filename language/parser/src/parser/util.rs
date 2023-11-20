@@ -7,8 +7,7 @@ use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use syntax::{
-    DataType, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement,
-    TraitImplementor,
+    DataType, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement, TraitImplementor,
 };
 
 use std::sync::Mutex;
@@ -54,10 +53,7 @@ impl<'a> ParserUtils<'a> {
 
         Syntax::add::<StructData>(
             &self.syntax,
-            token.make_error(
-                self.file.clone(),
-                format!("Duplicate structure {}", structure.data.name),
-            ),
+            token.make_error(self.file.clone(), format!("Duplicate structure {}", structure.data.name)),
             structure.data(),
         );
 
@@ -83,14 +79,7 @@ impl<'a> ParserUtils<'a> {
     ) {
         match implementor {
             Ok(implementor) => {
-                match Self::add_implementation(
-                    handle.clone(),
-                    syntax.clone(),
-                    implementor,
-                    resolver,
-                    process_manager,
-                )
-                .await
+                match Self::add_implementation(handle.clone(), syntax.clone(), implementor, resolver, process_manager).await
                 {
                     Ok(_) => {}
                     Err(error) => {
@@ -138,14 +127,8 @@ impl<'a> ParserUtils<'a> {
             functions.push(function.data.clone());
         }
 
-        let output = FinishedTraitImplementor {
-            target,
-            base,
-            attributes: implementor.attributes,
-            functions,
-            chalk_type,
-            generics,
-        };
+        let output =
+            FinishedTraitImplementor { target, base, attributes: implementor.attributes, functions, chalk_type, generics };
 
         {
             let mut locked = syntax.lock().unwrap();
@@ -192,24 +175,14 @@ impl<'a> ParserUtils<'a> {
 
         Syntax::add(
             syntax,
-            ParsingError::new(
-                file,
-                (0, 0),
-                0,
-                (0, 0),
-                0,
-                format!("Duplicate function {}", adding.data.name),
-            ),
+            ParsingError::new(file, (0, 0), 0, (0, 0), 0, format!("Duplicate function {}", adding.data.name)),
             &adding.data,
         );
         return adding;
     }
 }
 
-pub fn add_generics(
-    input: String,
-    parser_utils: &mut ParserUtils,
-) -> (UnparsedType, ParsingFuture<Types>) {
+pub fn add_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {
     let mut generics: Vec<ParsingFuture<Types>> = Vec::default();
     let mut unparsed_generics = Vec::default();
     let mut last: Option<(UnparsedType, ParsingFuture<Types>)> = None;
@@ -256,10 +229,7 @@ pub fn add_generics(
     );
 }
 
-async fn to_generic(
-    name: String,
-    generics: Vec<ParsingFuture<Types>>,
-) -> Result<Types, ParsingError> {
+async fn to_generic(name: String, generics: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
     let mut output = Vec::default();
     for generic in generics {
         output.push(generic.await?.clone());
@@ -318,16 +288,10 @@ fn inner_generic(
         }
     }
 
-    return (
-        UnparsedType::Generic(Box::new(unparsed), unparsed_values),
-        Box::pin(async_to_generic(outer, values)),
-    );
+    return (UnparsedType::Generic(Box::new(unparsed), unparsed_values), Box::pin(async_to_generic(outer, values)));
 }
 
-async fn async_to_generic(
-    outer: ParsingFuture<Types>,
-    bounds: Vec<ParsingFuture<Types>>,
-) -> Result<Types, ParsingError> {
+async fn async_to_generic(outer: ParsingFuture<Types>, bounds: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
     let mut new_bounds = Vec::default();
     for bound in bounds {
         new_bounds.push(bound.await?);

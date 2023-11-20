@@ -48,22 +48,11 @@ impl LLVMCompiler {
 #[async_trait]
 impl<T> Compiler<T> for LLVMCompiler {
     async fn compile(&self, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
-        let mut binding =
-            CompilerTypeGetter::new(Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
+        let mut binding = CompilerTypeGetter::new(Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
 
-        if CompilerImpl::compile(
-            &mut binding,
-            &self.arguments,
-            syntax,
-            &self.compiling,
-            &self.struct_compiling,
-        )
-        .await
-        {
+        if CompilerImpl::compile(&mut binding, &self.arguments, syntax, &self.compiling, &self.struct_compiling).await {
             if receiver.recv().await.is_some() {
-                return binding
-                    .get_target(&self.arguments.target)
-                    .map(|inner| unsafe { inner.call() });
+                return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
             }
         } else {
             receiver.recv().await;

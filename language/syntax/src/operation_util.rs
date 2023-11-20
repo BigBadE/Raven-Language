@@ -24,9 +24,7 @@ impl Future for OperationGetter {
         for operation in &self.operation {
             if let Some(output) = locked.operations.get(operation) {
                 return Poll::Ready(Ok(output.clone()));
-            } else if let Some(output) =
-                locked.operations.get(&operation.replace("{}", "{+}").to_string())
-            {
+            } else if let Some(output) = locked.operations.get(&operation.replace("{}", "{+}").to_string()) {
                 return Poll::Ready(Ok(output.clone()));
             }
         }

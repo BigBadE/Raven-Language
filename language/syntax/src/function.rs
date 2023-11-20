@@ -11,13 +11,11 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 
 use crate::async_util::{AsyncDataGetter, HandleWrapper, NameResolver};
-use crate::code::{
-    Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField,
-};
+use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
 use crate::{
-    is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager,
-    SimpleVariableManager, Syntax, TopElement, TopElementManager, Types,
+    is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, SimpleVariableManager, Syntax,
+    TopElement, TopElementManager, Types,
 };
 
 /// The static data of a function, which is set during parsing and immutable throughout the entire compilation process.
@@ -87,8 +85,7 @@ impl TopElement for FunctionData {
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
         // Finalize the code and combine it with the codeless finalized function.
-        let finalized_function =
-            process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
+        let finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
         let finalized_function = Arc::new(finalized_function);
         let mut locked = syntax.lock().unwrap();
 
@@ -268,13 +265,7 @@ impl CodelessFinalizedFunction {
             let handle = manager.handle().clone();
             handle.lock().unwrap().spawn(
                 new_method.data.name.clone(),
-                degeneric_code(
-                    syntax.clone(),
-                    original,
-                    resolver.boxed_clone(),
-                    new_method.clone(),
-                    manager,
-                ),
+                degeneric_code(syntax.clone(), original, resolver.boxed_clone(), new_method.clone(), manager),
             );
 
             return Ok(new_method);

@@ -25,10 +25,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
         names: HashMap::default(),
         waker: None,
     }));
-    let mut syntax = Syntax::new(Box::new(TypesChecker::new(
-        handle.clone(),
-        settings.runner_settings.include_references(),
-    )));
+    let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
     syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
 
     let syntax = Arc::new(Mutex::new(syntax));
@@ -56,12 +53,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
                     .as_ref()
                     .map(|inner| inner.handle().clone())
                     .unwrap_or_else(|| settings.cpu_runtime.handle().clone())
-                    .spawn(parse(
-                        syntax.clone(),
-                        handle.clone(),
-                        source_set.relative(&*file).clone(),
-                        file.read(),
-                    )),
+                    .spawn(parse(syntax.clone(), handle.clone(), source_set.relative(&*file).clone(), file.read())),
             );
         }
     }
@@ -112,11 +104,7 @@ pub async fn start<T>(
     let code_compiler;
     {
         let locked = syntax.lock().unwrap();
-        code_compiler = get_compiler(
-            locked.compiling.clone(),
-            locked.strut_compiling.clone(),
-            compiler_arguments,
-        );
+        code_compiler = get_compiler(locked.compiling.clone(), locked.strut_compiling.clone(), compiler_arguments);
     }
 
     let _ = sender.send(code_compiler.compile(receiver, &syntax).await).await;
