@@ -66,13 +66,17 @@ fn get_token(last: &TokenTypes, token_type: &TokenTypes) -> u32 {
         _ => {}
     }
     let temp = match token_type {
-        TokenTypes::Identifier | TokenTypes::ReturnType => SemanticTokenTypes::Type,
-        TokenTypes::Variable => SemanticTokenTypes::Property,
-        TokenTypes::Modifier => SemanticTokenTypes::Keyword,
+        TokenTypes::Identifier | TokenTypes::ReturnType | TokenTypes::ArgumentName |
+        TokenTypes::ReturnTypeArrow | TokenTypes::Generic => SemanticTokenTypes::Type,
+        TokenTypes::Variable | TokenTypes::ImplStart | TokenTypes::TraitStart => SemanticTokenTypes::Property,
+        TokenTypes::Modifier | TokenTypes::GenericsStart | TokenTypes::GenericsEnd | TokenTypes::GenericBound
+        | TokenTypes::GenericBoundEnd | TokenTypes::For => SemanticTokenTypes::Keyword,
         TokenTypes::Comment => SemanticTokenTypes::Comment,
-        TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New | TokenTypes::FunctionStart => {
-            SemanticTokenTypes::Keyword
-        }
+        TokenTypes::ImportStart | TokenTypes::Return | TokenTypes::New | TokenTypes::FunctionStart
+        | TokenTypes::Let =>
+            SemanticTokenTypes::Keyword,
+        TokenTypes::Integer | TokenTypes::Float => SemanticTokenTypes::Number,
+        TokenTypes::CallingType | TokenTypes::Attribute => SemanticTokenTypes::Function,
         TokenTypes::StringStart | TokenTypes::StringEnd | TokenTypes::StringEscape => SemanticTokenTypes::String,
         _ => SemanticTokenTypes::None,
     } as u32;

@@ -9,6 +9,7 @@ use std::sync::Mutex;
 
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
+use indexmap::IndexMap;
 
 use async_recursion::async_recursion;
 
@@ -100,6 +101,14 @@ impl FinalizedTypes {
         };
     }
 
+    pub fn get_generic_types(&self) -> &IndexMap<String, Vec<FinalizedTypes>> {
+        return match self {
+            FinalizedTypes::Struct(base, _) => &base.generics,
+            FinalizedTypes::Reference(inner) => inner.get_generic_types(),
+            _ => panic!("Failed to get generic types!"),
+        };
+    }
+
     /// Fixes generics by replacing any generic references lacking bounds with their bounds
     #[async_recursion]
     pub async fn fix_generics(
@@ -149,6 +158,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(inner, _) => &inner.fields,
             FinalizedTypes::Reference(inner) => inner.get_fields(),
+            FinalizedTypes::GenericType(base, _) => base.get_fields(),
             _ => panic!("Tried to get fields of generic!"),
         };
     }
@@ -206,7 +216,7 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structure, _) => {
                 match &structure.data.chalk_data.as_ref().unwrap() {
-                    ChalkData::Struct(types, _) => types.clone(),   // skipcq: RS-W1110 types isn't Copy
+                    ChalkData::Struct(types, _) => types.clone(), // skipcq: RS-W1110 types isn't Copy
                     ChalkData::Trait(types, _, _) => types.clone(), // skipcq: RS-W1110 types isn't Copy
                 }
             }
@@ -502,6 +512,7 @@ impl FinalizedTypes {
             FinalizedTypes::Generic(name, bounds) => {
                 if let Some(found) = generics.get(name) {
                     // This should never trip, but it's a sanity check.
+                    // TODO confirm
                     for bound in bounds {
                         if !found.of_type(bound, syntax.clone()).await {
                             return Err(bounds_error);
@@ -517,10 +528,18 @@ impl FinalizedTypes {
             }
             FinalizedTypes::GenericType(base, bounds) => {
                 base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
-                let mut found = Vec::default();
-                for bound in bounds {
+                let generic_bounds = base.get_generic_types();
+
+                let mut found = HashMap::default();
+                for (name, generic_bounds) in generic_bounds {
+                    let mut bound = bounds.remove(0);
                     bound.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
-                    found.push(bound.clone());
+                    for generic_bound in generic_bounds {
+                        if !generic_bound.of_type(&bound, syntax.clone()).await {
+                            return Err(bounds_error);
+                        }
+                    }
+                    found.insert(name.clone(), bound.clone());
                 }
                 *self = base.flatten(&mut found, syntax).await?;
                 Ok(())
@@ -544,7 +563,7 @@ impl FinalizedTypes {
     #[async_recursion]
     pub async fn flatten(
         &self,
-        generics: &Vec<FinalizedTypes>,
+        generics: &HashMap<String, FinalizedTypes>,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> Result<FinalizedTypes, ParsingError> {
         return match self {
@@ -553,7 +572,11 @@ impl FinalizedTypes {
                     // If there are no bounds, we're good.
                     return Ok(self.clone());
                 }
-                let name = format!("{}<{}>", found.data.name, display_parenless(generics, ", "));
+                let name = format!(
+                    "{}<{}>",
+                    found.data.name,
+                    display_parenless(&generics.values().cloned().collect::<Vec<_>>(), ", ")
+                );
                 // If this type has already been flattened with these args, return that.
                 if syntax.lock().unwrap().structures.types.contains_key(&name) {
                     let data;
@@ -567,7 +590,7 @@ impl FinalizedTypes {
                         base.clone(),
                         Some(Box::new(FinalizedTypes::GenericType(
                             Box::new(FinalizedTypes::Struct(found.clone(), None)),
-                            generics.clone(),
+                            generics.values().cloned().collect::<Vec<_>>(),
                         ))),
                     ))
                 } else {
@@ -610,15 +633,14 @@ impl FinalizedTypes {
                         data.clone(),
                         Some(Box::new(FinalizedTypes::GenericType(
                             Box::new(FinalizedTypes::Struct(found.clone(), None)),
-                            generics.clone(),
+                            generics.values().cloned().collect::<Vec<_>>(),
                         ))),
                     ))
                 }
             }
             FinalizedTypes::Reference(other) => other.flatten(generics, syntax).await,
             FinalizedTypes::Array(inner) => inner.flatten(generics, syntax).await,
-            FinalizedTypes::Generic(_, _) => panic!("Unresolved generic!"),
-            FinalizedTypes::GenericType(base, effects) => base.flatten(effects, syntax).await,
+            _ => panic!("Unresolved generic!"),
         };
     }
 

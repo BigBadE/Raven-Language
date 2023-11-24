@@ -1,0 +1,11 @@
+fn test() -> bool {
+    let testing = new Testing<str> {
+        test: "test!",
+    };
+
+    return testing.test == "test!";
+}
+
+struct Testing<T> {
+    test: T;
+}

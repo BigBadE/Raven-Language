@@ -172,7 +172,7 @@ async fn verify_create_struct(
     effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
-    let target = Syntax::parse_type(
+    let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
         placeholder_error(format!("Test")),
         code_verifier.resolver.boxed_clone(),
@@ -182,7 +182,14 @@ async fn verify_create_struct(
     .await?
     .finalize(code_verifier.syntax.clone())
     .await;
-
+    target
+        .degeneric(
+            &code_verifier.process_manager.generics,
+            &code_verifier.syntax,
+            placeholder_error("No type!".to_string()),
+            placeholder_error("Bounds error!".to_string()),
+        )
+        .await?;
     let mut final_effects = Vec::default();
     for (field_name, effect) in effects {
         let mut i = 0;

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -10,14 +11,14 @@ use lazy_static::lazy_static;
 
 use async_trait::async_trait;
 
-use crate::{DataType, is_modifier, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
-use crate::{Attribute, ParsingError};
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
 use crate::code::{FinalizedMemberField, MemberField};
 use crate::function::{FunctionData, UnfinalizedFunction};
 use crate::top_element_manager::TopElementManager;
 use crate::types::{FinalizedTypes, Types};
+use crate::{is_modifier, DataType, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
+use crate::{Attribute, ParsingError};
 
 lazy_static! {
     /// 64-bit integer type
@@ -241,35 +242,12 @@ impl FinalizedStruct {
     /// Degenerics a finalized struct
     pub async fn degeneric(
         &mut self,
-        generics: &Vec<FinalizedTypes>,
+        generics: &HashMap<String, FinalizedTypes>,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> Result<(), ParsingError> {
-        let mut i = 0;
-        for value in self.generics.values_mut() {
-            for generic in value {
-                if let FinalizedTypes::Generic(name, bounds) = generic {
-                    let name = name.clone();
-                    let temp: &FinalizedTypes = generics.get(i).unwrap();
-                    for bound in bounds {
-                        if !temp.of_type(&bound, syntax.clone()).await {
-                            panic!("Generic {} set to a {} which isn't a {}", name, temp.name(), bound.name());
-                        }
-                    }
-                    generic.clone_from(temp);
-                    i += 1;
-                } else {
-                    unreachable!();
-                }
-            }
-        }
-
+        self.generics.clear();
         for field in &mut self.fields {
-            let types = &mut field.field.field_type;
-            if let FinalizedTypes::Generic(name, _) = types {
-                let index = self.generics.iter().position(|(other_name, _)| name == other_name).unwrap();
-                let generic: &FinalizedTypes = generics.get(index).unwrap();
-                types.clone_from(generic);
-            }
+            field.field.field_type.degeneric(generics, syntax, ParsingError::empty(), ParsingError::empty()).await?;
         }
 
         return Ok(());
