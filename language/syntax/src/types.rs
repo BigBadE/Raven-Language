@@ -9,7 +9,6 @@ use std::sync::Mutex;
 
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;
-use indexmap::IndexMap;
 
 use async_recursion::async_recursion;
 
@@ -98,14 +97,6 @@ impl FinalizedTypes {
             FinalizedTypes::Struct(structure, _) => structure.data.id,
             FinalizedTypes::Reference(inner) => inner.id(),
             _ => panic!("Tried to ID generic!"),
-        };
-    }
-
-    pub fn get_generic_types(&self) -> &IndexMap<String, Vec<FinalizedTypes>> {
-        return match self {
-            FinalizedTypes::Struct(base, _) => &base.generics,
-            FinalizedTypes::Reference(inner) => inner.get_generic_types(),
-            _ => panic!("Failed to get generic types!"),
         };
     }
 
@@ -528,7 +519,7 @@ impl FinalizedTypes {
             }
             FinalizedTypes::GenericType(base, bounds) => {
                 base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
-                let generic_bounds = base.get_generic_types();
+                let generic_bounds = &base.inner_struct().generics;
 
                 let mut found = HashMap::default();
                 for (name, generic_bounds) in generic_bounds {
