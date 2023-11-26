@@ -16,5 +16,5 @@ chalk-recursive = "0.94.0"
 
 dashmap = "5.5.3"
 
-tokio = { version = "1.27.0", features = [ "rt" ] }
+tokio = { version = "1.27.0", features = [ "rt", "sync", "time" ] }
 async-recursion = { version = "1.0.5", path = "../../crates/async-recursion" }

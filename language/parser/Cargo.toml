@@ -10,4 +10,4 @@ async-recursion = { version = "1.0.5", path = "../../crates/async-recursion" }
 anyhow = "1.0.75"
 indexmap = "2.1.0"
 
-tokio = { version = "1.33.0", features = ["rt"] }
+tokio = { version = "1.33.0", features = ["rt", "sync", "time"] }

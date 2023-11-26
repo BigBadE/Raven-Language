@@ -9,7 +9,7 @@ syntax = { path = "../syntax" }
 indexmap = "2.1.0"
 
 # CPU-bound async tasks
-tokio = { version = "1.33.0", features = ["rt"] }
+tokio = { version = "1.33.0", features = ["rt", "sync", "time"] }
 
 # Utility / Code Cleanliness
 anyhow = "1.0.75"

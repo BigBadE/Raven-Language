@@ -10,7 +10,7 @@ parser = { path = "../../../language/parser" }
 lsp-server = "0.7.4"
 lsp-types = {  version = "0.94.1", features = ["proposed"] }
 
-tokio = { version = "1.33.0", features = ["rt-multi-thread"] }
+tokio = { version = "1.33.0", features = ["rt-multi-thread", "sync", "time"] }
 
 crossbeam-channel = "0.5.8"
 
