@@ -3,6 +3,13 @@ name = "magpie"
 version = "0.1.0"
 edition = "2021"
 
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "benchmark"
+harness = false
+
 [dependencies]
 runner = { path = "../../language/runner" }
 data = { path = "../../language/data" }
@@ -11,4 +18,4 @@ async-recursion = { path = "../../crates/async-recursion" }
 
 include_dir = "0.7.3"
 
-tokio = { version = "1.33.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.33.0", features = ["rt-multi-thread", "macros", "time", "sync"] }
