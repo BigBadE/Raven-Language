@@ -34,3 +34,9 @@ Make sure that your LLVM_SYS_130_PREFIX is set with no backslashes "\" or spaces
 Double check that the bin folder exists in the LLVM_SYS_130_PREFIX path, along with an executable named "llvm_config"
 
 Restart you computer to make sure the environmental variable change takes place.
+
+## /usr/bin/ld: cannot find -lz: No such file or directory
+
+Install zlib1g-dev
+
+``sudo apt-get install zlib1g-dev``
