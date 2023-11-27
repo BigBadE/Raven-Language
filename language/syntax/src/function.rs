@@ -196,7 +196,8 @@ impl CodelessFinalizedFunction {
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
             let mut effect = arguments[i].get_return(variables).unwrap();
-            effect.fix_generics(resolver, syntax).await?;
+
+            effect.fix_generics(&*manager, syntax).await?;
             match method.arguments[i]
                 .field
                 .field_type

@@ -40,7 +40,7 @@ pub async fn check_impl_call(
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
         finding_return_type = found.get_return(variables).unwrap();
-        finding_return_type.fix_generics(&*code_verifier.resolver, &code_verifier.syntax).await?;
+        finding_return_type.fix_generics(code_verifier.process_manager, &code_verifier.syntax).await?;
         finalized_effects.insert(0, found);
     }
 

@@ -116,7 +116,8 @@ impl SourceSet for FileSourceSet {
     }
 
     fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path().replace(self.root.to_str().unwrap(), "").replace(path::MAIN_SEPARATOR, "::");
+        let name =
+            other.path().replace(self.root.to_str().unwrap(), "").replace(path::MAIN_SEPARATOR, "::").replace('/', "::");
         if name.len() == 0 {
             let path = other.path();
             let name: &str = path.split(path::MAIN_SEPARATOR).last().unwrap();
@@ -198,7 +199,8 @@ impl ParsingError {
         }
 
         if file.is_none() {
-            panic!("Missing file: {}", self.message);
+            println!("Missing file: {}", self.message);
+            return;
         }
         let file = file.unwrap();
         let contents = file.read();

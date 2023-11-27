@@ -60,7 +60,7 @@ impl Future for ImplWaiter {
     }
 }
 
-/// Waits for an implementation of the triat matching the constraints
+/// Waits for an implementation of the trait matching the constraints
 pub struct TraitImplWaiter<F> {
     /// The program
     pub syntax: Arc<Mutex<Syntax>>,

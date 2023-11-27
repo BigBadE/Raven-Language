@@ -11,14 +11,13 @@ use checker::output::TypesChecker;
 use data::{Arguments, CompilerArguments};
 use parser::parse;
 use syntax::async_util::HandleWrapper;
-use syntax::ParsingError;
 use syntax::syntax::Syntax;
+use syntax::ParsingError;
 
 use crate::{get_compiler, JoinWaiter};
 
 /// Runs Raven to completion with the given arguments
 pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    //Parse source, getting handles and building into the unresolved syntax.
     let handle = Arc::new(Mutex::new(HandleWrapper::new(settings.cpu_runtime.handle().clone())));
     let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
     syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
@@ -28,6 +27,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     let (sender, mut receiver) = mpsc::channel(1);
     let (go_sender, go_receiver) = mpsc::channel(1);
 
+    // Starts the compiler in anticipation of parsing
     settings.cpu_runtime.spawn(start(
         settings.runner_settings.compiler_arguments.clone(),
         sender,
@@ -36,6 +36,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     ));
 
     let mut handles = Vec::default();
+    // Parses source, getting handles and building into the unresolved syntax.
     for source_set in &settings.runner_settings.sources {
         for file in source_set.get_files() {
             if !file.path().ends_with("rv") {

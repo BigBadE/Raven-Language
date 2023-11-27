@@ -76,7 +76,7 @@ impl SourceSet for InnerFileSourceSet {
     }
 
     fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path().replace(path::MAIN_SEPARATOR, "::");
+        let name = other.path().replace(path::MAIN_SEPARATOR, "::").replace('/', "::");
         return name[0..name.len() - 3].to_string();
     }
 

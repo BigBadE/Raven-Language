@@ -8,7 +8,7 @@ use syntax::function::CodelessFinalizedFunction;
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
-use syntax::{is_modifier, Modifier, ParsingError, SimpleVariableManager};
+use syntax::{is_modifier, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
 
 /// Checks a method call to make sure it's valid
 pub async fn check_method_call(
@@ -78,7 +78,8 @@ pub async fn check_method_call(
             .await?;
             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
-            if !check_args(&method, &*code_verifier.resolver, &mut finalized_effects, &code_verifier.syntax, variables).await
+            if !check_args(&method, code_verifier.process_manager, &mut finalized_effects, &code_verifier.syntax, variables)
+                .await
             {
                 return Err(placeholder_error(format!(
                     "Incorrect args to method {}: {:?} vs {:?}",
@@ -125,7 +126,18 @@ pub async fn check_method_call(
             let variables = &variables;
             let resolver_ref = &*code_verifier.resolver;
             let returning = &returning;
-            let process_manager = code_verifier.process_manager;
+            let mut process_manager = code_verifier.process_manager.clone();
+
+            // GenericTypes are flattened, so a List<T> becomes List<str> for example.
+            // This means when trying to find any impl of List<str>, List<T> is ignored.
+            // This line is a hack that un-does that flattening and extracts the generics.
+            if let FinalizedTypes::GenericType(base, mut bounds) = return_type.unflatten() {
+                for (name, _) in &base.inner_struct().generics {
+                    process_manager.generics.insert(name.clone(), bounds.pop().unwrap());
+                }
+            }
+
+            let process_manager = &process_manager;
             let syntax = &code_verifier.syntax;
             let checker = async move |method| -> Result<FinalizedEffects, ParsingError> {
                 check_method(
@@ -139,6 +151,7 @@ pub async fn check_method_call(
                 )
                 .await
             };
+
             return TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
                 resolver: code_verifier.resolver.boxed_clone(),
@@ -226,7 +239,7 @@ pub async fn check_method(
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, resolver, &mut effects, syntax, variables).await {
+    if !check_args(&method, process_manager, &mut effects, syntax, variables).await {
         return Err(placeholder_error(format!(
             "Incorrect args to method {}: {:?} vs {:?}",
             method.data.name,
@@ -246,7 +259,7 @@ pub async fn check_method(
 /// Checks to see if arguments are valid
 pub async fn check_args(
     function: &Arc<CodelessFinalizedFunction>,
-    resolver: &dyn NameResolver,
+    process_manager: &dyn ProcessManager,
     args: &mut Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
@@ -261,7 +274,7 @@ pub async fn check_args(
             let inner = returning.as_mut().unwrap();
             let other = &function.arguments.get(i).unwrap().field.field_type;
 
-            inner.fix_generics(resolver, syntax).await.unwrap();
+            inner.fix_generics(process_manager, syntax).await.unwrap();
             if !inner.of_type(other, syntax.clone()).await {
                 return false;
             }

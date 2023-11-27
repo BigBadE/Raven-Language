@@ -1,0 +1,11 @@
+import list;
+
+pub struct ArrayList<T> {
+    array: [T];
+}
+
+impl<T> List<T> for ArrayList<T> {
+    fn get(self, index: u64) -> T {
+        return self.array[index];
+    }
+}

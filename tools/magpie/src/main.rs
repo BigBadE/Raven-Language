@@ -13,13 +13,13 @@ mod test;
 /// The core Raven library
 static CORE: Dir = include_dir!("lib/core/src");
 /// The universal standard library, which calls per-platform standards
-static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal");
+static STD_UNIVERSAL: Dir = include_dir!("lib/std/universal/src");
 /// The windows standard library
-static STD_WINDOWS: Dir = include_dir!("lib/std/windows");
+static STD_WINDOWS: Dir = include_dir!("lib/std/windows/src");
 /// The linux standard library
-static STD_LINUX: Dir = include_dir!("lib/std/linux");
+static STD_LINUX: Dir = include_dir!("lib/std/linux/src");
 /// The MacOS standard library
-static STD_MACOS: Dir = include_dir!("lib/std/macos");
+static STD_MACOS: Dir = include_dir!("lib/std/macos/src");
 //static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
 /// Finds the Raven project/file and runs it
@@ -153,7 +153,7 @@ impl SourceSet for InnerSourceSet {
     }
 
     fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path().replace(path::MAIN_SEPARATOR, "::");
+        let name = other.path().replace(path::MAIN_SEPARATOR, "::").replace('/', "::");
         return name[0..name.len() - 3].to_string();
     }
 

@@ -1,14 +1,11 @@
+import collections::array_list;
+import list::List;
 import stdio;
-import numbers::Match;
 
 fn main() {
-    if 4 == 4 {
-        printf("Passed!");
-    } else {
-        printf("Failed!");
-    }
+    let arraylist = new ArrayList<str> {
+        array: ["Test"],
+    };
 
-    for thing in my_struct.iter().some_other_call() {
-
-    }
+    print(arraylist.get(0));
 }
