@@ -244,10 +244,12 @@ impl FinalizedStruct {
         &mut self,
         generics: &HashMap<String, FinalizedTypes>,
         syntax: &Arc<Mutex<Syntax>>,
+        none_error: ParsingError,
+        bounds_error: ParsingError,
     ) -> Result<(), ParsingError> {
         self.generics.clear();
         for field in &mut self.fields {
-            field.field.field_type.degeneric(generics, syntax, ParsingError::empty(), ParsingError::empty()).await?;
+            field.field.field_type.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
         }
 
         return Ok(());

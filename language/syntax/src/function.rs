@@ -176,7 +176,6 @@ impl CodelessFinalizedFunction {
         arguments: &Vec<FinalizedEffects>,
         syntax: &Arc<Mutex<Syntax>>,
         variables: &SimpleVariableManager,
-        resolver: &dyn NameResolver,
         returning: Option<FinalizedTypes>,
     ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.
@@ -278,10 +277,10 @@ impl CodelessFinalizedFunction {
 
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();
-            handle.lock().unwrap().spawn(
-                new_method.data.name.clone(),
-                degeneric_code(syntax.clone(), original, resolver.boxed_clone(), new_method.clone(), manager),
-            );
+            handle
+                .lock()
+                .unwrap()
+                .spawn(new_method.data.name.clone(), degeneric_code(syntax.clone(), original, new_method.clone(), manager));
 
             return Ok(new_method);
         };
@@ -319,7 +318,6 @@ impl Future for GenericWaiter {
 async fn degeneric_code(
     syntax: Arc<Mutex<Syntax>>,
     original: Arc<CodelessFinalizedFunction>,
-    resolver: Box<dyn NameResolver>,
     degenericed_method: Arc<CodelessFinalizedFunction>,
     manager: Box<dyn ProcessManager>,
 ) {
@@ -331,7 +329,7 @@ async fn degeneric_code(
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
     // Degenerics the code body.
-    let code = match code.degeneric(&*manager, &*resolver, &mut variables, &syntax).await {
+    let code = match code.degeneric(&*manager, &mut variables, &syntax).await {
         Ok(inner) => inner,
         Err(error) => panic!("Error degenericing code: {}", error),
     };
@@ -413,12 +411,11 @@ impl FinalizedCodeBody {
     pub async fn degeneric(
         mut self,
         process_manager: &dyn ProcessManager,
-        resolver: &dyn NameResolver,
         variables: &mut SimpleVariableManager,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
-            expression.effect.degeneric(process_manager, variables, resolver, syntax).await?;
+            expression.effect.degeneric(process_manager, variables, syntax).await?;
         }
 
         return Ok(self);

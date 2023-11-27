@@ -2,7 +2,7 @@ use crate::check_code::{placeholder_error, verify_effect};
 use crate::output::TypesChecker;
 use crate::CodeVerifier;
 use std::sync::{Arc, Mutex};
-use syntax::async_util::{AsyncDataGetter, NameResolver};
+use syntax::async_util::AsyncDataGetter;
 use syntax::code::{Effects, FinalizedEffects};
 use syntax::function::CodelessFinalizedFunction;
 use syntax::syntax::Syntax;
@@ -124,7 +124,6 @@ pub async fn check_method_call(
 
             let effects = &finalized_effects;
             let variables = &variables;
-            let resolver_ref = &*code_verifier.resolver;
             let returning = &returning;
             let mut process_manager = code_verifier.process_manager.clone();
 
@@ -146,7 +145,6 @@ pub async fn check_method_call(
                     effects.clone(),
                     syntax,
                     variables,
-                    resolver_ref,
                     returning.clone(),
                 )
                 .await
@@ -196,7 +194,6 @@ pub async fn check_method_call(
         finalized_effects,
         &code_verifier.syntax,
         variables,
-        &*code_verifier.resolver,
         returning,
     )
     .await;
@@ -210,22 +207,13 @@ pub async fn check_method(
     mut effects: Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    resolver: &dyn NameResolver,
     returning: Option<FinalizedTypes>,
 ) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
 
-        method = CodelessFinalizedFunction::degeneric(
-            method,
-            Box::new(manager),
-            &effects,
-            syntax,
-            variables,
-            resolver,
-            returning,
-        )
-        .await?;
+        method =
+            CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects, syntax, variables, returning).await?;
 
         let temp_effect = match method.return_type.as_ref() {
             Some(returning) => FinalizedEffects::MethodCall(

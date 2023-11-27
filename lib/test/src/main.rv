@@ -7,5 +7,5 @@ fn main() {
         array: ["Test"],
     };
 
-    print(arraylist.get(0));
+    printf(arraylist.get(0));
 }

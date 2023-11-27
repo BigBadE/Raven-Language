@@ -8,7 +8,7 @@ use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, Finali
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use syntax::{is_modifier, Modifier, ParsingError, SimpleVariableManager};
+use syntax::{is_modifier, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
 
 /// Verifies a function and returns its code, which is verified seperate to prevent deadlocks
 pub async fn verify_function(
@@ -78,8 +78,26 @@ pub async fn verify_function_code(
     }
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
-    let mut code_verifier =
-        CodeVerifier { process_manager, resolver, return_type: codeless.return_type.clone(), syntax: syntax.clone() };
+    let mut process_manager = process_manager.clone();
+    for (name, bounds) in resolver.generics() {
+        let mut output = vec![];
+        for bound in bounds {
+            output.push(
+                Syntax::parse_type(syntax.clone(), ParsingError::empty(), resolver.boxed_clone(), bound.clone(), vec![])
+                    .await?
+                    .finalize(syntax.clone())
+                    .await,
+            )
+        }
+        process_manager.mut_generics().insert(name.clone(), FinalizedTypes::Generic(name.clone(), output));
+    }
+
+    let mut code_verifier = CodeVerifier {
+        process_manager: &process_manager,
+        resolver,
+        return_type: codeless.return_type.clone(),
+        syntax: syntax.clone(),
+    };
     let mut code = verify_code(&mut code_verifier, &mut variable_manager, code, true).await?;
 
     // Checks the return type exists

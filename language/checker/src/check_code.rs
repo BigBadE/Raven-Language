@@ -182,15 +182,25 @@ async fn verify_create_struct(
     .await?
     .finalize(code_verifier.syntax.clone())
     .await;
+    let mut generics = code_verifier.process_manager.generics.clone();
+
+    if let Some((base, bounds)) = target.inner_generic_type() {
+        let mut i = 0;
+        for (name, _) in &base.inner_struct().generics {
+            generics.insert(name.clone(), bounds[i].clone());
+            i += 1;
+        }
+    }
+
     target
         .degeneric(
-            &code_verifier.process_manager.generics,
+            &generics,
             &code_verifier.syntax,
             placeholder_error("No type!".to_string()),
             placeholder_error("Bounds error!".to_string()),
         )
         .await?;
-    let mut final_effects = Vec::default();
+    let mut final_effects = vec![];
     for (field_name, effect) in effects {
         let mut i = 0;
         let fields = target.get_fields();

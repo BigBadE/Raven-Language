@@ -12,7 +12,7 @@ use chalk_solve::rust_ir::TraitDatum;
 
 use async_recursion::async_recursion;
 
-use crate::async_util::{AsyncDataGetter, NameResolver};
+use crate::async_util::AsyncDataGetter;
 use crate::chalk_interner::ChalkIr;
 use crate::code::FinalizedMemberField;
 use crate::function::{display, display_parenless, FunctionData};
@@ -115,24 +115,8 @@ impl FinalizedTypes {
             }
             FinalizedTypes::Reference(inner) => inner.fix_generics(resolver, syntax).await?,
             FinalizedTypes::Array(inner) => inner.fix_generics(resolver, syntax).await?,
-            FinalizedTypes::Generic(name, bounds) => {
-                let found = &resolver.generics()[name];
-                let mut temp = vec![];
-                for bound in found {
-                    temp.push(
-                        Syntax::parse_type(
-                            syntax.clone(),
-                            ParsingError::empty(),
-                            resolver.boxed_clone(),
-                            bound.clone(),
-                            vec![],
-                        )
-                        .await?
-                        .finalize(syntax.clone())
-                        .await,
-                    )
-                }
-                *bounds = temp;
+            FinalizedTypes::Generic(name, _) => {
+                *self = resolver.generics()[name].clone();
             }
             FinalizedTypes::GenericType(base, bounds) => {
                 base.fix_generics(resolver, syntax).await?;
@@ -239,6 +223,14 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => inner.inner_struct(),
             FinalizedTypes::GenericType(inner, _) => inner.inner_struct(),
             _ => panic!("Tried to get inner struct of invalid type! {:?}", self),
+        };
+    }
+
+    pub fn inner_generic_type(&self) -> Option<(&Box<FinalizedTypes>, &Vec<FinalizedTypes>)> {
+        return match self {
+            FinalizedTypes::GenericType(inner, bounds) => Some((inner, bounds)),
+            FinalizedTypes::Reference(inner) => inner.inner_generic_type(),
+            _ => None,
         };
     }
 
@@ -532,12 +524,17 @@ impl FinalizedTypes {
                     }
                     found.insert(name.clone(), bound.clone());
                 }
-                *self = base.flatten(&mut found, syntax).await?;
+                *self = base.flatten(&mut found, syntax, none_error, bounds_error).await?;
                 Ok(())
             }
             FinalizedTypes::Reference(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
             FinalizedTypes::Array(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
-            _ => Ok(()),
+            FinalizedTypes::Struct(inner, _) => {
+                let mut temp = FinalizedStruct::clone(inner);
+                temp.degeneric(generics, syntax, none_error, bounds_error).await?;
+                *inner = Arc::new(temp);
+                Ok(())
+            }
         };
     }
 
@@ -556,6 +553,8 @@ impl FinalizedTypes {
         &self,
         generics: &HashMap<String, FinalizedTypes>,
         syntax: &Arc<Mutex<Syntax>>,
+        none_error: ParsingError,
+        bounds_error: ParsingError,
     ) -> Result<FinalizedTypes, ParsingError> {
         return match self {
             FinalizedTypes::Struct(found, _) => {
@@ -609,7 +608,7 @@ impl FinalizedTypes {
                     let mut data =
                         FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), found.data.clone()).await.deref());
                     data.data.clone_from(&arc_other);
-                    data.degeneric(generics, syntax).await?;
+                    data.degeneric(generics, syntax, none_error, bounds_error).await?;
                     let data = Arc::new(data);
                     // Add the flattened type to the
                     let mut locked = syntax.lock().unwrap();
@@ -629,8 +628,8 @@ impl FinalizedTypes {
                     ))
                 }
             }
-            FinalizedTypes::Reference(other) => other.flatten(generics, syntax).await,
-            FinalizedTypes::Array(inner) => inner.flatten(generics, syntax).await,
+            FinalizedTypes::Reference(other) => other.flatten(generics, syntax, none_error, bounds_error).await,
+            FinalizedTypes::Array(inner) => inner.flatten(generics, syntax, none_error, bounds_error).await,
             _ => panic!("Unresolved generic!"),
         };
     }

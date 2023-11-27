@@ -194,7 +194,6 @@ async fn try_get_impl(data: &ImplCheckerData<'_>) -> Result<Option<FinalizedEffe
                 data.finalized_effects.clone(),
                 &data.code_verifier.syntax,
                 &data.variables,
-                &*data.code_verifier.resolver,
                 returning,
             )
             .await
