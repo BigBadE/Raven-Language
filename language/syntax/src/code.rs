@@ -123,7 +123,7 @@ pub enum Effects {
     ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
     // Finds the method with the name and calls it with those arguments.
     // Calling, calling function, function arguments, and return type (if explicitly required, see CodelessFinalizedFunction::degeneric)
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>),
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>, CodeErrorToken),
     // Sets the variable to a value.
     Set(Box<Effects>, Box<Effects>),
     // Loads variable with the given name.

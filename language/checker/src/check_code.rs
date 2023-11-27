@@ -328,7 +328,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 panic!("Screwed up trait! {} for {:?}", traits, resolver.imports());
             }
         }
-        Effects::MethodCall(calling, method, effects, returning) => {
+        Effects::MethodCall(calling, method, effects, returning, token) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?)
@@ -352,9 +352,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         }
 
                         if output.len() > 1 {
-                            return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
+                            return Err(token.make_error(format!("Duplicate method {} for generic!", method)));
                         } else if output.is_empty() {
-                            return Err(placeholder_error(format!("No method {} for generic!", method)));
+                            return Err(token.make_error(format!("No method {} for generic!", method)));
                         }
 
                         let (found_trait, found) = output.pop().unwrap();
@@ -367,13 +367,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
                     finalized_effects.insert(0, calling);
 
-                    let method = Syntax::get_function(syntax.clone(), placeholder_error(
+                    let method = Syntax::get_function(syntax.clone(), token.make_error(
                         format!("Failed to find method {}::{}", return_type.inner_struct().data.name, method)),
                                                       format!("{}::{}", return_type.inner_struct().data.name, method), resolver.boxed_clone(), false).await?;
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
 
                     if !check_args(&method, &mut finalized_effects, syntax, variables).await {
-                        return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
+                        return Err(token.make_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                                              finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
                     }
@@ -393,16 +393,16 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         resolver: resolver.boxed_clone(),
                         method: method.clone(),
                         return_type: return_type.clone(),
-                        error: placeholder_error(format!("Unknown method {}", method)),
+                        error: token.make_error(format!("Unknown method {}", method)),
                     }.await?
                 }
             } else {
-                Syntax::get_function(syntax.clone(), placeholder_error(format!("Unknown method {}", method)),
+                Syntax::get_function(syntax.clone(), token.make_error(format!("Unknown method {}", method)),
                                      method, resolver.boxed_clone(), true).await?
             };
 
             let returning = match returning {
-                Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
+                Some(inner) => Some(Syntax::parse_type(syntax.clone(), token.make_error(format!("Bounds error!")),
                                                        resolver, inner, vec!()).await?.finalize(syntax.clone()).await),
                 None => None
             };

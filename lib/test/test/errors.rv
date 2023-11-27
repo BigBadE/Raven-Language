@@ -1,5 +1,7 @@
 import stdio;
 
 fn test() -> bool {
+
+  test_error();
   return false;
 }

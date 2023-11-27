@@ -78,7 +78,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                         let name = last.to_string(parser_utils.buffer);
                         // The calling effect must be boxed if it exists.
                         effect = Some(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
-                                                          name.clone(), effects, None));
+                                                          name.clone(), effects, None, CodeErrorToken::new(last.clone(), parser_utils.file.clone())));
                     }
                     // If it's not a method call, it's a parenthesized effect.
                     _ => if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
@@ -368,6 +368,7 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
 fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
                         -> Result<Effects, ParsingError> {
     let name = parser_utils.tokens.get(parser_utils.index - 2).unwrap().to_string(parser_utils.buffer);
+    let token = parser_utils.tokens[parser_utils.index - 2].clone();
     // Get the type being expressed. Should only be one type.
     let returning: Option<UnparsedType> = if let UnparsedType::Generic(_, bounds) = add_generics(String::new(), parser_utils).0 {
         if bounds.len() != 1 {
@@ -396,7 +397,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     }
 
     return Ok(Effects::MethodCall(effect.map(|inner| Box::new(inner)),
-                                  name.clone(), effects, returning));
+                                  name.clone(), effects, returning, CodeErrorToken::new(token, parser_utils.file.clone())));
 }
 
 fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
