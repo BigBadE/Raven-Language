@@ -135,7 +135,7 @@ pub enum Effects {
     // Struct to create and a tuple of the name of the field and the argument.
     CreateStruct(UnparsedType, Vec<(String, Effects, CodeErrorToken)>, CodeErrorToken),
     // Creates an array of the given effects.
-    CreateArray(Vec<Effects>),
+    CreateArray(Vec<(Effects, CodeErrorToken)>),
     // Creates a constant of the given type.
     Float(f64),
     Int(i64),

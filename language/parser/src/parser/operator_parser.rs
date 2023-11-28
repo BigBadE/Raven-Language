@@ -25,6 +25,7 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
         parser_utils.index += 1;
     }
 
+    let mut first_element_token = CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone());
     let (mut index, mut tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
     let mut right = match parse_line(parser_utils, match state {
         ParseState::ControlVariable | ParseState::ControlOperator => ParseState::ControlOperator,
@@ -33,21 +34,24 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
         Ok(inner) => inner.map(|inner| inner.effect),
         Err(_) => None
     };
+    first_element_token.change_token_end(&parser_utils.tokens[parser_utils.index]);
 
     if right.is_some() {
         while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
+            let mut next_element_token = CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone());
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
-            if let Some(found) = next {
-                if let Effects::NOP() = &found {
+            next_element_token.change_token_end(&parser_utils.tokens[parser_utils.index]);
+            if let Some(next_element) = next {
+                if let Effects::NOP() = &next_element {
                     break;
                 }
                 right = match right.unwrap() {
                     Effects::CreateArray(mut inner) => {
-                        inner.push(found);
+                        inner.push((found, next_element_token));
                         Some(Effects::CreateArray(inner))
                     }
-                    other => Some(Effects::CreateArray(vec!(other, found)))
+                    first_element => Some(Effects::CreateArray(vec!((first_element, first_element_token), (next_element, next_element_token))))
                 };
             } else {
                 break;
