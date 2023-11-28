@@ -48,10 +48,10 @@ pub fn parse_operator(last: Option<Effects>, parser_utils: &mut ParserUtils, sta
                 }
                 right = match right.unwrap() {
                     Effects::CreateArray(mut inner) => {
-                        inner.push((found, next_element_token));
+                        inner.push((next_element, next_element_token));
                         Some(Effects::CreateArray(inner))
                     }
-                    first_element => Some(Effects::CreateArray(vec!((first_element, first_element_token), (next_element, next_element_token))))
+                    first_element => Some(Effects::CreateArray(vec!((first_element, first_element_token.clone()), (next_element, next_element_token))))
                 };
             } else {
                 break;

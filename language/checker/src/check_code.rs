@@ -84,7 +84,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                 let mut last = values.pop().unwrap();
                 if let Effects::CreateArray(mut effects) = last {
                     if effects.len() > 0 {
-                        last = effects.pop().unwrap();
+                        last = effects.pop().unwrap().0;
                         reading_array = Some(effects);
                     } else {
                         last = Effects::CreateArray(vec!());
@@ -125,7 +125,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 if inner_array {
                                     if let Effects::CreateArray(last) = values.last_mut().unwrap() {
                                         for effect in effects {
-                                            last.push(effect);
+                                            last.push((effect, token.clone()));
                                         }
                                     }
                                 } else {
@@ -144,12 +144,12 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 }.await?;
 
                                 (outer_operation, values) = assign_with_priority(new_operation.clone(), &found, values,
-                                                                                 new_inner, &inner_data, effects, inner_array, token, inner_token);
+                                                                                 new_inner, &inner_data, effects, inner_array, token.clone(), inner_token);
                             }
                         } else {
                             if let Some(mut found) = reading_array {
-                                if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                                    inner.push(Effects::Operation(inner_operation, effects, inner_token));
+                                if let (Effects::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
+                                    inner.push((Effects::Operation(inner_operation, effects, inner_token.clone()), token.clone()));
                                 } else {
                                     panic!("Expected array!");
                                 }
@@ -166,24 +166,24 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                                 }.await?;
 
                                 (outer_operation, values) = assign_with_priority(operation.clone(), &outer_data, values,
-                                                                                 inner_operation, &inner_data, effects, false, token, inner_token);
+                                                                                 inner_operation, &inner_data, effects, false, token.clone(), inner_token);
                             }
                         }
                     } else {
                         if let Some(mut found) = reading_array {
-                            if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                                inner.push(Effects::Operation(inner_operation, effects, inner_token));
+                            if let (Effects::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
+                                inner.push((Effects::Operation(inner_operation, effects, inner_token.clone()), token.clone()));
                             } else {
                                 panic!("Expected array!");
                             }
                         } else {
-                            values.push(Effects::Operation(inner_operation, effects, token));
+                            values.push(Effects::Operation(inner_operation, effects, token.clone()));
                         }
                     }
                 } else {
                     if let Some(mut found) = reading_array {
-                        if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                            inner.push(last);
+                        if let (Effects::CreateArray(inner), token) = found.last_mut().unwrap() {
+                            inner.push((last, token.clone()));
                         } else {
                             panic!("Expected array!");
                         }
@@ -205,7 +205,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}") {
                 if let Effects::CreateArray(_) = values.get(0).unwrap() {} else {
-                    let effect = Effects::CreateArray(vec!(values.remove(0)));
+                    let effect = Effects::CreateArray(vec!((values.remove(0), token)));
                     values.push(effect);
                 }
             }
@@ -467,22 +467,22 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
         Effects::Char(char) => store(FinalizedEffects::Char(char)),
         Effects::CreateArray(effects) => {
             let mut output = Vec::new();
-            for effect in effects {
-                output.push(verify_effect(process_manager, resolver.boxed_clone(), effect,
-                                          return_type, syntax, variables, references).await?);
+            for (effect, token) in effects {
+                output.push((verify_effect(process_manager, resolver.boxed_clone(), effect,
+                                          return_type, syntax, variables, references).await?, token));
             }
 
-            let types = output.get(0).map(|found| found.get_return(variables).unwrap());
+            let types = output.get(0).map(|found| found.0.get_return(variables).unwrap());
             if let Some(found) = &types {
-                for checking in &output {
+                for (checking, token) in &output {
                     let returning = checking.get_return(variables).unwrap();
                     if !returning.of_type(found, syntax.clone()).await {
-                        return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
+                        return Err(token.make_error(format!("{:?} isn't a {:?}!", checking, types)));
                     }
                 }
             }
 
-            store(FinalizedEffects::CreateArray(types, output))
+            store(FinalizedEffects::CreateArray(types, output.into_iter().map(|(finalized_effect, _token)| finalized_effect).collect()))
         }
     };
     return Ok(output);
@@ -585,7 +585,7 @@ pub fn assign_with_priority(operation: String, found: &Arc<StructData>, mut valu
     return if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
         if inner_array {
             if let Effects::CreateArray(inner) = values.last_mut().unwrap() {
-                inner.push(inner_effects.remove(0));
+                inner.push((inner_effects.remove(0), inner_token));
             } else {
                 panic!("Assumed op args ended with an array when they didn't!")
             }
