@@ -2,11 +2,5 @@ import stdio;
 
 fn test() -> bool {
   let test = 8;
-  test = function_return();
   return false;
-}
-
-
-fn function_return() {
-  return;
 }

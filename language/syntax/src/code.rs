@@ -133,7 +133,7 @@ pub enum Effects {
     CodeBody(CodeBody),
     // Finds the implementation of the given trait for the given calling type, and calls the given method.
     // Calling, trait to call, function name, args, and return type (if explicitly required)
-    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
+    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>, CodeErrorToken),
     // Finds the method with the name and calls it with those arguments.
     // Calling, calling function, function arguments, and return type (if explicitly required, see CodelessFinalizedFunction::degeneric)
     MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>, CodeErrorToken),

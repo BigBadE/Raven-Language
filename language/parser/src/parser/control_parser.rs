@@ -268,17 +268,16 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32, error_
     body.expressions.insert(0, Expression::new(ExpressionType::Line,
                                                Effects::CreateVariable(name.clone(), Box::new(Effects::ImplementationCall(
                                                    Box::new(Effects::LoadVariable(variable.clone())),
-                                                   "iter::Iter".to_string(), "next".to_string(), vec!(), None)), error_token.clone())));
+                                                   "iter::Iter".to_string(), "next".to_string(), vec!(), None, error_token.clone())), error_token.clone())));
 
     // Jumps to the header of the for loop after each loop
     body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id + 1).to_string())));
 
     let for_check = CodeBody::new(vec!(
-        Expression::new(ExpressionType::Line,
-                        Effects::CompareJump(Box::new(Effects::ImplementationCall(
-                            Box::new(Effects::LoadVariable(variable.clone())), "iter::Iter".to_string(),
-                            "has_next".to_string(), vec!(), None)),
-                                             body.label.clone(), id.to_string() + "end"))), (id + 1).to_string());
+        Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(Effects::ImplementationCall( 
+                Box::new(Effects::LoadVariable(variable.clone())), "iter::Iter".to_string(),
+                "has_next".to_string(), vec!(), None, error_token.clone())),
+            body.label.clone(), id.to_string() + "end"))), (id + 1).to_string());
     // Checks if the end is reached, and if so jumps to the end of the block.
     // The block after is named id + end so it can be named before it exists.
     top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(for_check)));

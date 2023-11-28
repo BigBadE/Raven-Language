@@ -205,7 +205,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}") {
                 if let Effects::CreateArray(_) = values.get(0).unwrap() {} else {
-                    let effect = Effects::CreateArray(vec!((values.remove(0), token)));
+                    let effect = Effects::CreateArray(vec!((values.remove(0), token.clone())));
                     values.push(effect);
                 }
             }
@@ -219,10 +219,10 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
 
             verify_effect(process_manager, resolver,
                           Effects::ImplementationCall(calling, operation.name.clone(),
-                                                      String::new(), values, None),
+                                                      String::new(), values, None, token.clone()),
                           return_type, syntax, variables, references).await?
         }
-        Effects::ImplementationCall(calling, traits, method, effects, returning) => {
+        Effects::ImplementationCall(calling, traits, method, effects, returning, token) => {
             let mut finalized_effects = Vec::new();
             for effect in effects {
                 finalized_effects.push(verify_effect(process_manager, resolver.boxed_clone(), effect, return_type, syntax, variables, references).await?)
@@ -251,9 +251,9 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         } else if found.name.split("::").last().unwrap() == method {
                             let mut target = finding_return_type.find_method(&method).unwrap();
                             if target.len() > 1 {
-                                return Err(placeholder_error(format!("Ambiguous function {}", method)));
+                                return Err(token.make_error(format!("Ambiguous function {}", method)));
                             } else if target.is_empty() {
-                                return Err(placeholder_error(format!("Unknown function {}", method)));
+                                return Err(token.make_error(format!("Unknown function {}", method)));
                             }
                             let (_, target) = target.pop().unwrap();
 
@@ -278,8 +278,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                     }
 
                     if !method.is_empty() {
-                        return Err(placeholder_error(
-                            format!("Unknown method {} in {}", method, data)));
+                        return Err(token.make_error(format!("Unknown method {} in {}", method, data)));
                     }
                 }
 
@@ -288,8 +287,8 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                         syntax: syntax.clone(),
                         return_type: finding_return_type.clone(),
                         data: data.clone(),
-                        error: placeholder_error(
-                            format!("Nothing implements {} for {}", inner, finding_return_type)),
+                        // unsure about following error, making best guess for now
+                        error: token.make_error(format!("Nothing implements {} for {}", inner, finding_return_type)),
                     }.await?;
 
                     for temp in &result {
@@ -297,7 +296,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             let method = AsyncDataGetter::new(syntax.clone(), temp.clone()).await;
 
                             let returning = match &returning {
-                                Some(inner) => Some(Syntax::parse_type(syntax.clone(), placeholder_error(format!("Bounds error!")),
+                                Some(inner) => Some(Syntax::parse_type(syntax.clone(), token.make_error(format!("Bounds error!")),
                                                                        resolver.boxed_clone(), inner.clone(), vec!()).await?.finalize(syntax.clone()).await),
                                 None => None
                             };
