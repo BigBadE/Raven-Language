@@ -104,6 +104,13 @@ impl CodeErrorToken {
         self.token.end = end_token.end;
         self.token.end_offset = end_token.end_offset;
     }
+
+    pub fn make_empty() -> Self {
+       return Self {
+            token: Token::new(TokenTypes::Colon, None, (0, 0), 0, (0, 0), 0, ),
+            file_name: String::default()
+        } 
+    }
 }
 
 

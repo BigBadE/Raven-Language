@@ -14,8 +14,8 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     let mut types = ExpressionType::Line;
     while let Some(expression) =
         parse_line(parser_utils, ParseState::None)? {
-        if expression.expression_type != ExpressionType::Line {
-            types = expression.expression_type;
+        if !(expression.expression_type == ExpressionType::Line) {
+            types = expression.clone().expression_type;
         }
         lines.push(expression);
     }
@@ -159,7 +159,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 }
             }
             TokenTypes::Return => {
-                expression_type = ExpressionType::Return
+                expression_type = ExpressionType::Return(CodeErrorToken::new(token.clone(), parser_utils.file.clone()))
             }
             TokenTypes::New => {
                 if effect.is_some() {
@@ -178,7 +178,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
                 // Get the code in the next block.
                 let (returning, body) = parse_code(parser_utils)?;
                 // If the inner block returns/breaks, then the outer one should too
-                if expression_type == ExpressionType::Line {
+                if matches!(expression_type, ExpressionType::Line) {
                     expression_type = returning;
                 }
                 effect = Some(Effects::CodeBody(body));
@@ -196,7 +196,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState)
 
                 let expression = parse_if(parser_utils)?;
                 // If the if returns/breaks, the outer block should too
-                if expression_type == ExpressionType::Line {
+                if matches!(expression_type, ExpressionType::Line) {
                     expression_type = expression.expression_type;
                 }
                 return Ok(Some(Expression::new(expression_type, expression.effect)));

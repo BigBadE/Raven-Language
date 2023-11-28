@@ -28,10 +28,10 @@ pub struct FinalizedExpression {
 }
 
 /// the types of expressions: a normal line, a return, or a break (for inside control statements).
-#[derive(Clone, Copy, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum ExpressionType {
     Break,
-    Return,
+    Return(CodeErrorToken),
     Line,
 }
 
@@ -64,6 +64,19 @@ pub struct FinalizedMemberField {
     pub attributes: Vec<Attribute>,
     pub field: FinalizedField,
 }
+
+impl PartialEq for ExpressionType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ExpressionType::Return(_), ExpressionType::Return(_)) => true,
+            (ExpressionType::Line, ExpressionType::Line) => true, 
+            (ExpressionType::Break, ExpressionType::Break) => true, 
+            _ => false
+        }
+
+    }
+}
+
 
 impl MemberField {
     pub fn new(modifiers: u8, attributes: Vec<Attribute>, field: Field) -> Self {

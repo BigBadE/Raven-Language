@@ -55,7 +55,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             let (other_returning, body) = parse_code(parser_utils)?;
             // An if statement is only the return of the block if every code path returns, so if they differ
             // this can't be a return block.
-            if other_returning != returning {
+            if other_returning == returning {
                 returning = ExpressionType::Line;
             }
             else_ifs.push((effect.unwrap().effect, body));
@@ -64,7 +64,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             // Get the else body
             let (other_returning, body) = parse_code(parser_utils)?;
             // Check to make sure the else body returns if the other bodies do.
-            if other_returning != returning {
+            if other_returning == returning {
                 returning = ExpressionType::Line;
             }
             else_body = Some(body);

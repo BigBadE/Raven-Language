@@ -75,7 +75,7 @@ pub fn compile_block<'ctx>(code: &FinalizedCodeBody, function: FunctionValue<'ct
     let mut broke = false;
     for line in &code.expressions {
         match line.expression_type {
-            ExpressionType::Return => {
+            ExpressionType::Return(_) => {
                 if let FinalizedEffects::CodeBody(body) = &line.effect {
                     if !broke {
                         let destination = unwrap_or_create(&body.label, function, type_getter);

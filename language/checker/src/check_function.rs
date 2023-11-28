@@ -9,6 +9,7 @@ use syntax::types::FinalizedTypes;
 use crate::finalize_generics;
 use crate::check_code::{placeholder_error, verify_code};
 use crate::output::TypesChecker;
+use data::tokens::{CodeErrorToken};
 
 pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mutex<Syntax>>,
                              include_refs: bool) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
@@ -70,7 +71,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
 
     if !code.returns {
         if codeless.return_type.is_none() {
-            code.expressions.push(FinalizedExpression::new(ExpressionType::Return, FinalizedEffects::NOP()));
+            code.expressions.push(FinalizedExpression::new(ExpressionType::Return(CodeErrorToken::make_empty()), FinalizedEffects::NOP()));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(placeholder_error(format!("Function {} returns void instead of a {}!", codeless.data.name,
                                                  codeless.return_type.as_ref().unwrap())));

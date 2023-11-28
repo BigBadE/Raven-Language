@@ -24,11 +24,11 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
             _ => {}
         }
 
-        body.push(FinalizedExpression::new(line.expression_type,
+        body.push(FinalizedExpression::new(line.expression_type.clone(),
                                            verify_effect(process_manager, resolver.boxed_clone(),
                                                          line.effect, return_type, syntax, variables, references).await?));
 
-        if let ExpressionType::Return = line.expression_type {
+        if let ExpressionType::Return(token) = line.expression_type {
             if let Some(return_type) = return_type {
                 let mut last = body.pop().unwrap();
                 let last_type = last.effect.get_return(variables).unwrap();
@@ -41,10 +41,10 @@ pub async fn verify_code(process_manager: &TypesChecker, resolver: &Box<dyn Name
                             data: return_type.clone(),
                             error: placeholder_error(format!("You shouldn't see this! Report this!")),
                         }.await?;
-                        last = FinalizedExpression::new(ExpressionType::Return,
+                        last = FinalizedExpression::new(ExpressionType::Return(token),
                                                         FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone()));
                     } else {
-                        return Err(placeholder_error(format!("Expected {}, found {}", return_type, last_type)));
+                        return Err(token.make_error(format!("Expected {}, found {}", return_type, last_type)));
                     }
                 }
                 body.push(last);
