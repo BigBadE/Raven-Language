@@ -11,7 +11,7 @@ use syntax::types::Types;
 use std::sync::Mutex;
 
 use crate::{ImportNameResolver, TokenTypes};
-use data::tokens::Token;
+use data::tokens::{Token, CodeErrorToken};
 
 pub struct ParserUtils<'a> {
     pub buffer: &'a [u8],
@@ -143,6 +143,8 @@ impl<'a> ParserUtils<'a> {
                     code: CodeBody::new(Vec::new(), "empty".to_string()),
                     return_type: None,
                     data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
+                    // unsure about this, but if it errors, i don't know what to do
+                    token: CodeErrorToken::make_empty()
                 }
             }
         };

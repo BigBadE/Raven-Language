@@ -10,6 +10,7 @@ use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
+use data::tokens::{CodeErrorToken};
 
 #[derive(Clone)]
 pub struct TypesChecker {
@@ -44,6 +45,8 @@ impl ProcessManager for TypesChecker {
                     arguments: vec![],
                     return_type: None,
                     data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
+                    // unsure about this, but if it errors, i don't know what to do
+                    token: CodeErrorToken::make_empty()
                 }, CodeBody::new(Vec::new(), String::new()))
             }
         }
@@ -61,6 +64,8 @@ impl ProcessManager for TypesChecker {
                     code: Default::default(),
                     return_type: None,
                     data: Arc::new(FunctionData::new(Vec::new(), 0, String::new())),
+                    // unsure about this, but if it errors, i don't know what to do
+                    token: CodeErrorToken::make_empty()
                 }
             }
         }

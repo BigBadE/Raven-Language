@@ -1,10 +1,12 @@
 import stdio;
 
 fn test() -> bool {
-  let test = [1, 2, 3];
+  let test = 8;
+  test = function_return();
   return false;
 }
 
-fn bad_return() -> bool {
-  return 1;
+
+fn function_return() {
+  return;
 }

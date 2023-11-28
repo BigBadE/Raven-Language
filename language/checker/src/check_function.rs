@@ -7,7 +7,7 @@ use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, Finali
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
 use crate::finalize_generics;
-use crate::check_code::{placeholder_error, verify_code};
+use crate::check_code::{verify_code};
 use crate::output::TypesChecker;
 use data::tokens::{CodeErrorToken};
 
@@ -39,6 +39,7 @@ pub async fn verify_function(mut function: UnfinalizedFunction, syntax: &Arc<Mut
         arguments: fields,
         return_type,
         data: function.data.clone(),
+        token: function.token.clone()
     };
 
     return Ok((codeless, function.code));
@@ -73,7 +74,7 @@ pub async fn verify_function_code(process_manager: &TypesChecker, resolver: Box<
         if codeless.return_type.is_none() {
             code.expressions.push(FinalizedExpression::new(ExpressionType::Return(CodeErrorToken::make_empty()), FinalizedEffects::NOP()));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
-            return Err(placeholder_error(format!("Function {} returns void instead of a {}!", codeless.data.name,
+            return Err(codeless.token.make_error(format!("Function {} returns void instead of a {}!", codeless.data.name,
                                                  codeless.return_type.as_ref().unwrap())));
         }
     }

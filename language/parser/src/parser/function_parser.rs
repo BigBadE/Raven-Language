@@ -10,7 +10,7 @@ use syntax::types::Types;
 use crate::parser::code_parser::parse_code;
 use crate::parser::struct_parser::{parse_generics, to_field};
 use crate::parser::util::ParserUtils;
-use data::tokens::TokenTypes;
+use data::tokens::{TokenTypes, CodeErrorToken};
 
 pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attributes: Vec<Attribute>, modifiers: Vec<Modifier>)
                       -> Result<UnfinalizedFunction, ParsingError> {
@@ -22,6 +22,8 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
 
     let mut last_arg = String::new();
     let mut last_arg_type = String::new();
+
+    let token = parser_utils.tokens[parser_utils.index].clone();
 
     while !parser_utils.tokens.is_empty() {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -92,6 +94,7 @@ pub fn parse_function(parser_utils: &mut ParserUtils, trait_function: bool, attr
         code: code.unwrap_or(CodeBody::new(Vec::new(), "empty".to_string())),
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name)),
+        token: CodeErrorToken::new(token, parser_utils.file.clone())
     });
 }
 
