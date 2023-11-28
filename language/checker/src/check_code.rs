@@ -261,13 +261,13 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             if let FinalizedTypes::Generic(_, _) = return_type {
                                 return Ok(FinalizedEffects::GenericVirtualCall(i, target,
                                                                                AsyncDataGetter::new(syntax.clone(), found.clone()).await,
-                                                                               finalized_effects));
+                                                                               finalized_effects, token.clone()));
                             }
 
                             syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
                                 degeneric_header(target.clone(),
                                                  found.clone(), syntax.clone(), process_manager.cloned(),
-                                                 finalized_effects.clone(), variables.clone()));
+                                                 finalized_effects.clone(), variables.clone(), token.clone()));
 
                             let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
                             return Ok(FinalizedEffects::VirtualCall(i,

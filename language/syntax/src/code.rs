@@ -194,7 +194,7 @@ pub enum FinalizedEffects {
     // and on the given arguments (first argument must be the downcased trait).
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     // Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
-    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, CodeErrorToken),
     // Downcasts a structure into its trait, which can only be used in a VirtualCall.
     Downcast(Box<FinalizedEffects>, FinalizedTypes),
     // Internally used by low-level verifier to store a type on the heap.
@@ -268,7 +268,7 @@ impl FinalizedEffects {
                 function.return_type.as_ref().map(|inner| {
                     FinalizedTypes::Reference(Box::new(inner.clone()))
                 }),
-            FinalizedEffects::GenericVirtualCall(_, _, function, _) => function.return_type.clone()
+            FinalizedEffects::GenericVirtualCall(_, _, function, _, _) => function.return_type.clone()
         };
         return temp;
     }
@@ -379,12 +379,12 @@ impl FinalizedEffects {
                 storing.degeneric(process_manager, variables, syntax).await?,
             FinalizedEffects::Downcast(_, target) => target
                 .degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?,
-            FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {
+            FinalizedEffects::GenericVirtualCall(index, target, found, effects, token) => {
                 println!("{:?}", process_manager.generics());
                 syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
                     degeneric_header(target.clone(),
                                      found.data.clone(), syntax.clone(), process_manager.cloned(),
-                                     effects.clone(), variables.clone()));
+                                     effects.clone(), variables.clone(), token.clone()));
 
                 let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
                 let mut temp = vec!();
@@ -397,7 +397,9 @@ impl FinalizedEffects {
 }
 
 pub async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<FunctionData>, syntax: Arc<Mutex<Syntax>>,
-                              mut manager: Box<dyn ProcessManager>, arguments: Vec<FinalizedEffects>, variables: SimpleVariableManager) -> Result<(), ParsingError> {
+                              mut manager: Box<dyn ProcessManager>, arguments: Vec<FinalizedEffects>, variables: SimpleVariableManager,
+                              error_token: CodeErrorToken)
+            -> Result<(), ParsingError> {
     let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter {
         getting: base,
         syntax: syntax.clone(),
@@ -430,15 +432,15 @@ pub async fn degeneric_header(degenericed: Arc<FunctionData>, base: Arc<Function
     // Degeneric the arguments.
     for arguments in &mut new_method.arguments {
         arguments.field.field_type.degeneric(&manager.generics(), &syntax,
-                                             placeholder_error(format!("No generic in {}", new_method.data.name)),
-                                             placeholder_error("Invalid bounds!".to_string())).await?;
+                                             error_token.make_error(format!("No generic in {}", new_method.data.name)),
+                                             error_token.make_error("Invalid bounds!".to_string())).await?;
     }
 
     // Degeneric the return type if there is one.
     if let Some(returning) = &mut new_method.return_type {
         returning.degeneric(&manager.generics(), &syntax,
-                            placeholder_error(format!("No generic in {}", new_method.data.name)),
-                            placeholder_error("Invalid bounds!".to_string())).await?;
+                            error_token.make_error(format!("No generic in {}", new_method.data.name)),
+                            error_token.make_error("Invalid bounds!".to_string())).await?;
     }
 
     let mut locked = syntax.lock().unwrap();
