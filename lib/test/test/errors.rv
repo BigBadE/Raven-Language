@@ -2,5 +2,10 @@ import stdio;
 
 fn test() -> bool {
   let test = 8;
+  function_args("wow");
   return false;
+}
+
+fn function_args(int: u64) {
+
 }

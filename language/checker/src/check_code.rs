@@ -302,7 +302,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
                             };
 
                             if let Ok(found) = check_method(process_manager, method,
-                                                            finalized_effects.clone(), syntax, &variables, returning).await {
+                                                            finalized_effects.clone(), syntax, &variables, returning, token.clone()).await {
                                 return Ok(Some(found));
                             }
                         }
@@ -407,7 +407,7 @@ async fn verify_effect(process_manager: &TypesChecker, resolver: Box<dyn NameRes
             };
 
             let method = AsyncDataGetter::new(syntax.clone(), method).await;
-            check_method(process_manager, method, finalized_effects, syntax, variables, returning).await?
+            check_method(process_manager, method, finalized_effects, syntax, variables, returning, token.clone()).await?
         }
         Effects::CompareJump(effect, first, second) =>
             FinalizedEffects::CompareJump(Box::new(
@@ -495,7 +495,7 @@ fn store(effect: FinalizedEffects) -> FinalizedEffects {
 pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<CodelessFinalizedFunction>,
                           mut effects: Vec<FinalizedEffects>, syntax: &Arc<Mutex<Syntax>>,
                           variables: &SimpleVariableManager,
-                          returning: Option<FinalizedTypes>) -> Result<FinalizedEffects, ParsingError> {
+                          returning: Option<FinalizedTypes>, error_token: CodeErrorToken) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
 
@@ -511,7 +511,7 @@ pub async fn check_method(process_manager: &TypesChecker, mut method: Arc<Codele
     }
 
     if !check_args(&method, &mut effects, syntax, variables).await {
-        return Err(placeholder_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
+        return Err(error_token.make_error(format!("Incorrect args to method {}: {:?} vs {:?}", method.data.name,
                                              method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
                                              effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>())));
     }
