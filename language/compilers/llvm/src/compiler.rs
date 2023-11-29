@@ -88,6 +88,7 @@ impl<'ctx> CompilerImpl<'ctx> {
                     continue;
                 };
             }
+
             if finalized_function.code.expressions.len() == 0 {
                 continue;
             }

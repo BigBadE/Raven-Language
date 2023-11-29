@@ -319,14 +319,10 @@ impl TopElement for StructData {
                 function.generics.insert(name.clone(), bounds.clone());
             }
 
-            let function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
-
-            let mut locked = syntax.lock().unwrap();
+            let mut function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
+            function.flatten(&syntax).await.unwrap();
+            let locked = syntax.lock().unwrap();
             locked.compiling.insert(function.data.name.clone(), Arc::new(function));
-            for waker in &locked.compiling_wakers {
-                waker.wake_by_ref();
-            }
-            locked.compiling_wakers.clear();
         }
         handle.lock().unwrap().finish_task(&data.name);
     }

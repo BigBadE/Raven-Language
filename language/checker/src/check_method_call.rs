@@ -1,14 +1,16 @@
-use crate::check_code::{placeholder_error, verify_effect};
-use crate::output::TypesChecker;
-use crate::CodeVerifier;
 use std::sync::{Arc, Mutex};
+
 use syntax::async_util::AsyncDataGetter;
 use syntax::code::{Effects, FinalizedEffects};
 use syntax::function::CodelessFinalizedFunction;
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
-use syntax::{is_modifier, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
+use syntax::{is_modifier, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
+
+use crate::check_code::{placeholder_error, verify_effect};
+use crate::output::TypesChecker;
+use crate::CodeVerifier;
 
 /// Checks a method call to make sure it's valid
 pub async fn check_method_call(
@@ -125,30 +127,19 @@ pub async fn check_method_call(
             let effects = &finalized_effects;
             let variables = &variables;
             let returning = &returning;
-            let mut process_manager = code_verifier.process_manager.clone();
-
-            // GenericTypes are flattened, so a List<T> becomes List<str> for example.
-            // This means when trying to find any impl of List<str>, List<T> is ignored.
-            // This line is a hack that un-does that flattening and extracts the generics.
-            if let FinalizedTypes::GenericType(base, mut bounds) = return_type.unflatten() {
-                for (name, _) in &base.inner_struct().generics {
-                    process_manager.generics.insert(name.clone(), bounds.pop().unwrap());
-                }
-            }
-
-            let process_manager = &process_manager;
+            let return_type = &return_type.unflatten();
+            let process_manager = code_verifier.process_manager;
             let syntax = &code_verifier.syntax;
-            let checker = async move |method| -> Result<FinalizedEffects, ParsingError> {
-                check_method(
-                    process_manager,
-                    AsyncDataGetter::new(syntax.clone(), method).await,
-                    effects.clone(),
-                    syntax,
-                    variables,
-                    returning.clone(),
-                )
-                .await
-            };
+            let checker =
+                async move |implementor: FinishedTraitImplementor, method| -> Result<FinalizedEffects, ParsingError> {
+                    let method = AsyncDataGetter::new(syntax.clone(), method).await;
+                    let mut process_manager = process_manager.clone();
+                    implementor
+                        .base
+                        .resolve_generic(return_type, syntax, &mut process_manager.generics, ParsingError::empty())
+                        .await?;
+                    check_method(&process_manager, method, effects.clone(), syntax, variables, returning.clone()).await
+                };
 
             return TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),

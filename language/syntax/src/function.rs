@@ -90,16 +90,13 @@ impl TopElement for FunctionData {
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
         // Finalize the code and combine it with the codeless finalized function.
-        let finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
+        let mut finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
+        finalized_function.flatten(&syntax).await.unwrap();
         let finalized_function = Arc::new(finalized_function);
-        let mut locked = syntax.lock().unwrap();
+        let locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
         locked.compiling.insert(name.clone(), finalized_function.clone());
-        for waker in &locked.compiling_wakers {
-            waker.wake_by_ref();
-        }
-        locked.compiling_wakers.clear();
 
         if finalized_function.data.name == locked.async_manager.target {
             if let Some(found) = locked.async_manager.target_waker.as_ref() {
@@ -298,17 +295,24 @@ struct GenericWaiter {
     /// The program
     syntax: Arc<Mutex<Syntax>>,
     /// Name of the function to wait for
-    name: String,
+    data: Arc<FunctionData>,
 }
 
 impl Future for GenericWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().compiling.contains_key(&self.name) {
+        return if self.syntax.lock().unwrap().functions.data.contains_key(&self.data) {
             Poll::Ready(())
         } else {
-            self.syntax.lock().unwrap().compiling_wakers.push(cx.waker().clone());
+            self.syntax
+                .lock()
+                .unwrap()
+                .functions
+                .wakers
+                .entry(self.data.name.clone())
+                .or_insert(vec![])
+                .push(cx.waker().clone());
             Poll::Pending
         };
     }
@@ -322,7 +326,7 @@ async fn degeneric_code(
     manager: Box<dyn ProcessManager>,
 ) {
     // This has to wait until the original is ready to be compiled.
-    GenericWaiter { syntax: syntax.clone(), name: original.data.name.clone() }.await;
+    GenericWaiter { syntax: syntax.clone(), data: original.data.clone() }.await;
 
     // Gets a clone of the code of the original.
     let code = syntax.lock().unwrap().compiling.get(&original.data.name).unwrap().code.clone();
@@ -335,15 +339,12 @@ async fn degeneric_code(
     };
 
     // Combines the degenericed function with the degenericed code to finalize it.
-    let output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
+    let mut output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
+    output.flatten(&syntax).await.unwrap();
 
     // Sends the finalized function to be compiled.
-    let mut locked = syntax.lock().unwrap();
+    let locked = syntax.lock().unwrap();
     locked.compiling.insert(output.data.name.clone(), Arc::new(output));
-    for waker in &locked.compiling_wakers {
-        waker.wake_by_ref();
-    }
-    locked.compiling_wakers.clear();
 }
 
 /// A finalized function, which is ready to be compiled and has been checked of any errors.
@@ -370,6 +371,14 @@ impl FinalizedFunction {
             return_type: self.return_type.clone(),
             data: self.data.clone(),
         };
+    }
+
+    pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+        self.code.flatten(syntax).await?;
+        for field in &mut self.fields {
+            field.field.field_type.flatten(&syntax).await?;
+        }
+        return Ok(());
     }
 }
 
@@ -405,6 +414,13 @@ impl FinalizedCodeBody {
     /// Creates a new code body
     pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: bool) -> Self {
         return Self { label, expressions, returns };
+    }
+
+    pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+        for line in &mut self.expressions {
+            line.effect.flatten(syntax).await?;
+        }
+        return Ok(());
     }
 
     /// Degenerics every effect inside the body of code.

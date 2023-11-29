@@ -37,8 +37,6 @@ use crate::{is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingE
 pub struct Syntax {
     /// The compiling functions, accessed from the compiler.
     pub compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
-    /// Compiling wakers
-    pub compiling_wakers: Vec<Waker>,
     /// The compiling structs, accessed from the compiler.
     pub strut_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
     /// All parsing errors on the entire program
@@ -65,7 +63,6 @@ impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
             compiling: Arc::new(DashMap::default()),
-            compiling_wakers: Vec::default(),
             strut_compiling: Arc::new(DashMap::default()),
             errors: Vec::default(),
             functions: TopElementManager::default(),
@@ -163,16 +160,14 @@ impl Syntax {
         &self,
         implementing_trait: &FinalizedTypes,
         implementor_struct: &FinalizedTypes,
-    ) -> Option<Vec<Arc<FunctionData>>> {
+    ) -> Option<Vec<(FinishedTraitImplementor, Vec<Arc<FunctionData>>)>> {
         let mut output = Vec::default();
         for implementation in &self.implementations {
             if implementation.target.inner_struct().data == implementor_struct.inner_struct().data
                 && (implementing_trait.of_type_sync(&implementation.base, None).0
                     || self.solve(&implementing_trait, &implementation.base))
             {
-                for function in &implementation.functions {
-                    output.push(function.clone());
-                }
+                output.push((implementation.clone(), implementation.functions.clone()));
             }
         }
         return if output.is_empty() { None } else { Some(output) };

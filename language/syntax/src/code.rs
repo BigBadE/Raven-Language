@@ -212,6 +212,76 @@ pub enum FinalizedEffects {
 }
 
 impl FinalizedEffects {
+    #[async_recursion]
+    pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+        match self {
+            FinalizedEffects::CreateVariable(_, value, types) => {
+                value.flatten(syntax).await?;
+                types.flatten(syntax).await?;
+            }
+            FinalizedEffects::CompareJump(effect, _, _) => effect.flatten(syntax).await?,
+            FinalizedEffects::CodeBody(body) => body.flatten(syntax).await?,
+            FinalizedEffects::MethodCall(calling, _, arguments) => {
+                if let Some(found) = calling {
+                    found.flatten(syntax).await?;
+                }
+                for argument in arguments {
+                    argument.flatten(syntax).await?;
+                }
+            }
+            FinalizedEffects::GenericMethodCall(_, types, arguments) => {
+                types.flatten(syntax).await?;
+                for argument in arguments {
+                    argument.flatten(syntax).await?;
+                }
+            }
+            FinalizedEffects::Set(base, value) => {
+                base.flatten(syntax).await?;
+                value.flatten(syntax).await?;
+            }
+            FinalizedEffects::Load(base, _, _) => {
+                base.flatten(syntax).await?;
+            }
+            FinalizedEffects::CreateStruct(storing, types, effects) => {
+                if let Some(found) = storing {
+                    found.flatten(syntax).await?;
+                }
+                types.flatten(syntax).await?;
+                for (_, found) in effects {
+                    found.flatten(syntax).await?;
+                }
+            }
+            FinalizedEffects::CreateArray(types, effects) => {
+                if let Some(found) = types {
+                    found.flatten(syntax).await?;
+                }
+                for effect in effects {
+                    effect.flatten(syntax).await?;
+                }
+            }
+            FinalizedEffects::VirtualCall(_, _, effects) => {
+                for effect in effects {
+                    effect.flatten(syntax).await?;
+                }
+            }
+            FinalizedEffects::GenericVirtualCall(_, _, _, effects) => {
+                for effect in effects {
+                    effect.flatten(syntax).await?;
+                }
+            }
+            FinalizedEffects::Downcast(base, target) => {
+                base.flatten(syntax).await?;
+                target.flatten(syntax).await?;
+            }
+            FinalizedEffects::HeapStore(storing) => storing.flatten(syntax).await?,
+            FinalizedEffects::HeapAllocate(types) => types.flatten(syntax).await?,
+            FinalizedEffects::ReferenceLoad(base) => base.flatten(syntax).await?,
+            FinalizedEffects::StackStore(storing) => storing.flatten(syntax).await?,
+            _ => {}
+        }
+        return Ok(());
+    }
+
     /// Gets the return type of the effect, requiring a variable manager to get
     /// any variables from, or None if the effect has no return type.
     pub fn get_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
@@ -243,11 +313,11 @@ impl FinalizedEffects {
             // Returns the structure type.
             FinalizedEffects::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             // Returns the internal constant type.
-            FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone(), None)),
-            FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone(), None)),
-            FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone(), None)),
-            FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone(), None)),
-            FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone(), None)),
+            FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
+            FinalizedEffects::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
+            FinalizedEffects::Bool(_) => Some(FinalizedTypes::Struct(BOOL.clone())),
+            FinalizedEffects::String(_) => Some(FinalizedTypes::Struct(STR.clone())),
+            FinalizedEffects::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone())),
             // Stores just return their inner type.
             FinalizedEffects::HeapStore(inner) | FinalizedEffects::StackStore(inner) | FinalizedEffects::Set(_, inner) => {
                 inner.get_return(variables)
@@ -460,9 +530,14 @@ pub async fn degeneric_header(
             .await?;
     }
 
+    let new_method = Arc::new(new_method);
+
+    let mut code =
+        CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(vec![], "empty".to_string(), true));
+    code.flatten(&syntax).await?;
+
     let mut locked = syntax.lock().unwrap();
     locked.functions.types.insert(new_method.data.name.clone(), new_method.data.clone());
-    let new_method = Arc::new(new_method);
     locked.functions.data.insert(new_method.data.clone(), new_method.clone());
 
     if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
@@ -473,18 +548,7 @@ pub async fn degeneric_header(
     locked.functions.wakers.remove(&new_method.data.name);
 
     // Give the compiler the empty body
-    locked.compiling.insert(
-        new_method.data.name.clone(),
-        Arc::new(CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(
-            vec![],
-            "empty".to_string(),
-            true,
-        ))),
-    );
-    for waker in &locked.compiling_wakers {
-        waker.wake_by_ref();
-    }
-    locked.compiling_wakers.clear();
+    locked.compiling.insert(new_method.data.name.clone(), Arc::new(code));
     return Ok(());
 }
 
