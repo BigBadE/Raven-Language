@@ -106,11 +106,17 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<Fin
             if found.name == *data.method {
                 let mut temp = vec![];
                 mem::swap(&mut temp, data.finalized_effects);
-                return Ok(Some(FinalizedEffects::VirtualCall(
-                    i,
+
+                let output = CodelessFinalizedFunction::degeneric(
                     AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
-                    temp,
-                )));
+                    Box::new(data.code_verifier.process_manager.clone()),
+                    &temp,
+                    &data.code_verifier.syntax,
+                    &data.variables,
+                    None,
+                )
+                .await?;
+                return Ok(Some(FinalizedEffects::VirtualCall(i, output, temp)));
             } else if found.name.split("::").last().unwrap() == data.method {
                 let mut target = data.finding_return_type.find_method(&data.method).unwrap();
                 if target.len() > 1 {

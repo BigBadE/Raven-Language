@@ -538,7 +538,7 @@ pub fn compile_effect<'ctx>(
                 .try_as_basic_value()
                 .left()
         }
-        FinalizedEffects::Downcast(base, target) => {
+        FinalizedEffects::Downcast(base, target, functions) => {
             let found = base.get_return(type_getter).unwrap();
             if is_modifier(found.inner_struct().data.modifiers, Modifier::Trait) {
                 if !target.eq(&found) {
@@ -549,7 +549,7 @@ pub fn compile_effect<'ctx>(
             } else {
                 let mut table = type_getter.vtable.clone();
                 let base = compile_effect(type_getter, function, base, id).unwrap();
-                let table = unsafe { Arc::get_mut_unchecked(&mut table) }.get_vtable(type_getter, &found, &target);
+                let table = unsafe { Arc::get_mut_unchecked(&mut table) }.get_vtable(type_getter, target, &found, functions);
                 *id += 1;
 
                 let structure = type_getter

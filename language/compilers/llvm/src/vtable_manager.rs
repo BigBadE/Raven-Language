@@ -3,6 +3,7 @@ use inkwell::values::{BasicValue, GlobalValue};
 use inkwell::AddressSpace;
 use std::collections::HashMap;
 use std::sync::Arc;
+use syntax::function::FunctionData;
 use syntax::r#struct::StructData;
 use syntax::types::FinalizedTypes;
 
@@ -18,8 +19,9 @@ impl<'ctx> VTableManager<'ctx> {
     pub fn get_vtable(
         &mut self,
         type_getter: &mut CompilerTypeGetter<'ctx>,
-        structure: &FinalizedTypes,
         target: &FinalizedTypes,
+        structure: &FinalizedTypes,
+        functions: &Vec<Arc<FunctionData>>,
     ) -> GlobalValue<'ctx> {
         if let Some(found) = self.data.get(&(structure.inner_struct().data.clone(), target.inner_struct().data.clone())) {
             return *found;
@@ -29,11 +31,9 @@ impl<'ctx> VTableManager<'ctx> {
             let locked = type_getter.syntax.clone();
             let locked = locked.lock().unwrap();
 
-            for (_, found) in locked.get_implementation_methods(structure, &target).unwrap() {
-                for found in found {
-                    let func = type_getter.get_function(locked.functions.data.get(&found).unwrap());
-                    values.push(func.as_global_value().as_basic_value_enum());
-                }
+            for found in functions {
+                let func = type_getter.get_function(locked.functions.data.get(found).unwrap());
+                values.push(func.as_global_value().as_basic_value_enum());
             }
         }
         let structure = structure.inner_struct().data.clone();

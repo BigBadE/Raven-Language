@@ -89,10 +89,6 @@ impl<'ctx> CompilerImpl<'ctx> {
                 };
             }
 
-            for line in &finalized_function.code.expressions {
-                println!("{:?}", line.effect);
-            }
-
             if finalized_function.code.expressions.len() == 0 {
                 continue;
             }

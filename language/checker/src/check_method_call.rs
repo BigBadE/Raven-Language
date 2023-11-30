@@ -93,6 +93,15 @@ pub async fn check_method_call(
 
             let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
 
+            let method = CodelessFinalizedFunction::degeneric(
+                method,
+                Box::new(code_verifier.process_manager.clone()),
+                &finalized_effects,
+                &code_verifier.syntax,
+                &variables,
+                None,
+            )
+            .await?;
             return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
         }
 
@@ -274,11 +283,11 @@ pub async fn check_args(
                 .unwrap();
 
                 // Make sure every function is finished adding
-                for func in funcs {
-                    AsyncDataGetter::new(syntax.clone(), func).await;
+                for func in &funcs {
+                    AsyncDataGetter::new(syntax.clone(), func.clone()).await;
                 }
 
-                args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone()));
+                args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone(), funcs));
             }
         } else {
             return false;

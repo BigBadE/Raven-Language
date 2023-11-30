@@ -507,18 +507,9 @@ impl FinalizedTypes {
             }
             FinalizedTypes::GenericType(base, bounds) => {
                 base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
-                let generic_bounds = &base.inner_struct().generics;
 
-                let mut i = 0;
-                for (_, generic_bounds) in generic_bounds {
-                    let bound = &mut bounds[i];
+                for bound in &mut *bounds {
                     bound.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
-                    for generic_bound in generic_bounds {
-                        if !generic_bound.of_type(&bound, syntax.clone()).await {
-                            return Err(bounds_error);
-                        }
-                    }
-                    i += 1;
                 }
                 Ok(())
             }

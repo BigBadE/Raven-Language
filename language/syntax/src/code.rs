@@ -199,8 +199,8 @@ pub enum FinalizedEffects {
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
     GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
-    /// Downcasts a structure into its trait, which can only be used in a VirtualCall.
-    Downcast(Box<FinalizedEffects>, FinalizedTypes),
+    /// Downcasts a structure into its trait (with the given functions), which can only be used in a VirtualCall.
+    Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<FunctionData>>),
     /// Internally used by low-level verifier to store a type on the heap.
     HeapStore(Box<FinalizedEffects>),
     /// Allocates space on the heap.
@@ -261,7 +261,8 @@ impl FinalizedEffects {
                     effect.flatten(syntax).await?;
                 }
             }
-            FinalizedEffects::VirtualCall(_, _, effects) => {
+            FinalizedEffects::VirtualCall(_, function, effects) => {
+                *function = function.flatten(syntax).await?;
                 for effect in effects {
                     effect.flatten(syntax).await?;
                 }
@@ -271,7 +272,7 @@ impl FinalizedEffects {
                     effect.flatten(syntax).await?;
                 }
             }
-            FinalizedEffects::Downcast(base, target) => {
+            FinalizedEffects::Downcast(base, target, _) => {
                 base.flatten(syntax).await?;
                 target.flatten(syntax).await?;
             }
@@ -293,7 +294,7 @@ impl FinalizedEffects {
             | FinalizedEffects::CompareJump(_, _, _)
             | FinalizedEffects::CodeBody(_) => None,
             // Downcasts simply return the downcasting target.
-            FinalizedEffects::CreateVariable(_, _, types) | FinalizedEffects::Downcast(_, types) => Some(types.clone()),
+            FinalizedEffects::CreateVariable(_, _, types) | FinalizedEffects::Downcast(_, types, _) => Some(types.clone()),
             FinalizedEffects::MethodCall(_, function, _)
             | FinalizedEffects::GenericMethodCall(function, _, _)
             | FinalizedEffects::VirtualCall(_, function, _)
@@ -445,7 +446,7 @@ impl FinalizedEffects {
                     effect.degeneric(process_manager, variables, syntax).await?;
                 }
             }
-            FinalizedEffects::HeapAllocate(target) | FinalizedEffects::Downcast(_, target) => {
+            FinalizedEffects::HeapAllocate(target) | FinalizedEffects::Downcast(_, target, _) => {
                 target.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?
             }
             FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {
@@ -464,6 +465,9 @@ impl FinalizedEffects {
                 let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
                 let mut temp = vec![];
                 mem::swap(&mut temp, effects);
+                let output =
+                    CodelessFinalizedFunction::degeneric(output, process_manager.cloned(), &temp, &syntax, &variables, None)
+                        .await?;
                 *self = FinalizedEffects::VirtualCall(*index, output, temp);
             }
         }

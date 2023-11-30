@@ -70,7 +70,7 @@ async fn check_return_type(
     }
 
     return if last_type.of_type(return_type, code_verifier.syntax.clone()).await {
-        ImplWaiter {
+        let value = ImplWaiter {
             syntax: code_verifier.syntax.clone(),
             return_type: last_type.clone(),
             data: return_type.clone(),
@@ -80,7 +80,7 @@ async fn check_return_type(
 
         body.push(FinalizedExpression::new(
             ExpressionType::Return,
-            FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone()),
+            FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone(), value),
         ));
         Ok(true)
     } else {
