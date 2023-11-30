@@ -127,7 +127,7 @@ pub async fn check_method_call(
             let effects = &finalized_effects;
             let variables = &variables;
             let returning = &returning;
-            let return_type = &return_type.unflatten();
+            let return_type = &return_type;
             let process_manager = code_verifier.process_manager;
             let syntax = &code_verifier.syntax;
             let checker =

@@ -29,7 +29,7 @@ impl<'ctx> VTableManager<'ctx> {
             let locked = type_getter.syntax.clone();
             let locked = locked.lock().unwrap();
 
-            for (_, found) in locked.get_implementation_methods(structure, &target.unflatten()).unwrap() {
+            for (_, found) in locked.get_implementation_methods(structure, &target).unwrap() {
                 for found in found {
                     let func = type_getter.get_function(locked.functions.data.get(&found).unwrap());
                     values.push(func.as_global_value().as_basic_value_enum());

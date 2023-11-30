@@ -92,11 +92,19 @@ impl TopElement for FunctionData {
         // Finalize the code and combine it with the codeless finalized function.
         let mut finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
         finalized_function.flatten(&syntax).await.unwrap();
+
         let finalized_function = Arc::new(finalized_function);
-        let locked = syntax.lock().unwrap();
+        let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
         locked.compiling.insert(name.clone(), finalized_function.clone());
+
+        if let Some(found) = locked.compiling_wakers.get(&name) {
+            for waker in found {
+                waker.wake_by_ref();
+            }
+        }
+        locked.compiling_wakers.remove(&name);
 
         if finalized_function.data.name == locked.async_manager.target {
             if let Some(found) = locked.async_manager.target_waker.as_ref() {
@@ -161,6 +169,19 @@ impl CodelessFinalizedFunction {
         };
     }
 
+    pub async fn flatten(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
+        let mut output = CodelessFinalizedFunction::clone(self);
+        if let Some(found) = &mut output.return_type {
+            found.flatten(syntax).await?;
+        }
+
+        for field in &mut output.arguments {
+            field.field.field_type.flatten(syntax).await?;
+        }
+
+        return Ok(Arc::new(output));
+    }
+
     /// Makes a copy of the CodelessFinalizedFunction with all the generics solidified into their actual type.
     /// Figures out the solidified types by comparing generics against the input effect types,
     /// then replaces all generic types with their solidified types.
@@ -212,6 +233,11 @@ impl CodelessFinalizedFunction {
                 }
             }
         }
+
+        if manager.generics().is_empty() {
+            return Ok(method);
+        }
+
         // Now all the generic types have been resolved, it's time to replace them with
         // their solidified versions.
         // Degenericed function names have a $ seperating the name and the generics.
@@ -263,6 +289,7 @@ impl CodelessFinalizedFunction {
             let new_method = Arc::new(new_method);
             let mut locked = syntax.lock().unwrap();
             locked.functions.types.insert(name, new_method.data.clone());
+
             locked.functions.data.insert(new_method.data.clone(), new_method.clone());
 
             if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
@@ -302,14 +329,13 @@ impl Future for GenericWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().functions.data.contains_key(&self.data) {
+        return if self.syntax.lock().unwrap().compiling.contains_key(&self.data.name) {
             Poll::Ready(())
         } else {
             self.syntax
                 .lock()
                 .unwrap()
-                .functions
-                .wakers
+                .compiling_wakers
                 .entry(self.data.name.clone())
                 .or_insert(vec![])
                 .push(cx.waker().clone());
@@ -343,7 +369,13 @@ async fn degeneric_code(
     output.flatten(&syntax).await.unwrap();
 
     // Sends the finalized function to be compiled.
-    let locked = syntax.lock().unwrap();
+    let mut locked = syntax.lock().unwrap();
+    if let Some(found) = locked.compiling_wakers.get(&output.data.name) {
+        for waker in found {
+            waker.wake_by_ref();
+        }
+    }
+    locked.compiling_wakers.remove(&output.data.name);
     locked.compiling.insert(output.data.name.clone(), Arc::new(output));
 }
 

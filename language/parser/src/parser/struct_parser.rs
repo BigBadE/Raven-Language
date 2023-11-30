@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::code::{Field, MemberField};
+use syntax::function::display_parenless;
 use syntax::r#struct::{get_internal, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -35,7 +36,14 @@ pub fn parse_structure(
                 name = token.to_string(parser_utils.buffer);
                 parser_utils.imports.parent = Some(name.clone());
             }
-            TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
+            TokenTypes::GenericsStart => {
+                parse_generics(parser_utils, &mut generics);
+                parser_utils.imports.parent = Some(format!(
+                    "{}<{}>",
+                    parser_utils.imports.parent.as_ref().unwrap(),
+                    display_parenless(&generics.keys().collect(), ", ")
+                ));
+            }
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::InvalidCharacters => {
                 parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
@@ -125,29 +133,7 @@ pub fn parse_implementor(
                     base = temp;
                     state = 1;
                 } else {
-                    let mut temp_name = name.clone();
-                    let mut depth = 0;
-                    while temp_name.as_bytes()[0] == b'[' {
-                        temp_name = temp_name[1..temp_name.len() - 1].to_string();
-                        depth += 1;
-                    }
-
-                    if generics.contains_key(&temp_name) {
-                        parser_utils.imports.parent = Some(name);
-                    } else {
-                        let mut found = String::default();
-                        for _ in 0..depth {
-                            found += "[";
-                        }
-
-                        found += &temp_name;
-
-                        for _ in 0..depth {
-                            found += "]";
-                        }
-
-                        parser_utils.imports.parent = Some(found);
-                    }
+                    parser_utils.imports.parent = Some(name);
                     implementor = temp;
                 }
             }

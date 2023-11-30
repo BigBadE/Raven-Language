@@ -37,6 +37,8 @@ use crate::{is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingE
 pub struct Syntax {
     /// The compiling functions, accessed from the compiler.
     pub compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
+    /// The compiling functions, accessed from the compiler.
+    pub compiling_wakers: HashMap<String, Vec<Waker>>,
     /// The compiling structs, accessed from the compiler.
     pub strut_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
     /// All parsing errors on the entire program
@@ -63,6 +65,7 @@ impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
             compiling: Arc::new(DashMap::default()),
+            compiling_wakers: HashMap::default(),
             strut_compiling: Arc::new(DashMap::default()),
             errors: Vec::default(),
             functions: TopElementManager::default(),
@@ -396,7 +399,7 @@ impl Syntax {
         }
 
         if getting.contains('<') {
-            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver).await?.1.remove(0));
+            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver).await?.remove(0));
         }
         return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
     }
@@ -409,7 +412,7 @@ impl Syntax {
         syntax: &Arc<Mutex<Syntax>>,
         error: &ParsingError,
         name_resolver: &dyn NameResolver,
-    ) -> Result<(usize, Vec<Types>), ParsingError> {
+    ) -> Result<Vec<Types>, ParsingError> {
         let mut last = 0;
         let mut found = Vec::default();
         let mut i = 0;
@@ -417,7 +420,7 @@ impl Syntax {
             match input[i] {
                 b'<' => {
                     let first = String::from_utf8_lossy(&input[last..i]);
-                    let (size, bounds) = Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
+                    let bounds = Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
                     let first = Self::get_struct(
                         syntax.clone(),
                         error.clone(),
@@ -427,7 +430,7 @@ impl Syntax {
                     )
                     .await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
-                    return Ok((i + size, found));
+                    return Ok(found);
                 }
                 b',' => {
                     let getting = String::from_utf8_lossy(&input[last..i]);
@@ -455,8 +458,9 @@ impl Syntax {
                         )
                         .await?,
                     );
-                    return Ok((i, found));
+                    return Ok(found);
                 }
+                b' ' => last = i + 1,
                 _ => {}
             }
             i += 1;

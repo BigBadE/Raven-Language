@@ -520,34 +520,26 @@ impl FinalizedTypes {
                     }
                     i += 1;
                 }
-                //TODO testing moving flatten later
-                //*self = base.flatten(&mut found, syntax, none_error, bounds_error).await?;
                 Ok(())
             }
             FinalizedTypes::Reference(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
             FinalizedTypes::Array(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
             FinalizedTypes::Struct(inner) => {
-                let mut temp = FinalizedStruct::clone(inner);
-                temp.degeneric(generics, syntax, none_error, bounds_error).await?;
-                *inner = Arc::new(temp);
+                let temp = FinalizedStruct::clone(inner);
+                *inner = temp.degeneric(generics, syntax, none_error, bounds_error).await?;
                 Ok(())
             }
         };
     }
 
-    /// Unflattens a flattened GenericType, used for some type checking after finalization
-    pub fn unflatten(&self) -> FinalizedTypes {
-        //TODO remove
-        return self.clone();
-    }
-
     #[async_recursion]
     pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
-        return match self {
-            FinalizedTypes::Reference(inner) => inner.flatten(syntax).await,
+        match self {
+            FinalizedTypes::Reference(inner) | FinalizedTypes::Array(inner) => return inner.flatten(syntax).await,
             FinalizedTypes::GenericType(base, bounds) => {
                 let base = base.inner_struct();
                 if bounds.is_empty() {
+                    *self = FinalizedTypes::Struct(base.clone());
                     // If there are no bounds, we're good.
                     return Ok(());
                 }
@@ -583,12 +575,19 @@ impl FinalizedTypes {
                         locked.structures.types.insert(name.clone(), arc_other.clone());
                         locked.structures.sorted.push(arc_other.clone());
                     }
+
                     // Get the FinalizedStruct and degeneric it.
                     let mut data =
                         FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), base.data.clone()).await.deref());
                     data.data.clone_from(&arc_other);
+
+                    // Update the structure's fields
+                    for field in &mut data.fields {
+                        field.field.field_type.flatten(syntax).await?;
+                    }
+
                     let data = Arc::new(data);
-                    // Add the flattened type to the
+                    // Add the flattened type to the syntax
                     let mut locked = syntax.lock().unwrap();
                     if let Some(wakers) = locked.structures.wakers.remove(&data.data.name) {
                         for waker in wakers {
@@ -599,10 +598,17 @@ impl FinalizedTypes {
                     locked.structures.data.insert(arc_other, data.clone());
                     *self = FinalizedTypes::Struct(data.clone());
                 }
-                Ok(())
             }
-            _ => Ok(()),
+            FinalizedTypes::Struct(inner) => {
+                let mut output = FinalizedStruct::clone(inner);
+                for field in &mut output.fields {
+                    field.field.field_type.flatten(syntax).await?;
+                }
+                *self = FinalizedTypes::Struct(Arc::new(output));
+            }
+            _ => {}
         };
+        return Ok(());
     }
 
     /// The name of the function

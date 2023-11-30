@@ -221,16 +221,18 @@ impl FinalizedEffects {
             }
             FinalizedEffects::CompareJump(effect, _, _) => effect.flatten(syntax).await?,
             FinalizedEffects::CodeBody(body) => body.flatten(syntax).await?,
-            FinalizedEffects::MethodCall(calling, _, arguments) => {
+            FinalizedEffects::MethodCall(calling, function, arguments) => {
                 if let Some(found) = calling {
                     found.flatten(syntax).await?;
                 }
+                *function = function.flatten(syntax).await?;
                 for argument in arguments {
                     argument.flatten(syntax).await?;
                 }
             }
-            FinalizedEffects::GenericMethodCall(_, types, arguments) => {
+            FinalizedEffects::GenericMethodCall(function, types, arguments) => {
                 types.flatten(syntax).await?;
+                *function = function.flatten(syntax).await?;
                 for argument in arguments {
                     argument.flatten(syntax).await?;
                 }
@@ -480,22 +482,19 @@ pub async fn degeneric_header(
 ) -> Result<(), ParsingError> {
     let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
 
-    let return_type = arguments[0].get_return(&variables).unwrap().unflatten();
-    if let FinalizedTypes::GenericType(_, generics) = return_type {
-        assert_eq!(function.generics.len(), generics.len());
+    let return_type = arguments[0].get_return(&variables).unwrap();
+    let (_, generics) = return_type.inner_generic_type().unwrap();
+    assert_eq!(function.generics.len(), generics.len());
 
-        let mut iterator = function.generics.iter();
-        for generic in generics {
-            let (name, bounds) = iterator.next().unwrap();
-            for bound in bounds {
-                if !generic.of_type(bound, syntax.clone()).await {
-                    return Err(placeholder_error("Failed bounds sanity check!".to_string()));
-                }
+    let mut iterator = function.generics.iter();
+    for generic in generics {
+        let (name, bounds) = iterator.next().unwrap();
+        for bound in bounds {
+            if !generic.of_type(bound, syntax.clone()).await {
+                return Err(placeholder_error("Failed bounds sanity check!".to_string()));
             }
-            manager.mut_generics().insert(name.clone(), generic);
         }
-    } else {
-        panic!("Wrong type! {:?}", arguments[0].get_return(&variables).unwrap().unflatten())
+        manager.mut_generics().insert(name.clone(), generic.clone());
     }
 
     // Copy the method and degeneric every type inside of it.
@@ -549,6 +548,13 @@ pub async fn degeneric_header(
 
     // Give the compiler the empty body
     locked.compiling.insert(new_method.data.name.clone(), Arc::new(code));
+
+    if let Some(found) = locked.compiling_wakers.get(&new_method.data.name) {
+        for waker in found {
+            waker.wake_by_ref();
+        }
+    }
+    locked.compiling_wakers.remove(&new_method.data.name);
     return Ok(());
 }
 

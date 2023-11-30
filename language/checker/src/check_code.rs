@@ -100,6 +100,7 @@ pub async fn verify_effect(
     if let Some(found) = finalize_basic(&effect).await {
         return Ok(found);
     }
+
     let output = match effect {
         Effects::Paren(inner) => verify_effect(code_verifier, variables, *inner).await?,
         Effects::CodeBody(body) => {

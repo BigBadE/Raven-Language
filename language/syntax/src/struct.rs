@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
 use crate::code::{FinalizedMemberField, MemberField};
-use crate::function::{FunctionData, UnfinalizedFunction};
+use crate::function::{display_parenless, FunctionData, UnfinalizedFunction};
 use crate::top_element_manager::TopElementManager;
 use crate::types::{FinalizedTypes, Types};
 use crate::{is_modifier, DataType, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
@@ -241,18 +241,39 @@ impl FinalizedStruct {
 
     /// Degenerics a finalized struct
     pub async fn degeneric(
-        &mut self,
+        mut self,
         generics: &HashMap<String, FinalizedTypes>,
         syntax: &Arc<Mutex<Syntax>>,
         none_error: ParsingError,
         bounds_error: ParsingError,
-    ) -> Result<(), ParsingError> {
+    ) -> Result<Arc<FinalizedStruct>, ParsingError> {
+        let targets: Vec<_> =
+            generics.iter().filter(|(key, _)| self.generics.contains_key(*key)).map(|(_, value)| value).collect();
+        if targets.is_empty() {
+            return Ok(Arc::new(self));
+        }
+        let mut data = StructData::clone(&self.data);
+        let name = format!("{}${}", data.name, display_parenless(&targets, "_"));
+        data.name = name.clone();
+        self.data = Arc::new(data);
         self.generics.clear();
         for field in &mut self.fields {
             field.field.field_type.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
         }
 
-        return Ok(());
+        let mut locked = syntax.lock().unwrap();
+        locked.structures.types.insert(name, self.data.clone());
+
+        let output = Arc::new(self);
+        locked.structures.data.insert(output.data.clone(), output.clone());
+
+        if let Some(wakers) = locked.structures.wakers.get(&output.data.name) {
+            for waker in wakers {
+                waker.wake_by_ref();
+            }
+        }
+        locked.structures.wakers.remove(&output.data.name);
+        return Ok(output);
     }
 }
 
@@ -321,7 +342,13 @@ impl TopElement for StructData {
 
             let mut function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
             function.flatten(&syntax).await.unwrap();
-            let locked = syntax.lock().unwrap();
+            let mut locked = syntax.lock().unwrap();
+            if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
+                for waker in found {
+                    waker.wake_by_ref();
+                }
+            }
+            locked.compiling_wakers.remove(&function.data.name);
             locked.compiling.insert(function.data.name.clone(), Arc::new(function));
         }
         handle.lock().unwrap().finish_task(&data.name);

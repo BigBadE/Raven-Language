@@ -4,6 +4,7 @@ use crate::CodeVerifier;
 use std::mem;
 use syntax::async_util::{AsyncDataGetter, UnparsedType};
 use syntax::code::{degeneric_header, Effects, FinalizedEffects};
+use syntax::function::CodelessFinalizedFunction;
 use syntax::r#struct::VOID;
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::ImplWaiter;
@@ -119,7 +120,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<Fin
                 }
                 let (_, target) = target.pop().unwrap();
 
-                let return_type = data.finalized_effects[0].get_return(data.variables).unwrap().unflatten();
+                let return_type = data.finalized_effects[0].get_return(data.variables).unwrap();
                 if matches!(return_type, FinalizedTypes::Generic(_, _)) {
                     let mut temp = vec![];
                     mem::swap(&mut temp, data.finalized_effects);
@@ -146,6 +147,16 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<Fin
                 let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
                 let mut temp = vec![];
                 mem::swap(&mut temp, data.finalized_effects);
+
+                let output = CodelessFinalizedFunction::degeneric(
+                    output,
+                    Box::new(data.code_verifier.process_manager.clone()),
+                    &temp,
+                    &data.code_verifier.syntax,
+                    &data.variables,
+                    None,
+                )
+                .await?;
                 return Ok(Some(FinalizedEffects::VirtualCall(i, output, temp)));
             }
             i += 1;
@@ -164,7 +175,7 @@ async fn try_get_impl(data: &ImplCheckerData<'_>) -> Result<Option<FinalizedEffe
         syntax: data.code_verifier.syntax.clone(),
         return_type: data.finding_return_type.clone(),
         data: data.data.clone(),
-        error: placeholder_error(format!("Nothing implements {} for {}", data.data, data.finding_return_type)),
+        error: placeholder_error(format!("Nothing implements {} for {:?}", data.data, data.finding_return_type)),
     }
     .await?;
 
