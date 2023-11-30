@@ -1,6 +1,6 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
-use crate::tokens::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_attribute_val, parse_modifier, parse_to_character};
+use data::tokens::{Token, TokenTypes};
 
 /// Handles when the tokenizer isn't in any other state.
 pub fn next_top_token(tokenizer: &mut Tokenizer) -> Token {

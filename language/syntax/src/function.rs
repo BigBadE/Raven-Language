@@ -17,6 +17,7 @@ use crate::{
     is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, SimpleVariableManager, Syntax,
     TopElement, TopElementManager, Types,
 };
+use data::tokens::CodeErrorToken;
 
 /// The static data of a function, which is set during parsing and immutable throughout the entire compilation process.
 /// Generics will copy this and change the name and types, but never modify the original.
@@ -132,6 +133,7 @@ pub struct UnfinalizedFunction {
     pub return_type: Option<ParsingFuture<Types>>,
     /// The function's data
     pub data: Arc<FunctionData>,
+    pub token: CodeErrorToken,
 }
 
 /// Gives generic access to the function data.
@@ -155,6 +157,7 @@ pub struct CodelessFinalizedFunction {
     pub return_type: Option<FinalizedTypes>,
     /// The function's data
     pub data: Arc<FunctionData>,
+    pub token: CodeErrorToken,
 }
 
 impl CodelessFinalizedFunction {
@@ -166,6 +169,7 @@ impl CodelessFinalizedFunction {
             code,
             return_type: self.return_type,
             data: self.data,
+            token: self.token,
         };
     }
 
@@ -392,6 +396,7 @@ pub struct FinalizedFunction {
     pub return_type: Option<FinalizedTypes>,
     /// The function's data
     pub data: Arc<FunctionData>,
+    pub token: CodeErrorToken,
 }
 
 impl FinalizedFunction {
@@ -402,6 +407,7 @@ impl FinalizedFunction {
             arguments: self.fields.clone(),
             return_type: self.return_type.clone(),
             data: self.data.clone(),
+            token: self.token.clone(),
         };
     }
 

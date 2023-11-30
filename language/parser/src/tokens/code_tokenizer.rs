@@ -1,6 +1,6 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
-use crate::tokens::tokens::{Token, TokenTypes};
 use crate::tokens::util::{parse_acceptable, parse_numbers};
+use data::tokens::{Token, TokenTypes};
 
 /// Gets the next token in a block of code.
 pub fn next_code_token(tokenizer: &mut Tokenizer) -> Token {

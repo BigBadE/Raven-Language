@@ -11,6 +11,7 @@ use crate::syntax::Syntax;
 use crate::top_element_manager::ImplWaiter;
 use crate::types::{FinalizedTypes, Types};
 use crate::{Attribute, ParsingError, ProcessManager, SimpleVariableManager, VariableManager};
+use data::tokens::CodeErrorToken;
 
 /// An expression is a single line of code, containing an effect and the type of expression.
 #[derive(Clone, Debug)]
@@ -31,12 +32,12 @@ pub struct FinalizedExpression {
 }
 
 /// the types of expressions: a normal line, a return, or a break (for inside control statements).
-#[derive(Clone, Copy, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum ExpressionType {
     /// Breaks break out of a looping control statement like a for or while loop
     Break,
     /// Return returns out of the current function
-    Return,
+    Return(CodeErrorToken),
     /// A line does nothing
     Line,
 }
@@ -81,6 +82,17 @@ pub struct FinalizedMemberField {
     pub field: FinalizedField,
 }
 
+impl PartialEq for ExpressionType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ExpressionType::Return(_), ExpressionType::Return(_)) => true,
+            (ExpressionType::Line, ExpressionType::Line) => true,
+            (ExpressionType::Break, ExpressionType::Break) => true,
+            _ => false,
+        }
+    }
+}
+
 impl MemberField {
     /// Creates a new field
     pub fn new(modifiers: u8, attributes: Vec<Attribute>, field: Field) -> Self {
@@ -118,7 +130,7 @@ pub enum Effects {
     /// An effect wrapped in parenthesis, just a wrapper around the effect to prevent issues with operator merging.
     Paren(Box<Effects>),
     /// Creates a variable with the given name and value.
-    CreateVariable(String, Box<Effects>),
+    CreateVariable(String, Box<Effects>, CodeErrorToken),
     /// Label of jumping to body
     Jump(String),
     /// Comparison effect, and label to jump to the first if true, second if false
@@ -127,10 +139,10 @@ pub enum Effects {
     CodeBody(CodeBody),
     /// Finds the implementation of the given trait for the given calling type, and calls the given method.
     /// Calling, trait to call, function name, args, and return type (if explicitly required)
-    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
+    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>, CodeErrorToken),
     /// Finds the method with the name and calls it with those arguments.
     /// Calling, calling function, function arguments, and return type (if explicitly required, see CodelessFinalizedFunction::degeneric)
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>),
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>, CodeErrorToken),
     /// Sets the variable to a value.
     Set(Box<Effects>, Box<Effects>),
     /// Loads variable with the given name.
@@ -138,11 +150,11 @@ pub enum Effects {
     /// Loads a field with the given name from the structure.
     Load(Box<Effects>, String),
     /// An unresolved operation, sent to the checker to resolve, with the given arguments.
-    Operation(String, Vec<Effects>),
+    Operation(String, Vec<Effects>, CodeErrorToken),
     /// Struct to create and a tuple of the name of the field and the argument.
-    CreateStruct(UnparsedType, Vec<(String, Effects)>),
+    CreateStruct(UnparsedType, Vec<(String, Effects, CodeErrorToken)>, CodeErrorToken),
     /// Creates an array of the given effects.
-    CreateArray(Vec<Effects>),
+    CreateArray(Vec<(Effects, CodeErrorToken)>),
     /// A float
     Float(f64),
     /// An integer
@@ -198,7 +210,7 @@ pub enum FinalizedEffects {
     /// and on the given arguments (first argument must be the downcased trait).
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
-    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, CodeErrorToken),
     /// Downcasts a structure into its trait (with the given functions), which can only be used in a VirtualCall.
     Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<FunctionData>>),
     /// Internally used by low-level verifier to store a type on the heap.
@@ -267,7 +279,7 @@ impl FinalizedEffects {
                     effect.flatten(syntax).await?;
                 }
             }
-            FinalizedEffects::GenericVirtualCall(_, _, _, effects) => {
+            FinalizedEffects::GenericVirtualCall(_, _, _, effects, _) => {
                 for effect in effects {
                     effect.flatten(syntax).await?;
                 }
@@ -298,7 +310,7 @@ impl FinalizedEffects {
             FinalizedEffects::MethodCall(_, function, _)
             | FinalizedEffects::GenericMethodCall(function, _, _)
             | FinalizedEffects::VirtualCall(_, function, _)
-            | FinalizedEffects::GenericVirtualCall(_, _, function, _) => {
+            | FinalizedEffects::GenericVirtualCall(_, _, function, _, _) => {
                 function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
             }
             FinalizedEffects::LoadVariable(name) => {
@@ -449,7 +461,7 @@ impl FinalizedEffects {
             FinalizedEffects::HeapAllocate(target) | FinalizedEffects::Downcast(_, target, _) => {
                 target.degeneric(process_manager.generics(), syntax, ParsingError::empty(), ParsingError::empty()).await?
             }
-            FinalizedEffects::GenericVirtualCall(index, target, found, effects) => {
+            FinalizedEffects::GenericVirtualCall(index, target, found, effects, token) => {
                 syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
                     target.name.clone(),
                     degeneric_header(
@@ -459,6 +471,7 @@ impl FinalizedEffects {
                         process_manager.cloned(),
                         effects.clone(),
                         variables.clone(),
+                        token.clone(),
                     ),
                 );
 
@@ -483,6 +496,7 @@ pub async fn degeneric_header(
     mut manager: Box<dyn ProcessManager>,
     arguments: Vec<FinalizedEffects>,
     variables: SimpleVariableManager,
+    error_token: CodeErrorToken,
 ) -> Result<(), ParsingError> {
     let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
 
@@ -515,8 +529,8 @@ pub async fn degeneric_header(
             .degeneric(
                 &manager.generics(),
                 &syntax,
-                placeholder_error(format!("No generic in {}", new_method.data.name)),
-                placeholder_error("Invalid bounds!".to_string()),
+                error_token.make_error(format!("No generic in {}", new_method.data.name)),
+                error_token.make_error("Invalid bounds!".to_string()),
             )
             .await?;
     }
@@ -527,8 +541,8 @@ pub async fn degeneric_header(
             .degeneric(
                 &manager.generics(),
                 &syntax,
-                placeholder_error(format!("No generic in {}", new_method.data.name)),
-                placeholder_error("Invalid bounds!".to_string()),
+                error_token.make_error(format!("No generic in {}", new_method.data.name)),
+                error_token.make_error("Invalid bounds!".to_string()),
             )
             .await?;
     }

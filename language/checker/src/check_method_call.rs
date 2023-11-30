@@ -22,7 +22,7 @@ pub async fn check_method_call(
     let calling;
     let method;
     let returning;
-    if let Effects::MethodCall(new_calling, new_method, effects, new_return_type) = effect {
+    if let Effects::MethodCall(new_calling, new_method, effects, new_return_type, _) = effect {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
         }

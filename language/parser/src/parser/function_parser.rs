@@ -10,7 +10,7 @@ use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, Parsi
 use crate::parser::code_parser::parse_code;
 use crate::parser::struct_parser::{parse_generics, to_field};
 use crate::parser::util::ParserUtils;
-use crate::tokens::tokens::TokenTypes;
+use data::tokens::{TokenTypes, CodeErrorToken};
 
 /// Parses a function
 pub fn parse_function(
@@ -27,6 +27,8 @@ pub fn parse_function(
 
     let mut last_arg = String::default();
     let mut last_arg_type = String::default();
+
+    let token = parser_utils.tokens[parser_utils.index].clone();
 
     while !parser_utils.tokens.is_empty() {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -112,6 +114,7 @@ pub fn parse_function(
         code: code.unwrap_or_else(|| CodeBody::new(Vec::default(), "empty".to_string())),
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name)),
+        token: CodeErrorToken::new(token, parser_utils.file.clone())
     });
 }
 

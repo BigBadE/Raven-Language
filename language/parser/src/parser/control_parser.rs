@@ -3,7 +3,8 @@ use syntax::function::CodeBody;
 use syntax::ParsingError;
 
 use crate::parser::code_parser::{parse_code, parse_line, ParseState};
-use crate::{ParserUtils, TokenTypes};
+use crate::ParserUtils;
+use data::tokens::{CodeErrorToken, TokenTypes};
 
 /// Parses an if statement into a single expression.
 pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingError> {
@@ -66,7 +67,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             let (other_returning, body) = parse_code(parser_utils)?;
             // An if statement is only the return of the block if every code path returns, so if they differ
             // this can't be a return block.
-            if other_returning != returning {
+            if other_returning == returning {
                 returning = ExpressionType::Line;
             }
             else_ifs.push((effect.unwrap().effect, body));
@@ -75,7 +76,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             // Get the else body
             let (other_returning, body) = parse_code(parser_utils)?;
             // Check to make sure the else body returns if the other bodies do.
-            if other_returning != returning {
+            if other_returning == returning {
                 returning = ExpressionType::Line;
             }
             else_body = Some(body);
@@ -120,6 +121,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     let name = name.to_string(parser_utils.buffer);
 
     // Gets the variable we're looping over
+    let mut error_token = CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone());
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
         return Err(parser_utils
@@ -128,6 +130,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
             .unwrap()
             .make_error(parser_utils.file.clone(), "Expected iterator, found void".to_string()));
     }
+    error_token.change_token_end(&parser_utils.tokens[parser_utils.index]);
 
     // Checks for the code start
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
@@ -144,7 +147,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     parser_utils.imports.last_id += 2;
 
     // Returns the finished for loop.
-    return create_for(name, effect.unwrap().effect, body, parser_utils.imports.last_id - 2);
+    return create_for(name, effect.unwrap().effect, body, parser_utils.imports.last_id - 2, error_token);
 }
 
 /// Parses a while statement into a single expression
@@ -304,10 +307,22 @@ fn create_if(
 }
 
 /// Creates a for loop effect from the body and iterator effect
-fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects, ParsingError> {
+fn create_for(
+    name: String,
+    effect: Effects,
+    mut body: CodeBody,
+    id: u32,
+    error_token: CodeErrorToken,
+) -> Result<Effects, ParsingError> {
     let mut top = Vec::default();
     let variable = format!("$iter{}", id);
-    top.insert(0, Expression::new(ExpressionType::Line, Effects::CreateVariable(variable.clone(), Box::new(effect))));
+    top.insert(
+        0,
+        Expression::new(
+            ExpressionType::Line,
+            Effects::CreateVariable(variable.clone(), Box::new(effect), error_token.clone()),
+        ),
+    );
     top.push(Expression::new(ExpressionType::Line, Effects::Jump((id + 1).to_string())));
     // Adds a call to the Iter::next function at the top of the for loop.
     body.expressions.insert(
@@ -322,7 +337,9 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
                     "next".to_string(),
                     vec![],
                     None,
+                    error_token.clone(),
                 )),
+                error_token.clone(),
             ),
         ),
     );
@@ -340,6 +357,7 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
                     "has_next".to_string(),
                     vec![],
                     None,
+                    error_token.clone(),
                 )),
                 body.label.clone(),
                 id.to_string() + "end",

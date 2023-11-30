@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 syntax = { path = "../syntax" }
+data = { path = "../data"}
 
 indexmap = "2.1.0"
 

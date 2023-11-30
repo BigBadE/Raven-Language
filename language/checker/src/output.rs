@@ -6,6 +6,7 @@ use std::sync::Mutex;
 
 use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
+use data::tokens::CodeErrorToken;
 use syntax::async_util::{HandleWrapper, NameResolver};
 use syntax::function::{
     CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData, UnfinalizedFunction,
@@ -54,6 +55,7 @@ impl ProcessManager for TypesChecker {
                         arguments: vec![],
                         return_type: None,
                         data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
+                        token: CodeErrorToken::make_empty(),
                     },
                     CodeBody::new(Vec::default(), String::default()),
                 )
@@ -78,6 +80,7 @@ impl ProcessManager for TypesChecker {
                     code: FinalizedCodeBody::default(),
                     return_type: None,
                     data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
+                    token: CodeErrorToken::make_empty(),
                 }
             }
         };

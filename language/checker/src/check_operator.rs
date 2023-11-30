@@ -1,11 +1,14 @@
-use crate::check_code::verify_effect;
-use crate::CodeVerifier;
 use std::mem;
 use std::sync::Arc;
+
+use data::tokens::CodeErrorToken;
 use syntax::code::{Effects, FinalizedEffects};
 use syntax::operation_util::OperationGetter;
 use syntax::r#struct::StructData;
 use syntax::{Attribute, ParsingError, SimpleVariableManager};
+
+use crate::check_code::verify_effect;
+use crate::CodeVerifier;
 
 /// Checks if an operator call is valid
 pub async fn check_operator(
@@ -15,9 +18,11 @@ pub async fn check_operator(
 ) -> Result<FinalizedEffects, ParsingError> {
     let operation;
     let mut values;
-    if let Effects::Operation(new_operation, new_values) = effect {
+    let token;
+    if let Effects::Operation(new_operation, new_values, new_token) = effect {
         operation = new_operation;
         values = new_values;
+        token = new_token
     } else {
         unreachable!()
     }
@@ -31,7 +36,7 @@ pub async fn check_operator(
         format!("Failed to find operation {} with {:?}", operation, values),
     );
     // Check if it's two operations that should be combined, like a list ([])
-    let outer_operation = combine_operation(&operation, &mut values, code_verifier).await?;
+    let outer_operation = combine_operation(&operation, &mut values, code_verifier, &token).await?;
 
     let operation = if let Some(found) = outer_operation {
         found
@@ -42,7 +47,7 @@ pub async fn check_operator(
     if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}")
     {
         if !matches!(values.first().unwrap(), Effects::CreateArray(_)) {
-            let effect = Effects::CreateArray(vec![values.remove(0)]);
+            let effect = Effects::CreateArray(vec![(values.remove(0), token.clone())]);
             values.push(effect);
         }
     }
@@ -57,7 +62,7 @@ pub async fn check_operator(
     return verify_effect(
         code_verifier,
         variables,
-        Effects::ImplementationCall(calling, operation.name.clone(), String::default(), values, None),
+        Effects::ImplementationCall(calling, operation.name.clone(), String::default(), values, None, token),
     )
     .await;
 }
@@ -67,6 +72,7 @@ async fn combine_operation(
     operation: &String,
     values: &mut Vec<Effects>,
     code_verifier: &mut CodeVerifier<'_>,
+    token: &CodeErrorToken,
 ) -> Result<Option<Arc<StructData>>, ParsingError> {
     let error = ParsingError::new(
         String::default(),
@@ -82,14 +88,14 @@ async fn combine_operation(
         let mut last = values.pop().unwrap();
         if let Effects::CreateArray(mut effects) = last {
             if effects.len() > 0 {
-                last = effects.pop().unwrap();
+                last = effects.pop().unwrap().0;
                 reading_array = Some(effects);
             } else {
                 last = Effects::CreateArray(vec![]);
             }
         }
 
-        if let Effects::Operation(inner_operation, effects) = last {
+        if let Effects::Operation(inner_operation, effects, inner_token) = last {
             if operation.ends_with("{}") && inner_operation.starts_with("{}") {
                 let combined = operation[0..operation.len() - 2].to_string() + &inner_operation;
                 let new_operation = if operation.starts_with("{}") && inner_operation.ends_with("{}") {
@@ -123,7 +129,7 @@ async fn combine_operation(
                         if inner_array {
                             if let Effects::CreateArray(last) = values.last_mut().unwrap() {
                                 for effect in effects {
-                                    last.push(effect);
+                                    last.push((effect, token.clone()));
                                 }
                             }
                         } else {
@@ -150,6 +156,8 @@ async fn combine_operation(
                             &inner_data,
                             effects,
                             inner_array,
+                            token.clone(),
+                            inner_token,
                         ));
                     }
                 } else {
@@ -175,16 +183,18 @@ async fn combine_operation(
                             &inner_data,
                             effects,
                             false,
+                            token.clone(),
+                            inner_token,
                         ));
                     }
                 }
             }
-            last = Effects::Operation(inner_operation, effects)
+            last = Effects::Operation(inner_operation, effects, inner_token)
         }
 
         if let Some(mut found) = reading_array {
-            if let Effects::CreateArray(inner) = found.last_mut().unwrap() {
-                inner.push(last);
+            if let (Effects::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
+                inner.push((last, inner_token.clone()));
             } else {
                 panic!("Expected array!");
             }
@@ -204,6 +214,8 @@ pub fn operator_pratt_parsing(
     inner_data: &Arc<StructData>,
     mut inner_effects: Vec<Effects>,
     inner_array: bool,
+    token: CodeErrorToken,
+    inner_token: CodeErrorToken,
 ) -> Option<Arc<StructData>> {
     let op_priority = Attribute::find_attribute("priority", &found.attributes)
         .map(|inner| inner.as_int_attribute().unwrap_or(0))
@@ -218,7 +230,7 @@ pub fn operator_pratt_parsing(
     return if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
         if inner_array {
             if let Effects::CreateArray(inner) = values.last_mut().unwrap() {
-                inner.push(inner_effects.remove(0));
+                inner.push((inner_effects.remove(0), inner_token));
             } else {
                 panic!("Assumed op args ended with an array when they didn't!")
             }
@@ -227,12 +239,12 @@ pub fn operator_pratt_parsing(
         }
         let mut temp = vec![];
         mem::swap(&mut temp, values);
-        inner_effects.insert(0, Effects::Operation(operation, temp));
+        inner_effects.insert(0, Effects::Operation(operation, temp, token));
         *values = inner_effects;
 
         Some(inner_data.clone())
     } else {
-        values.push(Effects::Operation(inner_operator, inner_effects));
+        values.push(Effects::Operation(inner_operator, inner_effects, inner_token));
         Some(found.clone())
     };
 }

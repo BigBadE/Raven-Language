@@ -95,7 +95,7 @@ pub fn compile_block<'ctx>(
     let mut broke = false;
     for line in &code.expressions {
         match line.expression_type {
-            ExpressionType::Return => {
+            ExpressionType::Return(_) => {
                 if let FinalizedEffects::CodeBody(body) = &line.effect {
                     if !broke {
                         let destination = get_block_or_create(&body.label, function, type_getter);
@@ -570,7 +570,7 @@ pub fn compile_effect<'ctx>(
         FinalizedEffects::GenericMethodCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
-        FinalizedEffects::GenericVirtualCall(_, _, _, _) => {
+        FinalizedEffects::GenericVirtualCall(_, _, _, _, _) => {
             panic!("Generic virtual call not degeneric'd!")
         }
     };

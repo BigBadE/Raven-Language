@@ -12,8 +12,8 @@ use syntax::{
 
 use std::sync::Mutex;
 
-use crate::tokens::tokens::Token;
-use crate::{ImportNameResolver, TokenTypes};
+use crate::ImportNameResolver;
+use data::tokens::{CodeErrorToken, Token, TokenTypes};
 
 /// A struct containing the data needed for parsing
 pub struct ParserUtils<'a> {
@@ -183,6 +183,7 @@ impl<'a> ParserUtils<'a> {
                 code: CodeBody::new(Vec::default(), "empty".to_string()),
                 return_type: None,
                 data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
+                token: CodeErrorToken::make_empty(),
             },
         };
 

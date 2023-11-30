@@ -1,3 +1,4 @@
+#![feature(try_trait_v2)]
 use anyhow::Error;
 use colored::Colorize;
 use std::fmt::{Debug, Display, Formatter};
@@ -7,6 +8,8 @@ use tokio::runtime::{Builder, Runtime};
 
 /// The type of the main LLVM function called by the program
 pub type Main<T> = unsafe extern "C" fn() -> T;
+
+pub mod tokens;
 
 /// Settings used in configuring the runner
 pub struct RunnerSettings {

@@ -1,7 +1,7 @@
 use crate::parser::function_parser::parse_function;
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
 use crate::parser::util::ParserUtils;
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 use indexmap::IndexMap;
 use std::sync::Arc;
 use syntax::async_util::{NameResolver, UnparsedType};

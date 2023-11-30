@@ -1,6 +1,7 @@
 use crate::check_code::{placeholder_error, verify_effect};
 use crate::check_method_call::check_method;
 use crate::CodeVerifier;
+use data::tokens::CodeErrorToken;
 use std::mem;
 use syntax::async_util::{AsyncDataGetter, UnparsedType};
 use syntax::code::{degeneric_header, Effects, FinalizedEffects};
@@ -23,7 +24,8 @@ pub async fn check_impl_call(
     let traits;
     let method;
     let returning;
-    if let Effects::ImplementationCall(new_calling, new_traits, new_method, effects, new_returning) = effect {
+    let token;
+    if let Effects::ImplementationCall(new_calling, new_traits, new_method, effects, new_returning, new_token) = effect {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
         }
@@ -31,6 +33,7 @@ pub async fn check_impl_call(
         traits = new_traits;
         method = new_method;
         returning = new_returning;
+        token = new_token;
     } else {
         unreachable!()
     }
@@ -65,7 +68,7 @@ pub async fn check_impl_call(
             finalized_effects: &mut finalized_effects,
             variables,
         };
-        if let Some(found) = check_virtual_type(&mut impl_checker).await? {
+        if let Some(found) = check_virtual_type(&mut impl_checker, token).await? {
             return Ok(found);
         }
 
@@ -99,7 +102,10 @@ pub struct ImplCheckerData<'a> {
 }
 
 /// Checks an implementation call to see if it should be a virtual call
-async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<FinalizedEffects>, ParsingError> {
+async fn check_virtual_type(
+    data: &mut ImplCheckerData<'_>,
+    token: CodeErrorToken,
+) -> Result<Option<FinalizedEffects>, ParsingError> {
     if data.finding_return_type.of_type_sync(data.data, None).0 {
         let mut i = 0;
         for found in &data.data.inner_struct().data.functions {
@@ -135,6 +141,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<Fin
                         target,
                         AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
                         temp,
+                        token,
                     )));
                 }
 
@@ -147,6 +154,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>) -> Result<Option<Fin
                         data.code_verifier.process_manager.cloned(),
                         data.finalized_effects.clone(),
                         data.variables.clone(),
+                        token,
                     ),
                 );
 

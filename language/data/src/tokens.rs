@@ -1,6 +1,6 @@
+use crate::ParsingError;
 use std::convert::Infallible;
 use std::ops::{ControlFlow, FromResidual, Try};
-use syntax::ParsingError;
 
 /// A token is a single string of characters in the file.
 /// For example, keywords, variables, etc... are a single token.
@@ -81,6 +81,31 @@ impl FromResidual<Token> for Token {
 impl FromResidual<Result<Infallible, Token>> for Token {
     fn from_residual(residual: Result<Infallible, Token>) -> Token {
         return residual.unwrap_err();
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CodeErrorToken {
+    pub token: Token,
+    pub file_name: String,
+}
+
+impl CodeErrorToken {
+    pub fn new(token: Token, file_name: String) -> Self {
+        return Self { token, file_name };
+    }
+
+    pub fn make_error(&self, message: String) -> ParsingError {
+        return self.token.make_error(self.file_name.clone(), message);
+    }
+
+    pub fn change_token_end(&mut self, end_token: &Token) {
+        self.token.end = end_token.end;
+        self.token.end_offset = end_token.end_offset;
+    }
+
+    pub fn make_empty() -> Self {
+        return Self { token: Token::new(TokenTypes::Colon, None, (0, 0), 0, (0, 0), 0), file_name: String::default() };
     }
 }
 

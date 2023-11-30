@@ -1,5 +1,5 @@
 use crate::tokens::tokenizer::{Tokenizer, TokenizerState};
-use crate::tokens::tokens::{Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 use syntax::MODIFIERS;
 
 /// Parses to one of the provided end characters

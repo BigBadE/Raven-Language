@@ -1,4 +1,5 @@
 use async_recursion::async_recursion;
+use data::tokens::CodeErrorToken;
 use syntax::async_util::UnparsedType;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody};
@@ -29,7 +30,7 @@ pub async fn verify_code(
         }
 
         body.push(FinalizedExpression::new(
-            line.expression_type,
+            line.expression_type.clone(),
             verify_effect(code_verifier, variables, line.effect).await?,
         ));
 
@@ -52,7 +53,7 @@ async fn check_return_type(
     body: &mut Vec<FinalizedExpression>,
     variables: &SimpleVariableManager,
 ) -> Result<bool, ParsingError> {
-    if line != ExpressionType::Return {
+    if !matches!(line, ExpressionType::Return(_)) {
         return Ok(false);
     }
 
@@ -62,6 +63,7 @@ async fn check_return_type(
     };
 
     let last = body.pop().unwrap();
+    println!("Getting return of {:?}", last.effect);
     let last_type = last.effect.get_return(variables).unwrap();
     // Only downcast types that don't match and aren't generic
     if last_type == *return_type || !last_type.name_safe().is_some() {
@@ -79,7 +81,7 @@ async fn check_return_type(
         .await?;
 
         body.push(FinalizedExpression::new(
-            ExpressionType::Return,
+            line,
             FinalizedEffects::Downcast(Box::new(last.effect), return_type.clone(), value),
         ));
         Ok(true)
@@ -110,33 +112,33 @@ pub async fn verify_effect(
             Box::new(verify_effect(code_verifier, variables, *first).await?),
             Box::new(verify_effect(code_verifier, variables, *second).await?),
         ),
-        Effects::Operation(_, _) => check_operator(code_verifier, variables, effect).await?,
-        Effects::ImplementationCall(_, _, _, _, _) => check_impl_call(code_verifier, variables, effect).await?,
-        Effects::MethodCall(_, _, _, _) => check_method_call(code_verifier, variables, effect).await?,
+        Effects::Operation(_, _, _) => check_operator(code_verifier, variables, effect).await?,
+        Effects::ImplementationCall(_, _, _, _, _, _) => check_impl_call(code_verifier, variables, effect).await?,
+        Effects::MethodCall(_, _, _, _, _) => check_method_call(code_verifier, variables, effect).await?,
         Effects::CompareJump(effect, first, second) => {
             FinalizedEffects::CompareJump(Box::new(verify_effect(code_verifier, variables, *effect).await?), first, second)
         }
-        Effects::CreateStruct(target, effects) => verify_create_struct(code_verifier, target, effects, variables).await?,
+        Effects::CreateStruct(target, effects, _) => verify_create_struct(code_verifier, target, effects, variables).await?,
         Effects::Load(effect, target) => {
             let output = verify_effect(code_verifier, variables, *effect).await?;
 
             let types = output.get_return(variables).unwrap().inner_struct().clone();
             FinalizedEffects::Load(Box::new(output), target.clone(), types)
         }
-        Effects::CreateVariable(name, effect) => {
+        Effects::CreateVariable(name, effect, token) => {
             let effect = verify_effect(code_verifier, variables, *effect).await?;
             let found;
             if let Some(temp_found) = effect.get_return(variables) {
                 found = temp_found;
             } else {
-                return Err(placeholder_error("No return type!".to_string()));
+                return Err(token.make_error("No return type!".to_string()));
             };
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::CreateVariable(name.clone(), Box::new(effect), found)
         }
         Effects::CreateArray(effects) => {
             let mut output = Vec::default();
-            for effect in effects {
+            for (effect, _) in effects {
                 output.push(verify_effect(code_verifier, variables, effect).await?);
             }
 
@@ -170,7 +172,7 @@ async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
 async fn verify_create_struct(
     code_verifier: &mut CodeVerifier<'_>,
     target: UnparsedType,
-    effects: Vec<(String, Effects)>,
+    effects: Vec<(String, Effects, CodeErrorToken)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
     let mut target = Syntax::parse_type(
@@ -202,7 +204,7 @@ async fn verify_create_struct(
         )
         .await?;
     let mut final_effects = vec![];
-    for (field_name, effect) in effects {
+    for (field_name, effect, error) in effects {
         let mut i = 0;
         let fields = target.get_fields();
         for field in fields {
@@ -213,7 +215,7 @@ async fn verify_create_struct(
         }
 
         if i == fields.len() {
-            return Err(placeholder_error(format!("Unknown field {}!", field_name)));
+            return Err(error.make_error(format!("Unknown field {}!", field_name)));
         }
 
         final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));

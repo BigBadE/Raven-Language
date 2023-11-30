@@ -1,5 +1,5 @@
 use crate::tokens::code_tokenizer::next_code_token;
-use crate::tokens::tokens::{Token, TokenCodeData, TokenTypes};
+use data::tokens::{Token, TokenCodeData, TokenTypes};
 use crate::tokens::top_tokenizer::{next_func_token, next_implementation_token, next_struct_token, next_top_token};
 use crate::tokens::util::{next_generic, parse_string};
 
