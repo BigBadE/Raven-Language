@@ -63,8 +63,14 @@ async fn check_return_type(
     };
 
     let last = body.pop().unwrap();
-    println!("Getting return of {:?}", last.effect);
-    let last_type = last.effect.get_return(variables).unwrap();
+    let last_type;
+    if let Some(found) = last.effect.get_return(variables) {
+        last_type = found;
+    } else {
+        // This is an if/for/while block, skip it
+        return Ok(true);
+    }
+
     // Only downcast types that don't match and aren't generic
     if last_type == *return_type || !last_type.name_safe().is_some() {
         body.push(last);
