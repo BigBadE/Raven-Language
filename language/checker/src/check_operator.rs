@@ -196,7 +196,8 @@ async fn combine_operation(
             if let (Effects::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
                 inner.push((last, inner_token.clone()));
             } else {
-                panic!("Expected array!");
+                let (effect, token) = found.pop().unwrap();
+                found.push((Effects::CreateArray(vec![(effect, token.clone())]), token))
             }
         } else {
             values.push(last);

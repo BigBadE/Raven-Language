@@ -88,8 +88,6 @@ fn main() {
         Err(()) => panic!("Error during build detected!"),
     };
 
-    println!("Dependencies: {:?}", project.dependencies);
-
     arguments.runner_settings.compiler_arguments.target = "main::main".to_string();
 
     let source = env::current_dir().unwrap().join("src");
@@ -98,7 +96,7 @@ fn main() {
         panic!("Source folder (src) not found!");
     }
 
-    println!("Building and running project...");
+    println!("Building and running {}...", project.name);
     match build::<()>(&mut arguments, vec![Box::new(FileSourceSet { root: source })]) {
         _ => {}
     }

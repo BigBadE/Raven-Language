@@ -23,6 +23,7 @@ pub fn my_macro_here_derive(input: proc_macro::TokenStream) -> proc_macro::Token
 
     let expanded = quote! {
         #[repr(C, align(8))]
+        #[derive(Debug)]
         pub struct #raven_name {
             type_id: core::ffi::c_int,
             #translated_extern
