@@ -9,6 +9,7 @@ use tokio::runtime::{Builder, Runtime};
 /// The type of the main LLVM function called by the program
 pub type Main<T> = unsafe extern "C" fn() -> T;
 
+pub mod externs;
 pub mod tokens;
 
 /// Settings used in configuring the runner
@@ -226,4 +227,10 @@ impl Display for ParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return write!(f, "Error at {} ({}:{}):\n{}", self.file, self.start.0, self.start.1, self.message);
     }
+}
+
+/// A small type for translating external Raven types into Rust types
+pub trait RavenExtern {
+    type Input;
+    unsafe fn translate(raven_type: *mut Self::Input) -> Self;
 }

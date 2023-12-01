@@ -1,10 +1,12 @@
 use core::fmt::Debug;
 use std::sync::atomic::{AtomicPtr, Ordering};
-use std::{env, path, ptr};
+use std::{env, path};
 
 use include_dir::{include_dir, Dir, DirEntry, File};
 
-use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, Readable, RunnerSettings, SourceSet};
+use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, RavenExtern, Readable, RunnerSettings, SourceSet};
+
+use crate::project::RavenProject;
 
 /// The Raven project types
 pub mod project;
@@ -20,7 +22,8 @@ static STD_WINDOWS: Dir = include_dir!("lib/std/windows/src");
 static STD_LINUX: Dir = include_dir!("lib/std/linux/src");
 /// The MacOS standard library
 static STD_MACOS: Dir = include_dir!("lib/std/macos/src");
-//static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
+/// The Magpie classes
+static MAGPIE: Dir = include_dir!("tools/magpie/lib/src");
 
 /// Finds the Raven project/file and runs it
 fn main() {
@@ -74,17 +77,18 @@ fn main() {
     );
 
     println!("Setting up build...");
-    /*let project = match build::<RawRavenProject>(&mut arguments, vec!(Box::new(FileSourceSet {
-        root: build_path,
-    }), Box::new(InnerSourceSet {
-        set: &MAGPIE
-    }))) {
+    let project = match build::<RavenProject>(
+        &mut arguments,
+        vec![Box::new(FileSourceSet { root: build_path }), Box::new(InnerSourceSet { set: &MAGPIE })],
+    ) {
         Ok(found) => match found {
             Some(found) => RavenProject::from(found),
-            None => panic!("No project method in build file!")
+            None => panic!("No project method in build file!"),
         },
-        Err(()) => panic!("Error during build detected!")
-    };*/
+        Err(()) => panic!("Error during build detected!"),
+    };
+
+    println!("Dependencies: {:?}", project.dependencies);
 
     arguments.runner_settings.compiler_arguments.target = "main::main".to_string();
 
@@ -101,7 +105,10 @@ fn main() {
 }
 
 /// Builds a Raven project, adding the needed dependencies
-pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<dyn SourceSet>>) -> Result<Option<T>, ()> {
+pub fn build<T: RavenExtern + 'static>(
+    arguments: &mut Arguments,
+    mut source: Vec<Box<dyn SourceSet>>,
+) -> Result<Option<T>, ()> {
     let platform_std = match env::consts::OS {
         "windows" => &STD_WINDOWS,
         "linux" => &STD_LINUX,
@@ -129,9 +136,9 @@ pub fn build<T: Send + 'static>(arguments: &mut Arguments, mut source: Vec<Box<d
 }
 
 /// Runs Raven and blocks until a result is gotten
-fn run<T: Send + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
-    let result = arguments.cpu_runtime.block_on(runner::runner::run::<AtomicPtr<T>>(&arguments))?;
-    return Ok(result.map(|inner| unsafe { ptr::read(inner.load(Ordering::Relaxed)) }));
+fn run<T: RavenExtern + 'static>(arguments: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+    let result = arguments.cpu_runtime.block_on(runner::runner::run::<AtomicPtr<T::Input>>(&arguments))?;
+    return Ok(result.map(|inner| unsafe { RavenExtern::translate(inner.load(Ordering::Relaxed)) }));
 }
 
 /// A source set for an internal directory with the include_dir macro

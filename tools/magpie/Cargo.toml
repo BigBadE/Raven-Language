@@ -14,6 +14,8 @@ harness = false
 runner = { path = "../../language/runner" }
 data = { path = "../../language/data" }
 
+magpie-derive = { path = "../magpie-derive" }
+
 async-recursion = { path = "../../crates/async-recursion" }
 
 include_dir = "0.7.3"

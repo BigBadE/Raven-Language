@@ -9,6 +9,7 @@ members = [
     "language/compilers/llvm",
 
     "tools/magpie",
+    "tools/magpie-derive",
     "tools/magpie/magpie-wrapper",
     "tools/ide-plugins/raven-language-server"
 ]
