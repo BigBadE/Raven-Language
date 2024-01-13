@@ -5,14 +5,15 @@ edition = "2021"
 
 [dependencies]
 syntax = { path = "../../../language/syntax" }
+data = { path = "../../../language/data" }
 parser = { path = "../../../language/parser" }
 
-lsp-server = "0.7.4"
-lsp-types = {  version = "0.94.1", features = ["proposed"] }
+lsp-server = "0.7.5"
+lsp-types = { version = "0.95.0", features = ["proposed"] }
 
 tokio = { version = "1.33.0", features = ["rt-multi-thread", "sync", "time"] }
 
-crossbeam-channel = "0.5.8"
+crossbeam-channel = "0.5.9"
 
 serde_json = "1.0.108"
-serde = "1.0.192"
+serde = "1.0.193"

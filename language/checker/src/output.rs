@@ -45,22 +45,19 @@ impl ProcessManager for TypesChecker {
         function: UnfinalizedFunction,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody) {
-        return match verify_function(function, syntax, self.include_refs).await {
-            Ok(output) => output,
-            Err(error) => {
-                syntax.lock().unwrap().errors.push(error.clone());
-                (
-                    CodelessFinalizedFunction {
-                        generics: IndexMap::default(),
-                        arguments: vec![],
-                        return_type: None,
-                        data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
-                        token: CodeErrorToken::make_empty(),
-                    },
-                    CodeBody::new(Vec::default(), String::default()),
-                )
-            }
-        };
+        return verify_function(function, syntax, self.include_refs).await.unwrap_or_else(|error| {
+            syntax.lock().unwrap().errors.push(error.clone());
+            (
+                CodelessFinalizedFunction {
+                    generics: IndexMap::default(),
+                    arguments: vec![],
+                    return_type: None,
+                    data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
+                    token: CodeErrorToken::make_empty(),
+                },
+                CodeBody::new(Vec::default(), String::default()),
+            )
+        });
     }
 
     async fn verify_code(
@@ -70,20 +67,17 @@ impl ProcessManager for TypesChecker {
         resolver: Box<dyn NameResolver>,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedFunction {
-        return match verify_function_code(self, resolver, code, function, syntax).await {
-            Ok(output) => output,
-            Err(error) => {
-                syntax.lock().unwrap().errors.push(error.clone());
-                FinalizedFunction {
-                    generics: IndexMap::default(),
-                    fields: vec![],
-                    code: FinalizedCodeBody::default(),
-                    return_type: None,
-                    data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
-                    token: CodeErrorToken::make_empty(),
-                }
+        return verify_function_code(self, resolver, code, function, syntax).await.unwrap_or_else(|error| {
+            syntax.lock().unwrap().errors.push(error.clone());
+            FinalizedFunction {
+                generics: IndexMap::default(),
+                fields: vec![],
+                code: FinalizedCodeBody::default(),
+                return_type: None,
+                data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
+                token: CodeErrorToken::make_empty(),
             }
-        };
+        });
     }
 
     async fn verify_struct(

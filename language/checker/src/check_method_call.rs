@@ -33,6 +33,22 @@ pub async fn check_method_call(
         unreachable!()
     }
 
+    let returning = match returning {
+        Some(inner) => Some(
+            Syntax::parse_type(
+                code_verifier.syntax.clone(),
+                placeholder_error(format!("Bounds error!")),
+                code_verifier.resolver.boxed_clone(),
+                inner,
+                vec![],
+            )
+            .await?
+            .finalize(code_verifier.syntax.clone())
+            .await,
+        ),
+        None => None,
+    };
+
     // Finds methods based off the calling type.
     let method = if let Some(found) = calling {
         let calling = verify_effect(code_verifier, variables, *found).await?;
@@ -117,22 +133,6 @@ pub async fn check_method_call(
         {
             value
         } else {
-            let returning = match returning {
-                Some(inner) => Some(
-                    Syntax::parse_type(
-                        code_verifier.syntax.clone(),
-                        placeholder_error(format!("Bounds error!")),
-                        code_verifier.resolver.boxed_clone(),
-                        inner,
-                        vec![],
-                    )
-                    .await?
-                    .finalize(code_verifier.syntax.clone())
-                    .await,
-                ),
-                None => None,
-            };
-
             let effects = &finalized_effects;
             let variables = &variables;
             let returning = &returning;
@@ -140,7 +140,7 @@ pub async fn check_method_call(
             let process_manager = code_verifier.process_manager;
             let syntax = &code_verifier.syntax;
             let checker =
-                async move |implementor: FinishedTraitImplementor, method| -> Result<FinalizedEffects, ParsingError> {
+                async move |implementor: Arc<FinishedTraitImplementor>, method| -> Result<FinalizedEffects, ParsingError> {
                     let method = AsyncDataGetter::new(syntax.clone(), method).await;
                     let mut process_manager = process_manager.clone();
                     implementor
@@ -161,6 +161,46 @@ pub async fn check_method_call(
             .await;
         }
     } else {
+        if method.contains("::") {
+            let possible = method.split("::").collect::<Vec<_>>();
+            let structure = possible[possible.len() - 2];
+            if let Ok(structure) = Syntax::get_struct(
+                code_verifier.syntax.clone(),
+                ParsingError::empty(),
+                structure.to_string(),
+                code_verifier.resolver.boxed_clone(),
+                vec![],
+            )
+            .await
+            {
+                for implementor in Syntax::get_struct_impl(
+                    code_verifier.syntax.clone(),
+                    structure.finalize(code_verifier.syntax.clone()).await,
+                )
+                .await
+                {
+                    for function in &implementor.functions {
+                        if function.name.split("::").last().unwrap() == possible[possible.len() - 1] {
+                            let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
+                            match check_method(
+                                &code_verifier.process_manager,
+                                method,
+                                finalized_effects.clone(),
+                                &code_verifier.syntax,
+                                variables,
+                                returning.clone(),
+                            )
+                            .await
+                            {
+                                Ok(result) => return Ok(result),
+                                Err(error) => println!("{}", error),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Syntax::get_function(
             code_verifier.syntax.clone(),
             placeholder_error(format!("Unknown method {}", method)),
@@ -169,22 +209,6 @@ pub async fn check_method_call(
             true,
         )
         .await?
-    };
-
-    let returning = match returning {
-        Some(inner) => Some(
-            Syntax::parse_type(
-                code_verifier.syntax.clone(),
-                placeholder_error(format!("Bounds error!")),
-                code_verifier.resolver.boxed_clone(),
-                inner,
-                vec![],
-            )
-            .await?
-            .finalize(code_verifier.syntax.clone())
-            .await,
-        ),
-        None => None,
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
@@ -211,7 +235,6 @@ pub async fn check_method(
 ) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
-
         method =
             CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects, syntax, variables, returning).await?;
 

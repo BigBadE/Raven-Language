@@ -8,12 +8,14 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
+
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, JoinHandle};
 
 use crate::function::display_parenless;
 use crate::syntax::Syntax;
-use crate::{ParsingError, TopElement};
+use crate::types::FinalizedTypes;
+use crate::{FinishedStructImplementor, ParsingError, TopElement};
 
 /// A future that asynchronously gets a type from its respective AsyncGetter.
 /// Will never deadlock because types are added to the AsyncGetter before being finalized.
@@ -41,6 +43,19 @@ pub struct AsyncDataGetter<T: TopElement> {
     pub getting: Arc<T>,
 }
 
+pub struct AsyncStructImplGetter {
+    /// The program
+    pub syntax: Arc<Mutex<Syntax>>,
+    /// Type to get
+    pub getting: FinalizedTypes,
+}
+
+impl AsyncStructImplGetter {
+    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: FinalizedTypes) -> Self {
+        return Self { syntax, getting };
+    }
+}
+
 impl<T: TopElement> AsyncTypesGetter<T> {
     /// Helper method to try a get a type with the given prefix, and adding a waker if not.
     fn get_types(
@@ -60,7 +75,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
         };
 
         let getting = T::get_manager(locked);
-        //Look for a structure of that name
+        //Look for a program of that name
         if let Some(found) = getting.types.get(&name).cloned() {
             if !not_trait || !found.is_trait() {
                 self.finished = Some(found.clone());
@@ -120,7 +135,7 @@ impl<T: TopElement> AsyncTypesGetter<T> {
 impl<T: TopElement> Future for AsyncTypesGetter<T> {
     type Output = Result<Arc<T>, ParsingError>;
 
-    /// Gets the top element from the structure with the given name, using the given imports.
+    /// Gets the top element from the program with the given name, using the given imports.
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // If we found it already, return it.
         if let Some(finished) = &self.finished {
@@ -185,6 +200,25 @@ where
 
         // This never panics because as long as the data exists, every element will be finalized.
         return Poll::Pending;
+    }
+}
+
+impl Future for AsyncStructImplGetter {
+    type Output = Vec<Arc<FinishedStructImplementor>>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut locked = self.syntax.lock().unwrap();
+
+        if let Some(found) = locked.struct_implementations.get(&self.getting) {
+            return Poll::Ready(found.clone());
+        }
+
+        return if locked.finished_impls() {
+            Poll::Ready(Vec::default())
+        } else {
+            locked.async_manager.impl_waiters.push(cx.waker().clone());
+            Poll::Pending
+        };
     }
 }
 
@@ -262,12 +296,7 @@ pub struct HandleWrapper {
 impl HandleWrapper {
     /// Creates a new handle wrapper
     pub fn new(handle: Handle) -> HandleWrapper {
-        return HandleWrapper {
-            handle,
-            joining: vec![],
-            names: HashMap::default(),
-            waker: None,
-        };
+        return HandleWrapper { handle, joining: vec![], names: HashMap::default(), waker: None };
     }
     /// Spawns a task and adds it to the joining vec
     pub fn spawn<T: Send + 'static, F: Future<Output = T> + Send + 'static>(&mut self, name: String, future: F) {

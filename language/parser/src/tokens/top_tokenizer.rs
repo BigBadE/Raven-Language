@@ -220,7 +220,7 @@ pub fn get_return_token(tokenizer: &mut Tokenizer) -> Token {
 }
 
 /// Finds the next token in the struct header. This only handles generics, implemented types,
-/// structure name, and the start of the code.
+/// program name, and the start of the code.
 pub fn next_struct_token(tokenizer: &mut Tokenizer) -> Token {
     match tokenizer.last.token_type {
         TokenTypes::StructStart | TokenTypes::TraitStart | TokenTypes::For => {
@@ -257,6 +257,9 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             if tokenizer.matches("for") {
                 tokenizer.state = TokenizerState::STRUCTURE;
                 tokenizer.make_token(TokenTypes::For)
+            } else if tokenizer.matches("{") {
+                tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
+                tokenizer.make_token(TokenTypes::StructTopElement)
             } else {
                 tokenizer.next_included()?;
                 tokenizer.parse_to_first(TokenTypes::Identifier, b'<', b' ')

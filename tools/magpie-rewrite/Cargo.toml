@@ -1,0 +1,10 @@
+[package]
+name = "magpie-rewrite"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+new-runner = { path = "../../rewrite/runner" }
+new-parser = { path = "../../rewrite/parser" }
+util = { path = "../../rewrite/util" }
+functions = { path = "../../rewrite/functions" }

@@ -2,8 +2,8 @@ use crossbeam_channel::Sender;
 use lsp_server::{Message, RequestId, Response};
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult};
 
+use data::tokens::{Token, TokenTypes};
 use parser::tokens::tokenizer::Tokenizer;
-use parser::tokens::tokens::{Token, TokenTypes};
 
 /// Parses the semantic tokens from the file and sends it to the IDE
 pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<Message>) {

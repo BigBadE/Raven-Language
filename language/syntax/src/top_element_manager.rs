@@ -78,7 +78,7 @@ pub struct TraitImplWaiter<F> {
 
 impl<
         T: Future<Output = Result<FinalizedEffects, ParsingError>>,
-        F: Fn(FinishedTraitImplementor, Arc<FunctionData>) -> T,
+        F: Fn(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> T,
     > Future for TraitImplWaiter<F>
 {
     type Output = Result<FinalizedEffects, ParsingError>;
@@ -114,7 +114,11 @@ impl<
                 },
                 Err(error) => return Poll::Ready(Err(error)),
             },
-            Poll::Pending => Poll::Pending,
+            Poll::Pending => {
+                let mut locked = self.syntax.lock().unwrap();
+                locked.async_manager.impl_waiters.push(cx.waker().clone());
+                Poll::Pending
+            }
         };
     }
 }
@@ -125,7 +129,7 @@ pub async fn find_trait_implementation(
     resolver: &dyn NameResolver,
     method: &String,
     return_type: &FinalizedTypes,
-) -> Result<Option<Vec<(FinishedTraitImplementor, Vec<Arc<FunctionData>>)>>, ParsingError> {
+) -> Result<Option<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>>, ParsingError> {
     let mut output = Vec::default();
 
     for import in resolver.imports() {
@@ -206,6 +210,48 @@ where
     pub data: HashMap<Arc<T>, Arc<T::Finalized>>,
     /// Wakers waiting on a type to be added to the types hashmap, waked after the type is added to types
     pub wakers: HashMap<String, Vec<Waker>>,
+}
+
+impl<T: TopElement> TopElementManager<T> {
+    fn wake(&mut self, name: &String) {
+        if let Some(wakers) = self.wakers.remove(name) {
+            for waker in wakers {
+                waker.wake();
+            }
+        }
+    }
+
+    pub fn set_id(&mut self, data: &mut T) {
+        data.set_id(
+            self.sorted.iter().position(|found| found.name() == data.name()).unwrap_or_else(|| self.sorted.len()) as u64
+        );
+    }
+
+    pub fn add_type(&mut self, data: Arc<T>) {
+        self.wake(data.name());
+        if let Some(_) = self.types.get(data.name()) {
+            // TODO handle this
+            unsafe {
+                Arc::get_mut_unchecked(&mut data.clone()).poison(ParsingError::new(
+                    String::default(),
+                    (0, 0),
+                    0,
+                    (0, 0),
+                    0,
+                    "Duplicate type!".to_string(),
+                ))
+            }
+        }
+        if !self.sorted.contains(&data) {
+            self.sorted.push(data.clone());
+        }
+        self.types.insert(data.name().clone(), data);
+    }
+
+    pub fn add_data(&mut self, types: Arc<T>, data: Arc<T::Finalized>) {
+        self.wake(types.name());
+        self.data.insert(types, data);
+    }
 }
 
 /// Rust's derive breaks this for some reason so it's manually implemented

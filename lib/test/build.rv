@@ -8,9 +8,6 @@ pub fn project() -> RavenProject {
         dependencies: [
             new Dependency {
                 name: "Test Dependency",
-            },
-            new Dependency {
-                name: "Other Dependency",
             }
         ],
     };

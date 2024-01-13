@@ -257,7 +257,7 @@ pub fn compile_effect<'ctx>(
         FinalizedEffects::LoadVariable(name) => {
             return Some(type_getter.variables.get(name).unwrap().1);
         }
-        //Loads variable/field pointer from structure, or self if structure is None
+        //Loads variable/field pointer from program, or self if program is None
         FinalizedEffects::Load(loading_from, field, _) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             //Compensate for type id

@@ -5,9 +5,10 @@ use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
 use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
-use syntax::types::Types;
+use syntax::types::{FinalizedTypes, Types};
 use syntax::{
-    DataType, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement, TraitImplementor,
+    DataType, FinishedStructImplementor, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement,
+    TraitImplementor,
 };
 
 use std::sync::Mutex;
@@ -40,6 +41,8 @@ impl<'a> ParserUtils<'a> {
             panic!("Empty name!");
         }
 
+        let name = if name == "Self" { self.file.clone() } else { name };
+
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(),
             token.make_error(self.file.clone(), format!("Failed to find type named {}", &name)),
@@ -63,7 +66,7 @@ impl<'a> ParserUtils<'a> {
 
         Syntax::add::<StructData>(
             &self.syntax,
-            token.make_error(self.file.clone(), format!("Duplicate structure {}", structure.data.name)),
+            token.make_error(self.file.clone(), format!("Duplicate program {}", structure.data.name)),
             structure.data(),
         );
 
@@ -127,30 +130,60 @@ impl<'a> ParserUtils<'a> {
         }
 
         let target = implementor.base.await?;
-        let base = implementor.implementor.await?;
-
         let target = target.finalize(syntax.clone()).await;
-        let base = base.finalize(syntax.clone()).await;
-
-        let chalk_type = Arc::new(Syntax::make_impldatum(&generics, &target, &base));
 
         let mut functions = Vec::default();
         for function in &implementor.functions {
             functions.push(function.data.clone());
         }
 
-        let output =
-            FinishedTraitImplementor { target, base, attributes: implementor.attributes, functions, chalk_type, generics };
+        if let Some(base) = implementor.implementor {
+            let base = base.await?;
+            let base = base.finalize(syntax.clone()).await;
 
-        {
-            let mut locked = syntax.lock().unwrap();
-            locked.implementations.push(output);
+            let chalk_type = Arc::new(Syntax::make_impldatum(&generics, &target, &base));
 
-            locked.async_manager.parsing_impls -= 1;
-            for waker in &locked.async_manager.impl_waiters {
-                waker.wake_by_ref();
+            let output = FinishedTraitImplementor {
+                target,
+                base,
+                attributes: implementor.attributes,
+                functions,
+                chalk_type,
+                generics,
+            };
+
+            {
+                let mut locked = syntax.lock().unwrap();
+                locked.implementations.push(Arc::new(output));
+
+                locked.async_manager.parsing_impls -= 1;
+                for waker in &locked.async_manager.impl_waiters {
+                    waker.wake_by_ref();
+                }
+                locked.async_manager.impl_waiters.clear();
             }
-            locked.async_manager.impl_waiters.clear();
+        } else {
+            let output = FinishedStructImplementor { target, attributes: implementor.attributes, functions, generics };
+
+            {
+                let mut locked = syntax.lock().unwrap();
+                for function in &output.functions {
+                    locked.functions.add_type(function.clone());
+                }
+
+                let mut target = output.target.clone();
+                if let Some((base, _bounds)) = target.inner_generic_type() {
+                    target = FinalizedTypes::clone(base);
+                }
+
+                locked.struct_implementations.entry(target).or_default().push(Arc::new(output));
+
+                locked.async_manager.parsing_impls -= 1;
+                for waker in &locked.async_manager.impl_waiters {
+                    waker.wake_by_ref();
+                }
+                locked.async_manager.impl_waiters.clear();
+            }
         }
 
         for function in implementor.functions {

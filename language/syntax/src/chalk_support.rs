@@ -37,7 +37,7 @@ impl RustIrDatabase<ChalkIr> for Syntax {
         panic!("Expected a trait, got {:?}", found.name);
     }
 
-    /// Gets the structure given the ID.
+    /// Gets the program given the ID.
     fn adt_datum(&self, adt_id: AdtId<ChalkIr>) -> Arc<AdtDatum<ChalkIr>> {
         let found = self.structures.sorted.get(adt_id.0 as usize).unwrap();
         assert_eq!(found.id as u32, adt_id.0);

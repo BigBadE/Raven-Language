@@ -195,7 +195,7 @@ impl ParsingError {
         let mut file = None;
         'outer: for source in sources {
             for readable in source.get_files() {
-                if source.relative(&*readable) == self.file {
+                if self.file.starts_with(&source.relative(&*readable)) {
                     file = Some(readable);
                     break 'outer;
                 }

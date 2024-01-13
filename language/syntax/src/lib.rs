@@ -24,6 +24,7 @@ use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
+use std::hash::Hash;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -58,8 +59,7 @@ pub use data::ParsingError;
 pub type ParsingFuture<T> = Pin<Box<dyn Future<Output = Result<T, ParsingError>> + Send + Sync>>;
 
 /// All the modifiers, used for modifier parsing and debug output.
-pub static MODIFIERS: [Modifier; 4] =
-    [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal];
+pub static MODIFIERS: [Modifier; 4] = [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal];
 
 /// All the modifiers structures/functions/fields can have
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -252,7 +252,7 @@ pub trait DataType<T: TopElement> {
 #[async_trait]
 pub trait TopElement
 where
-    Self: Sized,
+    Self: Sized + Clone + PartialEq + Eq + Hash,
 {
     /// The unfinalized type of this top element
     type Unfinalized: DataType<Self>;
@@ -277,7 +277,7 @@ where
     /// Name of the element
     fn name(&self) -> &String;
 
-    /// Creates a new poisoned structure of the element
+    /// Creates a new poisoned program of the element
     fn new_poisoned(name: String, error: ParsingError) -> Self;
 
     /// Verifies the top element: de-genericing, checking effect arguments, lifetimes, etc...
@@ -298,7 +298,7 @@ pub struct TraitImplementor {
     /// Base type
     pub base: ParsingFuture<Types>,
     /// Type being implemented
-    pub implementor: ParsingFuture<Types>,
+    pub implementor: Option<ParsingFuture<Types>>,
     /// The implementor's generics
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
     /// The implementor's attributes
@@ -317,6 +317,20 @@ pub struct FinishedTraitImplementor {
     pub base: FinalizedTypes,
     /// The implementation as a chalk type
     pub chalk_type: Arc<ImplDatum<ChalkIr>>,
+    /// The generics declared by this implementor
+    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    /// The attributes on this implementor
+    pub attributes: Vec<Attribute>,
+    /// All ths functions in this implementor
+    pub functions: Vec<Arc<FunctionData>>,
+}
+
+/// Finished impl block for a type.
+/// Ex: impl<T> Iter<T>
+#[derive(Clone)]
+pub struct FinishedStructImplementor {
+    /// Would be Iter<T>
+    pub target: FinalizedTypes,
     /// The generics declared by this implementor
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
     /// The attributes on this implementor

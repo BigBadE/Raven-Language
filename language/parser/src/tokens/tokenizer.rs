@@ -1,9 +1,9 @@
 use crate::tokens::code_tokenizer::next_code_token;
-use data::tokens::{Token, TokenCodeData, TokenTypes};
 use crate::tokens::top_tokenizer::{next_func_token, next_implementation_token, next_struct_token, next_top_token};
 use crate::tokens::util::{next_generic, parse_string};
+use data::tokens::{Token, TokenCodeData, TokenTypes};
 
-/// This structure keeps track of the variables required for the tokenizing.
+/// This program keeps track of the variables required for the tokenizing.
 pub struct Tokenizer<'a> {
     /// The current state. This is used to determine which method will handle the next token.
     /// See TokenizerState for all the states
@@ -247,26 +247,26 @@ impl TokenizerState {
     pub const STRING_TO_CODE_STRUCT_TOP: u64 = 1;
     /// The top of the file, not inside anything.
     pub const TOP_ELEMENT: u64 = 2;
-    /// Inside a structure declaration
+    /// Inside a program declaration
     pub const STRUCTURE: u64 = 3;
     /// Inside an implementation declaration, turns into a STRUCTURE for the body
     pub const IMPLEMENTATION: u64 = 4;
     /// Inside a function
     pub const FUNCTION: u64 = 5;
-    /// Inside a function that's inside a structure or impl
+    /// Inside a function that's inside a program or impl
     pub const FUNCTION_TO_STRUCT_TOP: u64 = 6;
     /// Inside the generic declaration of a function declaration.
     pub const GENERIC_TO_FUNC: u64 = 0x7;
-    /// Inside the generic declaration of a function declaration in a structure.
+    /// Inside the generic declaration of a function declaration in a program.
     pub const GENERIC_TO_FUNC_TO_STRUCT_TOP: u64 = 0x8;
-    /// Inside the generic declaration of a structure
+    /// Inside the generic declaration of a program
     pub const GENERIC_TO_STRUCT: u64 = 0x9;
     /// Inside the generic declaration of an implementation
     pub const GENERIC_TO_IMPL: u64 = 0xA;
-    /// The inside of a structure
+    /// The inside of a program
     pub const TOP_ELEMENT_TO_STRUCT: u64 = 0xB;
     /// A block of code
     pub const CODE: u64 = 0xC;
-    /// A block of code that returns to a structure
+    /// A block of code that returns to a program
     pub const CODE_TO_STRUCT_TOP: u64 = 0xD;
 }

@@ -19,7 +19,7 @@ use crate::function::{display, display_parenless, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 use crate::top_element_manager::TypeImplementsTypeWaiter;
-use crate::{is_modifier, Modifier, ParsingError, ProcessManager, StructData, TopElement};
+use crate::{is_modifier, Modifier, ParsingError, ProcessManager, StructData};
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
 /// For example, "test" is a Struct called str, which is an internal type.
@@ -38,7 +38,7 @@ pub enum Types {
     Array(Box<Types>),
 }
 
-///A type with a reference to the finalized structure instead of the data.
+///A type with a reference to the finalized program instead of the data.
 #[derive(Clone, Debug, Eq, Hash)]
 pub enum FinalizedTypes {
     /// A basic struct
@@ -203,7 +203,7 @@ impl FinalizedTypes {
                     for arg in bounds {
                         generic_args.push(GenericArgData::Ty(arg.to_chalk_type(binders)).intern(ChalkIr));
                     }
-                    // Returns the structure with the correct substitutions from bounds for generic types.
+                    // Returns the program with the correct substitutions from bounds for generic types.
                     return TyKind::Adt(id, Substitution::from_iter(ChalkIr, generic_args)).intern(ChalkIr);
                 } else {
                     unreachable!()
@@ -550,7 +550,7 @@ impl FinalizedTypes {
                     let mut other = StructData::clone(&base.data);
                     other.name.clone_from(&name);
 
-                    // Update the structure's functions
+                    // Update the program's functions
                     for function in &mut other.functions {
                         let mut temp = FunctionData::clone(function);
                         temp.name = format!("{}::{}", name, temp.name.split("::").last().unwrap());
@@ -561,10 +561,8 @@ impl FinalizedTypes {
                     let arc_other;
                     {
                         let mut locked = syntax.lock().unwrap();
-                        other.set_id(locked.structures.sorted.len() as u64);
+                        locked.structures.set_id(&mut other);
                         arc_other = Arc::new(other);
-                        locked.structures.types.insert(name.clone(), arc_other.clone());
-                        locked.structures.sorted.push(arc_other.clone());
                     }
 
                     // Get the FinalizedStruct and degeneric it.
@@ -572,21 +570,16 @@ impl FinalizedTypes {
                         FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), base.data.clone()).await.deref());
                     data.data.clone_from(&arc_other);
 
-                    // Update the structure's fields
+                    // Update the program's fields
                     for field in &mut data.fields {
+                        println!("Flattening {} for {}", field.field.name, data.data.name);
                         field.field.field_type.flatten(syntax).await?;
                     }
 
                     let data = Arc::new(data);
                     // Add the flattened type to the syntax
                     let mut locked = syntax.lock().unwrap();
-                    if let Some(wakers) = locked.structures.wakers.remove(&data.data.name) {
-                        for waker in wakers {
-                            waker.wake();
-                        }
-                    }
-
-                    locked.structures.data.insert(arc_other, data.clone());
+                    locked.structures.add_data(arc_other, data.clone());
                     *self = FinalizedTypes::Struct(data.clone());
                 }
             }

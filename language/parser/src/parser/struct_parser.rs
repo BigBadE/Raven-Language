@@ -12,7 +12,7 @@ use syntax::syntax::Syntax;
 use syntax::types::Types;
 use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, ParsingFuture, TraitImplementor};
 
-/// Parses a structure
+/// Parses a program
 pub fn parse_structure(
     parser_utils: &mut ParserUtils,
     attributes: Vec<Attribute>,
@@ -162,10 +162,11 @@ pub fn parse_implementor(
             TokenTypes::FunctionStart => {
                 let file = parser_utils.file.clone();
                 if parser_utils.file.is_empty() {
-                    parser_utils.file = format!("{}_{}", base.clone().unwrap(), implementor.clone().unwrap());
+                    parser_utils.file = format!("{}_{}", base.as_ref().unwrap(), implementor.as_ref().unwrap());
+                } else if let Some(implementor) = implementor.as_ref() {
+                    parser_utils.file = format!("{}::{}_{}", parser_utils.file, base.as_ref().unwrap(), implementor);
                 } else {
-                    parser_utils.file =
-                        format!("{}::{}_{}", parser_utils.file, base.clone().unwrap(), implementor.clone().unwrap());
+                    parser_utils.file = format!("{}::{}", parser_utils.file, base.as_ref().unwrap());
                 }
                 let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
                 functions.push(function?);
@@ -175,6 +176,7 @@ pub fn parse_implementor(
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
+            TokenTypes::InvalidCharacters => break,
             _ => panic!(
                 "How'd you get here? {} - {:?} ({}, {})",
                 parser_utils.file,
@@ -195,13 +197,17 @@ pub fn parse_implementor(
         vec![],
     ));
 
-    let implementor = Box::pin(Syntax::parse_type(
-        parser_utils.syntax.clone(),
-        token.make_error(parser_utils.file.clone(), format!("Failed to find")),
-        parser_utils.imports.boxed_clone(),
-        implementor.unwrap(),
-        vec![],
-    ));
+    let implementor = if let Some(implementor) = implementor {
+        Some(Syntax::parse_type(
+            parser_utils.syntax.clone(),
+            token.make_error(parser_utils.file.clone(), "Failed to find".to_string()),
+            parser_utils.imports.boxed_clone(),
+            implementor,
+            vec![],
+        ))
+    } else {
+        None
+    };
 
     return Ok(TraitImplementor { base, generics, implementor, functions, attributes });
 }

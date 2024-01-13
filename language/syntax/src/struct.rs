@@ -98,34 +98,34 @@ impl ChalkData {
     }
 }
 
-/// The static data of a structure.
+/// The static data of a program.
 #[derive(Clone)]
 pub struct StructData {
-    /// The structure's modifiers
+    /// The program's modifiers
     pub modifiers: u8,
-    /// The structure's chalk data
+    /// The program's chalk data
     pub chalk_data: Option<ChalkData>,
-    /// The structure's numerical ID, each struct has a unique ID that starts at 0 and increments by 1
+    /// The program's numerical ID, each struct has a unique ID that starts at 0 and increments by 1
     pub id: u64,
-    /// The structure's name
+    /// The program's name
     pub name: String,
-    /// The structure's attributes
+    /// The program's attributes
     pub attributes: Vec<Attribute>,
-    /// The structure's functions, if it's a trait
+    /// The program's functions, if it's a trait
     pub functions: Vec<Arc<FunctionData>>,
-    /// The structure's errors
+    /// The program's errors
     pub poisoned: Vec<ParsingError>,
 }
 
 /// An unfinalized struct
 pub struct UnfinalizedStruct {
-    /// The structure's generics
+    /// The program's generics
     pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
-    /// The structure's fields
+    /// The program's fields
     pub fields: Vec<ParsingFuture<MemberField>>,
-    /// The structure's functions
+    /// The program's functions
     pub functions: Vec<UnfinalizedFunction>,
-    /// The structure's data
+    /// The program's data
     pub data: Arc<StructData>,
 }
 
@@ -138,11 +138,11 @@ impl DataType<StructData> for UnfinalizedStruct {
 /// A finalized struct
 #[derive(Clone, Debug)]
 pub struct FinalizedStruct {
-    /// The structure's generics
+    /// The program's generics
     pub generics: IndexMap<String, Vec<FinalizedTypes>>,
-    /// The structure's fields
+    /// The program's fields
     pub fields: Vec<FinalizedMemberField>,
-    /// The structure's data
+    /// The program's data
     pub data: Arc<StructData>,
 }
 
@@ -255,24 +255,18 @@ impl FinalizedStruct {
         let mut data = StructData::clone(&self.data);
         let name = format!("{}${}", data.name, display_parenless(&targets, "_"));
         data.name = name.clone();
-        self.data = Arc::new(data);
         self.generics.clear();
         for field in &mut self.fields {
             field.field.field_type.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
         }
 
         let mut locked = syntax.lock().unwrap();
-        locked.structures.types.insert(name, self.data.clone());
-
+        locked.structures.set_id(&mut data);
+        self.data = Arc::new(data);
         let output = Arc::new(self);
-        locked.structures.data.insert(output.data.clone(), output.clone());
 
-        if let Some(wakers) = locked.structures.wakers.get(&output.data.name) {
-            for waker in wakers {
-                waker.wake_by_ref();
-            }
-        }
-        locked.structures.wakers.remove(&output.data.name);
+        locked.structures.add_type(output.data.clone());
+        locked.structures.add_data(output.data.clone(), output.clone());
         return Ok(output);
     }
 }
@@ -324,13 +318,7 @@ impl TopElement for StructData {
         let structure = Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);
         {
             let mut locked = syntax.lock().unwrap();
-            if let Some(wakers) = locked.structures.wakers.remove(&data.name) {
-                for waker in wakers {
-                    waker.wake();
-                }
-            }
-
-            locked.structures.data.insert(data.clone(), structure.clone());
+            locked.structures.add_data(data.clone(), structure.clone());
         }
 
         for function in functions {

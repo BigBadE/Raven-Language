@@ -82,7 +82,7 @@ async fn check_return_type(
             syntax: code_verifier.syntax.clone(),
             return_type: last_type.clone(),
             data: return_type.clone(),
-            error: placeholder_error(format!("You shouldn't see this! Report this!")),
+            error: placeholder_error("You shouldn't see this! Report this!".to_string()),
         }
         .await?;
 
@@ -183,7 +183,7 @@ async fn verify_create_struct(
 ) -> Result<FinalizedEffects, ParsingError> {
     let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
-        placeholder_error(format!("Test")),
+        placeholder_error("Unexpected error! Please report this!".to_string()),
         code_verifier.resolver.boxed_clone(),
         target,
         vec![],

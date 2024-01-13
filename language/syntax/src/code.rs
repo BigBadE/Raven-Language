@@ -147,7 +147,7 @@ pub enum Effects {
     Set(Box<Effects>, Box<Effects>),
     /// Loads variable with the given name.
     LoadVariable(String),
-    /// Loads a field with the given name from the structure.
+    /// Loads a field with the given name from the program.
     Load(Box<Effects>, String),
     /// An unresolved operation, sent to the checker to resolve, with the given arguments.
     Operation(String, Vec<Effects>, CodeErrorToken),
@@ -211,7 +211,7 @@ pub enum FinalizedEffects {
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
     GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, CodeErrorToken),
-    /// Downcasts a structure into its trait (with the given functions), which can only be used in a VirtualCall.
+    /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
     Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<FunctionData>>),
     /// Internally used by low-level verifier to store a type on the heap.
     HeapStore(Box<FinalizedEffects>),
@@ -321,11 +321,11 @@ impl FinalizedEffects {
                 // Failed to find a variable with that name.
                 panic!("Unresolved variable {} from {:?}", name, variables);
             }
-            // Gets the type of the field in the structure with that name.
+            // Gets the type of the field in the program with that name.
             FinalizedEffects::Load(_, name, loading) => {
                 loading.fields.iter().find(|field| &field.field.name == name).map(|field| field.field.field_type.clone())
             }
-            // Returns the structure type.
+            // Returns the program type.
             FinalizedEffects::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             // Returns the internal constant type.
             FinalizedEffects::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
@@ -554,25 +554,11 @@ pub async fn degeneric_header(
     code.flatten(&syntax).await?;
 
     let mut locked = syntax.lock().unwrap();
-    locked.functions.types.insert(new_method.data.name.clone(), new_method.data.clone());
-    locked.functions.data.insert(new_method.data.clone(), new_method.clone());
-
-    if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
-        for waker in wakers {
-            waker.wake_by_ref();
-        }
-    }
-    locked.functions.wakers.remove(&new_method.data.name);
+    locked.functions.add_type(new_method.data.clone());
+    locked.functions.add_data(new_method.data.clone(), new_method.clone());
 
     // Give the compiler the empty body
-    locked.compiling.insert(new_method.data.name.clone(), Arc::new(code));
-
-    if let Some(found) = locked.compiling_wakers.get(&new_method.data.name) {
-        for waker in found {
-            waker.wake_by_ref();
-        }
-    }
-    locked.compiling_wakers.remove(&new_method.data.name);
+    locked.add_compiling(Arc::new(code));
     return Ok(());
 }
 

@@ -45,7 +45,7 @@ pub async fn finalize_generics(
     return Ok(output);
 }
 
-/// Simple wrapper structure for the types used in code verification
+/// Simple wrapper program for the types used in code verification
 pub struct CodeVerifier<'a> {
     process_manager: &'a TypesChecker,
     resolver: Box<dyn NameResolver>,

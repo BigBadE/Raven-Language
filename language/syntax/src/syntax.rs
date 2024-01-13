@@ -22,16 +22,19 @@ use async_trait::async_trait;
 // Re-export main
 pub use data::Main;
 
-use crate::async_util::{AsyncTypesGetter, NameResolver, UnparsedType};
+use crate::async_util::{AsyncStructImplGetter, AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
 use crate::function::{FinalizedFunction, FunctionData};
 use crate::r#struct::{FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8};
 use crate::top_element_manager::{GetterManager, TopElementManager};
 use crate::types::FinalizedTypes;
-use crate::{is_modifier, Attribute, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager, TopElement, Types};
+use crate::{
+    is_modifier, Attribute, FinishedStructImplementor, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager,
+    TopElement, Types,
+};
 
 /// The entire program's syntax. Contains all the data passed to every step of the program.
-/// This structure is usually in a mutex lock, which prevents multiple functions from reading/writing
+/// This program is usually in a mutex lock, which prevents multiple functions from reading/writing
 /// to it at the same time.
 /// This is done so that the whole compiler can safely run multithreaded.
 pub struct Syntax {
@@ -47,8 +50,10 @@ pub struct Syntax {
     pub structures: TopElementManager<StructData>,
     /// All functions in the program
     pub functions: TopElementManager<FunctionData>,
-    /// All implementations in the program
-    pub implementations: Vec<FinishedTraitImplementor>,
+    /// All implementations of a trait in the program
+    pub implementations: Vec<Arc<FinishedTraitImplementor>>,
+    /// All implementations of a struct in the program
+    pub struct_implementations: HashMap<FinalizedTypes, Vec<Arc<FinishedStructImplementor>>>,
     /// The parsing state
     pub async_manager: GetterManager,
     /// All operations, for example Add or Multiply.
@@ -84,11 +89,22 @@ impl Syntax {
                 STR.data.clone(),
             ]),
             implementations: Vec::default(),
+            struct_implementations: HashMap::default(),
             async_manager: GetterManager::default(),
             operations: HashMap::default(),
             operation_wakers: HashMap::default(),
             process_manager,
         };
+    }
+
+    pub fn add_compiling(&mut self, function: Arc<FinalizedFunction>) {
+        if let Some(found) = self.compiling_wakers.get(&function.data.name) {
+            for waker in found {
+                waker.wake_by_ref();
+            }
+        }
+
+        self.compiling.insert(function.data.name.clone(), function);
     }
 
     /// Checks if the implementations are finished parsing.
@@ -163,7 +179,7 @@ impl Syntax {
         &self,
         implementing_trait: &FinalizedTypes,
         implementor_struct: &FinalizedTypes,
-    ) -> Option<Vec<(FinishedTraitImplementor, Vec<Arc<FunctionData>>)>> {
+    ) -> Option<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>> {
         let mut output = Vec::default();
         for implementation in &self.implementations {
             if implementation.target.inner_struct().data == implementor_struct.inner_struct().data
@@ -213,7 +229,7 @@ impl Syntax {
     /// bounds or has an implementation for it.
     /// May not be correct if the syntax isn't finished parsing implementations, check Syntax::finished_impls.
     pub fn solve(&self, first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
-        // Check to make sure the type is a basic structure, Chalk can't handle any other types.
+        // Check to make sure the type is a basic program, Chalk can't handle any other types.
         // u64 is T: Add<E, T>
         if let Some(inner) = self.solve_nonstruct_types(second, first) {
             return inner;
@@ -247,43 +263,15 @@ impl Syntax {
     }
 
     /// Adds the element to the syntax
-    pub fn add<T: TopElement + Eq + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
+    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
         let mut locked = syntax.lock().unwrap();
-        unsafe {
-            // Safety: add blocks the method which contains the other arc references, and they aren't shared across threads
-            // yet, so this is safe.
-            Arc::get_mut_unchecked(&mut adding.clone()).set_id(
-                locked
-                    .structures
-                    .sorted
-                    .iter()
-                    .position(|found| &found.name == adding.name())
-                    .unwrap_or_else(|| locked.structures.sorted.len()) as u64,
-            );
-        }
+        let manager = T::get_manager(locked.deref_mut());
+        manager.set_id(unsafe { Arc::get_mut_unchecked(&mut adding.clone()) });
+        manager.add_type(adding.clone());
 
         // Add any poisons to the syntax errors list.
         for poison in adding.errors() {
             locked.errors.push(poison.clone());
-        }
-
-        // Checks if a type with the same name is already in the async manager.
-        if let Some(mut old) = T::get_manager(locked.deref_mut()).types.get_mut(adding.name()).cloned() {
-            if adding.errors().is_empty() && adding.errors().is_empty() {
-                // Add a duplication error to the original type.
-                locked.errors.push(dupe_error.clone());
-                unsafe { Arc::get_mut_unchecked(&mut old) }.poison(dupe_error.clone());
-            } else {
-                // Ignored if one is poisoned
-            }
-        } else {
-            let manager = T::get_manager(locked.deref_mut());
-            // Don't want to add duplicates of internal types.
-            if !manager.sorted.contains(adding) {
-                manager.sorted.push(Arc::clone(adding));
-            }
-
-            manager.types.insert(adding.name().clone(), Arc::clone(adding));
         }
 
         let name = adding.name().clone();
@@ -356,6 +344,13 @@ impl Syntax {
         not_trait: bool,
     ) -> Result<Arc<FunctionData>, ParsingError> {
         return AsyncTypesGetter::new(syntax, error, getting, name_resolver, not_trait).await;
+    }
+
+    pub async fn get_struct_impl(
+        syntax: Arc<Mutex<Syntax>>,
+        getting: FinalizedTypes,
+    ) -> Vec<Arc<FinishedStructImplementor>> {
+        return AsyncStructImplGetter::new(syntax.clone(), getting).await;
     }
 
     /// Asynchronously gets a struct, or returns the error if that struct isn't found.

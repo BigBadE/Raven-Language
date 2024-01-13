@@ -292,16 +292,8 @@ impl CodelessFinalizedFunction {
             let original = method;
             let new_method = Arc::new(new_method);
             let mut locked = syntax.lock().unwrap();
-            locked.functions.types.insert(name, new_method.data.clone());
-
-            locked.functions.data.insert(new_method.data.clone(), new_method.clone());
-
-            if let Some(wakers) = locked.functions.wakers.get(&new_method.data.name) {
-                for waker in wakers {
-                    waker.wake_by_ref();
-                }
-            }
-            locked.functions.wakers.remove(&new_method.data.name);
+            locked.functions.add_type(new_method.data.clone());
+            locked.functions.add_data(new_method.data.clone(), new_method.clone());
 
             // Spawn a thread to asynchronously degeneric the code inside the function.
             let handle = manager.handle().clone();

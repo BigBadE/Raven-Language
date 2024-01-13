@@ -1,4 +1,5 @@
 import list;
+import array;
 
 pub struct ArrayList<T> {
     array: [T];
@@ -7,5 +8,13 @@ pub struct ArrayList<T> {
 impl<T> List<T> for ArrayList<T> {
     fn get(self, index: u64) -> T {
         return self.array[index];
+    }
+}
+
+impl<T> ArrayList<T> {
+    fn new(self) -> ArrayList<T> {
+        return new ArrayList<T> {
+            array: empty(),
+        };
     }
 }

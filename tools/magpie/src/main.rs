@@ -83,9 +83,12 @@ fn main() {
     ) {
         Ok(found) => match found {
             Some(found) => RavenProject::from(found),
-            None => panic!("No project method in build file!"),
+            None => {
+                println!("No project method in build file!");
+                return;
+            }
         },
-        Err(()) => panic!("Error during build detected!"),
+        Err(()) => return,
     };
 
     arguments.runner_settings.compiler_arguments.target = "main::main".to_string();

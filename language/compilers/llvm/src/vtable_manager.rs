@@ -15,7 +15,7 @@ pub struct VTableManager<'ctx> {
 }
 
 impl<'ctx> VTableManager<'ctx> {
-    /// Gets a vtable for the given structure and target trait, generating one if it doesn't exist
+    /// Gets a vtable for the given program and target trait, generating one if it doesn't exist
     pub fn get_vtable(
         &mut self,
         type_getter: &mut CompilerTypeGetter<'ctx>,

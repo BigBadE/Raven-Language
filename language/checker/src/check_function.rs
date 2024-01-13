@@ -65,13 +65,7 @@ pub async fn verify_function_code(
 ) -> Result<FinalizedFunction, ParsingError> {
     {
         let mut locked = syntax.lock().unwrap();
-        if let Some(wakers) = locked.functions.wakers.remove(&codeless.data.name) {
-            for waker in wakers {
-                waker.wake();
-            }
-        }
-
-        locked.functions.data.insert(codeless.data.clone(), Arc::new(codeless.clone()));
+        locked.functions.add_data(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 
     //Internal/external/trait functions verify everything but the code.

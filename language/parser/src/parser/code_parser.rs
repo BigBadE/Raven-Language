@@ -116,9 +116,8 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
             TokenTypes::New => {
                 if effect.is_some() {
-                    return Err(
-                        token.make_error(parser_utils.file.clone(), format!("Unexpected new! Did you forget a semicolon?"))
-                    );
+                    return Err(token
+                        .make_error(parser_utils.file.clone(), "Unexpected new! Did you forget a semicolon?".to_string()));
                 }
                 effect = Some(parse_new(parser_utils)?);
             }
@@ -130,7 +129,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     if effect.is_some() {
                         return Err(token.make_error(
                             parser_utils.file.clone(),
-                            format!("Unexpected block! Did you forget a semicolon?"),
+                            "Unexpected block! Did you forget a semicolon?".to_string(),
                         ));
                     }
 
@@ -513,7 +512,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     };
 }
 
-/// Parses a new structure call
+/// Parses a new program call
 fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let mut types: Option<UnparsedType> = None;
 
@@ -542,7 +541,7 @@ fn parse_new(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     return Ok(Effects::CreateStruct(types.unwrap(), values, CodeErrorToken::new(type_token, parser_utils.file.clone())));
 }
 
-/// Parses the arguments to a new structure
+/// Parses the arguments to a new program
 fn parse_new_args(parser_utils: &mut ParserUtils) -> Result<Vec<(String, Effects, CodeErrorToken)>, ParsingError> {
     let mut values = Vec::default();
     let mut name = String::default();
