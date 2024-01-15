@@ -104,6 +104,12 @@ impl Syntax {
             }
         }
 
+        if function.data.name == self.async_manager.target {
+            if let Some(found) = self.async_manager.target_waker.as_ref() {
+                found.wake_by_ref();
+            }
+        }
+
         self.compiling.insert(function.data.name.clone(), function);
     }
 
@@ -288,7 +294,7 @@ impl Syntax {
                     name.replace("{+}", "{}").clone()
                 } else {
                     let mut error = ParsingError::empty();
-                    error.message = format!("Expected a string with attribute operator!");
+                    error.message = "Expected a string with attribute operator!";
                     locked.errors.push(error);
                     return;
                 };
@@ -474,9 +480,7 @@ impl Syntax {
         resolved_generics: Vec<String>,
     ) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
-            UnparsedType::Basic(name) => {
-                Syntax::get_struct(syntax, Self::swap_error(error, &name), name, resolver, resolved_generics).await
-            }
+            UnparsedType::Basic(name) => Syntax::get_struct(syntax, error, name, resolver, resolved_generics).await,
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::default();
                 for arg in args {
@@ -498,13 +502,6 @@ impl Syntax {
             }
         };
         return temp;
-    }
-
-    /// Adds extra data to an error
-    fn swap_error(error: ParsingError, new_type: &String) -> ParsingError {
-        let mut error = error.clone();
-        error.message = format!("Unknown type {}!", new_type);
-        return error;
     }
 }
 

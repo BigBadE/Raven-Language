@@ -10,6 +10,7 @@ use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
 
 use async_trait::async_trait;
+use data::tokens::Span;
 
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
@@ -109,6 +110,8 @@ pub struct StructData {
     pub id: u64,
     /// The program's name
     pub name: String,
+    /// The struct's span
+    pub span: Span,
     /// The program's attributes
     pub attributes: Vec<Attribute>,
     /// The program's functions, if it's a trait
@@ -179,14 +182,21 @@ impl StructData {
             id: 0,
             modifiers: Modifier::Internal as u8,
             name,
+            span: Span::default(),
             functions: Vec::default(),
             poisoned: Vec::default(),
         };
     }
 
     /// Creates a new struct data with the given args
-    pub fn new(attributes: Vec<Attribute>, functions: Vec<Arc<FunctionData>>, modifiers: u8, name: String) -> Self {
-        return Self { attributes, chalk_data: None, id: 0, modifiers, name, functions, poisoned: Vec::default() };
+    pub fn new(
+        attributes: Vec<Attribute>,
+        functions: Vec<Arc<FunctionData>>,
+        modifiers: u8,
+        span: Span,
+        name: String,
+    ) -> Self {
+        return Self { attributes, chalk_data: None, id: 0, modifiers, name, span, functions, poisoned: Vec::default() };
     }
 
     /// Sets the internal chalk data, used to make sure all ids are unique and incremental in an async environment
@@ -227,7 +237,7 @@ impl StructData {
 
     /// Creates a new poison'd struct data
     pub fn new_poisoned(name: String, error: ParsingError) -> Self {
-        let mut output = Self::new(Vec::default(), Vec::default(), 0, name);
+        let mut output = Self::new(Vec::default(), Vec::default(), 0, error.span.clone(), name);
         output.poisoned = vec![error];
         return output;
     }
@@ -244,20 +254,18 @@ impl FinalizedStruct {
         mut self,
         generics: &HashMap<String, FinalizedTypes>,
         syntax: &Arc<Mutex<Syntax>>,
-        none_error: ParsingError,
-        bounds_error: ParsingError,
-    ) -> Result<Arc<FinalizedStruct>, ParsingError> {
+    ) -> Arc<FinalizedStruct> {
         let targets: Vec<_> =
             generics.iter().filter(|(key, _)| self.generics.contains_key(*key)).map(|(_, value)| value).collect();
         if targets.is_empty() {
-            return Ok(Arc::new(self));
+            return Arc::new(self);
         }
         let mut data = StructData::clone(&self.data);
         let name = format!("{}${}", data.name, display_parenless(&targets, "_"));
         data.name = name.clone();
         self.generics.clear();
         for field in &mut self.fields {
-            field.field.field_type.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
+            field.field.field_type.degeneric(generics, syntax).await;
         }
 
         let mut locked = syntax.lock().unwrap();
@@ -267,7 +275,7 @@ impl FinalizedStruct {
 
         locked.structures.add_type(output.data.clone());
         locked.structures.add_data(output.data.clone(), output.clone());
-        return Ok(output);
+        return output;
     }
 }
 
@@ -275,6 +283,10 @@ impl FinalizedStruct {
 impl TopElement for StructData {
     type Unfinalized = UnfinalizedStruct;
     type Finalized = FinalizedStruct;
+
+    fn get_span(&self) -> &Span {
+        return &self.span;
+    }
 
     fn set_id(&mut self, id: u64) {
         self.id = id;
@@ -322,22 +334,16 @@ impl TopElement for StructData {
         }
 
         for function in functions {
-            let (mut function, code) = process_manager.verify_func(function, &syntax).await;
-
-            for (name, bounds) in &structure.generics {
-                function.generics.insert(name.clone(), bounds.clone());
-            }
-
-            let mut function = process_manager.verify_code(function, code, resolver.boxed_clone(), &syntax).await;
-            function.flatten(&syntax).await.unwrap();
-            let mut locked = syntax.lock().unwrap();
-            if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
-                for waker in found {
-                    waker.wake_by_ref();
-                }
-            }
-            locked.compiling_wakers.remove(&function.data.name);
-            locked.compiling.insert(function.data.name.clone(), Arc::new(function));
+            handle.lock().unwrap().spawn(
+                function.data.name.clone(),
+                FunctionData::verify(
+                    handle.clone(),
+                    function,
+                    syntax.clone(),
+                    resolver.boxed_clone(),
+                    process_manager.cloned(),
+                ),
+            );
         }
         handle.lock().unwrap().finish_task(&data.name);
     }

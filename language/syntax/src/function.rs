@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use async_trait::async_trait;
+use data::tokens::Span;
 use indexmap::IndexMap;
 
 use crate::async_util::{AsyncDataGetter, HandleWrapper, NameResolver};
@@ -15,9 +16,8 @@ use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMe
 use crate::types::FinalizedTypes;
 use crate::{
     is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, SimpleVariableManager, Syntax,
-    TopElement, TopElementManager, Types,
+    TopElement, TopElementManager, Types, VariableManager,
 };
-use data::tokens::CodeErrorToken;
 
 /// The static data of a function, which is set during parsing and immutable throughout the entire compilation process.
 /// Generics will copy this and change the name and types, but never modify the original.
@@ -29,19 +29,21 @@ pub struct FunctionData {
     pub modifiers: u8,
     /// The function's name
     pub name: String,
+    /// The function's span
+    pub span: Span,
     /// The function's errors if it has been poison'd
     pub poisoned: Vec<ParsingError>,
 }
 
 impl FunctionData {
     /// Creates a new function
-    pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String) -> Self {
-        return Self { attributes, modifiers, name, poisoned: Vec::default() };
+    pub fn new(attributes: Vec<Attribute>, modifiers: u8, name: String, span: Span) -> Self {
+        return Self { attributes, modifiers, name, span, poisoned: Vec::default() };
     }
 
     /// Creates an empty function data that errored while parsing.
     pub fn poisoned(name: String, error: ParsingError) -> Self {
-        return Self { attributes: Vec::default(), modifiers: 0, name, poisoned: vec![error] };
+        return Self { attributes: Vec::default(), modifiers: 0, name, span: error.span.clone(), poisoned: vec![error] };
     }
 }
 
@@ -50,6 +52,10 @@ impl FunctionData {
 impl TopElement for FunctionData {
     type Unfinalized = UnfinalizedFunction;
     type Finalized = CodelessFinalizedFunction;
+
+    fn get_span(&self) -> &Span {
+        return &self.span;
+    }
 
     fn set_id(&mut self, _id: u64) {
         //Ignored. Funcs don't have IDs
@@ -92,26 +98,16 @@ impl TopElement for FunctionData {
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
         // Finalize the code and combine it with the codeless finalized function.
         let mut finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
-        finalized_function.flatten(&syntax).await.unwrap();
+
+        if finalized_function.generics.is_empty() {
+            finalized_function.flatten(&syntax, &*process_manager).await.unwrap();
+        }
 
         let finalized_function = Arc::new(finalized_function);
         let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
-        locked.compiling.insert(name.clone(), finalized_function.clone());
-
-        if let Some(found) = locked.compiling_wakers.get(&name) {
-            for waker in found {
-                waker.wake_by_ref();
-            }
-        }
-        locked.compiling_wakers.remove(&name);
-
-        if finalized_function.data.name == locked.async_manager.target {
-            if let Some(found) = locked.async_manager.target_waker.as_ref() {
-                found.wake_by_ref();
-            }
-        }
+        locked.add_compiling(finalized_function.clone());
         handle.lock().unwrap().finish_task(&name);
     }
 
@@ -133,7 +129,6 @@ pub struct UnfinalizedFunction {
     pub return_type: Option<ParsingFuture<Types>>,
     /// The function's data
     pub data: Arc<FunctionData>,
-    pub token: CodeErrorToken,
 }
 
 /// Gives generic access to the function data.
@@ -157,7 +152,6 @@ pub struct CodelessFinalizedFunction {
     pub return_type: Option<FinalizedTypes>,
     /// The function's data
     pub data: Arc<FunctionData>,
-    pub token: CodeErrorToken,
 }
 
 impl CodelessFinalizedFunction {
@@ -169,7 +163,6 @@ impl CodelessFinalizedFunction {
             code,
             return_type: self.return_type,
             data: self.data,
-            token: self.token,
         };
     }
 
@@ -197,42 +190,31 @@ impl CodelessFinalizedFunction {
         mut manager: Box<dyn ProcessManager>,
         arguments: &Vec<FinalizedEffects>,
         syntax: &Arc<Mutex<Syntax>>,
-        variables: &SimpleVariableManager,
-        returning: Option<FinalizedTypes>,
+        variables: &dyn VariableManager,
+        returning: Option<(FinalizedTypes, Span)>,
     ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
-            if let Some(returning) = returning {
+            if let Some((returning, span)) = returning {
                 inner
-                    .resolve_generic(
-                        &returning,
-                        syntax,
-                        manager.mut_generics(),
-                        placeholder_error("Invalid bounds!".to_string()),
-                    )
+                    .resolve_generic(&returning, syntax, manager.mut_generics(), span.make_error("Invalid bounds!"))
                     .await?;
             }
         }
 
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
-            let mut effect = arguments[i].get_return(variables).unwrap();
+            let mut effect = arguments[i].types.get_return(variables).unwrap();
 
             effect.fix_generics(&*manager, syntax).await?;
             match method.arguments[i]
                 .field
                 .field_type
-                .resolve_generic(
-                    &effect,
-                    syntax,
-                    manager.mut_generics(),
-                    placeholder_error(format!("Invalid bounds! {:?}", arguments[i])),
-                )
+                .resolve_generic(&effect, syntax, manager.mut_generics(), arguments[i].span.make_error("Invalid bounds!"))
                 .await
             {
                 Ok(_) => {}
                 Err(error) => {
-                    println!("error: {}", error);
                     return Err(error);
                 }
             }
@@ -263,29 +245,13 @@ impl CodelessFinalizedFunction {
             method_data.name.clone_from(&name);
             new_method.data = Arc::new(method_data);
             // Degeneric the arguments.
-            for arguments in &mut new_method.arguments {
-                arguments
-                    .field
-                    .field_type
-                    .degeneric(
-                        &manager.generics(),
-                        syntax,
-                        placeholder_error(format!("No generic in {}", name)),
-                        placeholder_error("Invalid bounds!".to_string()),
-                    )
-                    .await?;
+            for argument in &mut new_method.arguments {
+                argument.field.field_type.degeneric(&manager.generics(), syntax).await;
             }
 
             // Degeneric the return type if there is one.
-            if let Some(returning) = &mut new_method.return_type {
-                returning
-                    .degeneric(
-                        &manager.generics(),
-                        syntax,
-                        placeholder_error(format!("No generic in {}", name)),
-                        placeholder_error("Invalid bounds!".to_string()),
-                    )
-                    .await?;
+            if let Some(method_returning) = &mut new_method.return_type {
+                method_returning.degeneric(&manager.generics(), syntax).await;
             }
 
             // Add the new degenericed static data to the locked function.
@@ -305,11 +271,6 @@ impl CodelessFinalizedFunction {
             return Ok(new_method);
         };
     }
-}
-
-/// A placeholder error until the actual tokens are passed.
-fn placeholder_error(error: String) -> ParsingError {
-    return ParsingError::new(String::default(), (0, 0), 0, (0, 0), 0, error);
 }
 
 /// A waiter used by generics trying to degeneric a function that returns when the target function's
@@ -357,12 +318,12 @@ async fn degeneric_code(
     // Degenerics the code body.
     let code = match code.degeneric(&*manager, &mut variables, &syntax).await {
         Ok(inner) => inner,
-        Err(error) => panic!("Error degenericing code: {}", error),
+        Err(error) => panic!("Error degenericing code: {}", error.message),
     };
 
     // Combines the degenericed function with the degenericed code to finalize it.
     let mut output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
-    output.flatten(&syntax).await.unwrap();
+    output.flatten(&syntax, &*manager).await.unwrap();
 
     // Sends the finalized function to be compiled.
     let mut locked = syntax.lock().unwrap();
@@ -388,7 +349,6 @@ pub struct FinalizedFunction {
     pub return_type: Option<FinalizedTypes>,
     /// The function's data
     pub data: Arc<FunctionData>,
-    pub token: CodeErrorToken,
 }
 
 impl FinalizedFunction {
@@ -399,12 +359,16 @@ impl FinalizedFunction {
             arguments: self.fields.clone(),
             return_type: self.return_type.clone(),
             data: self.data.clone(),
-            token: self.token.clone(),
         };
     }
 
-    pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
-        self.code.flatten(syntax).await?;
+    pub async fn flatten(
+        &mut self,
+        syntax: &Arc<Mutex<Syntax>>,
+        process_manager: &dyn ProcessManager,
+    ) -> Result<(), ParsingError> {
+        let mut variables = SimpleVariableManager::for_final_function(self);
+        self.code.flatten(syntax, process_manager, &mut variables).await?;
         for field in &mut self.fields {
             field.field.field_type.flatten(&syntax).await?;
         }
@@ -446,9 +410,14 @@ impl FinalizedCodeBody {
         return Self { label, expressions, returns };
     }
 
-    pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
+    pub async fn flatten(
+        &mut self,
+        syntax: &Arc<Mutex<Syntax>>,
+        process_manager: &dyn ProcessManager,
+        variables: &mut SimpleVariableManager,
+    ) -> Result<(), ParsingError> {
         for line in &mut self.expressions {
-            line.effect.flatten(syntax).await?;
+            line.effect.types.flatten(syntax, process_manager, variables).await?;
         }
         return Ok(());
     }
@@ -461,7 +430,7 @@ impl FinalizedCodeBody {
         syntax: &Arc<Mutex<Syntax>>,
     ) -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
-            expression.effect.degeneric(process_manager, variables, syntax).await?;
+            expression.effect.types.degeneric(process_manager, variables, syntax, &expression.effect.span).await?;
         }
 
         return Ok(self);

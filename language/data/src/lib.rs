@@ -1,10 +1,12 @@
 #![feature(try_trait_v2)]
-use anyhow::Error;
-use colored::Colorize;
-use std::fmt::{Debug, Display, Formatter};
+
+use std::fmt::Debug;
 use std::path::PathBuf;
-use std::{fs, path};
+
+use colored::Colorize;
 use tokio::runtime::{Builder, Runtime};
+
+use crate::tokens::{Span, Token};
 
 /// The type of the main LLVM function called by the program
 pub type Main<T> = unsafe extern "C" fn() -> T;
@@ -74,11 +76,16 @@ impl RunnerSettings {
 
 /// A readable type
 pub trait Readable {
-    /// Reads the readable to a string
-    fn read(&self) -> String;
+    /// Reads the readable to a list of tokens
+    fn read(&self) -> Vec<Token>;
+
+    /// Gets the file's contents
+    fn contents(&self) -> String;
 
     /// Gets the path of the readable
     fn path(&self) -> String;
+
+    fn hash(&self) -> u64;
 }
 
 /// A set of Raven sources
@@ -93,101 +100,24 @@ pub trait SourceSet: Debug + Send + Sync {
     fn cloned(&self) -> Box<dyn SourceSet>;
 }
 
-/// A simple source set of a single file/folder
-#[derive(Clone, Debug)]
-pub struct FileSourceSet {
-    /// The path of the file/folder
-    pub root: PathBuf,
-}
-
-impl Readable for PathBuf {
-    fn read(&self) -> String {
-        return fs::read_to_string(self.clone())
-            .unwrap_or_else(|_| panic!("Failed to read source file: {}", self.to_str().unwrap()));
-    }
-
-    fn path(&self) -> String {
-        return self.to_str().unwrap().to_string();
-    }
-}
-
-impl SourceSet for FileSourceSet {
-    fn get_files(&self) -> Vec<Box<dyn Readable>> {
-        let mut output = Vec::default();
-        read_recursive(self.root.clone(), &mut output)
-            .unwrap_or_else(|_| panic!("Failed to read source files! Make sure {:?} exists", self.root));
-        return output;
-    }
-
-    fn relative(&self, other: &dyn Readable) -> String {
-        let name =
-            other.path().replace(self.root.to_str().unwrap(), "").replace(path::MAIN_SEPARATOR, "::").replace('/', "::");
-        if name.len() == 0 {
-            let path = other.path();
-            let name: &str = path.split(path::MAIN_SEPARATOR).last().unwrap();
-            return name[0..name.len() - 3].to_string();
-        }
-        return name.as_str()[2..name.len() - 3].to_string();
-    }
-
-    fn cloned(&self) -> Box<dyn SourceSet> {
-        return Box::new(self.clone());
-    }
-}
-
-/// Recursively reads a folder/file into the list of files
-fn read_recursive(base: PathBuf, output: &mut Vec<Box<dyn Readable>>) -> Result<(), Error> {
-    if fs::metadata(&base)?.file_type().is_dir() {
-        for file in fs::read_dir(&base)? {
-            let file = file?;
-            read_recursive(file.path(), output)?;
-        }
-    } else {
-        output.push(Box::new(base));
-    }
-    return Ok(());
-}
-
 /// An error somewhere in a source file, with exact location.
 #[derive(Clone, Debug)]
 pub struct ParsingError {
-    /// Name of the file this error is in
-    pub file: String,
-    /// The line number and index from that line
-    pub start: (u32, u32),
-    /// Offset from the start of the file
-    pub start_offset: usize,
-    /// The line number and index from that line
-    pub end: (u32, u32),
-    /// Offset from the start of the file
-    pub end_offset: usize,
+    /// The location of the error
+    pub span: Span,
     /// The error message
-    pub message: String,
+    pub message: &'static str,
 }
 
 impl ParsingError {
     /// An empty error, used for places where errors are ignored
     pub fn empty() -> Self {
-        return ParsingError {
-            file: String::default(),
-            start: (0, 0),
-            start_offset: 0,
-            end: (0, 0),
-            end_offset: 0,
-            message: "You shouldn't see this! Report this please!".to_string(),
-        };
+        return ParsingError { span: Span::default(), message: "You shouldn't see this! Report this please!" };
     }
 
     /// Creates a new error
-    pub fn new(
-        file: String,
-        start: (u32, u32),
-        start_offset: usize,
-        end: (u32, u32),
-        end_offset: usize,
-        message: String,
-    ) -> Self {
-        return Self { file, start, start_offset, end, end_offset, message };
+    pub fn new(span: Span, message: &'static str) -> Self {
+        return Self { span, message };
     }
 
     /// Prints the error to console
@@ -195,7 +125,7 @@ impl ParsingError {
         let mut file = None;
         'outer: for source in sources {
             for readable in source.get_files() {
-                if self.file.starts_with(&source.relative(&*readable)) {
+                if self.span.file == readable.hash() {
                     file = Some(readable);
                     break 'outer;
                 }
@@ -207,25 +137,27 @@ impl ParsingError {
             return;
         }
         let file = file.unwrap();
-        let contents = file.read();
-        let line = contents.lines().nth((self.start.0 as usize).max(1) - 1).unwrap_or("???");
+        let contents = file.contents();
+        let tokens = file.read();
+        let mut token = tokens[self.span.start].clone();
+        if self.span.start != self.span.end {
+            let end = &tokens[self.span.end];
+            token.end = end.end;
+            token.end_offset = token.end_offset;
+        }
+
+        let line = contents.lines().nth((token.start.0 as usize).max(1) - 1).unwrap_or("???");
         println!("{}", self.message.bright_red());
-        println!("{}", format!("in file {}:{}:{}", file.path(), self.start.0, self.start.1).bright_red());
-        println!("{} {}", " ".repeat(self.start.0.to_string().len()), "|".bright_cyan());
-        println!("{} {} {}", self.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
+        println!("{}", format!("in file {}:{}:{}", file.path(), token.start.0, token.start.1).bright_red());
+        println!("{} {}", " ".repeat(token.start.0.to_string().len()), "|".bright_cyan());
+        println!("{} {} {}", token.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
         println!(
             "{} {} {}{}",
-            " ".repeat(self.start.0.to_string().len()),
+            " ".repeat(token.start.0.to_string().len()),
             "|".bright_cyan(),
-            " ".repeat(self.start.1 as usize),
-            "^".repeat(self.end_offset - self.start_offset).bright_red()
+            " ".repeat(token.start.1 as usize),
+            "^".repeat(token.end_offset - token.start_offset).bright_red()
         );
-    }
-}
-
-impl Display for ParsingError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "Error at {} ({}:{}):\n{}", self.file, self.start.0, self.start.1, self.message);
     }
 }
 

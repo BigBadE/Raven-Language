@@ -1,10 +1,9 @@
 import collections::array_list;
 import list::List;
 import stdio;
-import collections::array_list;
 
 fn main() {
-    //let arraylist = ArrayList::new<str>();
+    let arraylist = ArrayList::new<str>();
 
-    //printf(arraylist.get(0));
+    printf(arraylist.get(0));
 }

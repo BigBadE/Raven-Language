@@ -14,7 +14,7 @@ use syntax::{
 use std::sync::Mutex;
 
 use crate::ImportNameResolver;
-use data::tokens::{CodeErrorToken, Token, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 
 /// A struct containing the data needed for parsing
 pub struct ParserUtils<'a> {
@@ -27,7 +27,9 @@ pub struct ParserUtils<'a> {
     /// The program
     pub syntax: Arc<Mutex<Syntax>>,
     /// The current file
-    pub file: String,
+    pub file: u64,
+    /// The current file name
+    pub file_name: String,
     /// The current imports
     pub imports: ImportNameResolver,
     /// Handle for spawning async tasks
@@ -41,7 +43,7 @@ impl<'a> ParserUtils<'a> {
             panic!("Empty name!");
         }
 
-        let name = if name == "Self" { self.file.clone() } else { name };
+        let name = if name == "Self" { self.file_name.clone() } else { name };
 
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(),
@@ -54,15 +56,12 @@ impl<'a> ParserUtils<'a> {
 
     /// Adds a struct to the syntax
     pub fn add_struct(&mut self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
-        let structure = match structure {
-            Ok(adding) => adding,
-            Err(error) => UnfinalizedStruct {
-                generics: IndexMap::default(),
-                fields: Vec::default(),
-                functions: Vec::default(),
-                data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
-            },
-        };
+        let structure = structure.unwrap_or_else(|error| UnfinalizedStruct {
+            generics: IndexMap::default(),
+            fields: Vec::default(),
+            functions: Vec::default(),
+            data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
+        });
 
         Syntax::add::<StructData>(
             &self.syntax,
@@ -216,15 +215,10 @@ impl<'a> ParserUtils<'a> {
                 code: CodeBody::new(Vec::default(), "empty".to_string()),
                 return_type: None,
                 data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
-                token: CodeErrorToken::make_empty(),
             },
         };
 
-        Syntax::add(
-            syntax,
-            ParsingError::new(file, (0, 0), 0, (0, 0), 0, format!("Duplicate function {}", adding.data.name)),
-            &adding.data,
-        );
+        Syntax::add(syntax, adding.data.span.make_error("Duplicate function"), &adding.data);
         return adding;
     }
 }

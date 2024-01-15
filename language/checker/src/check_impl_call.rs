@@ -1,7 +1,6 @@
-use crate::check_code::{placeholder_error, verify_effect};
+use crate::check_code::verify_effect;
 use crate::check_method_call::check_method;
 use crate::CodeVerifier;
-use data::tokens::CodeErrorToken;
 use std::mem;
 use syntax::async_util::{AsyncDataGetter, UnparsedType};
 use syntax::code::{degeneric_header, Effects, FinalizedEffects};
@@ -118,7 +117,7 @@ async fn check_virtual_type(
                     Box::new(data.code_verifier.process_manager.clone()),
                     &temp,
                     &data.code_verifier.syntax,
-                    &data.variables,
+                    data.variables,
                     None,
                 )
                 .await?;
@@ -167,7 +166,7 @@ async fn check_virtual_type(
                     Box::new(data.code_verifier.process_manager.clone()),
                     &temp,
                     &data.code_verifier.syntax,
-                    &data.variables,
+                    data.variables,
                     None,
                 )
                 .await?;

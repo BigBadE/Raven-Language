@@ -52,6 +52,7 @@ pub mod types;
 
 //Re-export ParsingError
 use crate::chalk_interner::ChalkIr;
+use data::tokens::Span;
 pub use data::ParsingError;
 
 /// An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
@@ -229,6 +230,17 @@ impl SimpleVariableManager {
 
         return variable_manager;
     }
+
+    /// Gets the variable manager for the function, filling in the function parameters
+    pub fn for_final_function(codeless: &FinalizedFunction) -> Self {
+        let mut variable_manager = SimpleVariableManager { variables: HashMap::default() };
+
+        for field in &codeless.fields {
+            variable_manager.variables.insert(field.field.name.clone(), field.field.field_type.clone());
+        }
+
+        return variable_manager;
+    }
 }
 
 impl VariableManager for SimpleVariableManager {
@@ -238,7 +250,7 @@ impl VariableManager for SimpleVariableManager {
 }
 
 /// A variable manager used for getting return types from effects
-pub trait VariableManager: Debug {
+pub trait VariableManager: Send + Sync + Debug {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes>;
 }
 
@@ -258,6 +270,9 @@ where
     type Unfinalized: DataType<Self>;
     /// The finalized type of this top element
     type Finalized;
+
+    /// Span
+    fn get_span(&self) -> &Span;
 
     /// Element id
     fn set_id(&mut self, id: u64);

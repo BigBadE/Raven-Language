@@ -16,26 +16,12 @@ pub struct Token {
     pub end: (u32, u32),
     /// The offset to the end of the token
     pub end_offset: usize,
-    /// Data about the code block around this token
-    pub code_data: Option<TokenCodeData>,
 }
 
 impl Token {
     /// Creates a new token, usually done by the tokenizer
-    pub fn new(
-        token_type: TokenTypes,
-        code_data: Option<TokenCodeData>,
-        start: (u32, u32),
-        start_offset: usize,
-        end: (u32, u32),
-        end_offset: usize,
-    ) -> Self {
-        return Self { token_type, start, start_offset, end, end_offset, code_data };
-    }
-
-    /// Creates an error for this part of the file.
-    pub fn make_error(&self, file: String, error: String) -> ParsingError {
-        return ParsingError::new(file, self.start, self.start_offset, self.end, self.end_offset, error);
+    pub fn new(token_type: TokenTypes, start: (u32, u32), start_offset: usize, end: (u32, u32), end_offset: usize) -> Self {
+        return Self { token_type, start, start_offset, end, end_offset };
     }
 
     /// Turns the token into the string it points to.
@@ -84,38 +70,25 @@ impl FromResidual<Result<Infallible, Token>> for Token {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct CodeErrorToken {
-    pub token: Token,
-    pub file_name: String,
+#[derive(Clone, Debug, Default)]
+pub struct Span {
+    pub file: u64,
+    pub start: usize,
+    pub end: usize,
 }
 
-impl CodeErrorToken {
-    pub fn new(token: Token, file_name: String) -> Self {
-        return Self { token, file_name };
+impl Span {
+    pub fn new(file: u64, index: usize) -> Self {
+        return Self { file, start: index, end: index };
     }
 
-    pub fn make_error(&self, message: String) -> ParsingError {
-        return self.token.make_error(self.file_name.clone(), message);
+    pub fn make_error(&self, message: &'static str) -> ParsingError {
+        return ParsingError::new(self.clone(), message);
     }
 
-    pub fn change_token_end(&mut self, end_token: &Token) {
-        self.token.end = end_token.end;
-        self.token.end_offset = end_token.end_offset;
+    pub fn change_token_end(&mut self, end: usize) {
+        self.end = end;
     }
-
-    pub fn make_empty() -> Self {
-        return Self { token: Token::new(TokenTypes::Colon, None, (0, 0), 0, (0, 0), 0), file_name: String::default() };
-    }
-}
-
-/// Data about the current code block
-#[derive(Clone, Debug)]
-pub struct TokenCodeData {
-    /// Start line of the code block
-    pub start_line: u32,
-    /// End line of the code block
-    pub end_line: u32,
 }
 
 /// The different types of tokens.

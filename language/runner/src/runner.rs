@@ -49,7 +49,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
                     .as_ref()
                     .map(|inner| inner.handle().clone())
                     .unwrap_or_else(|| settings.cpu_runtime.handle().clone())
-                    .spawn(parse(syntax.clone(), handle.clone(), source_set.relative(&*file).clone(), file.read())),
+                    .spawn(parse(syntax.clone(), handle.clone(), source_set.relative(&*file).clone(), file)),
             );
         }
     }

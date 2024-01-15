@@ -1,5 +1,8 @@
-use indexmap::IndexMap;
 use std::sync::Arc;
+
+use indexmap::IndexMap;
+
+use data::tokens::{Span, TokenTypes};
 use syntax::async_util::NameResolver;
 use syntax::code::MemberField;
 use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
@@ -10,7 +13,6 @@ use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, Parsi
 use crate::parser::code_parser::parse_code;
 use crate::parser::struct_parser::{parse_generics, to_field};
 use crate::parser::util::ParserUtils;
-use data::tokens::{TokenTypes, CodeErrorToken};
 
 /// Parses a function
 pub fn parse_function(
@@ -28,10 +30,10 @@ pub fn parse_function(
     let mut last_arg = String::default();
     let mut last_arg_type = String::default();
 
-    let token = parser_utils.tokens[parser_utils.index].clone();
+    let token = parser_utils.index;
 
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let token = &parser_utils.tokens[parser_utils.index];
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Identifier => name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer),
@@ -84,11 +86,9 @@ pub fn parse_function(
 
     if trait_function {
         if is_modifier(modifiers, Modifier::Internal) || is_modifier(modifiers, Modifier::Extern) {
-            return Err(parser_utils
-                .tokens
-                .get(parser_utils.index - 1)
-                .unwrap()
-                .make_error(parser_utils.file.clone(), "Traits can't be internal/external!".to_string()));
+            return Err(
+                Span::new(parser_utils.file, parser_utils.index - 1).make_error("Traits can't be internal/external!")
+            );
         } else {
             modifiers += Modifier::Trait as u8;
         }
@@ -108,13 +108,13 @@ pub fn parse_function(
         generics.insert(key.clone(), bounds);
     }
 
+    let span = Span::new(parser_utils.file, token);
     return Ok(UnfinalizedFunction {
         generics,
         fields,
         code: code.unwrap_or_else(|| CodeBody::new(Vec::default(), "empty".to_string())),
         return_type,
-        data: Arc::new(FunctionData::new(attributes, modifiers, name)),
-        token: CodeErrorToken::new(token, parser_utils.file.clone())
+        data: Arc::new(FunctionData::new(attributes, modifiers, name, span)),
     });
 }
 

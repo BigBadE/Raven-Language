@@ -1,5 +1,5 @@
 use async_recursion::async_recursion;
-use data::tokens::CodeErrorToken;
+use data::tokens::Span;
 use syntax::async_util::UnparsedType;
 use syntax::code::{Effects, ExpressionType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody};
@@ -53,9 +53,10 @@ async fn check_return_type(
     body: &mut Vec<FinalizedExpression>,
     variables: &SimpleVariableManager,
 ) -> Result<bool, ParsingError> {
-    if !matches!(line, ExpressionType::Return(_)) {
-        return Ok(false);
-    }
+    let span = match &line {
+        ExpressionType::Return(span) => span.clone(),
+        _ => Ok(false),
+    };
 
     let return_type = match code_verifier.return_type.as_ref() {
         Some(value) => value,
@@ -82,7 +83,7 @@ async fn check_return_type(
             syntax: code_verifier.syntax.clone(),
             return_type: last_type.clone(),
             data: return_type.clone(),
-            error: placeholder_error("You shouldn't see this! Report this!".to_string()),
+            error: ParsingError::empty(),
         }
         .await?;
 
@@ -92,7 +93,7 @@ async fn check_return_type(
         ));
         Ok(true)
     } else {
-        Err(placeholder_error(format!("Expected {}, found {}", return_type, last_type)))
+        Err(span.make_error("Incorrect return type!"))
     };
 }
 
@@ -109,7 +110,7 @@ pub async fn verify_effect(
         return Ok(found);
     }
 
-    let output = match effect {
+    let output = match effect.types {
         Effects::Paren(inner) => verify_effect(code_verifier, variables, *inner).await?,
         Effects::CodeBody(body) => {
             FinalizedEffects::CodeBody(verify_code(code_verifier, &mut variables.clone(), body, false).await?)
@@ -149,7 +150,7 @@ pub async fn verify_effect(
             }
 
             let types = output.first().map(|found| found.get_return(variables).unwrap());
-            check_type(&types, &output, variables, code_verifier).await?;
+            check_type(&types, &output, variables, code_verifier, &effect.span).await?;
 
             store(FinalizedEffects::CreateArray(types, output))
         }
@@ -178,12 +179,12 @@ async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
 async fn verify_create_struct(
     code_verifier: &mut CodeVerifier<'_>,
     target: UnparsedType,
-    effects: Vec<(String, Effects, CodeErrorToken)>,
+    effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
     let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
-        placeholder_error("Unexpected error! Please report this!".to_string()),
+        ParsingError::empty(),
         code_verifier.resolver.boxed_clone(),
         target,
         vec![],
@@ -201,16 +202,9 @@ async fn verify_create_struct(
         }
     }
 
-    target
-        .degeneric(
-            &generics,
-            &code_verifier.syntax,
-            placeholder_error("No type!".to_string()),
-            placeholder_error("Bounds error!".to_string()),
-        )
-        .await?;
+    target.degeneric(&generics, &code_verifier.syntax).await?;
     let mut final_effects = vec![];
-    for (field_name, effect, error) in effects {
+    for (field_name, effect) in effects {
         let mut i = 0;
         let fields = target.get_fields();
         for field in fields {
@@ -221,7 +215,7 @@ async fn verify_create_struct(
         }
 
         if i == fields.len() {
-            return Err(error.make_error(format!("Unknown field {}!", field_name)));
+            return Err(effect.span.make_error("Unknown field!"));
         }
 
         final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));
@@ -240,12 +234,13 @@ async fn check_type(
     output: &Vec<FinalizedEffects>,
     variables: &SimpleVariableManager,
     code_verifier: &CodeVerifier<'_>,
+    span: &Span,
 ) -> Result<(), ParsingError> {
     if let Some(found) = types {
         for checking in output {
             let returning = checking.get_return(variables).unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
-                return Err(placeholder_error(format!("{:?} isn't a {:?}!", checking, types)));
+                return Err(span.make_error("Incorrect types!"));
             }
         }
     }
@@ -255,9 +250,4 @@ async fn check_type(
 /// Shorthand for storing an effect on the heap
 fn store(effect: FinalizedEffects) -> FinalizedEffects {
     return FinalizedEffects::HeapStore(Box::new(effect));
-}
-
-/// Creates a placeholder error with the given message
-pub fn placeholder_error(message: String) -> ParsingError {
-    return ParsingError::new("".to_string(), (0, 0), 0, (0, 0), 0, message);
 }

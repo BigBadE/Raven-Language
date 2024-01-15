@@ -426,14 +426,13 @@ impl FinalizedTypes {
         other: &FinalizedTypes,
         syntax: &Arc<Mutex<Syntax>>,
         generics: &mut HashMap<String, FinalizedTypes>,
-        mut bounds_error: ParsingError,
+        bounds_error: ParsingError,
     ) -> Result<(), ParsingError> {
         match self {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.
                 for bound in bounds {
                     if !other.of_type(bound, syntax.clone()).await {
-                        bounds_error.message += &*format!(" {} and {}", other, bound);
                         return Err(bounds_error);
                     }
                 }
@@ -480,45 +479,27 @@ impl FinalizedTypes {
 
     /// Degenerics the type by replacing all generics with their solidified value.
     #[async_recursion]
-    pub async fn degeneric(
-        &mut self,
-        generics: &HashMap<String, FinalizedTypes>,
-        syntax: &Arc<Mutex<Syntax>>,
-        mut none_error: ParsingError,
-        bounds_error: ParsingError,
-    ) -> Result<(), ParsingError> {
+    pub async fn degeneric(&mut self, generics: &HashMap<String, FinalizedTypes>, syntax: &Arc<Mutex<Syntax>>) {
         return match self {
-            FinalizedTypes::Generic(name, bounds) => {
+            FinalizedTypes::Generic(name, _) => {
                 if let Some(found) = generics.get(name) {
-                    // This should never trip, but it's a sanity check.
-                    // TODO confirm
-                    for bound in bounds {
-                        if !found.of_type(bound, syntax.clone()).await {
-                            return Err(bounds_error);
-                        }
-                    }
                     self.clone_from(found);
-                    Ok(())
                 } else {
-                    none_error.message =
-                        format!("{}: {} and {:?}", none_error.message, self, generics.keys().collect::<Vec<_>>());
-                    Err(none_error)
+                    panic!("Missing generic type: {} and {:?}", self, generics.keys().collect::<Vec<_>>());
                 }
             }
             FinalizedTypes::GenericType(base, bounds) => {
-                base.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
+                base.degeneric(generics, syntax).await;
 
                 for bound in &mut *bounds {
-                    bound.degeneric(generics, syntax, none_error.clone(), bounds_error.clone()).await?;
+                    bound.degeneric(generics, syntax).await;
                 }
-                Ok(())
             }
-            FinalizedTypes::Reference(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
-            FinalizedTypes::Array(inner) => inner.degeneric(generics, syntax, none_error, bounds_error).await,
+            FinalizedTypes::Reference(inner) => inner.degeneric(generics, syntax).await,
+            FinalizedTypes::Array(inner) => inner.degeneric(generics, syntax).await,
             FinalizedTypes::Struct(inner) => {
                 let temp = FinalizedStruct::clone(inner);
-                *inner = temp.degeneric(generics, syntax, none_error, bounds_error).await?;
-                Ok(())
+                *inner = temp.degeneric(generics, syntax).await;
             }
         };
     }

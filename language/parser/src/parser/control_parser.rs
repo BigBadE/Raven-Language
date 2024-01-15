@@ -4,7 +4,7 @@ use syntax::ParsingError;
 
 use crate::parser::code_parser::{parse_code, parse_line, ParseState};
 use crate::ParserUtils;
-use data::tokens::{CodeErrorToken, TokenTypes};
+use data::tokens::{Span, TokenTypes};
 
 /// Parses an if statement into a single expression.
 pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingError> {
@@ -15,20 +15,12 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     // This gets value == 2
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
     }
 
     // Make sure the if statement ended with a bracket
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+    if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
     }
 
     parser_utils.index += 1;
@@ -40,26 +32,18 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     let mut else_body = None;
 
     // Loop over every else block
-    while parser_utils.tokens.get(parser_utils.index).unwrap().token_type == TokenTypes::Else {
+    while parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Else {
         // Else ifs get added to the else if
-        if parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type == TokenTypes::If {
+        if parser_utils.tokens[parser_utils.index + 1].token_type == TokenTypes::If {
             parser_utils.index += 2;
 
             let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
             if effect.is_none() {
-                return Err(parser_utils
-                    .tokens
-                    .get(parser_utils.index)
-                    .unwrap()
-                    .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
+                return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
             }
 
-            if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-                return Err(parser_utils
-                    .tokens
-                    .get(parser_utils.index)
-                    .unwrap()
-                    .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+            if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
+                return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
             }
 
             parser_utils.index += 1;
@@ -72,7 +56,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
                 returning = ExpressionType::Line;
             }
             else_ifs.push((effect.unwrap().effect, body));
-        } else if parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type == TokenTypes::BlockStart {
+        } else if parser_utils.tokens[parser_utils.index + 1].token_type == TokenTypes::BlockStart {
             parser_utils.index += 2;
             // Get the else body
             let (other_returning, body) = parse_code(parser_utils)?;
@@ -106,23 +90,23 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
 /// Parses a for statement into a single expression
 pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
-    let name = parser_utils.tokens.get(parser_utils.index).unwrap();
+    let name = &parser_utils.tokens[parser_utils.index];
     parser_utils.index += 1;
     // Gets the name of the for loop variable
     if name.token_type != TokenTypes::Variable {
-        return Err(name.make_error(parser_utils.file.clone(), "Expected variable name!".to_string()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected variable name!"));
     }
 
     // Checks for the "in" keyword
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::In {
-        return Err(name.make_error(parser_utils.file.clone(), "Missing \"in\" in for loop.".to_string()));
+    if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::In {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Missing \"in\" in for loop."));
     }
     parser_utils.index += 1;
 
     let name = name.to_string(parser_utils.buffer);
 
     // Gets the variable we're looping over
-    let mut error_token = CodeErrorToken::new(parser_utils.tokens[parser_utils.index].clone(), parser_utils.file.clone());
+    let mut error_token = Span::new(parser_utils.file, parser_utils.index);
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
         return Err(parser_utils
@@ -131,15 +115,11 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
             .unwrap()
             .make_error(parser_utils.file.clone(), "Expected iterator, found void".to_string()));
     }
-    error_token.change_token_end(&parser_utils.tokens[parser_utils.index]);
+    error_token.change_token_end(parser_utils.index);
 
     // Checks for the code start
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index - 1)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Missing code body for loop.".to_string()));
+    if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
+        return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error("Missing code body for loop."));
     }
     parser_utils.index += 1;
 
@@ -155,19 +135,11 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
 pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
     }
 
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+    if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
     }
 
     parser_utils.index += 1;
@@ -180,33 +152,22 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
 /// Parses a do while into a single expression
 pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected body, found void".to_string()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
     }
+
     parser_utils.index += 1;
 
     let (_returning, body) = parse_code(parser_utils)?;
 
-    if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::While {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected while!".to_string()));
+    if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::While {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected while!"));
     }
 
     parser_utils.index += 1;
 
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(parser_utils
-            .tokens
-            .get(parser_utils.index)
-            .unwrap()
-            .make_error(parser_utils.file.clone(), "Expected condition, found void".to_string()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
     }
 
     parser_utils.imports.last_id += 1;
@@ -313,7 +274,7 @@ fn create_for(
     effect: Effects,
     mut body: CodeBody,
     id: u32,
-    error_token: CodeErrorToken,
+    error_token: Span,
 ) -> Result<Effects, ParsingError> {
     let mut top = Vec::default();
     let variable = format!("$iter{}", id);
