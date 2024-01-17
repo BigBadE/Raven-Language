@@ -1,14 +1,15 @@
+use data::tokens::Span;
 use std::sync::{Arc, Mutex};
 
 use syntax::async_util::AsyncDataGetter;
-use syntax::code::{Effects, FinalizedEffects};
+use syntax::code::{EffectType, Effects, FinalizedEffects};
 use syntax::function::CodelessFinalizedFunction;
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
 use syntax::{is_modifier, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
 
-use crate::check_code::{placeholder_error, verify_effect};
+use crate::check_code::verify_effect;
 use crate::output::TypesChecker;
 use crate::CodeVerifier;
 
@@ -22,7 +23,7 @@ pub async fn check_method_call(
     let calling;
     let method;
     let returning;
-    if let Effects::MethodCall(new_calling, new_method, effects, new_return_type, _) = effect {
+    if let EffectType::MethodCall(new_calling, new_method, effects, new_return_type) = effect.types {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
         }
@@ -34,10 +35,10 @@ pub async fn check_method_call(
     }
 
     let returning = match returning {
-        Some(inner) => Some(
+        Some((inner, span)) => Some((
             Syntax::parse_type(
                 code_verifier.syntax.clone(),
-                placeholder_error(format!("Bounds error!")),
+                span.make_error("Bounds error!"),
                 code_verifier.resolver.boxed_clone(),
                 inner,
                 vec![],
@@ -45,14 +46,15 @@ pub async fn check_method_call(
             .await?
             .finalize(code_verifier.syntax.clone())
             .await,
-        ),
+            span,
+        )),
         None => None,
     };
 
     // Finds methods based off the calling type.
     let method = if let Some(found) = calling {
         let calling = verify_effect(code_verifier, variables, *found).await?;
-        let return_type = calling.get_return(variables).unwrap();
+        let return_type: FinalizedTypes = calling.get_return(variables).unwrap();
 
         // If it's generic, check its trait bounds for the method
         if return_type.name_safe().is_none() {
@@ -71,14 +73,14 @@ pub async fn check_method_call(
                 }
 
                 if output.len() > 1 {
-                    return Err(placeholder_error(format!("Duplicate method {} for generic!", method)));
+                    return Err(calling.span.make_error("Duplicate method for generic!"));
                 } else if output.is_empty() {
-                    return Err(placeholder_error(format!("No method {} for generic!", method)));
+                    return Err(calling.span.make_error("No method for generic!"));
                 }
 
                 let (found_trait, found) = output.pop().unwrap();
 
-                return Ok(FinalizedEffects::GenericMethodCall(found, found_trait.clone(), finalized_effects));
+                return Ok(FinalizedEffectType::GenericMethodCall(found, found_trait.clone(), finalized_effects));
             }
         }
 
@@ -88,7 +90,7 @@ pub async fn check_method_call(
 
             let method = Syntax::get_function(
                 code_verifier.syntax.clone(),
-                placeholder_error(format!("Failed to find method {}::{}", return_type.inner_struct().data.name, method)),
+                effect.span.make_error("Failed to find method"),
                 format!("{}::{}", return_type.inner_struct().data.name, method),
                 code_verifier.resolver.boxed_clone(),
                 false,
@@ -96,26 +98,28 @@ pub async fn check_method_call(
             .await?;
             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
-            if !check_args(&method, code_verifier.process_manager, &mut finalized_effects, &code_verifier.syntax, variables)
-                .await
+            if !check_args(
+                &method,
+                code_verifier.process_manager,
+                &mut finalized_effects,
+                &code_verifier.syntax,
+                variables,
+                &effect.span,
+            )
+            .await
             {
-                return Err(placeholder_error(format!(
-                    "Incorrect args to method {}: {:?} vs {:?}",
-                    method.data.name,
-                    method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
-                    finalized_effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>()
-                )));
+                return Err(effect.span.make_error("Incorrect args to method"));
             }
 
             let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
 
-            return Ok(FinalizedEffects::VirtualCall(index, method, finalized_effects));
+            return Ok(FinalizedEffectType::VirtualCall(index, method, finalized_effects));
         }
 
         finalized_effects.insert(0, calling);
         if let Ok(value) = Syntax::get_function(
             code_verifier.syntax.clone(),
-            placeholder_error(String::default()),
+            ParsingError::empty(),
             method.clone(),
             code_verifier.resolver.boxed_clone(),
             true,
@@ -130,16 +134,18 @@ pub async fn check_method_call(
             let return_type = &return_type;
             let process_manager = code_verifier.process_manager;
             let syntax = &code_verifier.syntax;
-            let checker =
-                async move |implementor: Arc<FinishedTraitImplementor>, method| -> Result<FinalizedEffects, ParsingError> {
-                    let method = AsyncDataGetter::new(syntax.clone(), method).await;
-                    let mut process_manager = process_manager.clone();
-                    implementor
-                        .base
-                        .resolve_generic(return_type, syntax, &mut process_manager.generics, ParsingError::empty())
-                        .await?;
-                    check_method(&process_manager, method, effects.clone(), syntax, variables, returning.clone()).await
-                };
+            let checker = async move |implementor: Arc<FinishedTraitImplementor>,
+                                      method|
+                        -> Result<FinalizedEffects, ParsingError> {
+                let method = AsyncDataGetter::new(syntax.clone(), method).await;
+                let mut process_manager = process_manager.clone();
+                implementor
+                    .base
+                    .resolve_generic(return_type, syntax, &mut process_manager.generics, ParsingError::empty())
+                    .await?;
+                check_method(&process_manager, method, effects.clone(), syntax, variables, returning.clone(), &effect.span)
+                    .await
+            };
 
             return TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
@@ -147,7 +153,7 @@ pub async fn check_method_call(
                 method: method.clone(),
                 return_type: return_type.clone(),
                 checker,
-                error: placeholder_error(format!("Unknown method {}", method)),
+                error: effect.span.make_error("Unknown method"),
             }
             .await;
         }
@@ -180,11 +186,12 @@ pub async fn check_method_call(
                                 &code_verifier.syntax,
                                 variables,
                                 returning.clone(),
+                                &effect.span,
                             )
                             .await
                             {
                                 Ok(result) => return Ok(result),
-                                Err(error) => println!("{}", error),
+                                Err(error) => println!("Error: {}", error.message),
                             }
                         }
                     }
@@ -194,7 +201,7 @@ pub async fn check_method_call(
 
         Syntax::get_function(
             code_verifier.syntax.clone(),
-            placeholder_error(format!("Unknown method {}", method)),
+            effect.span.make_error("Unknown method"),
             method,
             code_verifier.resolver.boxed_clone(),
             true,
@@ -210,6 +217,7 @@ pub async fn check_method_call(
         &code_verifier.syntax,
         variables,
         returning,
+        &effect.span,
     )
     .await;
 }
@@ -222,7 +230,8 @@ pub async fn check_method(
     mut effects: Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    returning: Option<FinalizedTypes>,
+    returning: Option<(FinalizedTypes, Span)>,
+    span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
     if !method.generics.is_empty() {
         let manager = process_manager.clone();
@@ -230,31 +239,28 @@ pub async fn check_method(
             CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects, syntax, variables, returning).await?;
 
         let temp_effect = match method.return_type.as_ref() {
-            Some(returning) => FinalizedEffects::MethodCall(
-                Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))),
+            Some(returning) => FinalizedEffectType::MethodCall(
+                Some(Box::new(FinalizedEffectType::HeapAllocate(returning.clone()))),
                 method.clone(),
                 effects,
             ),
-            None => FinalizedEffects::MethodCall(None, method.clone(), effects),
+            None => FinalizedEffectType::MethodCall(None, method.clone(), effects),
         };
 
         return Ok(temp_effect);
     }
 
-    if !check_args(&method, process_manager, &mut effects, syntax, variables).await {
-        return Err(placeholder_error(format!(
-            "Incorrect args to method {}: {:?} vs {:?}",
-            method.data.name,
-            method.arguments.iter().map(|field| &field.field.field_type).collect::<Vec<_>>(),
-            effects.iter().map(|effect| effect.get_return(variables).unwrap()).collect::<Vec<_>>()
-        )));
+    if !check_args(&method, process_manager, &mut effects, syntax, variables, span).await {
+        return Err(span.make_error("Incorrect args to method!"));
     }
 
     return Ok(match method.return_type.as_ref() {
-        Some(returning) => {
-            FinalizedEffects::MethodCall(Some(Box::new(FinalizedEffects::HeapAllocate(returning.clone()))), method, effects)
-        }
-        None => FinalizedEffects::MethodCall(None, method, effects),
+        Some(returning) => FinalizedEffectType::MethodCall(
+            Some(Box::new(FinalizedEffectType::HeapAllocate(returning.clone()))),
+            method,
+            effects,
+        ),
+        None => FinalizedEffectType::MethodCall(None, method, effects),
     });
 }
 
@@ -265,6 +271,7 @@ pub async fn check_args(
     args: &mut Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
+    span: &Span,
 ) -> bool {
     if function.arguments.len() != args.len() {
         return false;
@@ -291,7 +298,7 @@ pub async fn check_args(
                     syntax: syntax.clone(),
                     return_type,
                     data: other.clone(),
-                    error: placeholder_error(format!("Failed to find impl! Report this!")),
+                    error: span.make_error("Failed to find impl! Report this!"),
                 }
                 .await
                 .unwrap();
@@ -301,7 +308,7 @@ pub async fn check_args(
                     AsyncDataGetter::new(syntax.clone(), func.clone()).await;
                 }
 
-                args.insert(i, FinalizedEffects::Downcast(Box::new(temp), other.clone(), funcs));
+                args.insert(i, FinalizedEffectType::Downcast(Box::new(temp), other.clone(), funcs));
             }
         } else {
             return false;

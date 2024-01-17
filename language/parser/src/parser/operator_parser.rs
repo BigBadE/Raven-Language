@@ -53,15 +53,15 @@ pub fn parse_operator(
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             next_element_token.change_token_end(parser_utils.index);
             if let Some(next_element) = next {
-                if matches!(next_element, Effects::NOP) {
+                if matches!(next_element, EffectType::NOP) {
                     break;
                 }
                 right = match right.unwrap() {
-                    Effects::CreateArray(mut inner) => {
+                    EffectType::CreateArray(mut inner) => {
                         inner.push((next_element, next_element_token));
-                        Some(Effects::CreateArray(inner))
+                        Some(EffectType::CreateArray(inner))
                     }
-                    first_element => Some(Effects::CreateArray(vec![
+                    first_element => Some(EffectType::CreateArray(vec![
                         (first_element, first_element_token.clone()),
                         (next_element, next_element_token),
                     ])),
@@ -72,10 +72,10 @@ pub fn parse_operator(
         }
 
         if let Some(inner) = &right {
-            if matches!(*inner, Effects::NOP) {
+            if matches!(*inner, EffectType::NOP) {
                 parser_utils.index = index;
                 parser_utils.tokens.truncate(tokens);
-                return Ok(Effects::Operation(operation, effects, Span::new(parser_utils.file, parser_utils.index)));
+                return Ok(EffectType::Operation(operation, effects, Span::new(parser_utils.file, parser_utils.index)));
             } else {
                 operation += "{}";
             }

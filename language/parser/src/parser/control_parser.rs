@@ -1,4 +1,4 @@
-use syntax::code::{Effects, Expression, ExpressionType};
+use syntax::code::{EffectType, Effects, Expression, ExpressionType};
 use syntax::function::CodeBody;
 use syntax::ParsingError;
 
@@ -179,11 +179,14 @@ fn create_do_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effec
     let mut top = Vec::default();
 
     let label = body.label.clone();
-    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id - 1).to_string() + "end")));
-    top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
-    top.push(Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect), label, id.to_string() + "end")));
+    body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump((id - 1).to_string() + "end")));
+    top.push(Expression::new(ExpressionType::Line, EffectType::CodeBody(body)));
+    top.push(Expression::new(
+        ExpressionType::Line,
+        EffectType::CompareJump(Box::new(effect), label, id.to_string() + "end"),
+    ));
 
-    return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
+    return Ok(EffectType::CodeBody(CodeBody::new(top, id.to_string())));
 }
 
 /// Creates a while effect from the body and the condition
@@ -192,12 +195,12 @@ fn create_while(effect: Effects, mut body: CodeBody, id: u32) -> Result<Effects,
 
     top.push(Expression::new(
         ExpressionType::Line,
-        Effects::CompareJump(Box::new(effect), body.label.clone(), id.to_string() + "end"),
+        EffectType::CompareJump(Box::new(effect), body.label.clone(), id.to_string() + "end"),
     ));
-    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string())));
-    top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
+    body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump(id.to_string())));
+    top.push(Expression::new(ExpressionType::Line, EffectType::CodeBody(body)));
 
-    return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
+    return Ok(EffectType::CodeBody(CodeBody::new(top, id.to_string())));
 }
 
 /// Creates an if statement from the body, the effect, the else ifs, and the else body
@@ -212,7 +215,7 @@ fn create_if(
 
     // Maps the else body, if there is an else_if there needs to be an empty else to put the else if into.
     let mut else_body = if let Some(mut body) = else_body {
-        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
+        body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump(id.to_string() + "end")));
         Some(body)
     } else if !else_ifs.is_empty() {
         Some(CodeBody::new(Vec::default(), id.to_string()))
@@ -224,16 +227,16 @@ fn create_if(
     // Add every else if statement
     while !else_ifs.is_empty() {
         let (effect, mut body) = else_ifs.remove(0);
-        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
+        body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump(id.to_string() + "end")));
         // Creates the body of the else if by adding another if statement to the top of the else.
         let inner = CodeBody::new(
             vec![
                 Expression::new(
                     ExpressionType::Line,
-                    Effects::CompareJump(Box::new(effect), body.label.clone(), else_body.as_ref().unwrap().label.clone()),
+                    EffectType::CompareJump(Box::new(effect), body.label.clone(), else_body.as_ref().unwrap().label.clone()),
                 ),
-                Expression::new(ExpressionType::Line, Effects::CodeBody(body)),
-                Expression::new(ExpressionType::Line, Effects::CodeBody(else_body.unwrap())),
+                Expression::new(ExpressionType::Line, EffectType::CodeBody(body)),
+                Expression::new(ExpressionType::Line, EffectType::CodeBody(else_body.unwrap())),
             ],
             temp.to_string(),
         );
@@ -243,29 +246,29 @@ fn create_if(
 
     // Where we jump if the if fails
     let if_jumping = if let Some(body) = &mut else_body {
-        body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(body.label.clone())));
+        body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump(body.label.clone())));
         body.label.clone()
     } else {
         id.to_string() + "end"
     };
 
-    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump(id.to_string() + "end")));
+    body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump(id.to_string() + "end")));
 
     // The CodeBody before the if statement that controls the control flow
     let mut top = CodeBody::new(
         vec![
-            Expression::new(ExpressionType::Line, Effects::CompareJump(Box::new(effect), body.label.clone(), if_jumping)),
-            Expression::new(ExpressionType::Line, Effects::CodeBody(body)),
+            Expression::new(ExpressionType::Line, EffectType::CompareJump(Box::new(effect), body.label.clone(), if_jumping)),
+            Expression::new(ExpressionType::Line, EffectType::CodeBody(body)),
         ],
         id.to_string(),
     );
 
     // Add the else body.
     if let Some(body) = else_body {
-        top.expressions.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
+        top.expressions.push(Expression::new(ExpressionType::Line, EffectType::CodeBody(body)));
     }
 
-    return Ok(Effects::CodeBody(top));
+    return Ok(EffectType::CodeBody(top));
 }
 
 /// Creates a for loop effect from the body and iterator effect
@@ -282,19 +285,19 @@ fn create_for(
         0,
         Expression::new(
             ExpressionType::Line,
-            Effects::CreateVariable(variable.clone(), Box::new(effect), error_token.clone()),
+            EffectType::CreateVariable(variable.clone(), Box::new(effect), error_token.clone()),
         ),
     );
-    top.push(Expression::new(ExpressionType::Line, Effects::Jump((id + 1).to_string())));
+    top.push(Expression::new(ExpressionType::Line, EffectType::Jump((id + 1).to_string())));
     // Adds a call to the Iter::next function at the top of the for loop.
     body.expressions.insert(
         0,
         Expression::new(
             ExpressionType::Line,
-            Effects::CreateVariable(
+            EffectType::CreateVariable(
                 name.clone(),
-                Box::new(Effects::ImplementationCall(
-                    Box::new(Effects::LoadVariable(variable.clone())),
+                Box::new(EffectType::ImplementationCall(
+                    Box::new(EffectType::LoadVariable(variable.clone())),
                     "iter::Iter".to_string(),
                     "next".to_string(),
                     vec![],
@@ -307,14 +310,14 @@ fn create_for(
     );
 
     // Jumps to the header of the for loop after each loop
-    body.expressions.push(Expression::new(ExpressionType::Line, Effects::Jump((id + 1).to_string())));
+    body.expressions.push(Expression::new(ExpressionType::Line, EffectType::Jump((id + 1).to_string())));
 
     let for_check = CodeBody::new(
         vec![Expression::new(
             ExpressionType::Line,
-            Effects::CompareJump(
-                Box::new(Effects::ImplementationCall(
-                    Box::new(Effects::LoadVariable(variable.clone())),
+            EffectType::CompareJump(
+                Box::new(EffectType::ImplementationCall(
+                    Box::new(EffectType::LoadVariable(variable.clone())),
                     "iter::Iter".to_string(),
                     "has_next".to_string(),
                     vec![],
@@ -329,8 +332,8 @@ fn create_for(
     );
     // Checks if the end is reached, and if so jumps to the end of the block.
     // The block after is named id + end so it can be named before it exists.
-    top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(for_check)));
-    top.push(Expression::new(ExpressionType::Line, Effects::CodeBody(body)));
+    top.push(Expression::new(ExpressionType::Line, EffectType::CodeBody(for_check)));
+    top.push(Expression::new(ExpressionType::Line, EffectType::CodeBody(body)));
 
-    return Ok(Effects::CodeBody(CodeBody::new(top, id.to_string())));
+    return Ok(EffectType::CodeBody(CodeBody::new(top, id.to_string())));
 }

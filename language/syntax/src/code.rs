@@ -127,6 +127,12 @@ pub struct Effects {
     pub span: Span,
 }
 
+impl Effects {
+    pub fn new(span: Span, types: EffectType) -> Self {
+        return Self { types, span };
+    }
+}
+
 /// Effects are single pieces of code which are strung together to make an expression.
 /// For example, a single method call, creating a variable, setting a variable, etc... are all effects.
 #[derive(Clone, Debug)]
@@ -148,7 +154,7 @@ pub enum EffectType {
     ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
     /// Finds the method with the name and calls it with those arguments.
     /// Calling, calling function, function arguments, and return type (if explicitly required)
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<UnparsedType>),
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<(UnparsedType, Span)>),
     /// Sets the variable to a value.
     Set(Box<Effects>, Box<Effects>),
     /// Loads variable with the given name.
@@ -221,7 +227,7 @@ pub enum FinalizedEffectType {
     /// Calls a virtual method, usually a downcasted trait, with the given function index, function,
     /// and on the given arguments (first argument must be the downcased trait).
     VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
-    /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on Effects::ImplementationCall
+    /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on EffectType::ImplementationCall
     GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
     Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<FunctionData>>),

@@ -1,7 +1,7 @@
 use crate::tokens::code_tokenizer::next_code_token;
 use crate::tokens::top_tokenizer::{next_func_token, next_implementation_token, next_struct_token, next_top_token};
 use crate::tokens::util::{next_generic, parse_string};
-use data::tokens::{Token, TokenCodeData, TokenTypes};
+use data::tokens::{Token, TokenTypes};
 
 /// This program keeps track of the variables required for the tokenizing.
 pub struct Tokenizer<'a> {
@@ -24,8 +24,6 @@ pub struct Tokenizer<'a> {
     pub len: usize,
     /// A buffer of all characters in the file
     pub buffer: &'a [u8],
-    /// Data for token errors
-    pub code_data: Option<TokenCodeData>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -38,10 +36,9 @@ impl<'a> Tokenizer<'a> {
             index: 0,
             line: 1,
             line_index: 0,
-            last: Token::new(TokenTypes::Start, None, (1, 0), 0, (1, 0), 0),
+            last: Token::new(TokenTypes::Start, (1, 0), 0, (1, 0), 0),
             len: buffer.len(),
             buffer,
-            code_data: None,
         };
     }
 
@@ -102,7 +99,6 @@ impl<'a> Tokenizer<'a> {
             if self.index == self.len {
                 return Err(Token::new(
                     TokenTypes::EOF,
-                    None,
                     self.last.end,
                     self.last.end_offset,
                     (self.line, self.index as u32 - self.line_index),
@@ -163,7 +159,6 @@ impl<'a> Tokenizer<'a> {
 
         return Token::new(
             token,
-            self.code_data.clone(),
             self.last.end,
             self.last.end_offset,
             (self.line, self.index as u32 - self.line_index),
@@ -176,7 +171,6 @@ impl<'a> Tokenizer<'a> {
         if self.index == self.len {
             return Token::new(
                 TokenTypes::EOF,
-                self.code_data.clone(),
                 self.last.end,
                 self.last.end_offset,
                 (self.line, self.index as u32 - self.line_index),
@@ -193,7 +187,6 @@ impl<'a> Tokenizer<'a> {
 
         return Token::new(
             types,
-            self.code_data.clone(),
             self.last.end,
             self.last.end_offset,
             (self.line, self.index as u32 - self.line_index),
@@ -210,7 +203,6 @@ impl<'a> Tokenizer<'a> {
     pub fn make_token(&self, token_type: TokenTypes) -> Token {
         return Token::new(
             token_type,
-            self.code_data.clone(),
             self.last.end,
             self.last.end_offset,
             (self.line, self.index as u32 - self.line_index),

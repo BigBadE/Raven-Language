@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use data::tokens::Span;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -6,7 +7,6 @@ use std::sync::Mutex;
 
 use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
-use data::tokens::CodeErrorToken;
 use syntax::async_util::{HandleWrapper, NameResolver};
 use syntax::function::{
     CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData, UnfinalizedFunction,
@@ -52,8 +52,7 @@ impl ProcessManager for TypesChecker {
                     generics: IndexMap::default(),
                     arguments: vec![],
                     return_type: None,
-                    data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
-                    token: CodeErrorToken::make_empty(),
+                    data: Arc::new(FunctionData::new(Vec::default(), 0, String::default(), Span::default())),
                 },
                 CodeBody::new(Vec::default(), String::default()),
             )
@@ -74,8 +73,7 @@ impl ProcessManager for TypesChecker {
                 fields: vec![],
                 code: FinalizedCodeBody::default(),
                 return_type: None,
-                data: Arc::new(FunctionData::new(Vec::default(), 0, String::default())),
-                token: CodeErrorToken::make_empty(),
+                data: Arc::new(FunctionData::new(Vec::default(), 0, String::default(), Span::default())),
             }
         });
     }
@@ -93,7 +91,7 @@ impl ProcessManager for TypesChecker {
                 FinalizedStruct {
                     generics: IndexMap::default(),
                     fields: vec![],
-                    data: Arc::new(StructData::new(Vec::default(), Vec::default(), 0, String::default())),
+                    data: Arc::new(StructData::new(Vec::default(), Vec::default(), 0, Span::default(), String::default())),
                 }
             }
         }

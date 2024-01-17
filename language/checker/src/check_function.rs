@@ -98,7 +98,8 @@ pub async fn verify_function_code(
     // Checks the return type exists
     if !code.returns {
         if codeless.return_type.is_none() {
-            code.expressions.push(FinalizedExpression::new(ExpressionType::Return(Span::default()), FinalizedEffects::NOP));
+            code.expressions
+                .push(FinalizedExpression::new(ExpressionType::Return(Span::default()), FinalizedEffectType::NOP));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(codeless.data.span.make_error("Function returns void instead of the correct type!"));
         }

@@ -1,8 +1,8 @@
+use data::tokens::Span;
 use std::mem;
 use std::sync::Arc;
 
-use data::tokens::CodeErrorToken;
-use syntax::code::{Effects, FinalizedEffects};
+use syntax::code::{EffectType, Effects, FinalizedEffects};
 use syntax::operation_util::OperationGetter;
 use syntax::r#struct::StructData;
 use syntax::{Attribute, ParsingError, SimpleVariableManager};
@@ -18,25 +18,16 @@ pub async fn check_operator(
 ) -> Result<FinalizedEffects, ParsingError> {
     let operation;
     let mut values;
-    let token;
-    if let Effects::Operation(new_operation, new_values, new_token) = effect {
+    if let EffectType::Operation(new_operation, new_values) = effect.types {
         operation = new_operation;
         values = new_values;
-        token = new_token
     } else {
         unreachable!()
     }
 
-    let error = ParsingError::new(
-        String::default(),
-        (0, 0),
-        0,
-        (0, 0),
-        0,
-        format!("Failed to find operation {} with {:?}", operation, values),
-    );
+    let error = effect.span.make_error("Failed to find operation!");
     // Check if it's two operations that should be combined, like a list ([])
-    let outer_operation = combine_operation(&operation, &mut values, code_verifier, &token).await?;
+    let outer_operation = combine_operation(&operation, &mut values, code_verifier, &effect.span).await?;
 
     let operation = if let Some(found) = outer_operation {
         found
@@ -46,8 +37,8 @@ pub async fn check_operator(
 
     if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}")
     {
-        if !matches!(values.first().unwrap(), Effects::CreateArray(_)) {
-            let effect = Effects::CreateArray(vec![(values.remove(0), token.clone())]);
+        if !matches!(values.first().unwrap(), EffectType::CreateArray(_)) {
+            let effect = EffectType::CreateArray(vec![values.remove(0)]);
             values.push(effect);
         }
     }
@@ -56,13 +47,16 @@ pub async fn check_operator(
     if values.len() > 0 {
         calling = Box::new(values.remove(0));
     } else {
-        calling = Box::new(Effects::NOP);
+        calling = Box::new(EffectType::NOP);
     }
 
     return verify_effect(
         code_verifier,
         variables,
-        Effects::ImplementationCall(calling, operation.name.clone(), String::default(), values, None, token),
+        EffectType::new(
+            EffectType::ImplementationCall(calling, operation.name.clone(), String::default(), values, None),
+            effect.span.clone(),
+        ),
     )
     .await;
 }
@@ -72,30 +66,23 @@ async fn combine_operation(
     operation: &String,
     values: &mut Vec<Effects>,
     code_verifier: &mut CodeVerifier<'_>,
-    token: &CodeErrorToken,
+    span: &Span,
 ) -> Result<Option<Arc<StructData>>, ParsingError> {
-    let error = ParsingError::new(
-        String::default(),
-        (0, 0),
-        0,
-        (0, 0),
-        0,
-        format!("Failed to find operation {} with {:?}", operation, values),
-    );
+    let error = span.make_error("Failed to find operation");
 
     if values.len() > 0 {
         let mut reading_array = None;
         let mut last = values.pop().unwrap();
-        if let Effects::CreateArray(mut effects) = last {
+        if let EffectType::CreateArray(mut effects) = last {
             if effects.len() > 0 {
                 last = effects.pop().unwrap().0;
                 reading_array = Some(effects);
             } else {
-                last = Effects::CreateArray(vec![]);
+                last = EffectType::CreateArray(vec![]);
             }
         }
 
-        if let Effects::Operation(inner_operation, effects, inner_token) = last {
+        if let EffectType::Operation(inner_operation, effects, inner_token) = last {
             if operation.ends_with("{}") && inner_operation.starts_with("{}") {
                 let combined = operation[0..operation.len() - 2].to_string() + &inner_operation;
                 let new_operation = if operation.starts_with("{}") && inner_operation.ends_with("{}") {
@@ -122,14 +109,14 @@ async fn combine_operation(
 
                     let mut inner_array = false;
                     if let Some(found) = reading_array {
-                        values.push(Effects::CreateArray(found));
+                        values.push(EffectType::CreateArray(found));
                         inner_array = true;
                     }
                     if new_operation.len() >= combined.len() {
                         if inner_array {
-                            if let Effects::CreateArray(last) = values.last_mut().unwrap() {
+                            if let EffectType::CreateArray(last) = values.last_mut().unwrap() {
                                 for effect in effects {
-                                    last.push((effect, token.clone()));
+                                    last.push(effect);
                                 }
                             }
                         } else {
@@ -156,7 +143,7 @@ async fn combine_operation(
                             &inner_data,
                             effects,
                             inner_array,
-                            token.clone(),
+                            span.clone(),
                             inner_token,
                         ));
                     }
@@ -183,21 +170,21 @@ async fn combine_operation(
                             &inner_data,
                             effects,
                             false,
-                            token.clone(),
+                            span.clone(),
                             inner_token,
                         ));
                     }
                 }
             }
-            last = Effects::Operation(inner_operation, effects, inner_token)
+            last = EffectType::Operation(inner_operation, effects, inner_token)
         }
 
         if let Some(mut found) = reading_array {
-            if let (Effects::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
+            if let (EffectType::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
                 inner.push((last, inner_token.clone()));
             } else {
                 let (effect, token) = found.pop().unwrap();
-                found.push((Effects::CreateArray(vec![(effect, token.clone())]), token))
+                found.push((EffectType::CreateArray(vec![(effect, token.clone())]), token))
             }
         } else {
             values.push(last);
@@ -215,8 +202,8 @@ pub fn operator_pratt_parsing(
     inner_data: &Arc<StructData>,
     mut inner_effects: Vec<Effects>,
     inner_array: bool,
-    token: CodeErrorToken,
-    inner_token: CodeErrorToken,
+    token: Span,
+    inner_token: Span,
 ) -> Option<Arc<StructData>> {
     let op_priority = Attribute::find_attribute("priority", &found.attributes)
         .map(|inner| inner.as_int_attribute().unwrap_or(0))
@@ -230,7 +217,7 @@ pub fn operator_pratt_parsing(
 
     return if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
         if inner_array {
-            if let Effects::CreateArray(inner) = values.last_mut().unwrap() {
+            if let EffectType::CreateArray(inner) = values.last_mut().unwrap() {
                 inner.push((inner_effects.remove(0), inner_token));
             } else {
                 panic!("Assumed op args ended with an array when they didn't!")
@@ -240,12 +227,12 @@ pub fn operator_pratt_parsing(
         }
         let mut temp = vec![];
         mem::swap(&mut temp, values);
-        inner_effects.insert(0, Effects::Operation(operation, temp, token));
+        inner_effects.insert(0, EffectType::new(EffectType::Operation(operation, temp), token));
         *values = inner_effects;
 
         Some(inner_data.clone())
     } else {
-        values.push(Effects::Operation(inner_operator, inner_effects, inner_token));
+        values.push(EffectType::new(EffectType::Operation(inner_operator, inner_effects), inner_token));
         Some(found.clone())
     };
 }

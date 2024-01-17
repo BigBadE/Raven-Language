@@ -183,7 +183,7 @@ impl CodelessFinalizedFunction {
     /// Figures out the solidified types by comparing generics against the input effect types,
     /// then replaces all generic types with their solidified types.
     /// This can't always figure out return types, so an optional return type variable is passed as well
-    /// for function calls that include them (see Effects::MethodCall)
+    /// for function calls that include them (see EffectType::MethodCall)
     /// The VariableManager here is for the arguments to the function, and not for the function itself.
     pub async fn degeneric(
         method: Arc<CodelessFinalizedFunction>,

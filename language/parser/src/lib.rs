@@ -2,8 +2,9 @@
 #![feature(let_chains)]
 extern crate core;
 
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -33,7 +34,8 @@ pub async fn parse(syntax: Arc<Mutex<Syntax>>, handle: Arc<Mutex<HandleWrapper>>
         index: 0,
         tokens: file.read(),
         syntax,
-        file: name.clone(),
+        file: file.hash(),
+        file_name: name.clone(),
         imports: ImportNameResolver::new(name.clone()),
         handle,
     };
