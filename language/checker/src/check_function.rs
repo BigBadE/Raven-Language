@@ -5,7 +5,9 @@ use data::tokens::Span;
 use std::sync::Arc;
 use std::sync::Mutex;
 use syntax::async_util::NameResolver;
-use syntax::code::{ExpressionType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField};
+use syntax::code::{
+    ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField,
+};
 use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
@@ -78,10 +80,19 @@ pub async fn verify_function_code(
         let mut output = vec![];
         for bound in bounds {
             output.push(
-                Syntax::parse_type(syntax.clone(), ParsingError::empty(), resolver.boxed_clone(), bound.clone(), vec![])
-                    .await?
-                    .finalize(syntax.clone())
-                    .await,
+                Syntax::parse_type(
+                    syntax.clone(),
+                    ParsingError::new(
+                        Span::default(),
+                        "You shouldn't see this! Report this please! Location: Verify function code",
+                    ),
+                    resolver.boxed_clone(),
+                    bound.clone(),
+                    vec![],
+                )
+                .await?
+                .finalize(syntax.clone())
+                .await,
             )
         }
         process_manager.mut_generics().insert(name.clone(), FinalizedTypes::Generic(name.clone(), output));
@@ -98,8 +109,10 @@ pub async fn verify_function_code(
     // Checks the return type exists
     if !code.returns {
         if codeless.return_type.is_none() {
-            code.expressions
-                .push(FinalizedExpression::new(ExpressionType::Return(Span::default()), FinalizedEffectType::NOP));
+            code.expressions.push(FinalizedExpression::new(
+                ExpressionType::Return(Span::default()),
+                FinalizedEffects::new(Span::default(), FinalizedEffectType::NOP),
+            ));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
             return Err(codeless.data.span.make_error("Function returns void instead of the correct type!"));
         }

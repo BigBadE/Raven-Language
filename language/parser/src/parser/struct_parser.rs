@@ -1,9 +1,8 @@
-use crate::parser::function_parser::parse_function;
-use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
-use crate::parser::util::ParserUtils;
-use data::tokens::{Token, TokenTypes};
-use indexmap::IndexMap;
 use std::sync::Arc;
+
+use indexmap::IndexMap;
+
+use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::code::{Field, MemberField};
 use syntax::function::display_parenless;
@@ -11,6 +10,10 @@ use syntax::r#struct::{get_internal, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
 use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, ParsingFuture, TraitImplementor};
+
+use crate::parser::function_parser::parse_function;
+use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
+use crate::parser::util::ParserUtils;
 
 /// Parses a program
 pub fn parse_structure(
@@ -23,6 +26,7 @@ pub fn parse_structure(
     let mut member_modifiers = Vec::default();
     let mut member_attributes = Vec::default();
 
+    let start = Span::new(parser_utils.file, parser_utils.index);
     let mut name = String::default();
     let mut fields = Vec::default();
     let mut generics = IndexMap::default();
@@ -48,7 +52,7 @@ pub fn parse_structure(
             TokenTypes::InvalidCharacters => {
                 parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
                     format!("{}", parser_utils.file),
-                    token.make_error(parser_utils.file.clone(), "Unexpected top element!".to_string()),
+                    Span::new(parser_utils.file, parser_utils.index).make_error("Unexpected top element!"),
                 )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
@@ -60,11 +64,11 @@ pub fn parse_structure(
                 }
             }
             TokenTypes::FunctionStart => {
-                let file = parser_utils.file.clone();
-                if parser_utils.file.is_empty() {
-                    parser_utils.file = format!("{}", name);
+                let file = parser_utils.file_name.clone();
+                if parser_utils.file_name.is_empty() {
+                    parser_utils.file_name = format!("{}", name);
                 } else {
-                    parser_utils.file = format!("{}::{}", parser_utils.file, name);
+                    parser_utils.file_name = format!("{}::{}", parser_utils.file_name, name);
                 }
                 let function = parse_function(
                     parser_utils,
@@ -72,8 +76,8 @@ pub fn parse_structure(
                     member_attributes,
                     member_modifiers,
                 );
-                functions.push(ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function));
-                parser_utils.file = file;
+                functions.push(ParserUtils::add_function(&parser_utils.syntax, parser_utils.file_name.clone(), function));
+                parser_utils.file_name = file;
                 member_attributes = Vec::default();
                 member_modifiers = Vec::default();
             }
@@ -101,6 +105,7 @@ pub fn parse_structure(
             attributes,
             functions.iter().map(|inner| inner.data.clone()).collect::<Vec<_>>(),
             modifiers,
+            start,
             name,
         ))
     };
@@ -115,7 +120,10 @@ pub fn parse_implementor(
     modifiers: Vec<Modifier>,
 ) -> Result<TraitImplementor, ParsingError> {
     let mut base = None;
+    let mut base_span = None;
     let mut implementor = None;
+    let mut implementor_span = None;
+
     let mut member_attributes = Vec::default();
     let mut member_modifiers = Vec::default();
     let mut functions = Vec::default();
@@ -131,10 +139,12 @@ pub fn parse_implementor(
                 let temp = Some(UnparsedType::Basic(name.clone()));
                 if state == 0 {
                     base = temp;
+                    base_span = Some(Span::new(parser_utils.file, parser_utils.index - 1));
                     state = 1;
                 } else {
                     parser_utils.imports.parent = Some(name);
                     implementor = temp;
+                    implementor_span = Some(Span::new(parser_utils.file, parser_utils.index - 1));
                 }
             }
             TokenTypes::GenericsStart => {
@@ -144,10 +154,12 @@ pub fn parse_implementor(
                     if state == 1 {
                         let found = UnparsedType::Generic(Box::new(base.unwrap()), parse_type_generics(parser_utils)?);
                         base = Some(found);
+                        base_span.as_mut().unwrap().change_token_end(parser_utils.index - 1);
                     } else {
                         let found =
                             UnparsedType::Generic(Box::new(implementor.unwrap()), parse_type_generics(parser_utils)?);
                         implementor = Some(found);
+                        implementor_span.as_mut().unwrap().change_token_end(parser_utils.index - 1);
                     }
                 }
             }
@@ -160,17 +172,18 @@ pub fn parse_implementor(
                 }
             }
             TokenTypes::FunctionStart => {
-                let file = parser_utils.file.clone();
-                if parser_utils.file.is_empty() {
-                    parser_utils.file = format!("{}_{}", base.as_ref().unwrap(), implementor.as_ref().unwrap());
+                let file = parser_utils.file_name.clone();
+                if parser_utils.file_name.is_empty() {
+                    parser_utils.file_name = format!("{}_{}", base.as_ref().unwrap(), implementor.as_ref().unwrap());
                 } else if let Some(implementor) = implementor.as_ref() {
-                    parser_utils.file = format!("{}::{}_{}", parser_utils.file, base.as_ref().unwrap(), implementor);
+                    parser_utils.file_name =
+                        format!("{}::{}_{}", parser_utils.file_name, base.as_ref().unwrap(), implementor);
                 } else {
-                    parser_utils.file = format!("{}::{}", parser_utils.file, base.as_ref().unwrap());
+                    parser_utils.file_name = format!("{}::{}", parser_utils.file_name, base.as_ref().unwrap());
                 }
                 let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
                 functions.push(function?);
-                parser_utils.file = file;
+                parser_utils.file_name = file;
                 member_attributes = Vec::default();
                 member_modifiers = Vec::default();
             }
@@ -187,11 +200,9 @@ pub fn parse_implementor(
         }
     }
 
-    let token = parser_utils.tokens.get(parser_utils.index - 1).unwrap();
-
     let base = Box::pin(Syntax::parse_type(
         parser_utils.syntax.clone(),
-        token.make_error(parser_utils.file.clone(), format!("Failed to find")),
+        base_span.unwrap().make_error("Failed to find type"),
         parser_utils.imports.boxed_clone(),
         base.unwrap(),
         vec![],
@@ -200,7 +211,7 @@ pub fn parse_implementor(
     let implementor = if let Some(implementor) = implementor {
         Some(Syntax::parse_type(
             parser_utils.syntax.clone(),
-            token.make_error(parser_utils.file.clone(), "Failed to find".to_string()),
+            implementor_span.unwrap().make_error("Failed to find type"),
             parser_utils.imports.boxed_clone(),
             implementor,
             vec![],
@@ -277,11 +288,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 unparsed_bounds.push(unparsed.clone());
                 bounds.push(Syntax::parse_type(
                     parser_utils.syntax.clone(),
-                    parser_utils
-                        .tokens
-                        .get(parser_utils.index - 1)
-                        .unwrap()
-                        .make_error(parser_utils.file.clone(), format!("Bounds error!")),
+                    Span::new(parser_utils.file, parser_utils.index - 1).make_error("Bounds error!"),
                     parser_utils.imports.boxed_clone(),
                     unparsed,
                     vec![],
@@ -371,12 +378,12 @@ pub fn parse_field(
 ) -> ParsingFuture<MemberField> {
     let mut types = None;
     while !parser_utils.tokens.is_empty() {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let token = &parser_utils.tokens[parser_utils.index];
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::FieldType => {
                 let name = token.to_string(parser_utils.buffer).clone();
-                types = Some(parser_utils.get_struct(token, name))
+                types = Some(parser_utils.get_struct(&Span::new(parser_utils.file, parser_utils.index - 1), name))
             }
             TokenTypes::FieldSeparator => {}
             TokenTypes::FieldEnd => break,

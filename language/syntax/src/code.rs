@@ -187,6 +187,12 @@ pub struct FinalizedEffects {
     pub span: Span,
 }
 
+impl FinalizedEffects {
+    pub fn new(span: Span, types: FinalizedEffectType) -> Self {
+        return Self { types, span };
+    }
+}
+
 /// Effects that have been finalized and are ready for compilation
 #[derive(Clone, Debug)]
 pub enum FinalizedEffectType {
@@ -434,7 +440,10 @@ impl FinalizedEffectType {
                     syntax: syntax.clone(),
                     return_type: implementor.clone(),
                     data: found_trait.clone(),
-                    error: ParsingError::empty(),
+                    error: ParsingError::new(
+                        Span::default(),
+                        "You shouldn't see this! Report this please! Location: Degeneric generic method call",
+                    ),
                 }
                 .await?;
 

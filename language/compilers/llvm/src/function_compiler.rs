@@ -8,7 +8,7 @@ use std::sync::Arc;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue, FunctionValue};
 
-use syntax::code::{ExpressionType, FinalizedEffects};
+use syntax::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
 use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::types::FinalizedTypes;
 use syntax::{is_modifier, Attribute, Modifier};
@@ -96,7 +96,7 @@ pub fn compile_block<'ctx>(
     for line in &code.expressions {
         match line.expression_type {
             ExpressionType::Return(_) => {
-                if let FinalizedEffectType::CodeBody(body) = &line.effect {
+                if let FinalizedEffectType::CodeBody(body) = &line.effect.types {
                     if !broke {
                         let destination = get_block_or_create(&body.label, function, type_getter);
                         type_getter.compiler.builder.build_unconditional_branch(destination);
@@ -105,7 +105,7 @@ pub fn compile_block<'ctx>(
                     broke = true;
                 }
 
-                if matches!(&line.effect, FinalizedEffectType::NOP) {
+                if matches!(&line.effect.types, FinalizedEffectType::NOP) {
                     if !broke {
                         type_getter.compiler.builder.build_return(None);
                     }
@@ -120,11 +120,11 @@ pub fn compile_block<'ctx>(
             }
             ExpressionType::Line => {
                 if broke {
-                    if matches!(&line.effect, FinalizedEffectType::CodeBody(_)) {
+                    if matches!(&line.effect.types, FinalizedEffectType::CodeBody(_)) {
                         compile_effect(type_getter, function, &line.effect, id);
                     }
                 } else {
-                    match &line.effect {
+                    match &line.effect.types {
                         FinalizedEffectType::CodeBody(body) => {
                             let destination = get_block_or_create(&body.label, function, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(destination);
@@ -170,7 +170,7 @@ pub fn compile_effect<'ctx>(
     effect: &FinalizedEffects,
     id: &mut u64,
 ) -> Option<BasicValueEnum<'ctx>> {
-    return match effect {
+    return match &effect.types {
         FinalizedEffectType::NOP => {
             panic!("Tried to compile a NOP! For {}", function.get_name().to_str().unwrap())
         }
@@ -262,7 +262,7 @@ pub fn compile_effect<'ctx>(
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             //Compensate for type id
             let mut offset = 1;
-            for struct_field in &loading_from.get_return(type_getter).unwrap().inner_struct().fields {
+            for struct_field in &loading_from.types.get_return(type_getter).unwrap().inner_struct().fields {
                 if &struct_field.field.name != field {
                     offset += 1;
                 } else {
@@ -539,7 +539,7 @@ pub fn compile_effect<'ctx>(
                 .left()
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
-            let found = base.get_return(type_getter).unwrap();
+            let found = base.types.get_return(type_getter).unwrap();
             if is_modifier(found.inner_struct().data.modifiers, Modifier::Trait) {
                 if !target.eq(&found) {
                     panic!("Downcasting to a trait that doesn't match! Not implemented yet!")
@@ -570,7 +570,7 @@ pub fn compile_effect<'ctx>(
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
-        FinalizedEffectType::GenericVirtualCall(_, _, _, _, _) => {
+        FinalizedEffectType::GenericVirtualCall(_, _, _, _) => {
             panic!("Generic virtual call not degeneric'd!")
         }
     };

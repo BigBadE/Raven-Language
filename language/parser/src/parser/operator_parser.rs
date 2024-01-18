@@ -53,18 +53,21 @@ pub fn parse_operator(
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             next_element_token.change_token_end(parser_utils.index);
             if let Some(next_element) = next {
-                if matches!(next_element, EffectType::NOP) {
+                if matches!(next_element.types, EffectType::NOP) {
                     break;
                 }
-                right = match right.unwrap() {
+                right = match right.unwrap().types {
                     EffectType::CreateArray(mut inner) => {
-                        inner.push((next_element, next_element_token));
-                        Some(EffectType::CreateArray(inner))
+                        inner.push(next_element);
+                        Some(Effects::new(next_element_token, EffectType::CreateArray(inner)))
                     }
-                    first_element => Some(EffectType::CreateArray(vec![
-                        (first_element, first_element_token.clone()),
-                        (next_element, next_element_token),
-                    ])),
+                    first_element => Some(Effects::new(
+                        next_element_token,
+                        EffectType::CreateArray(vec![
+                            Effects::new(first_element_token.clone(), first_element),
+                            next_element,
+                        ]),
+                    )),
                 };
             } else {
                 break;
@@ -72,10 +75,13 @@ pub fn parse_operator(
         }
 
         if let Some(inner) = &right {
-            if matches!(*inner, EffectType::NOP) {
+            if matches!(inner.types, EffectType::NOP) {
                 parser_utils.index = index;
                 parser_utils.tokens.truncate(tokens);
-                return Ok(EffectType::Operation(operation, effects, Span::new(parser_utils.file, parser_utils.index)));
+                return Ok(Effects::new(
+                    Span::new(parser_utils.file, parser_utils.index),
+                    EffectType::Operation(operation, effects),
+                ));
             } else {
                 operation += "{}";
             }

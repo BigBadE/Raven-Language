@@ -100,7 +100,8 @@ impl Hash for FilePath {
 
 impl Readable for FilePath {
     fn read(&self) -> Vec<Token> {
-        let mut tokenizer = Tokenizer::new(self.contents().as_bytes());
+        let binding = self.contents();
+        let mut tokenizer = Tokenizer::new(binding.as_bytes());
         let mut tokens = Vec::default();
         loop {
             tokens.push(tokenizer.next());
@@ -113,16 +114,17 @@ impl Readable for FilePath {
     }
 
     fn contents(&self) -> String {
-        fs::read_to_string(self.clone()).unwrap_or_else(|_| panic!("Failed to read source file: {}", self.to_str().unwrap()))
+        fs::read_to_string(&self.path.clone())
+            .unwrap_or_else(|_| panic!("Failed to read source file: {}", self.path.to_str().unwrap()))
     }
 
     fn path(&self) -> String {
-        return self.to_str().unwrap().to_string();
+        return self.path.to_str().unwrap().to_string();
     }
 
     fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
+        Hash::hash(&self, &mut hasher);
         return hasher.finish();
     }
 }

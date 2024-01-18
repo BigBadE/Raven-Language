@@ -37,9 +37,11 @@ pub async fn check_operator(
 
     if Attribute::find_attribute("operation", &operation.attributes).unwrap().as_string_attribute().unwrap().contains("{+}")
     {
-        if !matches!(values.first().unwrap(), EffectType::CreateArray(_)) {
-            let effect = EffectType::CreateArray(vec![values.remove(0)]);
-            values.push(effect);
+        if !matches!(values.first().unwrap().types, EffectType::CreateArray(_)) {
+            let first = values.remove(0);
+            let span = first.span.clone();
+            let effect = EffectType::CreateArray(vec![first]);
+            values.push(Effects::new(span, effect));
         }
     }
 
@@ -47,15 +49,15 @@ pub async fn check_operator(
     if values.len() > 0 {
         calling = Box::new(values.remove(0));
     } else {
-        calling = Box::new(EffectType::NOP);
+        calling = Box::new(Effects::new(Span::default(), EffectType::NOP));
     }
 
     return verify_effect(
         code_verifier,
         variables,
-        EffectType::new(
-            EffectType::ImplementationCall(calling, operation.name.clone(), String::default(), values, None),
+        Effects::new(
             effect.span.clone(),
+            EffectType::ImplementationCall(calling, operation.name.clone(), String::default(), values, None),
         ),
     )
     .await;
@@ -73,16 +75,16 @@ async fn combine_operation(
     if values.len() > 0 {
         let mut reading_array = None;
         let mut last = values.pop().unwrap();
-        if let EffectType::CreateArray(mut effects) = last {
+        if let EffectType::CreateArray(mut effects) = last.types {
             if effects.len() > 0 {
-                last = effects.pop().unwrap().0;
+                last = effects.pop().unwrap();
                 reading_array = Some(effects);
             } else {
-                last = EffectType::CreateArray(vec![]);
+                last = Effects::new(span.clone(), EffectType::CreateArray(vec![]));
             }
         }
 
-        if let EffectType::Operation(inner_operation, effects, inner_token) = last {
+        if let EffectType::Operation(inner_operation, effects) = last.types {
             if operation.ends_with("{}") && inner_operation.starts_with("{}") {
                 let combined = operation[0..operation.len() - 2].to_string() + &inner_operation;
                 let new_operation = if operation.starts_with("{}") && inner_operation.ends_with("{}") {
@@ -109,12 +111,12 @@ async fn combine_operation(
 
                     let mut inner_array = false;
                     if let Some(found) = reading_array {
-                        values.push(EffectType::CreateArray(found));
+                        values.push(Effects::new(last.span.clone(), EffectType::CreateArray(found)));
                         inner_array = true;
                     }
-                    if new_operation.len() >= combined.len() {
+                    return if new_operation.len() >= combined.len() {
                         if inner_array {
-                            if let EffectType::CreateArray(last) = values.last_mut().unwrap() {
+                            if let EffectType::CreateArray(last) = &mut values.last_mut().unwrap().types {
                                 for effect in effects {
                                     last.push(effect);
                                 }
@@ -124,7 +126,7 @@ async fn combine_operation(
                                 values.push(effect);
                             }
                         }
-                        return Ok(Some(found));
+                        Ok(Some(found))
                     } else {
                         let new_inner = "{}".to_string() + &combined[new_operation.replace("{+}", "{}").len()..];
 
@@ -135,7 +137,7 @@ async fn combine_operation(
                         }
                         .await?;
 
-                        return Ok(operator_pratt_parsing(
+                        Ok(operator_pratt_parsing(
                             new_operation.clone(),
                             &found,
                             values,
@@ -144,9 +146,9 @@ async fn combine_operation(
                             effects,
                             inner_array,
                             span.clone(),
-                            inner_token,
-                        ));
-                    }
+                            last.span.clone(),
+                        ))
+                    };
                 } else {
                     if reading_array.is_none() {
                         let outer_data = OperationGetter {
@@ -171,20 +173,20 @@ async fn combine_operation(
                             effects,
                             false,
                             span.clone(),
-                            inner_token,
+                            last.span.clone(),
                         ));
                     }
                 }
             }
-            last = EffectType::Operation(inner_operation, effects, inner_token)
+            last = Effects::new(last.span.clone(), EffectType::Operation(inner_operation, effects))
         }
 
         if let Some(mut found) = reading_array {
-            if let (EffectType::CreateArray(inner), inner_token) = found.last_mut().unwrap() {
-                inner.push((last, inner_token.clone()));
+            if let EffectType::CreateArray(inner) = &mut found.last_mut().unwrap().types {
+                inner.push(last);
             } else {
-                let (effect, token) = found.pop().unwrap();
-                found.push((EffectType::CreateArray(vec![(effect, token.clone())]), token))
+                let effect = found.pop().unwrap();
+                found.push(Effects::new(effect.span.clone(), EffectType::CreateArray(vec![effect])))
             }
         } else {
             values.push(last);
@@ -217,8 +219,8 @@ pub fn operator_pratt_parsing(
 
     return if lhs_priority < op_priority || (!op_parse_left && lhs_priority == op_priority) {
         if inner_array {
-            if let EffectType::CreateArray(inner) = values.last_mut().unwrap() {
-                inner.push((inner_effects.remove(0), inner_token));
+            if let EffectType::CreateArray(inner) = &mut values.last_mut().unwrap().types {
+                inner.push(inner_effects.remove(0));
             } else {
                 panic!("Assumed op args ended with an array when they didn't!")
             }
@@ -227,12 +229,12 @@ pub fn operator_pratt_parsing(
         }
         let mut temp = vec![];
         mem::swap(&mut temp, values);
-        inner_effects.insert(0, EffectType::new(EffectType::Operation(operation, temp), token));
+        inner_effects.insert(0, Effects::new(token, EffectType::Operation(operation, temp)));
         *values = inner_effects;
 
         Some(inner_data.clone())
     } else {
-        values.push(EffectType::new(EffectType::Operation(inner_operator, inner_effects), inner_token));
+        values.push(Effects::new(inner_token, EffectType::Operation(inner_operator, inner_effects)));
         Some(found.clone())
     };
 }

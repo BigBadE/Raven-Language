@@ -14,7 +14,7 @@ use syntax::{
 use std::sync::Mutex;
 
 use crate::ImportNameResolver;
-use data::tokens::{Token, TokenTypes};
+use data::tokens::{Span, Token, TokenTypes};
 
 /// A struct containing the data needed for parsing
 pub struct ParserUtils<'a> {
@@ -38,7 +38,7 @@ pub struct ParserUtils<'a> {
 
 impl<'a> ParserUtils<'a> {
     /// Returns a future for getting a struct given its name
-    pub fn get_struct(&self, token: &Token, name: String) -> ParsingFuture<Types> {
+    pub fn get_struct(&self, span: &Span, name: String) -> ParsingFuture<Types> {
         if name.is_empty() {
             panic!("Empty name!");
         }
@@ -47,7 +47,7 @@ impl<'a> ParserUtils<'a> {
 
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(),
-            token.make_error(self.file.clone(), format!("Failed to find type named {}", &name)),
+            span.make_error("Failed to find type!"),
             name,
             Box::new(self.imports.clone()),
             vec![],
@@ -55,7 +55,7 @@ impl<'a> ParserUtils<'a> {
     }
 
     /// Adds a struct to the syntax
-    pub fn add_struct(&mut self, token: Token, structure: Result<UnfinalizedStruct, ParsingError>) {
+    pub fn add_struct(&mut self, span: &Span, structure: Result<UnfinalizedStruct, ParsingError>) {
         let structure = structure.unwrap_or_else(|error| UnfinalizedStruct {
             generics: IndexMap::default(),
             fields: Vec::default(),
@@ -63,11 +63,7 @@ impl<'a> ParserUtils<'a> {
             data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
         });
 
-        Syntax::add::<StructData>(
-            &self.syntax,
-            token.make_error(self.file.clone(), format!("Duplicate program {}", structure.data.name)),
-            structure.data(),
-        );
+        Syntax::add::<StructData>(&self.syntax, span.make_error("Duplicate structure"), structure.data());
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
         self.handle.lock().unwrap().spawn(
@@ -237,7 +233,10 @@ pub fn parse_generics(input: String, parser_utils: &mut ParserUtils) -> (Unparse
                     UnparsedType::Basic(token.to_string(parser_utils.buffer)),
                     Box::pin(Syntax::get_struct(
                         parser_utils.syntax.clone(),
-                        token.make_error(parser_utils.file.clone(), format!("")),
+                        ParsingError::new(
+                            Span::default(),
+                            "You shouldn't see this! Report this please! Location: Parse generics",
+                        ),
                         token.to_string(parser_utils.buffer),
                         Box::new(parser_utils.imports.clone()),
                         vec![],
@@ -303,7 +302,10 @@ fn inner_generic(
                     UnparsedType::Basic(token.to_string(parser_utils.buffer)),
                     Box::pin(Syntax::get_struct(
                         parser_utils.syntax.clone(),
-                        token.make_error(parser_utils.file.clone(), format!("Idk here")),
+                        ParsingError::new(
+                            Span::default(),
+                            "You shouldn't see this! Report this please! Location: Inner generics",
+                        ),
                         token.to_string(parser_utils.buffer),
                         Box::new(parser_utils.imports.clone()),
                         vec![],

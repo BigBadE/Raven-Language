@@ -55,7 +55,7 @@ async fn check_return_type(
 ) -> Result<bool, ParsingError> {
     let span = match &line {
         ExpressionType::Return(span) => span.clone(),
-        _ => Ok(false),
+        _ => return Ok(false),
     };
 
     let return_type = match code_verifier.return_type.as_ref() {
@@ -65,7 +65,7 @@ async fn check_return_type(
 
     let last = body.pop().unwrap();
     let last_type;
-    if let Some(found) = last.effect.get_return(variables) {
+    if let Some(found) = last.effect.types.get_return(variables) {
         last_type = found;
     } else {
         // This is an if/for/while block, skip it
@@ -83,13 +83,19 @@ async fn check_return_type(
             syntax: code_verifier.syntax.clone(),
             return_type: last_type.clone(),
             data: return_type.clone(),
-            error: ParsingError::empty(),
+            error: ParsingError::new(
+                Span::default(),
+                "You shouldn't see this! Report this please! Location: Return type check",
+            ),
         }
         .await?;
 
         body.push(FinalizedExpression::new(
             line,
-            FinalizedEffectType::Downcast(Box::new(last.effect), return_type.clone(), value),
+            FinalizedEffects::new(
+                Span::default(),
+                FinalizedEffectType::Downcast(Box::new(last.effect), return_type.clone(), value),
+            ),
         ));
         Ok(true)
     } else {
@@ -112,51 +118,59 @@ pub async fn verify_effect(
 
     let output = match effect.types {
         EffectType::Paren(inner) => verify_effect(code_verifier, variables, *inner).await?,
-        EffectType::CodeBody(body) => {
-            FinalizedEffectType::CodeBody(verify_code(code_verifier, &mut variables.clone(), body, false).await?)
-        }
-        EffectType::Set(first, second) => FinalizedEffectType::Set(
-            Box::new(verify_effect(code_verifier, variables, *first).await?),
-            Box::new(verify_effect(code_verifier, variables, *second).await?),
+        EffectType::CodeBody(body) => FinalizedEffects::new(
+            effect.span.clone(),
+            FinalizedEffectType::CodeBody(verify_code(code_verifier, &mut variables.clone(), body, false).await?),
         ),
-        EffectType::Operation(_, _, _) => check_operator(code_verifier, variables, effect).await?,
-        EffectType::ImplementationCall(_, _, _, _, _, _) => check_impl_call(code_verifier, variables, effect).await?,
-        EffectType::MethodCall(_, _, _, _, _) => check_method_call(code_verifier, variables, effect).await?,
-        EffectType::CompareJump(effect, first, second) => FinalizedEffectType::CompareJump(
-            Box::new(verify_effect(code_verifier, variables, *effect).await?),
-            first,
-            second,
+        EffectType::Set(first, second) => FinalizedEffects::new(
+            effect.span.clone(),
+            FinalizedEffectType::Set(
+                Box::new(verify_effect(code_verifier, variables, *first).await?),
+                Box::new(verify_effect(code_verifier, variables, *second).await?),
+            ),
         ),
-        EffectType::CreateStruct(target, effects, _) => {
-            verify_create_struct(code_verifier, target, effects, variables).await?
-        }
-        EffectType::Load(effect, target) => {
-            let output = verify_effect(code_verifier, variables, *effect).await?;
+        EffectType::Operation(_, _) => check_operator(code_verifier, variables, effect).await?,
+        EffectType::ImplementationCall(_, _, _, _, _) => check_impl_call(code_verifier, variables, effect).await?,
+        EffectType::MethodCall(_, _, _, _) => check_method_call(code_verifier, variables, effect).await?,
+        EffectType::CompareJump(effect, first, second) => FinalizedEffects::new(
+            effect.span.clone(),
+            FinalizedEffectType::CompareJump(
+                Box::new(verify_effect(code_verifier, variables, *effect).await?),
+                first,
+                second,
+            ),
+        ),
+        EffectType::CreateStruct(target, effects) => verify_create_struct(code_verifier, target, effects, variables).await?,
+        EffectType::Load(inner_effect, target) => {
+            let output = verify_effect(code_verifier, variables, *inner_effect).await?;
 
-            let types = output.get_return(variables).unwrap().inner_struct().clone();
-            FinalizedEffectType::Load(Box::new(output), target.clone(), types)
+            let types = output.types.get_return(variables).unwrap().inner_struct().clone();
+            FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::Load(Box::new(output), target.clone(), types))
         }
-        EffectType::CreateVariable(name, effect, token) => {
-            let effect = verify_effect(code_verifier, variables, *effect).await?;
+        EffectType::CreateVariable(name, inner_effect) => {
+            let effect = verify_effect(code_verifier, variables, *inner_effect).await?;
             let found;
-            if let Some(temp_found) = effect.get_return(variables) {
+            if let Some(temp_found) = effect.types.get_return(variables) {
                 found = temp_found;
             } else {
-                return Err(token.make_error("No return type!".to_string()));
+                return Err(effect.span.make_error("No return type!"));
             };
             variables.variables.insert(name.clone(), found.clone());
-            FinalizedEffectType::CreateVariable(name.clone(), Box::new(effect), found)
+            FinalizedEffects::new(
+                effect.span.clone(),
+                FinalizedEffectType::CreateVariable(name.clone(), Box::new(effect), found),
+            )
         }
         EffectType::CreateArray(effects) => {
             let mut output = Vec::default();
-            for (effect, _) in effects {
+            for effect in effects {
                 output.push(verify_effect(code_verifier, variables, effect).await?);
             }
 
-            let types = output.first().map(|found| found.get_return(variables).unwrap());
+            let types = output.first().map(|found| found.types.get_return(variables).unwrap());
             check_type(&types, &output, variables, code_verifier, &effect.span).await?;
 
-            store(FinalizedEffectType::CreateArray(types, output))
+            FinalizedEffects::new(effect.span.clone(), store(FinalizedEffectType::CreateArray(types, output)))
         }
         _ => unreachable!(),
     };
@@ -165,18 +179,21 @@ pub async fn verify_effect(
 
 /// Separately handles a few basic effects to declutter the main function
 async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
-    return Some(match effects {
-        EffectType::NOP => panic!("Tried to compile a NOP!"),
-        EffectType::Jump(jumping) => FinalizedEffectType::Jump(jumping.clone()),
-        EffectType::LoadVariable(variable) => FinalizedEffectType::LoadVariable(variable.clone()),
-        EffectType::Float(float) => store(FinalizedEffectType::Float(*float)),
-        EffectType::Int(int) => store(FinalizedEffectType::UInt(*int as u64)),
-        EffectType::UInt(uint) => store(FinalizedEffectType::UInt(*uint)),
-        EffectType::Bool(bool) => store(FinalizedEffectType::Bool(*bool)),
-        EffectType::String(string) => store(FinalizedEffectType::String(string.clone())),
-        EffectType::Char(char) => store(FinalizedEffectType::Char(*char)),
-        _ => return None,
-    });
+    return Some(FinalizedEffects::new(
+        effects.span.clone(),
+        match &effects.types {
+            EffectType::NOP => panic!("Tried to compile a NOP!"),
+            EffectType::Jump(jumping) => FinalizedEffectType::Jump(jumping.clone()),
+            EffectType::LoadVariable(variable) => FinalizedEffectType::LoadVariable(variable.clone()),
+            EffectType::Float(float) => store(FinalizedEffectType::Float(*float)),
+            EffectType::Int(int) => store(FinalizedEffectType::UInt(*int as u64)),
+            EffectType::UInt(uint) => store(FinalizedEffectType::UInt(*uint)),
+            EffectType::Bool(bool) => store(FinalizedEffectType::Bool(*bool)),
+            EffectType::String(string) => store(FinalizedEffectType::String(string.clone())),
+            EffectType::Char(char) => store(FinalizedEffectType::Char(*char)),
+            _ => return None,
+        },
+    ));
 }
 
 /// Verifies a CreateStruct call
@@ -188,7 +205,7 @@ async fn verify_create_struct(
 ) -> Result<FinalizedEffects, ParsingError> {
     let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
-        ParsingError::empty(),
+        ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Verify create struct"),
         code_verifier.resolver.boxed_clone(),
         target,
         vec![],
@@ -206,7 +223,7 @@ async fn verify_create_struct(
         }
     }
 
-    target.degeneric(&generics, &code_verifier.syntax).await?;
+    target.degeneric(&generics, &code_verifier.syntax).await;
     let mut final_effects = vec![];
     for (field_name, effect) in effects {
         let mut i = 0;
@@ -225,10 +242,13 @@ async fn verify_create_struct(
         final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));
     }
 
-    return Ok(FinalizedEffectType::CreateStruct(
-        Some(Box::new(FinalizedEffectType::HeapAllocate(target.clone()))),
-        target,
-        final_effects,
+    return Ok(FinalizedEffects::new(
+        Span::default(),
+        FinalizedEffectType::CreateStruct(
+            Some(Box::new(FinalizedEffects::new(Span::default(), FinalizedEffectType::HeapAllocate(target.clone())))),
+            target,
+            final_effects,
+        ),
     ));
 }
 
@@ -242,7 +262,7 @@ async fn check_type(
 ) -> Result<(), ParsingError> {
     if let Some(found) = types {
         for checking in output {
-            let returning = checking.get_return(variables).unwrap();
+            let returning = checking.types.get_return(variables).unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
                 return Err(span.make_error("Incorrect types!"));
             }
@@ -252,6 +272,6 @@ async fn check_type(
 }
 
 /// Shorthand for storing an effect on the heap
-fn store(effect: FinalizedEffects) -> FinalizedEffects {
-    return FinalizedEffectType::HeapStore(Box::new(effect));
+fn store(effect: FinalizedEffectType) -> FinalizedEffectType {
+    return FinalizedEffectType::HeapStore(Box::new(FinalizedEffects::new(Span::default(), effect)));
 }

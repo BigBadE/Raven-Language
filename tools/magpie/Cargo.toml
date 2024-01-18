@@ -13,6 +13,7 @@ harness = false
 [dependencies]
 runner = { path = "../../language/runner" }
 data = { path = "../../language/data" }
+parser = { path = "../../language/parser" }
 
 magpie-derive = { path = "../magpie-derive" }
 

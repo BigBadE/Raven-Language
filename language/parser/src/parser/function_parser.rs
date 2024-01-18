@@ -36,7 +36,7 @@ pub fn parse_function(
         let token = &parser_utils.tokens[parser_utils.index];
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Identifier => name = parser_utils.file.clone() + "::" + &*token.to_string(parser_utils.buffer),
+            TokenTypes::Identifier => name = parser_utils.file_name.clone() + "::" + &*token.to_string(parser_utils.buffer),
             TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
             TokenTypes::ArgumentsStart | TokenTypes::ArgumentSeparator | TokenTypes::ArgumentTypeSeparator => {}
             TokenTypes::ArgumentName => last_arg = token.to_string(parser_utils.buffer),
@@ -48,14 +48,17 @@ pub fn parse_function(
                     }
 
                     fields.push(Box::pin(to_field(
-                        parser_utils.get_struct(token, parser_utils.imports.parent.as_ref().unwrap().clone()),
+                        parser_utils.get_struct(
+                            &Span::new(parser_utils.file, parser_utils.index - 1),
+                            parser_utils.imports.parent.as_ref().unwrap().clone(),
+                        ),
                         Vec::default(),
                         0,
                         last_arg,
                     )));
                 } else {
                     fields.push(Box::pin(to_field(
-                        parser_utils.get_struct(token, last_arg_type),
+                        parser_utils.get_struct(&Span::new(parser_utils.file, parser_utils.index - 1), last_arg_type),
                         Vec::default(),
                         0,
                         last_arg,
@@ -67,7 +70,7 @@ pub fn parse_function(
             TokenTypes::ArgumentsEnd | TokenTypes::ReturnTypeArrow => {}
             TokenTypes::ReturnType => {
                 let ret_name = token.to_string(parser_utils.buffer).clone();
-                return_type = Some(parser_utils.get_struct(token, ret_name))
+                return_type = Some(parser_utils.get_struct(&Span::new(parser_utils.file, parser_utils.index - 1), ret_name))
             }
             TokenTypes::CodeStart => {
                 code = Some(parse_code(parser_utils)?.1);
@@ -99,7 +102,7 @@ pub fn parse_function(
         for bound in generic {
             bounds.push(Syntax::parse_type(
                 parser_utils.syntax.clone(),
-                ParsingError::empty(),
+                ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Parse function"),
                 parser_utils.imports.boxed_clone(),
                 bound.clone(),
                 vec![],

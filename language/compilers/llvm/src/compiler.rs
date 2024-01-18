@@ -8,6 +8,7 @@ use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
 
+use data::tokens::Span;
 use data::CompilerArguments;
 use syntax::async_util::EmptyNameResolver;
 use syntax::function::FinalizedFunction;
@@ -57,7 +58,7 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) -> bool {
         match Syntax::get_function(
             syntax.clone(),
-            ParsingError::empty(),
+            ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: compile"),
             arguments.target.clone(),
             Box::new(EmptyNameResolver {}),
             false,

@@ -75,7 +75,7 @@ impl RunnerSettings {
 }
 
 /// A readable type
-pub trait Readable {
+pub trait Readable: Send {
     /// Reads the readable to a list of tokens
     fn read(&self) -> Vec<Token>;
 
@@ -110,11 +110,6 @@ pub struct ParsingError {
 }
 
 impl ParsingError {
-    /// An empty error, used for places where errors are ignored
-    pub fn empty() -> Self {
-        return ParsingError { span: Span::default(), message: "You shouldn't see this! Report this please!" };
-    }
-
     /// Creates a new error
     pub fn new(span: Span, message: &'static str) -> Self {
         return Self { span, message };
@@ -144,6 +139,16 @@ impl ParsingError {
             let end = &tokens[self.span.end];
             token.end = end.end;
             token.end_offset = token.end_offset;
+        }
+
+        // Multi-line tokens aren't supported, set the end to the start
+        if token.start.0 != token.end.0 {
+            token.start_offset = token.end_offset - token.end.1 as usize;
+            token.start = (token.end.0, 0);
+        }
+
+        if token.end_offset == token.start_offset {
+            token.start_offset -= 1;
         }
 
         let line = contents.lines().nth((token.start.0 as usize).max(1) - 1).unwrap_or("???");

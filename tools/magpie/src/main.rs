@@ -1,10 +1,15 @@
 use core::fmt::Debug;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::{env, path};
 
 use include_dir::{include_dir, Dir, DirEntry, File};
 
-use data::{Arguments, CompilerArguments, FileSourceSet, ParsingError, RavenExtern, Readable, RunnerSettings, SourceSet};
+use data::tokens::{Token, TokenTypes};
+use data::{Arguments, CompilerArguments, ParsingError, RavenExtern, Readable, RunnerSettings, SourceSet};
+use parser::tokens::tokenizer::Tokenizer;
+use parser::FileSourceSet;
 
 use crate::project::RavenProject;
 
@@ -183,11 +188,31 @@ fn read_recursive(base: &Dir<'static>, output: &mut Vec<Box<dyn Readable>>) {
 }
 
 impl Readable for FileWrapper {
-    fn read(&self) -> String {
+    fn read(&self) -> Vec<Token> {
+        let binding = self.contents();
+        let mut tokenizer = Tokenizer::new(binding.as_bytes());
+        let mut tokens = Vec::default();
+        loop {
+            tokens.push(tokenizer.next());
+            if tokens.last().unwrap().token_type == TokenTypes::EOF {
+                break;
+            }
+        }
+
+        return tokens;
+    }
+
+    fn contents(&self) -> String {
         return self.file.contents_utf8().unwrap().to_string();
     }
 
     fn path(&self) -> String {
         return self.file.path().to_str().unwrap().to_string();
+    }
+
+    fn hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        Hash::hash(&self.path(), &mut hasher);
+        return hasher.finish();
     }
 }

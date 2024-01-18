@@ -1,7 +1,7 @@
 use crate::parser::function_parser::parse_function;
 use crate::parser::struct_parser::{parse_implementor, parse_structure};
 use crate::parser::util::ParserUtils;
-use data::tokens::{Token, TokenTypes};
+use data::tokens::{Span, Token, TokenTypes};
 use std::sync::Arc;
 use syntax::async_util::NameResolver;
 use syntax::function::FunctionData;
@@ -20,7 +20,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::InvalidCharacters => {
                 parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
                     format!("${}", parser_utils.file),
-                    token.make_error(parser_utils.file.clone(), "Invalid top element!".to_string()),
+                    Span::new(parser_utils.file, parser_utils.index - 1).make_error("Invalid top element!"),
                 )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
@@ -28,7 +28,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, false, attributes, modifiers);
-                let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file.clone(), function);
+                let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file_name.clone(), function);
                 let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
                 parser_utils.handle.lock().unwrap().spawn(
                     function.data.name.clone(),
@@ -45,16 +45,16 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 modifiers = vec![];
             }
             TokenTypes::StructStart => {
-                let token = token.clone();
+                let span = Span::new(parser_utils.file, parser_utils.index - 1);
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                parser_utils.add_struct(token, structure);
+                parser_utils.add_struct(&span, structure);
                 attributes = vec![];
                 modifiers = vec![];
             }
             TokenTypes::TraitStart => {
+                let span = Span::new(parser_utils.file, parser_utils.index - 1);
                 if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern) {
-                    let error =
-                        token.make_error(parser_utils.file.clone(), "Traits can't be internal/external!".to_string());
+                    let error = span.make_error("Traits can't be internal/external!");
                     drop(parse_structure(parser_utils, attributes, modifiers));
                     parser_utils
                         .syntax
@@ -64,9 +64,8 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                     break;
                 }
                 modifiers.push(Modifier::Trait);
-                let token = token.clone();
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                parser_utils.add_struct(token, structure);
+                parser_utils.add_struct(&span, structure);
                 attributes = Vec::default();
                 modifiers = Vec::default();
             }

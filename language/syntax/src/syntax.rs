@@ -20,6 +20,7 @@ use tokio::sync::mpsc::Receiver;
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 // Re-export main
+use data::tokens::Span;
 pub use data::Main;
 
 use crate::async_util::{AsyncStructImplGetter, AsyncTypesGetter, NameResolver, UnparsedType};
@@ -293,9 +294,7 @@ impl Syntax {
                 if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
                     name.replace("{+}", "{}").clone()
                 } else {
-                    let mut error = ParsingError::empty();
-                    error.message = "Expected a string with attribute operator!";
-                    locked.errors.push(error);
+                    locked.errors.push(ParsingError::new(Span::default(), "Expected a string with the attribute operator!"));
                     return;
                 };
 

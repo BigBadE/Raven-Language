@@ -4,7 +4,7 @@ use crate::CodeVerifier;
 use data::tokens::Span;
 use std::mem;
 use syntax::async_util::{AsyncDataGetter, UnparsedType};
-use syntax::code::{degeneric_header, EffectType, Effects, FinalizedEffects};
+use syntax::code::{degeneric_header, EffectType, Effects, FinalizedEffectType, FinalizedEffects};
 use syntax::function::CodelessFinalizedFunction;
 use syntax::r#struct::VOID;
 use syntax::syntax::Syntax;
@@ -37,18 +37,18 @@ pub async fn check_impl_call(
     }
 
     let mut finding_return_type;
-    if matches!(*calling, EffectType::NOP) {
+    if matches!(calling.types, EffectType::NOP) {
         finding_return_type = FinalizedTypes::Struct(VOID.clone());
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
-        finding_return_type = found.get_return(variables).unwrap();
+        finding_return_type = found.types.get_return(variables).unwrap();
         finding_return_type.fix_generics(code_verifier.process_manager, &code_verifier.syntax).await?;
         finalized_effects.insert(0, found);
     }
 
     if let Ok(inner) = Syntax::get_struct(
         code_verifier.syntax.clone(),
-        ParsingError::empty(),
+        ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Check impl call"),
         traits.clone(),
         code_verifier.resolver.boxed_clone(),
         vec![],
@@ -117,7 +117,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
                     None,
                 )
                 .await?;
-                return Ok(Some(FinalizedEffectType::VirtualCall(i, output, temp)));
+                return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp))));
             } else if found.name.split("::").last().unwrap() == data.method {
                 let mut target = data.finding_return_type.find_method(&data.method).unwrap();
                 if target.len() > 1 {
@@ -127,16 +127,18 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
                 }
                 let (_, target) = target.pop().unwrap();
 
-                let return_type = data.finalized_effects[0].get_return(data.variables).unwrap();
+                let return_type = data.finalized_effects[0].types.get_return(data.variables).unwrap();
                 if matches!(return_type, FinalizedTypes::Generic(_, _)) {
                     let mut temp = vec![];
                     mem::swap(&mut temp, data.finalized_effects);
-                    return Ok(Some(FinalizedEffectType::GenericVirtualCall(
-                        i,
-                        target,
-                        AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
-                        temp,
-                        token,
+                    return Ok(Some(FinalizedEffects::new(
+                        token.clone(),
+                        FinalizedEffectType::GenericVirtualCall(
+                            i,
+                            target,
+                            AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
+                            temp,
+                        ),
                     )));
                 }
 
@@ -166,7 +168,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
                     None,
                 )
                 .await?;
-                return Ok(Some(FinalizedEffectType::VirtualCall(i, output, temp)));
+                return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp))));
             }
             i += 1;
         }

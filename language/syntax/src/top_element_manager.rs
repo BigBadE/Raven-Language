@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
 
+use data::tokens::Span;
 use data::ParsingError;
 
 use crate::async_util::NameResolver;
@@ -135,7 +136,10 @@ pub async fn find_trait_implementation(
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(
             syntax.clone(),
-            ParsingError::empty(),
+            ParsingError::new(
+                Span::default(),
+                "You shouldn't see this! Report this please! Location: Find trait implementation",
+            ),
             import.split("::").last().unwrap().to_string(),
             resolver.boxed_clone(),
             vec![],
