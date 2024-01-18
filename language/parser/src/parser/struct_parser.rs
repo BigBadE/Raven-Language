@@ -51,7 +51,7 @@ pub fn parse_structure(
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::InvalidCharacters => {
                 parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
-                    format!("{}", parser_utils.file),
+                    format!("{}", parser_utils.file_name),
                     Span::new(parser_utils.file, parser_utils.index).make_error("Unexpected top element!"),
                 )))
             }
@@ -100,7 +100,7 @@ pub fn parse_structure(
     let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Trait) {
         get_internal(name)
     } else {
-        let name = format!("{}::{}", parser_utils.file, name);
+        let name = format!("{}::{}", parser_utils.file_name, name);
         Arc::new(StructData::new(
             attributes,
             functions.iter().map(|inner| inner.data.clone()).collect::<Vec<_>>(),
@@ -192,7 +192,7 @@ pub fn parse_implementor(
             TokenTypes::InvalidCharacters => break,
             _ => panic!(
                 "How'd you get here? {} - {:?} ({}, {})",
-                parser_utils.file,
+                parser_utils.file_name,
                 token.token_type,
                 state,
                 token.to_string(parser_utils.buffer)
@@ -305,7 +305,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             _ => panic!(
                 "Unknown token type {:?} - {} ({:?})",
                 token.token_type,
-                parser_utils.file,
+                parser_utils.file_name,
                 parser_utils.tokens[parser_utils.index - 8..parser_utils.index]
                     .iter()
                     .map(|inner| format!("{:?} ({})", &inner.token_type, inner.to_string(parser_utils.buffer)))

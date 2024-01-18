@@ -60,7 +60,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                         .syntax
                         .lock()
                         .unwrap()
-                        .add_poison(Arc::new(StructData::new_poisoned(format!("${}", parser_utils.file), error)));
+                        .add_poison(Arc::new(StructData::new_poisoned(format!("${}", parser_utils.file_name), error)));
                     break;
                 }
                 modifiers.push(Modifier::Trait);
