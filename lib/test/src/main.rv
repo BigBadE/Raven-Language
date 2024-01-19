@@ -3,7 +3,8 @@ import list::List;
 import stdio;
 
 fn main() {
-    let arraylist = ArrayList::new<str>();
+    ArrayList::test<str>();
+    /*let arraylist = ArrayList::new<str>();
 
-    printf(arraylist.get(0));
+    printf(arraylist.get(0));*/
 }

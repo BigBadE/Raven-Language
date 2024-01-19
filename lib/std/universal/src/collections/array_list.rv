@@ -1,5 +1,6 @@
 import list;
 import array;
+import stdio;
 
 pub struct ArrayList<T> {
     array: [T];
@@ -12,9 +13,13 @@ impl<T> List<T> for ArrayList<T> {
 }
 
 impl<T> ArrayList<T> {
-    fn new(self) -> ArrayList<T> {
+    fn new() -> ArrayList<T> {
         return new ArrayList<T> {
             array: empty(),
         };
+    }
+
+    fn test() {
+        printf("Test!");
     }
 }
