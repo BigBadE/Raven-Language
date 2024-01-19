@@ -293,10 +293,6 @@ impl TopElement for StructData {
         self.set_chalk_data();
     }
 
-    fn poison(&mut self, error: ParsingError) {
-        self.poisoned.push(error);
-    }
-
     fn is_operator(&self) -> bool {
         return self.is_trait() && Attribute::find_attribute("operation", &self.attributes).is_some();
     }

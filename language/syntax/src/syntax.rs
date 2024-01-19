@@ -111,6 +111,10 @@ impl Syntax {
             }
         }
 
+        if function.code.expressions.len() == 0 && self.compiling.contains_key(&function.data.name) {
+            return;
+        }
+
         self.compiling.insert(function.data.name.clone(), function);
     }
 
@@ -270,9 +274,17 @@ impl Syntax {
     }
 
     /// Adds the element to the syntax
-    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &Arc<T>) {
+    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &mut Arc<T>) {
         let mut locked = syntax.lock().unwrap();
+        /*if T::get_manager(locked.deref_mut()).types.contains_key(adding.name()) {
+            locked.errors.push(adding.get_span().make_error("Duplicate type!"));
+        }*/
+
         let manager = T::get_manager(locked.deref_mut());
+        // SAFETY
+        // Technically, the data could be cloned and edited safely,
+        // but this is faster and because this should be the only reference it's faster.
+        // This adheres to Arc's two rules: The inner data type isn't casted and there are no other active borrows.
         manager.set_id(unsafe { Arc::get_mut_unchecked(&mut adding.clone()) });
         manager.add_type(adding.clone());
 

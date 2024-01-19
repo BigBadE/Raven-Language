@@ -235,7 +235,7 @@ impl<T: TopElement> TopElementManager<T> {
         self.wake(data.name());
         if let Some(_) = self.types.get(data.name()) {
             // TODO handle this
-            unsafe { Arc::get_mut_unchecked(&mut data.clone()).poison(data.get_span().make_error("Duplicate type!")) }
+            //unsafe { Arc::get_mut_unchecked(&mut data.clone()).poison(data.get_span().make_error("Duplicate type!")) }
         }
         if !self.sorted.contains(&data) {
             self.sorted.push(data.clone());

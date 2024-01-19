@@ -277,9 +277,6 @@ where
     /// Element id
     fn set_id(&mut self, id: u64);
 
-    /// Poisons the element, adding an error to it and forcing users to ignore issues with it
-    fn poison(&mut self, error: ParsingError);
-
     /// Whether the top element is a function and has the operator modifier
     fn is_operator(&self) -> bool;
 

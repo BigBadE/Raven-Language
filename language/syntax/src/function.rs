@@ -61,10 +61,6 @@ impl TopElement for FunctionData {
         //Ignored. Funcs don't have IDs
     }
 
-    fn poison(&mut self, error: ParsingError) {
-        self.poisoned.push(error);
-    }
-
     fn is_operator(&self) -> bool {
         return false;
     }
@@ -258,6 +254,11 @@ impl CodelessFinalizedFunction {
             let original = method;
             let new_method = Arc::new(new_method);
             let mut locked = syntax.lock().unwrap();
+            // Since Syntax can't be locked this whole time, sometimes someone else can beat this method to the punch.
+            // It's super rare to happen, but if it does just give up
+            /*if syntax.lock().unwrap().functions.types.contains_key(&name) {
+                return Ok(new_method);
+            }*/
             locked.functions.add_type(new_method.data.clone());
             locked.functions.add_data(new_method.data.clone(), new_method.clone());
 
@@ -327,13 +328,7 @@ async fn degeneric_code(
 
     // Sends the finalized function to be compiled.
     let mut locked = syntax.lock().unwrap();
-    if let Some(found) = locked.compiling_wakers.get(&output.data.name) {
-        for waker in found {
-            waker.wake_by_ref();
-        }
-    }
-    locked.compiling_wakers.remove(&output.data.name);
-    locked.compiling.insert(output.data.name.clone(), Arc::new(output));
+    locked.add_compiling(Arc::new(output));
 }
 
 /// A finalized function, which is ready to be compiled and has been checked of any errors.

@@ -7,7 +7,7 @@ use syntax::r#struct::{StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::{FinalizedTypes, Types};
 use syntax::{
-    DataType, FinishedStructImplementor, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement,
+    FinishedStructImplementor, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement,
     TraitImplementor,
 };
 
@@ -56,14 +56,14 @@ impl<'a> ParserUtils<'a> {
 
     /// Adds a struct to the syntax
     pub fn add_struct(&mut self, span: &Span, structure: Result<UnfinalizedStruct, ParsingError>) {
-        let structure = structure.unwrap_or_else(|error| UnfinalizedStruct {
+        let mut structure = structure.unwrap_or_else(|error| UnfinalizedStruct {
             generics: IndexMap::default(),
             fields: Vec::default(),
             functions: Vec::default(),
             data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
         });
 
-        Syntax::add::<StructData>(&self.syntax, span.make_error("Duplicate structure"), structure.data());
+        Syntax::add::<StructData>(&self.syntax, span.make_error("Duplicate structure"), &mut structure.data);
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
         self.handle.lock().unwrap().spawn(
@@ -203,7 +203,7 @@ impl<'a> ParserUtils<'a> {
         file: String,
         function: Result<UnfinalizedFunction, ParsingError>,
     ) -> UnfinalizedFunction {
-        let adding = match function {
+        let mut adding = match function {
             Ok(adding) => adding,
             Err(error) => UnfinalizedFunction {
                 generics: IndexMap::default(),
@@ -214,7 +214,7 @@ impl<'a> ParserUtils<'a> {
             },
         };
 
-        Syntax::add(syntax, adding.data.span.make_error("Duplicate function"), &adding.data);
+        Syntax::add(syntax, adding.data.span.make_error("Duplicate function"), &mut adding.data);
         return adding;
     }
 }

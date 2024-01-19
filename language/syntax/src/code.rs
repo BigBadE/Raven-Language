@@ -578,6 +578,5 @@ pub async fn degeneric_header(
     locked.functions.add_data(new_method.data.clone(), new_method.clone());
 
     // Give the compiler the empty body
-    locked.add_compiling(Arc::new(code));
     return Ok(());
 }
