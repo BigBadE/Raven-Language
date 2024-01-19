@@ -1,30 +1,13 @@
 [workspace]
+exclude = [
+    "language/compilers",
+    "tools/ide-plugins"
+]
 members = [
-    "language/checker",
-    "language/parser",
-    "language/runner",
-    "language/syntax",
-    "language/data",
+    "language/*",
+    "language/compilers/*",
 
-    "language/compilers/llvm",
-
-    "rewrite/format",
-    "rewrite/functions",
-    "rewrite/generics",
-    "rewrite/lexer",
-    "rewrite/parser",
-    "rewrite/program",
-    "rewrite/runner",
-    "rewrite/types",
-    "rewrite/util",
-
-    "rewrite/compilers/compiler",
-
-    "tools/magpie",
-    "tools/magpie-derive",
+    "tools/*",
     "tools/magpie/magpie-wrapper",
-    "tools/ide-plugins/raven-language-server",
-
-    "tools/magpie-rewrite"
 ]
 resolver = "2"

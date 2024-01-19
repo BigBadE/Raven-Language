@@ -553,7 +553,6 @@ impl FinalizedTypes {
 
                     // Update the program's fields
                     for field in &mut data.fields {
-                        println!("Flattening {} for {}", field.field.name, data.data.name);
                         field.field.field_type.flatten(syntax).await?;
                     }
 
