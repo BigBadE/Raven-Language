@@ -1,5 +1,6 @@
 #![feature(get_mut_unchecked, box_into_inner)]
 
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -60,10 +61,10 @@ impl LLVMCompiler {
 impl<T> Compiler<T> for LLVMCompiler {
     /// Compiles a syntax, with a receiver that is used to wait for verification before running
     async fn compile(&self, mut receiver: Receiver<()>, syntax: &Arc<Mutex<Syntax>>) -> Option<T> {
-        let mut binding = CompilerTypeGetter::new(Arc::new(CompilerImpl::new(&self.context)), syntax.clone());
-
-        if CompilerImpl::compile(&mut binding, &self.arguments, syntax, &self.compiling, &self.struct_compiling).await {
+        if let Some(main) = CompilerImpl::get_main(&self.arguments, syntax).await {
             if receiver.recv().await.is_some() {
+                let mut binding = CompilerTypeGetter::new(Rc::new(CompilerImpl::new(&self.context)), syntax.clone());
+                CompilerImpl::compile(main, &mut binding, &self.compiling, &self.struct_compiling);
                 return binding.get_target(&self.arguments.target).map(|inner| unsafe { inner.call() });
             }
         } else {

@@ -12,12 +12,6 @@
 //! Rust 1.39 did not include support for async fn in traits. Trying to include
 //! an async fn in a trait produces the following error:
 //!
-//! ```compile_fail
-//! trait MyTrait {
-//!     async fn f() {}
-//! }
-//! ```
-//!
 //! ```text
 //! error[E0706]: trait fns cannot be declared `async`
 //!  --> src/main.rs:4:5

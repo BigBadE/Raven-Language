@@ -39,7 +39,7 @@ pub fn instance_function<'a, 'ctx>(
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
         value = create_function_value(&function, type_getter, None);
-        unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.push((value, function));
+        type_getter.compiling.borrow_mut().push((value, function));
     }
     return value;
 }
@@ -547,9 +547,9 @@ pub fn compile_effect<'ctx>(
                     compile_effect(type_getter, function, base, id)
                 }
             } else {
-                let mut table = type_getter.vtable.clone();
+                let table = type_getter.vtable.clone();
                 let base = compile_effect(type_getter, function, base, id).unwrap();
-                let table = unsafe { Arc::get_mut_unchecked(&mut table) }.get_vtable(type_getter, target, &found, functions);
+                let table = table.borrow_mut().get_vtable(type_getter, target, &found, functions);
                 *id += 1;
 
                 let structure = type_getter

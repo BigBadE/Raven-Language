@@ -16,7 +16,7 @@ use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMe
 use crate::types::FinalizedTypes;
 use crate::{
     is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, SimpleVariableManager, Syntax,
-    TopElement, TopElementManager, Types, VariableManager,
+    TopElement, TopElementManager, Types,
 };
 
 /// The static data of a function, which is set during parsing and immutable throughout the entire compilation process.
@@ -190,7 +190,7 @@ impl CodelessFinalizedFunction {
         mut manager: Box<dyn ProcessManager>,
         arguments: &Vec<FinalizedEffects>,
         syntax: &Arc<Mutex<Syntax>>,
-        variables: &dyn VariableManager,
+        variables: &SimpleVariableManager,
         returning: Option<(FinalizedTypes, Span)>,
     ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         // Degenerics the return type if there is one and returning is some.

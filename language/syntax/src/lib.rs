@@ -250,7 +250,7 @@ impl VariableManager for SimpleVariableManager {
 }
 
 /// A variable manager used for getting return types from effects
-pub trait VariableManager: Send + Sync + Debug {
+pub trait VariableManager: Debug {
     fn get_variable(&self, name: &String) -> Option<FinalizedTypes>;
 }
 

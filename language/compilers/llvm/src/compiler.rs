@@ -11,7 +11,7 @@ use inkwell::OptimizationLevel;
 use data::tokens::Span;
 use data::CompilerArguments;
 use syntax::async_util::EmptyNameResolver;
-use syntax::function::FinalizedFunction;
+use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
 use syntax::r#struct::FinalizedStruct;
 use syntax::syntax::Syntax;
 use syntax::ParsingError;
@@ -33,13 +33,6 @@ pub struct CompilerImpl<'ctx> {
     pub execution_engine: ExecutionEngine<'ctx>,
 }
 
-/// SAFETY LLVM isn't safe for access across multiple threads, but this module only accesses it from
-/// one thread at a time.
-unsafe impl Send for CompilerImpl<'_> {}
-
-/// SAFETY See above
-unsafe impl Sync for CompilerImpl<'_> {}
-
 impl<'ctx> CompilerImpl<'ctx> {
     /// Creates a new CompilerImpl from the context
     pub fn new(context: &'ctx Context) -> Self {
@@ -50,13 +43,10 @@ impl<'ctx> CompilerImpl<'ctx> {
     }
 
     /// Compiles a syntax with the required data and returns if the required function is found
-    pub async fn compile(
-        type_getter: &mut CompilerTypeGetter<'ctx>,
+    pub async fn get_main(
         arguments: &CompilerArguments,
         syntax: &Arc<Mutex<Syntax>>,
-        functions: &Arc<DashMap<String, Arc<FinalizedFunction>>>,
-        _structures: &Arc<DashMap<String, Arc<FinalizedStruct>>>,
-    ) -> bool {
+    ) -> Option<Arc<CodelessFinalizedFunction>> {
         match Syntax::get_function(
             syntax.clone(),
             ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: compile"),
@@ -67,14 +57,23 @@ impl<'ctx> CompilerImpl<'ctx> {
         .await
         {
             Ok(_) => {}
-            Err(_) => return false,
+            Err(_) => return None,
         };
 
         let function = MainFuture { syntax: syntax.clone() }.await;
-        instance_function(Arc::new(function.to_codeless()), type_getter);
+        return Some(Arc::new(function.to_codeless()));
+    }
 
-        while !type_getter.compiling.is_empty() {
-            let (function_type, function) = unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.remove(0);
+    pub fn compile(
+        main: Arc<CodelessFinalizedFunction>,
+        type_getter: &mut CompilerTypeGetter<'ctx>,
+        functions: &Arc<DashMap<String, Arc<FinalizedFunction>>>,
+        _structures: &Arc<DashMap<String, Arc<FinalizedStruct>>>,
+    ) {
+        instance_function(main, type_getter);
+
+        while !type_getter.compiling.borrow().is_empty() {
+            let (function_type, function) = type_getter.compiling.borrow_mut().remove(0);
 
             if !function.data.poisoned.is_empty() || function.data.name.is_empty() {
                 // The checker handles the poisoned functions
@@ -86,7 +85,7 @@ impl<'ctx> CompilerImpl<'ctx> {
                 finalized_function = if let Some(found) = functions.get(&function.data.name) {
                     found.clone()
                 } else {
-                    unsafe { Arc::get_mut_unchecked(&mut type_getter.compiling) }.push((function_type, function));
+                    type_getter.compiling.borrow_mut().push((function_type, function));
                     continue;
                 };
             }
@@ -112,6 +111,5 @@ impl<'ctx> CompilerImpl<'ctx> {
         }*/
 
         print_formatted(type_getter.compiler.module.to_string());
-        return true;
     }
 }

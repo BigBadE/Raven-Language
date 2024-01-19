@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -22,11 +24,11 @@ pub struct CompilerTypeGetter<'ctx> {
     /// Program syntax
     pub syntax: Arc<Mutex<Syntax>>,
     /// All generated VTables
-    pub vtable: Arc<VTableManager<'ctx>>,
+    pub vtable: Rc<RefCell<VTableManager<'ctx>>>,
     /// The compiler
-    pub compiler: Arc<CompilerImpl<'ctx>>,
+    pub compiler: Rc<CompilerImpl<'ctx>>,
     /// Functions being compiled
-    pub compiling: Arc<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>,
+    pub compiling: Rc<RefCell<Vec<(FunctionValue<'ctx>, Arc<CodelessFinalizedFunction>)>>>,
     /// Current function's code blocks
     pub blocks: HashMap<String, BasicBlock<'ctx>>,
     /// The current block
@@ -35,21 +37,14 @@ pub struct CompilerTypeGetter<'ctx> {
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
 }
 
-/// SAFETY LLVM isn't safe for access across multiple threads, but this module only accesses it from
-/// one thread at a time.
-unsafe impl Send for CompilerTypeGetter<'_> {}
-
-/// SAFETY See above
-unsafe impl Sync for CompilerTypeGetter<'_> {}
-
 impl<'ctx> CompilerTypeGetter<'ctx> {
     /// Creates a new CompilerTypeGetter
-    pub fn new(compiler: Arc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
+    pub fn new(compiler: Rc<CompilerImpl<'ctx>>, syntax: Arc<Mutex<Syntax>>) -> Self {
         return Self {
             syntax,
-            vtable: Arc::new(VTableManager::default()),
+            vtable: Rc::new(RefCell::new(VTableManager::default())),
             compiler,
-            compiling: Arc::new(Vec::default()),
+            compiling: Rc::new(RefCell::new(Vec::default())),
             blocks: HashMap::default(),
             current_block: None,
             variables: HashMap::default(),

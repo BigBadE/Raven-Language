@@ -57,7 +57,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     let mut errors = Vec::default();
     //Join any compilers errors
     for handle in handles {
-        match handle.await {
+        match time::timeout(Duration::from_secs(1), handle).await {
             Err(error) => errors.push(Error::new(error)),
             Ok(_) => {}
         }
@@ -72,7 +72,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
 
     syntax.lock().unwrap().finish();
 
-    match time::timeout(Duration::from_secs(5), JoinWaiter { handle: handle.clone() }).await {
+    match time::timeout(Duration::from_secs(1), JoinWaiter { handle: handle.clone() }).await {
         Ok(_) => {}
         Err(_) => {
             for (name, _) in &handle.lock().unwrap().names {
