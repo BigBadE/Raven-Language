@@ -211,7 +211,7 @@ impl Readable for FileWrapper {
     }
 
     fn hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = DefaultHasher::default();
         Hash::hash(&self.path(), &mut hasher);
         return hasher.finish();
     }

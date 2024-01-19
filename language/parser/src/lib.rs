@@ -123,7 +123,7 @@ impl Readable for FilePath {
     }
 
     fn hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = DefaultHasher::default();
         Hash::hash(&self, &mut hasher);
         return hasher.finish();
     }

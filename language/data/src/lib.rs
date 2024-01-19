@@ -138,7 +138,7 @@ impl ParsingError {
         if self.span.start != self.span.end {
             let end = &tokens[self.span.end];
             token.end = end.end;
-            token.end_offset = token.end_offset;
+            token.end_offset = end.end_offset;
         }
 
         // Multi-line tokens aren't supported, set the end to the start

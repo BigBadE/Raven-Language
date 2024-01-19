@@ -112,6 +112,7 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => inner.fix_generics(resolver, syntax).await?,
             FinalizedTypes::Array(inner) => inner.fix_generics(resolver, syntax).await?,
             FinalizedTypes::Generic(name, _) => {
+                //skipcq: RS-W1070 Can't use clone_from because self is borrowed mutably
                 *self = resolver.generics()[name].clone();
             }
             FinalizedTypes::GenericType(base, bounds) => {

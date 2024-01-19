@@ -1,12 +1,14 @@
-use crate::parser::function_parser::parse_function;
-use crate::parser::struct_parser::{parse_implementor, parse_structure};
-use crate::parser::util::ParserUtils;
-use data::tokens::{Span, Token, TokenTypes};
 use std::sync::Arc;
+
+use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::NameResolver;
 use syntax::function::FunctionData;
 use syntax::r#struct::StructData;
 use syntax::{Attribute, Modifier, TopElement, MODIFIERS};
+
+use crate::parser::function_parser::parse_function;
+use crate::parser::struct_parser::{parse_implementor, parse_structure};
+use crate::parser::util::ParserUtils;
 
 /// Parses a top element
 pub fn parse_top(parser_utils: &mut ParserUtils) {

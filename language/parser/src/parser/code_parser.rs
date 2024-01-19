@@ -14,7 +14,7 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
     let mut types = ExpressionType::Line;
     while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
         if expression.expression_type != ExpressionType::Line {
-            types = expression.expression_type.clone();
+            types.clone_from(&expression.expression_type);
         }
         lines.push(expression);
     }
@@ -246,7 +246,10 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
         }
     }
 
-    return Ok(Some(Expression::new(expression_type, effect.unwrap_or(Effects::new(Span::default(), EffectType::NOP)))));
+    return Ok(Some(Expression::new(
+        expression_type,
+        effect.unwrap_or_else(|| Effects::new(Span::default(), EffectType::NOP)),
+    )));
 }
 
 /// Tells the function what to do after the line is parsed

@@ -249,6 +249,7 @@ pub enum FinalizedEffectType {
 
 impl FinalizedEffectType {
     #[async_recursion]
+    // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
     pub async fn flatten(
         &mut self,
         syntax: &Arc<Mutex<Syntax>>,

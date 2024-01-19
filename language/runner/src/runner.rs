@@ -55,7 +55,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     }
 
     let mut errors = Vec::default();
-    //Join any compilers errors
+    //Join any parsing errors
     for handle in handles {
         match time::timeout(Duration::from_secs(1), handle).await {
             Err(error) => errors.push(Error::new(error)),

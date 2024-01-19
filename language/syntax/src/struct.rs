@@ -262,7 +262,7 @@ impl FinalizedStruct {
         }
         let mut data = StructData::clone(&self.data);
         let name = format!("{}${}", data.name, display_parenless(&targets, "_"));
-        data.name = name.clone();
+        data.name.clone_from(&name);
         self.generics.clear();
         for field in &mut self.fields {
             field.field.field_type.degeneric(generics, syntax).await;
