@@ -88,7 +88,9 @@ pub struct FileSourceSet {
     pub root: PathBuf,
 }
 
+/// A wrapper around the PathBuf type, used for implementing traits on it
 pub struct FilePath {
+    /// The path to the file
     pub path: PathBuf,
 }
 

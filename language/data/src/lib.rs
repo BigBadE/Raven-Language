@@ -11,7 +11,9 @@ use crate::tokens::{Span, Token};
 /// The type of the main LLVM function called by the program
 pub type Main<T> = unsafe extern "C" fn() -> T;
 
+/// Handles the externals for translating Raven types to Rust types
 pub mod externs;
+/// Tokens
 pub mod tokens;
 
 /// Settings used in configuring the runner

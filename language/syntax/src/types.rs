@@ -223,6 +223,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Gets the inner generic type from a type
     pub fn inner_generic_type(&self) -> Option<(&Box<FinalizedTypes>, &Vec<FinalizedTypes>)> {
         return match self {
             FinalizedTypes::GenericType(inner, bounds) => Some((inner, bounds)),
