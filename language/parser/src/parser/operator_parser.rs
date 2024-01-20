@@ -44,14 +44,14 @@ pub fn parse_operator(
         Ok(inner) => inner.map(|inner| inner.effect),
         Err(_) => None,
     };
-    first_element_token.change_token_end(parser_utils.index);
+    first_element_token.extend_span(parser_utils.index);
 
     if right.is_some() {
         while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
             let mut next_element_token = Span::new(parser_utils.file, parser_utils.index);
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
-            next_element_token.change_token_end(parser_utils.index);
+            next_element_token.extend_span(parser_utils.index);
             if let Some(next_element) = next {
                 if matches!(next_element.types, EffectType::NOP) {
                     break;

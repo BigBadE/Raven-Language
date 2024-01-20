@@ -70,23 +70,30 @@ impl FromResidual<Result<Infallible, Token>> for Token {
     }
 }
 
+/// A span is a span of tokens in a file. This allows errors to show exactly what went wrong in the code
 #[derive(Clone, Debug, Default)]
 pub struct Span {
+    /// The hash of the file this token is in
     pub file: u64,
+    /// The start index in the list of tokens
     pub start: usize,
+    /// The end index in the list of tokens
     pub end: usize,
 }
 
 impl Span {
+    /// Creates a new span
     pub fn new(file: u64, index: usize) -> Self {
         return Self { file, start: index, end: index };
     }
 
+    /// Makes an error from the span with the static message
     pub fn make_error(&self, message: &'static str) -> ParsingError {
         return ParsingError::new(self.clone(), message);
     }
 
-    pub fn change_token_end(&mut self, end: usize) {
+    /// Extends the span to encompass more tokens
+    pub fn extend_span(&mut self, end: usize) {
         self.end = end;
     }
 }

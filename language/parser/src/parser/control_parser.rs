@@ -107,7 +107,7 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     if effect.is_none() {
         return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected iterator, found void"));
     }
-    error_token.change_token_end(parser_utils.index);
+    error_token.extend_span(parser_utils.index);
 
     // Checks for the code start
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {

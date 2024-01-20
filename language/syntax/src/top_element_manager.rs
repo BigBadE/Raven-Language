@@ -217,6 +217,7 @@ where
 }
 
 impl<T: TopElement> TopElementManager<T> {
+    /// Wakes up all sleepers for the given name
     fn wake(&mut self, name: &String) {
         if let Some(wakers) = self.wakers.remove(name) {
             for waker in wakers {
@@ -225,12 +226,14 @@ impl<T: TopElement> TopElementManager<T> {
         }
     }
 
+    /// Sets the correct ID on the data type
     pub fn set_id(&mut self, data: &mut T) {
         data.set_id(
             self.sorted.iter().position(|found| found.name() == data.name()).unwrap_or_else(|| self.sorted.len()) as u64
         );
     }
 
+    /// Adds the type to the list of types
     pub fn add_type(&mut self, data: Arc<T>) {
         self.wake(data.name());
         if !self.sorted.contains(&data) {
@@ -239,6 +242,7 @@ impl<T: TopElement> TopElementManager<T> {
         self.types.insert(data.name().clone(), data);
     }
 
+    /// Adds the finalized data to the list of types.
     pub fn add_data(&mut self, types: Arc<T>, data: Arc<T::Finalized>) {
         self.wake(types.name());
         self.data.insert(types, data);

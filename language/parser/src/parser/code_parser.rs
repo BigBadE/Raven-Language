@@ -522,7 +522,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     // If the rest of the line doesn't exist, return an error because the value must be set to something.
     return match parse_line(parser_utils, ParseState::None)? {
         Some(line) => {
-            error_token.change_token_end(parser_utils.index - 2);
+            error_token.extend_span(parser_utils.index - 2);
             Ok(Effects::new(error_token, EffectType::CreateVariable(name, Box::new(line.effect))))
         }
         None => Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected value, found void!")),

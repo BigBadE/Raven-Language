@@ -154,12 +154,12 @@ pub fn parse_implementor(
                     if state == 1 {
                         let found = UnparsedType::Generic(Box::new(base.unwrap()), parse_type_generics(parser_utils)?);
                         base = Some(found);
-                        base_span.as_mut().unwrap().change_token_end(parser_utils.index - 1);
+                        base_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     } else {
                         let found =
                             UnparsedType::Generic(Box::new(implementor.unwrap()), parse_type_generics(parser_utils)?);
                         implementor = Some(found);
-                        implementor_span.as_mut().unwrap().change_token_end(parser_utils.index - 1);
+                        implementor_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     }
                 }
             }

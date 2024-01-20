@@ -121,20 +121,24 @@ impl Field {
     }
 }
 
+/// Effects are single pieces of code which are strung together to make an expression.
+/// For example, a single method call, creating a variable, setting a variable, etc... are all effects.
 #[derive(Clone, Debug)]
 pub struct Effects {
+    /// The type of the effect
     pub types: EffectType,
+    /// The span of the effect
     pub span: Span,
 }
 
 impl Effects {
+    /// Creates a new effect
     pub fn new(span: Span, types: EffectType) -> Self {
         return Self { types, span };
     }
 }
 
-/// Effects are single pieces of code which are strung together to make an expression.
-/// For example, a single method call, creating a variable, setting a variable, etc... are all effects.
+/// The type of the effect, storing all per-effect data
 #[derive(Clone, Debug)]
 pub enum EffectType {
     /// A placeholder of no operation, which should be resolved before finalizing.
@@ -181,13 +185,17 @@ pub enum EffectType {
     String(String),
 }
 
+/// Effects that have been finalized and are ready for compilation
 #[derive(Clone, Debug)]
 pub struct FinalizedEffects {
+    /// The type of the effect
     pub types: FinalizedEffectType,
+    /// The span of the effect
     pub span: Span,
 }
 
 impl FinalizedEffects {
+    /// Creates a new finalized effect
     pub fn new(span: Span, types: FinalizedEffectType) -> Self {
         return Self { types, span };
     }
@@ -248,6 +256,7 @@ pub enum FinalizedEffectType {
 }
 
 impl FinalizedEffectType {
+    /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
     #[async_recursion]
     // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
     pub async fn flatten(
