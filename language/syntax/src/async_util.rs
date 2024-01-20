@@ -43,6 +43,7 @@ pub struct AsyncDataGetter<T: TopElement> {
     pub getting: Arc<T>,
 }
 
+/// Asynchronously gets the implementation of a structure
 pub struct AsyncStructImplGetter {
     /// The program
     pub syntax: Arc<Mutex<Syntax>>,
@@ -51,6 +52,7 @@ pub struct AsyncStructImplGetter {
 }
 
 impl AsyncStructImplGetter {
+    /// Creates a new async struct impl getter
     pub fn new(syntax: Arc<Mutex<Syntax>>, getting: FinalizedTypes) -> Self {
         return Self { syntax, getting };
     }

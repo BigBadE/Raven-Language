@@ -5,8 +5,9 @@ use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, parse_quote, Data, DeriveInput, Fields, GenericParam, Generics};
 
+/// Implements the derive macro for RavenExtern
 #[proc_macro_derive(RavenExtern)]
-pub fn my_macro_here_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn raven_extern_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
 

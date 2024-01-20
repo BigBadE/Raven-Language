@@ -41,7 +41,7 @@ impl<'ctx> CompilerImpl<'ctx> {
         return Self { module, context, builder: context.create_builder(), execution_engine };
     }
 
-    /// Compiles a syntax with the required data and returns if the required function is found
+    /// Finds the main function
     pub async fn get_main(
         arguments: &CompilerArguments,
         syntax: &Arc<Mutex<Syntax>>,
@@ -63,6 +63,7 @@ impl<'ctx> CompilerImpl<'ctx> {
         return Some(Arc::new(function.to_codeless()));
     }
 
+    /// Compiles the main function
     pub fn compile(
         main: Arc<CodelessFinalizedFunction>,
         type_getter: &mut CompilerTypeGetter<'ctx>,

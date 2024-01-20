@@ -162,6 +162,7 @@ impl CodelessFinalizedFunction {
         };
     }
 
+    /// Flattens codeless a function
     pub async fn flatten(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
         let mut output = CodelessFinalizedFunction::clone(self);
         if let Some(found) = &mut output.return_type {
@@ -357,6 +358,7 @@ impl FinalizedFunction {
         };
     }
 
+    /// Flattens a function with code
     pub async fn flatten(
         &mut self,
         syntax: &Arc<Mutex<Syntax>>,
@@ -405,6 +407,7 @@ impl FinalizedCodeBody {
         return Self { label, expressions, returns };
     }
 
+    /// Flattens a body of code
     pub async fn flatten(
         &mut self,
         syntax: &Arc<Mutex<Syntax>>,

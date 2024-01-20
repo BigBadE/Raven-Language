@@ -505,6 +505,7 @@ impl FinalizedTypes {
         };
     }
 
+    /// Flattens a type
     #[async_recursion]
     pub async fn flatten(&mut self, syntax: &Arc<Mutex<Syntax>>) -> Result<(), ParsingError> {
         match self {

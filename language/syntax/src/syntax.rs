@@ -98,6 +98,7 @@ impl Syntax {
         };
     }
 
+    /// Adds a function to the compiling list
     pub fn add_compiling(&mut self, function: Arc<FinalizedFunction>) {
         if let Some(found) = self.compiling_wakers.get(&function.data.name) {
             for waker in found {
@@ -363,6 +364,7 @@ impl Syntax {
         return AsyncTypesGetter::new(syntax, error, getting, name_resolver, not_trait).await;
     }
 
+    /// Gets the implementation of a structure
     pub async fn get_struct_impl(
         syntax: Arc<Mutex<Syntax>>,
         getting: FinalizedTypes,
