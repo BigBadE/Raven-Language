@@ -1,0 +1,81 @@
+.btn-warning {
+    margin-top: 100px;
+}
+
+#installnow {
+    margin-top: 80px;
+}
+
+#install-raven{
+    background-color: #272932;
+    border-color:rgb(0, 0, 0);
+}
+
+.navbar-expand{
+    height: 100;
+    background-image:linear-gradient(to right, #272932,#272932);
+    padding: 0;
+}
+
+.navbar-brand{
+    font-size: 30;
+}
+
+.navbar-brand img{
+    height: 100;
+    padding-left: 0px;
+}
+
+.nav-link{
+    font-size: 18;
+}
+
+.p-5{
+    margin-top: 10;
+    background-color: rgba(64, 73, 158, 0.37);
+}
+
+#welcome{
+    margin-top: 130;
+}
+
+.container-fluid{
+    padding-left: 80;
+}
+
+.about-iframe {
+    margin-top: 100px;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    margin: 0 auto;
+    padding: 25px;
+    color: #333333;
+    font-family: "Helvetica Neue", Helvetica, "Segoe UI", Arial, freesans, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  
+  h1 {
+    line-height: 1;
+  }
+  
+  code {
+    border-radius: 5px;
+    background-color: #eee;
+    display: inline-block;
+    padding: 0 8px;
+    font-family: Consolas, Courier, monospace;
+  }
+
+  #doc_frame{
+    margin: 0;
+    height: 2000px;
+  }
+
+  .tab-content{
+    
+  }
+  
