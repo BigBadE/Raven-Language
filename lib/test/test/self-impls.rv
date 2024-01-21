@@ -1,0 +1,13 @@
+fn test() -> bool {
+    return Test::test();
+}
+
+pub struct Test {
+
+}
+
+impl Test {
+    pub fn test() -> bool {
+        return true;
+    }
+}

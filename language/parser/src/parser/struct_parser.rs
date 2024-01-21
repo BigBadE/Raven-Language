@@ -172,6 +172,9 @@ pub fn parse_implementor(
                 }
             }
             TokenTypes::FunctionStart => {
+                if parser_utils.file_name == "self-impls" {
+                    println!("Found func");
+                }
                 let file = parser_utils.file_name.clone();
                 if parser_utils.file_name.is_empty() {
                     parser_utils.file_name = format!("{}_{}", base.as_ref().unwrap(), implementor.as_ref().unwrap());
@@ -189,7 +192,9 @@ pub fn parse_implementor(
             }
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
-            TokenTypes::InvalidCharacters => break,
+            TokenTypes::InvalidCharacters => {
+                return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error("Invalid characters!"))
+            }
             _ => panic!(
                 "How'd you get here? {} - {:?} ({}, {})",
                 parser_utils.file_name,

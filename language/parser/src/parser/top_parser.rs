@@ -80,7 +80,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 };
 
                 parser_utils.handle.lock().unwrap().spawn(
-                    "temp".to_string(),
+                    "implementor".to_string(),
                     ParserUtils::add_implementor(
                         parser_utils.handle.clone(),
                         parser_utils.syntax.clone(),

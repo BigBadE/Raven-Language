@@ -272,6 +272,9 @@ pub fn next_implementation_token(tokenizer: &mut Tokenizer) -> Token {
             } else if tokenizer.matches("for") {
                 tokenizer.state = TokenizerState::STRUCTURE;
                 tokenizer.make_token(TokenTypes::For)
+            } else if tokenizer.matches("{") {
+                tokenizer.state = TokenizerState::TOP_ELEMENT_TO_STRUCT;
+                tokenizer.make_token(TokenTypes::StructTopElement)
             } else {
                 tokenizer.state = TokenizerState::TOP_ELEMENT;
                 tokenizer.last.to_string(tokenizer.buffer);
