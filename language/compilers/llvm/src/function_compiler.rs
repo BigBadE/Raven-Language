@@ -201,7 +201,7 @@ pub fn compile_effect<'ctx>(
         }
         FinalizedEffectType::CodeBody(body) => compile_block(body, function, type_getter, id),
         //Calling function, function arguments
-        FinalizedEffectType::MethodCall(pointer, calling_function, arguments) => {
+        FinalizedEffectType::MethodCall(pointer, calling_function, arguments, _) => {
             let mut final_arguments = Vec::default();
 
             let calling = type_getter.get_function(calling_function);
@@ -262,7 +262,7 @@ pub fn compile_effect<'ctx>(
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             //Compensate for type id
             let mut offset = 1;
-            for struct_field in &loading_from.types.get_return(type_getter).unwrap().inner_struct().fields {
+            for struct_field in &loading_from.types.get_nongeneric_return(type_getter).unwrap().inner_struct().fields {
                 if &struct_field.field.name != field {
                     offset += 1;
                 } else {
@@ -539,7 +539,7 @@ pub fn compile_effect<'ctx>(
                 .left()
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
-            let found = base.types.get_return(type_getter).unwrap();
+            let found = base.types.get_nongeneric_return(type_getter).unwrap();
             if is_modifier(found.inner_struct().data.modifiers, Modifier::Trait) {
                 if !target.eq(&found) {
                     panic!("Downcasting to a trait that doesn't match! Not implemented yet!")

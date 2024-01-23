@@ -107,6 +107,7 @@ impl Syntax {
         }
 
         if function.data.name == self.async_manager.target {
+            println!("Adding main!");
             if let Some(found) = self.async_manager.target_waker.as_ref() {
                 found.wake_by_ref();
             }
@@ -194,7 +195,7 @@ impl Syntax {
     ) -> Option<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>> {
         let mut output = Vec::default();
         for implementation in &self.implementations {
-            if implementation.target.inner_struct().data == implementor_struct.inner_struct().data
+            if implementor_struct.of_type_sync(&implementation.target, None).0
                 && (implementing_trait.of_type_sync(&implementation.base, None).0
                     || self.solve(&implementing_trait, &implementation.base))
             {
@@ -507,6 +508,10 @@ impl Syntax {
                         )
                         .await?,
                     );
+                }
+
+                if generics.is_empty() {
+                    println!("Found with no generics!");
                 }
                 Ok(Types::GenericType(
                     Box::new(Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?),

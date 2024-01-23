@@ -51,7 +51,7 @@ pub struct ImportNameResolver {
     /// The current generics
     pub generics: HashMap<String, Vec<UnparsedType>>,
     /// The parent type
-    pub parent: Option<String>,
+    pub parent: Option<UnparsedType>,
     /// Last ID used on a code block label
     pub last_id: u32,
 }

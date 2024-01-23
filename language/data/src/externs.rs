@@ -1,4 +1,4 @@
-use std::ffi::{c_char, CString};
+use std::ffi::c_char;
 use std::mem::size_of;
 use std::ptr;
 
@@ -8,7 +8,17 @@ impl RavenExtern for String {
     type Input = c_char;
 
     unsafe fn translate(raven_type: *mut c_char) -> Self {
-        return CString::from_raw(raven_type).to_str().unwrap().to_string();
+        let mut output = vec![];
+        let mut pointer = raven_type;
+        loop {
+            let value = ptr::read(pointer);
+            if value == 0 {
+                break;
+            }
+            output.push(value as u8);
+            pointer = pointer.add(1);
+        }
+        return String::from_utf8_unchecked(output);
     }
 }
 

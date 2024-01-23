@@ -44,13 +44,18 @@ pub fn parse_function(
             TokenTypes::ArgumentEnd => {
                 if last_arg_type.is_empty() {
                     if !parser_utils.imports.parent.is_some() {
-                        panic!("No parent for {}!", name);
+                        return Err(
+                            Span::new(parser_utils.file, parser_utils.index - 1).make_error("self in static function!")
+                        );
                     }
 
                     fields.push(Box::pin(to_field(
-                        parser_utils.get_struct(
-                            &Span::new(parser_utils.file, parser_utils.index - 1),
-                            parser_utils.imports.parent.as_ref().unwrap().clone(),
+                        Syntax::parse_type(
+                            parser_utils.syntax.clone(),
+                            ParsingError::new(Span::default(), "You shouldn't see this! At function parser"),
+                            Box::new(parser_utils.imports.clone()),
+                            parser_utils.imports.parent.clone().unwrap(),
+                            vec![],
                         ),
                         Vec::default(),
                         0,
@@ -117,7 +122,16 @@ pub fn parse_function(
         fields,
         code: code.unwrap_or_else(|| CodeBody::new(Vec::default(), "empty".to_string())),
         return_type,
-        data: Arc::new(FunctionData::new(attributes, modifiers, name, span)),
+        data: Arc::new(FunctionData::new(attributes, modifiers, name, span.clone())),
+        parent: parser_utils.imports.parent.clone().map(|types| {
+            Syntax::parse_type(
+                parser_utils.syntax.clone(),
+                span.make_error("Invalid type!"),
+                Box::new(parser_utils.imports.clone()),
+                types,
+                vec![],
+            )
+        }),
     });
 }
 

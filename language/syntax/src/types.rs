@@ -472,6 +472,7 @@ impl FinalizedTypes {
                 if let FinalizedTypes::Array(other) = other {
                     return inner.resolve_generic(other, syntax, generics, bounds_error).await;
                 }
+
                 return Err(bounds_error);
             }
             _ => {}

@@ -1,6 +1,7 @@
 /// This file contains the representation of code in Raven and helper methods to transform that code.
 use async_recursion::async_recursion;
 use data::tokens::Span;
+use std::collections::HashMap;
 use std::mem;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -214,8 +215,8 @@ pub enum FinalizedEffectType {
     CompareJump(Box<FinalizedEffects>, String, String),
     /// Nested code body.
     CodeBody(FinalizedCodeBody),
-    /// Calls the function on the given value (if any) with the given arguments.
-    MethodCall(Option<Box<FinalizedEffects>>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    /// Calls the function on the given value (if any) with the given arguments and the given return type (if generic). The first arg is the output location
+    MethodCall(Option<Box<FinalizedEffects>>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, Option<FinalizedTypes>),
     /// Calls the trait's function with the given arguments.
     GenericMethodCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
     /// Sets given reference to given value.
@@ -273,10 +274,19 @@ impl FinalizedEffectType {
             }
             Self::CompareJump(effect, _, _) => effect.types.flatten(syntax, process_manager, variables).await?,
             Self::CodeBody(body) => body.flatten(syntax, process_manager, variables).await?,
-            Self::MethodCall(calling, function, arguments) => {
+            Self::MethodCall(calling, function, arguments, _return_type) => {
                 if let Some(found) = calling {
                     found.types.flatten(syntax, process_manager, variables).await?;
                 }
+                *function = CodelessFinalizedFunction::degeneric(
+                    function.clone(),
+                    process_manager.cloned(),
+                    arguments,
+                    syntax,
+                    variables,
+                    None,
+                )
+                .await?;
                 *function = function.flatten(syntax).await?;
                 for argument in arguments {
                     argument.types.flatten(syntax, process_manager, variables).await?;
@@ -285,6 +295,15 @@ impl FinalizedEffectType {
             Self::GenericMethodCall(function, types, arguments) => {
                 types.flatten(syntax).await?;
                 *function = function.flatten(syntax).await?;
+                *function = CodelessFinalizedFunction::degeneric(
+                    function.clone(),
+                    process_manager.cloned(),
+                    arguments,
+                    syntax,
+                    variables,
+                    None,
+                )
+                .await?;
                 for argument in arguments {
                     argument.types.flatten(syntax, process_manager, variables).await?;
                 }
@@ -346,14 +365,14 @@ impl FinalizedEffectType {
         return Ok(());
     }
 
-    /// Gets the return type of the effect, requiring a variable manager to get
-    /// any variables from, or None if the effect has no return type.
-    pub fn get_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
-        let temp = match self {
+    /// get_return is async to handle special cases with function return types being generic.
+    /// This can only be called on degenericed types and as such can be sync
+    pub fn get_nongeneric_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
+        return match self {
             Self::NOP | Self::Jump(_) | Self::CompareJump(_, _, _) | Self::CodeBody(_) => None,
             // Downcasts simply return the downcasting target.
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
-            Self::MethodCall(_, function, _)
+            Self::MethodCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
             | Self::VirtualCall(_, function, _)
             | Self::GenericVirtualCall(_, _, function, _) => {
@@ -380,18 +399,82 @@ impl FinalizedEffectType {
             Self::String(_) => Some(FinalizedTypes::Struct(STR.clone())),
             Self::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone())),
             // Stores just return their inner type.
-            Self::HeapStore(inner) | Self::StackStore(inner) | Self::Set(_, inner) => inner.types.get_return(variables),
+            Self::HeapStore(inner) | Self::StackStore(inner) | Self::Set(_, inner) => {
+                inner.types.get_nongeneric_return(variables)
+            }
             // References return their inner type as well.
-            Self::ReferenceLoad(inner) => match inner.types.get_return(variables).unwrap() {
+            Self::ReferenceLoad(inner) => match inner.types.get_nongeneric_return(variables).unwrap() {
                 FinalizedTypes::Reference(inner) => Some(*inner),
                 _ => panic!("Tried to load non-reference!"),
             },
             // Heap allocations shouldn't get return type checked, even though they have a type.
-            Self::HeapAllocate(_) => panic!("Tried to return type a heap allocation!"),
+            Self::HeapAllocate(_) => panic!("Tried to get a type from a heap alloc!"),
             // Returns the target type as an array type.
             Self::CreateArray(types, _) => types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner))),
         };
-        return temp;
+    }
+
+    /// Gets the return type of the effect, requiring a variable manager to get
+    /// any variables from, or None if the effect has no return type.
+    #[async_recursion]
+    pub async fn get_return(
+        &self,
+        variables: &SimpleVariableManager,
+        syntax: &Arc<Mutex<Syntax>>,
+    ) -> Option<FinalizedTypes> {
+        return match self {
+            Self::MethodCall(_, function, args, return_type) => match function.return_type.as_ref().cloned() {
+                Some(mut inner) => {
+                    println!("{}: {}", function.data.name, inner);
+                    if let Some(return_type) = return_type {
+                        let generics = function
+                            .generics
+                            .iter()
+                            .map(|(name, _)| (name.clone(), return_type.clone()))
+                            .collect::<HashMap<_, _>>();
+                        inner.degeneric(&generics, syntax).await;
+                    } else if let Some(calling) = args.get(0) {
+                        let other = calling.types.get_return(variables, syntax).await;
+                        if let Some(found) = other {
+                            println!("Degenericing with {} and {}", found, function.parent.as_ref().unwrap());
+                            let mut generics = HashMap::new();
+                            function
+                                .parent
+                                .as_ref()
+                                .unwrap()
+                                .resolve_generic(
+                                    &found,
+                                    syntax,
+                                    &mut generics,
+                                    ParsingError::new(Span::default(), "Unexpected error in get_return"),
+                                )
+                                .await
+                                .unwrap();
+                            println!("Found {:?}", generics);
+                            inner.degeneric(&generics, syntax).await;
+                        }
+                    }
+                    println!("{}: {}", function.data.name, inner);
+                    Some(FinalizedTypes::Reference(Box::new(inner)))
+                }
+                None => None,
+            },
+            Self::GenericMethodCall(function, _, _)
+            | Self::VirtualCall(_, function, _)
+            | Self::GenericVirtualCall(_, _, function, _) => {
+                function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
+            }
+            // Stores just return their inner type.
+            Self::HeapStore(inner) | Self::StackStore(inner) | Self::Set(_, inner) => {
+                inner.types.get_return(variables, syntax).await
+            }
+            // References return their inner type as well.
+            Self::ReferenceLoad(inner) => match inner.types.get_return(variables, syntax).await.unwrap() {
+                FinalizedTypes::Reference(inner) => Some(*inner),
+                _ => panic!("Tried to load non-reference!"),
+            },
+            _ => self.get_nongeneric_return(variables),
+        };
     }
 
     /// Degenericing replaces every instance of a generic function with its actual type.
@@ -429,7 +512,10 @@ impl FinalizedEffectType {
                     statement.effect.types.degeneric(process_manager, variables, syntax, span).await?;
                 }
             }
-            Self::MethodCall(calling, method, effects) => {
+            Self::MethodCall(calling, method, effects, return_type) => {
+                if let Some(found) = return_type {
+                    found.degeneric(process_manager.generics(), syntax).await;
+                }
                 if let Some(inner) = calling {
                     inner.types.degeneric(process_manager, variables, syntax, span).await?;
                 }
@@ -445,7 +531,7 @@ impl FinalizedEffectType {
                 let mut calling = effects.remove(0);
                 calling.types.degeneric(process_manager, variables, syntax, span).await?;
 
-                let implementor = calling.types.get_return(variables).unwrap();
+                let implementor = calling.types.get_return(variables, syntax).await.unwrap();
                 let implementation = ImplWaiter {
                     syntax: syntax.clone(),
                     return_type: implementor.clone(),
@@ -475,7 +561,8 @@ impl FinalizedEffectType {
                     None,
                 )
                 .await?;
-                *self = Self::MethodCall(None, function, effects.clone());
+                // TODO verify if none works here
+                *self = Self::MethodCall(None, function, effects.clone(), None);
             }
             // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
             Self::VirtualCall(_, _, effects) => {
@@ -546,7 +633,7 @@ pub async fn degeneric_header(
 ) -> Result<(), ParsingError> {
     let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
 
-    let return_type = arguments[0].types.get_return(&variables).unwrap();
+    let return_type = arguments[0].types.get_return(&variables, &syntax).await.unwrap();
     let (_, generics) = return_type.inner_generic_type().unwrap();
     assert_eq!(function.generics.len(), generics.len());
 

@@ -1,5 +1,6 @@
 use async_recursion::async_recursion;
 use data::tokens::Span;
+use std::sync::{Arc, Mutex};
 use syntax::async_util::UnparsedType;
 use syntax::code::{EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody};
@@ -34,7 +35,7 @@ pub async fn verify_code(
             verify_effect(code_verifier, variables, line.effect).await?,
         ));
 
-        if check_return_type(line.expression_type, code_verifier, &mut body, variables).await? {
+        if check_return_type(line.expression_type, code_verifier, &mut body, variables, &code_verifier.syntax).await? {
             return Ok(FinalizedCodeBody::new(body.clone(), code.label.clone(), true));
         }
     }
@@ -52,6 +53,7 @@ async fn check_return_type(
     code_verifier: &CodeVerifier<'_>,
     body: &mut Vec<FinalizedExpression>,
     variables: &SimpleVariableManager,
+    syntax: &Arc<Mutex<Syntax>>,
 ) -> Result<bool, ParsingError> {
     let span = match &line {
         ExpressionType::Return(span) => span.clone(),
@@ -65,7 +67,7 @@ async fn check_return_type(
 
     let last = body.pop().unwrap();
     let last_type;
-    if let Some(found) = last.effect.types.get_return(variables) {
+    if let Some(found) = last.effect.types.get_return(variables, syntax).await {
         last_type = found;
     } else {
         // This is an if/for/while block, skip it
@@ -144,17 +146,18 @@ pub async fn verify_effect(
         EffectType::Load(inner_effect, target) => {
             let output = verify_effect(code_verifier, variables, *inner_effect).await?;
 
-            let types = output.types.get_return(variables).unwrap().inner_struct().clone();
+            let types = output.types.get_return(variables, &code_verifier.syntax).await.unwrap().inner_struct().clone();
             FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::Load(Box::new(output), target.clone(), types))
         }
         EffectType::CreateVariable(name, inner_effect) => {
             let effect = verify_effect(code_verifier, variables, *inner_effect).await?;
             let found;
-            if let Some(temp_found) = effect.types.get_return(variables) {
+            if let Some(temp_found) = effect.types.get_return(variables, &code_verifier.syntax).await {
                 found = temp_found;
             } else {
                 return Err(effect.span.make_error("No return type!"));
             };
+
             variables.variables.insert(name.clone(), found.clone());
             FinalizedEffects::new(
                 effect.span.clone(),
@@ -167,7 +170,11 @@ pub async fn verify_effect(
                 output.push(verify_effect(code_verifier, variables, effect).await?);
             }
 
-            let types = output.first().map(|found| found.types.get_return(variables).unwrap());
+            let types = match output.first() {
+                Some(found) => found.types.get_return(variables, &code_verifier.syntax).await,
+                None => None,
+            };
+
             check_type(&types, &output, variables, code_verifier, &effect.span).await?;
 
             FinalizedEffects::new(effect.span.clone(), store(FinalizedEffectType::CreateArray(types, output)))
@@ -262,7 +269,7 @@ async fn check_type(
 ) -> Result<(), ParsingError> {
     if let Some(found) = types {
         for checking in output {
-            let returning = checking.types.get_return(variables).unwrap();
+            let returning = checking.types.get_return(variables, &code_verifier.syntax).await.unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
                 return Err(span.make_error("Incorrect types!"));
             }

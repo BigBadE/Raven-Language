@@ -5,7 +5,6 @@ use indexmap::IndexMap;
 use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::code::{Field, MemberField};
-use syntax::function::display_parenless;
 use syntax::r#struct::{get_internal, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::Types;
@@ -38,14 +37,13 @@ pub fn parse_structure(
         match token.token_type {
             TokenTypes::Identifier => {
                 name = token.to_string(parser_utils.buffer);
-                parser_utils.imports.parent = Some(name.clone());
+                parser_utils.imports.parent = Some(UnparsedType::Basic(name.clone()));
             }
             TokenTypes::GenericsStart => {
                 parse_generics(parser_utils, &mut generics);
-                parser_utils.imports.parent = Some(format!(
-                    "{}<{}>",
-                    parser_utils.imports.parent.as_ref().unwrap(),
-                    display_parenless(&generics.keys().collect(), ", ")
+                parser_utils.imports.parent = Some(UnparsedType::Generic(
+                    Box::new(parser_utils.imports.parent.clone().unwrap()),
+                    generics.keys().map(|key| UnparsedType::Basic(key.clone())).collect(),
                 ));
             }
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
@@ -142,7 +140,7 @@ pub fn parse_implementor(
                     base_span = Some(Span::new(parser_utils.file, parser_utils.index - 1));
                     state = 1;
                 } else {
-                    parser_utils.imports.parent = Some(name);
+                    parser_utils.imports.parent = temp.clone();
                     implementor = temp;
                     implementor_span = Some(Span::new(parser_utils.file, parser_utils.index - 1));
                 }
@@ -157,8 +155,9 @@ pub fn parse_implementor(
                         base_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     } else {
                         let found =
-                            UnparsedType::Generic(Box::new(implementor.unwrap()), parse_type_generics(parser_utils)?);
-                        implementor = Some(found);
+                            Some(UnparsedType::Generic(Box::new(implementor.unwrap()), parse_type_generics(parser_utils)?));
+                        parser_utils.imports.parent = found.clone();
+                        implementor = found;
                         implementor_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     }
                 }
@@ -172,9 +171,6 @@ pub fn parse_implementor(
                 }
             }
             TokenTypes::FunctionStart => {
-                if parser_utils.file_name == "self-impls" {
-                    println!("Found func");
-                }
                 let file = parser_utils.file_name.clone();
                 if parser_utils.file_name.is_empty() {
                     parser_utils.file_name = format!("{}_{}", base.as_ref().unwrap(), implementor.as_ref().unwrap());

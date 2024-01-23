@@ -211,6 +211,7 @@ impl<'a> ParserUtils<'a> {
                 code: CodeBody::new(Vec::default(), "empty".to_string()),
                 return_type: None,
                 data: Arc::new(FunctionData::new_poisoned(format!("${}", file), error)),
+                parent: None,
             },
         };
 
@@ -264,6 +265,7 @@ pub fn parse_generics(input: String, parser_utils: &mut ParserUtils) -> (Unparse
             }
         }
     }
+
     return (
         UnparsedType::Generic(Box::new(UnparsedType::Basic(input.clone())), unparsed_generics),
         Box::pin(to_generic(input, generics)),
@@ -334,7 +336,9 @@ fn inner_generic(
         }
     }
 
-    return (UnparsedType::Generic(Box::new(unparsed), unparsed_values), Box::pin(async_to_generic(outer, values)));
+    let types =
+        if unparsed_values.is_empty() { unparsed } else { UnparsedType::Generic(Box::new(unparsed), unparsed_values) };
+    return (types, Box::pin(async_to_generic(outer, values)));
 }
 
 /// Asynchronously gets a generic type from its base and bounds

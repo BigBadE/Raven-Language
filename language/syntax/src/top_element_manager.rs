@@ -88,31 +88,30 @@ impl<
         return match pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx)
         {
             Poll::Ready(inner) => match inner {
-                Ok(inner) => match inner {
-                    Some(found) => {
-                        for (types, trying) in found {
-                            for func in trying {
-                                match pin!((self.checker)(types.clone(), func)).poll(cx) {
-                                    Poll::Ready(found) => match found {
-                                        Ok(found) => return Poll::Ready(Ok(found)),
-                                        Err(_) => {}
-                                    },
-                                    Poll::Pending => return Poll::Pending,
+                Ok(inner) => {
+                    match inner {
+                        Some(found) => {
+                            for (types, trying) in found {
+                                for func in trying {
+                                    match pin!((self.checker)(types.clone(), func)).poll(cx) {
+                                        Poll::Ready(found) => match found {
+                                            Ok(found) => return Poll::Ready(Ok(found)),
+                                            Err(_) => {}
+                                        },
+                                        Poll::Pending => {}
+                                    }
                                 }
                             }
                         }
+                        None => {}
+                    }
+                    if self.syntax.lock().unwrap().finished_impls() {
+                        Poll::Ready(Err(self.error.clone()))
+                    } else {
                         self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
                         Poll::Pending
                     }
-                    None => {
-                        if self.syntax.lock().unwrap().finished_impls() {
-                            Poll::Ready(Err(self.error.clone()))
-                        } else {
-                            self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
-                            Poll::Pending
-                        }
-                    }
-                },
+                }
                 Err(error) => return Poll::Ready(Err(error)),
             },
             Poll::Pending => {

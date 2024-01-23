@@ -51,6 +51,10 @@ pub async fn verify_function(
         arguments: fields,
         return_type,
         data: function.data.clone(),
+        parent: match function.parent {
+            Some(found) => Some(found.await?.finalize(syntax.clone()).await),
+            None => None,
+        },
     };
 
     return Ok((codeless, function.code));

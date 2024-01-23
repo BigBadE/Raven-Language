@@ -19,7 +19,9 @@ impl<T> ArrayList<T> {
         };
     }
 
-    fn test() {
-        printf("Test!");
+    fn from_existing(array: [T]) -> ArrayList<T> {
+        return new ArrayList<T> {
+            array: array,
+        };
     }
 }

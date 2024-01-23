@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use syntax::async_util::AsyncDataGetter;
 use syntax::code::{EffectType, Effects, FinalizedEffectType, FinalizedEffects};
-use syntax::function::CodelessFinalizedFunction;
+use syntax::function::{CodelessFinalizedFunction, FunctionData};
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
@@ -54,7 +54,7 @@ pub async fn check_method_call(
     // Finds methods based off the calling type.
     let method = if let Some(found) = calling {
         let calling = verify_effect(code_verifier, variables, *found).await?;
-        let return_type: FinalizedTypes = calling.types.get_return(variables).unwrap();
+        let return_type: FinalizedTypes = calling.types.get_return(variables, &code_verifier.syntax).await.unwrap();
 
         // If it's generic, check its trait bounds for the method
         if return_type.name_safe().is_none() {
@@ -124,6 +124,7 @@ pub async fn check_method_call(
         }
 
         finalized_effects.insert(0, calling);
+
         if let Ok(value) = Syntax::get_function(
             code_verifier.syntax.clone(),
             ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Check method call"),
@@ -142,24 +143,25 @@ pub async fn check_method_call(
             let process_manager = code_verifier.process_manager;
             let syntax = &code_verifier.syntax;
             let span = &effect.span;
-            let checker =
-                async move |implementor: Arc<FinishedTraitImplementor>, method| -> Result<FinalizedEffects, ParsingError> {
-                    let method = AsyncDataGetter::new(syntax.clone(), method).await;
-                    let mut process_manager = process_manager.clone();
-                    implementor
-                        .base
-                        .resolve_generic(
-                            return_type,
-                            syntax,
-                            &mut process_manager.generics,
-                            ParsingError::new(
-                                Span::default(),
-                                "You shouldn't see this! Report this please! Location: Check method call (inner checker)",
-                            ),
-                        )
-                        .await?;
-                    check_method(&process_manager, method, effects.clone(), syntax, variables, returning.clone(), span).await
-                };
+            let checker = async move |implementor: Arc<FinishedTraitImplementor>,
+                                      method: Arc<FunctionData>|
+                        -> Result<FinalizedEffects, ParsingError> {
+                let method = AsyncDataGetter::new(syntax.clone(), method).await;
+                let mut process_manager = process_manager.clone();
+                implementor
+                    .base
+                    .resolve_generic(
+                        return_type,
+                        syntax,
+                        &mut process_manager.generics,
+                        ParsingError::new(
+                            Span::default(),
+                            "You shouldn't see this! Report this please! Location: Check method call (inner checker)",
+                        ),
+                    )
+                    .await?;
+                check_method(&process_manager, method, effects.clone(), syntax, variables, returning.clone(), span).await
+            };
 
             return TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
@@ -167,7 +169,7 @@ pub async fn check_method_call(
                 method: method.clone(),
                 return_type: return_type.clone(),
                 checker,
-                error: effect.span.make_error("Unknown method"),
+                error: effect.span.make_error("Unknown trait method"),
             }
             .await;
         }
@@ -175,6 +177,7 @@ pub async fn check_method_call(
         if method.contains("::") {
             let possible = method.split("::").collect::<Vec<_>>();
             let structure = possible[possible.len() - 2];
+
             if let Ok(structure) = Syntax::get_struct(
                 code_verifier.syntax.clone(),
                 ParsingError::new(
@@ -243,30 +246,13 @@ pub async fn check_method_call(
 /// The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(
     process_manager: &TypesChecker,
-    mut method: Arc<CodelessFinalizedFunction>,
+    method: Arc<CodelessFinalizedFunction>,
     mut effects: Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    returning: Option<(FinalizedTypes, Span)>,
+    generic_returning: Option<(FinalizedTypes, Span)>,
     span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
-    if !method.generics.is_empty() {
-        let manager = process_manager.clone();
-        method =
-            CodelessFinalizedFunction::degeneric(method, Box::new(manager), &effects, syntax, variables, returning).await?;
-
-        let temp_effect = match method.return_type.as_ref() {
-            Some(returning) => FinalizedEffectType::MethodCall(
-                Some(Box::new(FinalizedEffects::new(Span::default(), FinalizedEffectType::HeapAllocate(returning.clone())))),
-                method.clone(),
-                effects,
-            ),
-            None => FinalizedEffectType::MethodCall(None, method.clone(), effects),
-        };
-
-        return Ok(FinalizedEffects::new(span.clone(), temp_effect));
-    }
-
     if !check_args(&method, process_manager, &mut effects, syntax, variables, span).await {
         return Err(span.make_error("Incorrect args to method!"));
     }
@@ -278,9 +264,13 @@ pub async fn check_method(
                 Some(Box::new(FinalizedEffects::new(Span::default(), FinalizedEffectType::HeapAllocate(returning.clone())))),
                 method,
                 effects,
+                generic_returning.map(|(inner, _)| inner),
             ),
         ),
-        None => FinalizedEffects::new(span.clone(), FinalizedEffectType::MethodCall(None, method, effects)),
+        None => FinalizedEffects::new(
+            span.clone(),
+            FinalizedEffectType::MethodCall(None, method, effects, generic_returning.map(|(inner, _)| inner)),
+        ),
     });
 }
 
@@ -298,46 +288,49 @@ pub async fn check_args(
     }
 
     for i in 0..function.arguments.len() {
-        let mut returning = args[i].types.get_return(variables);
-        if returning.is_some() {
-            let inner = returning.as_mut().unwrap();
-            let other = &function.arguments[i].field.field_type;
-
-            inner.fix_generics(process_manager, syntax).await.unwrap();
-            if !inner.of_type(other, syntax.clone()).await {
-                return false;
-            }
-
-            // Only downcast if an implementation was found. Don't downcast if they're of the same type.
-            if !inner.of_type_sync(other, None).0 {
-                // Handle downcasting
-                let temp = args.remove(i);
-                let return_type = temp.types.get_return(variables).unwrap();
-                // Assumed to only be one function
-                let funcs = ImplWaiter {
-                    syntax: syntax.clone(),
-                    return_type,
-                    data: other.clone(),
-                    error: span.make_error("Failed to find impl! Report this!"),
-                }
-                .await
-                .unwrap();
-
-                // Make sure every function is finished adding
-                for func in &funcs {
-                    AsyncDataGetter::new(syntax.clone(), func.clone()).await;
-                }
-
-                args.insert(
-                    i,
-                    FinalizedEffects::new(
-                        temp.span.clone(),
-                        FinalizedEffectType::Downcast(Box::new(temp), other.clone(), funcs),
-                    ),
-                );
-            }
-        } else {
+        let mut returning = args[i].types.get_return(variables, syntax).await;
+        if !returning.is_some() {
             return false;
+        }
+        let inner = returning.as_mut().unwrap();
+        let other = &function.arguments[i].field.field_type;
+
+        inner.fix_generics(process_manager, syntax).await.unwrap();
+        if !inner.of_type(other, syntax.clone()).await {
+            println!("Fail! {} ({:?}) vs {}", inner, args[i], other);
+            return false;
+        }
+
+        // Only downcast if an implementation was found. Don't downcast if they're of the same type.
+        if !inner.of_type_sync(other, None).0 {
+            // Handle downcasting
+            let temp = args.remove(i);
+            let return_type = temp.types.get_return(variables, syntax).await.unwrap();
+
+            // Assumed to only be one function
+            let funcs = ImplWaiter {
+                syntax: syntax.clone(),
+                // u64
+                return_type,
+                // T: Number
+                data: other.clone(),
+                error: span.make_error("Failed to find impl! Report this!"),
+            }
+            .await
+            .unwrap();
+
+            // Make sure every function is finished adding
+            for func in &funcs {
+                AsyncDataGetter::new(syntax.clone(), func.clone()).await;
+            }
+
+            args.insert(
+                i,
+                FinalizedEffects::new(
+                    temp.span.clone(),
+                    FinalizedEffectType::Downcast(Box::new(temp), other.clone(), funcs),
+                ),
+            );
         }
     }
 

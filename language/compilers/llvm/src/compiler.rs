@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use dashmap::DashMap;
 use inkwell::builder::Builder;
@@ -7,6 +8,8 @@ use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
+
+use tokio::time;
 
 use data::tokens::Span;
 use data::CompilerArguments;
@@ -59,7 +62,11 @@ impl<'ctx> CompilerImpl<'ctx> {
             Err(_) => return None,
         };
 
-        let function = MainFuture { syntax: syntax.clone() }.await;
+        let function = match time::timeout(Duration::from_secs(2), MainFuture { syntax: syntax.clone() }).await {
+            Ok(found) => found,
+            Err(_) => panic!("Something went wrong with finding main!"),
+        };
+
         return Some(Arc::new(function.to_codeless()));
     }
 

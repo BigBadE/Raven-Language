@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::hash::{Hash, Hasher};
@@ -7,9 +8,10 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
+use indexmap::IndexMap;
+
 use async_trait::async_trait;
 use data::tokens::Span;
-use indexmap::IndexMap;
 
 use crate::async_util::{AsyncDataGetter, HandleWrapper, NameResolver};
 use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
@@ -92,6 +94,7 @@ impl TopElement for FunctionData {
         let name = current.data.name.clone();
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
+
         // Finalize the code and combine it with the codeless finalized function.
         let mut finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
 
@@ -125,6 +128,8 @@ pub struct UnfinalizedFunction {
     pub return_type: Option<ParsingFuture<Types>>,
     /// The function's data
     pub data: Arc<FunctionData>,
+    /// The function's parent
+    pub parent: Option<ParsingFuture<Types>>,
 }
 
 /// Gives generic access to the function data.
@@ -148,6 +153,8 @@ pub struct CodelessFinalizedFunction {
     pub return_type: Option<FinalizedTypes>,
     /// The function's data
     pub data: Arc<FunctionData>,
+    /// The parent structure
+    pub parent: Option<FinalizedTypes>,
 }
 
 impl CodelessFinalizedFunction {
@@ -190,6 +197,13 @@ impl CodelessFinalizedFunction {
         variables: &SimpleVariableManager,
         returning: Option<(FinalizedTypes, Span)>,
     ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
+        *manager.mut_generics() = method
+            .generics
+            .clone()
+            .into_iter()
+            .map(|(name, types)| (name.clone(), FinalizedTypes::Generic(name, types)))
+            .collect::<HashMap<_, _>>();
+
         // Degenerics the return type if there is one and returning is some.
         if let Some(inner) = method.return_type.clone() {
             if let Some((returning, span)) = returning {
@@ -201,7 +215,7 @@ impl CodelessFinalizedFunction {
 
         //Degenerics the arguments to the method
         for i in 0..method.arguments.len() {
-            let mut effect = arguments[i].types.get_return(variables).unwrap();
+            let mut effect = arguments[i].types.get_return(variables, syntax).await.unwrap();
 
             effect.fix_generics(&*manager, syntax).await?;
             match method.arguments[i]
@@ -355,6 +369,7 @@ impl FinalizedFunction {
             arguments: self.fields.clone(),
             return_type: self.return_type.clone(),
             data: self.data.clone(),
+            parent: None,
         };
     }
 

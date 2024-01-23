@@ -156,7 +156,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
         // Check each import if the element is in those files.
         for import in self.name_resolver.imports().clone() {
-            if let Some(output) = self.get_types(&mut locked, import, cx.waker().clone(), not_trait) {
+            if let Some(output) = self.get_types(&mut locked, import.clone(), cx.waker().clone(), not_trait) {
                 self.clean_up(&mut locked, self.name_resolver.imports());
                 return Poll::Ready(output);
             }

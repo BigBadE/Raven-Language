@@ -53,6 +53,7 @@ impl ProcessManager for TypesChecker {
                     arguments: vec![],
                     return_type: None,
                     data: Arc::new(FunctionData::new(Vec::default(), 0, String::default(), Span::default())),
+                    parent: None,
                 },
                 CodeBody::new(Vec::default(), String::default()),
             )
