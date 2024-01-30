@@ -26,6 +26,8 @@ pub mod check_method_call;
 pub mod check_operator;
 /// Checks structs
 pub mod check_struct;
+/// Degenerics types
+pub mod degeneric;
 /// Used to send data to be checked by the checker and then send the result to the compiler
 pub mod output;
 

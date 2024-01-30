@@ -257,115 +257,6 @@ pub enum FinalizedEffectType {
 }
 
 impl FinalizedEffectType {
-    /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
-    #[async_recursion]
-    // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
-    pub async fn flatten(
-        &mut self,
-        syntax: &Arc<Mutex<Syntax>>,
-        process_manager: &dyn ProcessManager,
-        variables: &mut SimpleVariableManager,
-    ) -> Result<(), ParsingError> {
-        match self {
-            Self::CreateVariable(name, value, types) => {
-                // TODO check if the variable should be flattened
-                variables.variables.insert(name.clone(), types.clone());
-                value.types.flatten(syntax, process_manager, variables).await?;
-                types.flatten(syntax).await?;
-            }
-            Self::CompareJump(effect, _, _) => effect.types.flatten(syntax, process_manager, variables).await?,
-            Self::CodeBody(body) => body.flatten(syntax, process_manager, variables).await?,
-            Self::MethodCall(calling, function, arguments, _return_type) => {
-                if let Some(found) = calling {
-                    found.types.flatten(syntax, process_manager, variables).await?;
-                }
-                *function = CodelessFinalizedFunction::degeneric(
-                    function.clone(),
-                    process_manager.cloned(),
-                    arguments,
-                    syntax,
-                    variables,
-                    None,
-                )
-                .await?;
-                *function = function.flatten(syntax).await?;
-                for argument in arguments {
-                    argument.types.flatten(syntax, process_manager, variables).await?;
-                }
-            }
-            Self::GenericMethodCall(function, types, arguments) => {
-                types.flatten(syntax).await?;
-                *function = function.flatten(syntax).await?;
-                *function = CodelessFinalizedFunction::degeneric(
-                    function.clone(),
-                    process_manager.cloned(),
-                    arguments,
-                    syntax,
-                    variables,
-                    None,
-                )
-                .await?;
-                for argument in arguments {
-                    argument.types.flatten(syntax, process_manager, variables).await?;
-                }
-            }
-            Self::Set(base, value) => {
-                base.types.flatten(syntax, process_manager, variables).await?;
-                value.types.flatten(syntax, process_manager, variables).await?;
-            }
-            Self::Load(base, _, _) => {
-                base.types.flatten(syntax, process_manager, variables).await?;
-            }
-            Self::CreateStruct(storing, types, effects) => {
-                if let Some(found) = storing {
-                    found.types.flatten(syntax, process_manager, variables).await?;
-                }
-                types.flatten(syntax).await?;
-                for (_, found) in effects {
-                    found.types.flatten(syntax, process_manager, variables).await?;
-                }
-            }
-            Self::CreateArray(types, effects) => {
-                if let Some(found) = types {
-                    found.flatten(syntax).await?;
-                }
-                for effect in effects {
-                    effect.types.flatten(syntax, process_manager, variables).await?;
-                }
-            }
-            Self::VirtualCall(_, function, effects) => {
-                *function = CodelessFinalizedFunction::degeneric(
-                    function.clone(),
-                    process_manager.cloned(),
-                    effects,
-                    syntax,
-                    variables,
-                    None,
-                )
-                .await?;
-                *function = function.flatten(syntax).await?;
-                for effect in effects {
-                    effect.types.flatten(syntax, process_manager, variables).await?;
-                }
-            }
-            Self::GenericVirtualCall(_, _, _, effects) => {
-                for effect in effects {
-                    effect.types.flatten(syntax, process_manager, variables).await?;
-                }
-            }
-            Self::Downcast(base, target, _) => {
-                base.types.flatten(syntax, process_manager, variables).await?;
-                target.flatten(syntax).await?;
-            }
-            Self::HeapStore(storing) => storing.types.flatten(syntax, process_manager, variables).await?,
-            Self::HeapAllocate(types) => types.flatten(syntax).await?,
-            Self::ReferenceLoad(base) => base.types.flatten(syntax, process_manager, variables).await?,
-            Self::StackStore(storing) => storing.types.flatten(syntax, process_manager, variables).await?,
-            _ => {}
-        }
-        return Ok(());
-    }
-
     /// get_return is async to handle special cases with function return types being generic.
     /// This can only be called on degenericed types and as such can be sync
     pub fn get_nongeneric_return(&self, variables: &dyn VariableManager) -> Option<FinalizedTypes> {
@@ -486,20 +377,6 @@ impl FinalizedEffectType {
         span: &Span,
     ) -> Result<(), ParsingError> {
         match self {
-            // Recursively searches nested effects for method calls.
-            Self::LoadVariable(variable) => {
-                variables.variables.get_mut(variable).unwrap().degeneric(process_manager.generics(), syntax).await
-            }
-            Self::Load(effect, _, types) => {
-                effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                *types = FinalizedStruct::clone(types).degeneric(process_manager.generics(), syntax).await;
-            }
-            Self::NOP | Self::Jump(_) | Self::Float(_) | Self::UInt(_) | Self::Bool(_) | Self::String(_) | Self::Char(_) => {
-            }
-            Self::CreateVariable(_, first, other) => {
-                first.types.degeneric(process_manager, variables, syntax, span).await?;
-                other.degeneric(process_manager.generics(), syntax).await;
-            }
             Self::CompareJump(effect, _, _)
             | Self::HeapStore(effect)
             | Self::ReferenceLoad(effect)
@@ -521,8 +398,7 @@ impl FinalizedEffectType {
                     effect.types.degeneric(&*manager, variables, syntax, span).await?;
                 }
                 // Calls the degeneric method on the method.
-                *method =
-                    CodelessFinalizedFunction::degeneric(method.clone(), manager, effects, syntax, variables, None).await?;
+                *method = degeneric_function(method.clone(), manager, effects, syntax, variables, None).await?;
             }
             Self::GenericMethodCall(function, found_trait, effects) => {
                 let mut calling = effects.remove(0);
@@ -616,61 +492,4 @@ impl FinalizedEffectType {
         }
         return Ok(());
     }
-}
-
-/// Degeneric's a function header
-pub async fn degeneric_header(
-    degenericed: Arc<FunctionData>,
-    base: Arc<FunctionData>,
-    syntax: Arc<Mutex<Syntax>>,
-    mut manager: Box<dyn ProcessManager>,
-    arguments: Vec<FinalizedEffects>,
-    variables: SimpleVariableManager,
-    span: Span,
-) -> Result<(), ParsingError> {
-    let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
-
-    let return_type = arguments[0].types.get_return(&variables, &syntax).await.unwrap();
-    let (_, generics) = return_type.inner_generic_type().unwrap();
-    assert_eq!(function.generics.len(), generics.len());
-
-    let mut iterator = function.generics.iter();
-    for generic in generics {
-        let (name, bounds) = iterator.next().unwrap();
-        for bound in bounds {
-            if !generic.of_type(bound, syntax.clone()).await {
-                return Err(span.make_error("Failed bounds sanity check!"));
-            }
-        }
-        manager.mut_generics().insert(name.clone(), generic.clone());
-    }
-
-    // Copy the method and degeneric every type inside of it.
-    let mut new_method = CodelessFinalizedFunction::clone(&function);
-    // Delete the generics because now they are all solidified.
-    new_method.generics.clear();
-    new_method.data = degenericed;
-
-    // Degeneric the arguments.
-    for arguments in &mut new_method.arguments {
-        arguments.field.field_type.degeneric(&manager.generics(), &syntax).await;
-    }
-
-    // Degeneric the return type if there is one.
-    if let Some(returning) = &mut new_method.return_type {
-        returning.degeneric(&manager.generics(), &syntax).await;
-    }
-
-    let new_method = Arc::new(new_method);
-
-    let mut code =
-        CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(vec![], "empty".to_string(), true));
-    code.flatten(&syntax, &*manager).await?;
-
-    let mut locked = syntax.lock().unwrap();
-    locked.functions.add_type(new_method.data.clone());
-    locked.functions.add_data(new_method.data.clone(), new_method.clone());
-
-    // Give the compiler the empty body
-    return Ok(());
 }

@@ -1,20 +1,15 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Display};
-use std::future::Future;
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::task::{Context, Poll};
 
 use indexmap::IndexMap;
 
 use async_trait::async_trait;
 use data::tokens::Span;
 
-use crate::async_util::{AsyncDataGetter, HandleWrapper, NameResolver};
-use crate::code::{Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
+use crate::async_util::{HandleWrapper, NameResolver};
+use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
 use crate::{
     is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, SimpleVariableManager, Syntax,
@@ -182,169 +177,6 @@ impl CodelessFinalizedFunction {
 
         return Ok(Arc::new(output));
     }
-
-    /// Makes a copy of the CodelessFinalizedFunction with all the generics solidified into their actual type.
-    /// Figures out the solidified types by comparing generics against the input effect types,
-    /// then replaces all generic types with their solidified types.
-    /// This can't always figure out return types, so an optional return type variable is passed as well
-    /// for function calls that include them (see EffectType::MethodCall)
-    /// The VariableManager here is for the arguments to the function, and not for the function itself.
-    pub async fn degeneric(
-        method: Arc<CodelessFinalizedFunction>,
-        mut manager: Box<dyn ProcessManager>,
-        arguments: &Vec<FinalizedEffects>,
-        syntax: &Arc<Mutex<Syntax>>,
-        variables: &SimpleVariableManager,
-        returning: Option<(FinalizedTypes, Span)>,
-    ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
-        *manager.mut_generics() = method
-            .generics
-            .clone()
-            .into_iter()
-            .map(|(name, types)| (name.clone(), FinalizedTypes::Generic(name, types)))
-            .collect::<HashMap<_, _>>();
-
-        // Degenerics the return type if there is one and returning is some.
-        if let Some(inner) = method.return_type.clone() {
-            if let Some((returning, span)) = returning {
-                inner
-                    .resolve_generic(&returning, syntax, manager.mut_generics(), span.make_error("Invalid bounds!"))
-                    .await?;
-            }
-        }
-
-        //Degenerics the arguments to the method
-        for i in 0..method.arguments.len() {
-            let mut effect = arguments[i].types.get_return(variables, syntax).await.unwrap();
-
-            effect.fix_generics(&*manager, syntax).await?;
-            match method.arguments[i]
-                .field
-                .field_type
-                .resolve_generic(&effect, syntax, manager.mut_generics(), arguments[i].span.make_error("Invalid bounds!"))
-                .await
-            {
-                Ok(_) => {}
-                Err(error) => {
-                    return Err(error);
-                }
-            }
-        }
-
-        if manager.generics().is_empty() {
-            return Ok(method);
-        }
-
-        // Now all the generic types have been resolved, it's time to replace them with
-        // their solidified versions.
-        // Degenericed function names have a $ seperating the name and the generics.
-        let name = format!(
-            "{}${}",
-            method.data.name.split("$").next().unwrap(),
-            display_parenless(&manager.generics().values().collect(), "_")
-        );
-        // If this function has already been degenericed, use the previous one.
-        if syntax.lock().unwrap().functions.types.contains_key(&name) {
-            let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
-            return Ok(AsyncDataGetter::new(syntax.clone(), data).await);
-        } else {
-            // Copy the method and degeneric every type inside of it.
-            let mut new_method = CodelessFinalizedFunction::clone(&method);
-            // Delete the generics because now they are all solidified.
-            new_method.generics.clear();
-            let mut method_data = FunctionData::clone(&method.data);
-            method_data.name.clone_from(&name);
-            new_method.data = Arc::new(method_data);
-            // Degeneric the arguments.
-            for argument in &mut new_method.arguments {
-                argument.field.field_type.degeneric(&manager.generics(), syntax).await;
-            }
-
-            // Degeneric the return type if there is one.
-            if let Some(method_returning) = &mut new_method.return_type {
-                method_returning.degeneric(&manager.generics(), syntax).await;
-            }
-
-            // Add the new degenericed static data to the locked function.
-            let original = method;
-            let new_method = Arc::new(new_method);
-            let mut locked = syntax.lock().unwrap();
-            // Since Syntax can't be locked this whole time, sometimes someone else can beat this method to the punch.
-            // It's super rare to happen, but if it does just give up
-            // TODO figure out of this is required
-            /*if syntax.lock().unwrap().functions.types.contains_key(&name) {
-                return Ok(new_method);
-            }*/
-            locked.functions.add_type(new_method.data.clone());
-            locked.functions.add_data(new_method.data.clone(), new_method.clone());
-
-            // Spawn a thread to asynchronously degeneric the code inside the function.
-            let handle = manager.handle().clone();
-            handle
-                .lock()
-                .unwrap()
-                .spawn(new_method.data.name.clone(), degeneric_code(syntax.clone(), original, new_method.clone(), manager));
-
-            return Ok(new_method);
-        };
-    }
-}
-
-/// A waiter used by generics trying to degeneric a function that returns when the target function's
-/// code is in the compiling list
-struct GenericWaiter {
-    /// The program
-    syntax: Arc<Mutex<Syntax>>,
-    /// Name of the function to wait for
-    data: Arc<FunctionData>,
-}
-
-impl Future for GenericWaiter {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().compiling.contains_key(&self.data.name) {
-            Poll::Ready(())
-        } else {
-            self.syntax
-                .lock()
-                .unwrap()
-                .compiling_wakers
-                .entry(self.data.name.clone())
-                .or_insert(vec![])
-                .push(cx.waker().clone());
-            Poll::Pending
-        };
-    }
-}
-
-/// Degenerics the code body of the method.
-async fn degeneric_code(
-    syntax: Arc<Mutex<Syntax>>,
-    original: Arc<CodelessFinalizedFunction>,
-    degenericed_method: Arc<CodelessFinalizedFunction>,
-    manager: Box<dyn ProcessManager>,
-) {
-    // This has to wait until the original is ready to be compiled.
-    GenericWaiter { syntax: syntax.clone(), data: original.data.clone() }.await;
-
-    // Gets a clone of the code of the original.
-    let code = syntax.lock().unwrap().compiling.get(&original.data.name).unwrap().code.clone();
-
-    let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
-    // Degenerics the code body.
-    let code = match code.degeneric(&*manager, &mut variables, &syntax).await {
-        Ok(inner) => inner,
-        Err(error) => panic!("Error degenericing code: {}", error.message),
-    };
-
-    // Combines the degenericed function with the degenericed code to finalize it.
-    let mut output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
-    output.flatten(&syntax, &*manager).await.unwrap();
-
-    // Sends the finalized function to be compiled.
-    let mut locked = syntax.lock().unwrap();
-    locked.add_compiling(Arc::new(output));
 }
 
 /// A finalized function, which is ready to be compiled and has been checked of any errors.
@@ -421,34 +253,6 @@ impl FinalizedCodeBody {
     /// Creates a new code body
     pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: bool) -> Self {
         return Self { label, expressions, returns };
-    }
-
-    /// Flattens a body of code
-    pub async fn flatten(
-        &mut self,
-        syntax: &Arc<Mutex<Syntax>>,
-        process_manager: &dyn ProcessManager,
-        variables: &mut SimpleVariableManager,
-    ) -> Result<(), ParsingError> {
-        for line in &mut self.expressions {
-            line.effect.types.flatten(syntax, process_manager, variables).await?;
-        }
-        return Ok(());
-    }
-
-    /// Degenerics every effect inside the body of code.
-    pub async fn degeneric(
-        mut self,
-        process_manager: &dyn ProcessManager,
-        variables: &mut SimpleVariableManager,
-        syntax: &Arc<Mutex<Syntax>>,
-    ) -> Result<FinalizedCodeBody, ParsingError> {
-        for expression in &mut self.expressions {
-            expression.effect.types.degeneric(process_manager, variables, syntax, &expression.effect.span).await?;
-            println!("Degeneric'd {:?}", expression.effect);
-        }
-
-        return Ok(self);
     }
 }
 

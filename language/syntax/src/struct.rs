@@ -248,35 +248,6 @@ impl FinalizedStruct {
     pub fn empty_of(data: StructData) -> Self {
         return Self { generics: IndexMap::default(), fields: Vec::default(), data: Arc::new(data) };
     }
-
-    /// Degenerics a finalized struct
-    pub async fn degeneric(
-        mut self,
-        generics: &HashMap<String, FinalizedTypes>,
-        syntax: &Arc<Mutex<Syntax>>,
-    ) -> Arc<FinalizedStruct> {
-        let targets: Vec<_> =
-            generics.iter().filter(|(key, _)| self.generics.contains_key(*key)).map(|(_, value)| value).collect();
-        if targets.is_empty() {
-            return Arc::new(self);
-        }
-        let mut data = StructData::clone(&self.data);
-        let name = format!("{}${}", data.name, display_parenless(&targets, "_"));
-        data.name.clone_from(&name);
-        self.generics.clear();
-        for field in &mut self.fields {
-            field.field.field_type.degeneric(generics, syntax).await;
-        }
-
-        let mut locked = syntax.lock().unwrap();
-        locked.structures.set_id(&mut data);
-        self.data = Arc::new(data);
-        let output = Arc::new(self);
-
-        locked.structures.add_type(output.data.clone());
-        locked.structures.add_data(output.data.clone(), output.clone());
-        return output;
-    }
 }
 
 #[async_trait]
