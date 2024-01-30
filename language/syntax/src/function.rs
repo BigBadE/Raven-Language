@@ -271,6 +271,7 @@ impl CodelessFinalizedFunction {
             let mut locked = syntax.lock().unwrap();
             // Since Syntax can't be locked this whole time, sometimes someone else can beat this method to the punch.
             // It's super rare to happen, but if it does just give up
+            // TODO figure out of this is required
             /*if syntax.lock().unwrap().functions.types.contains_key(&name) {
                 return Ok(new_method);
             }*/
@@ -444,6 +445,7 @@ impl FinalizedCodeBody {
     ) -> Result<FinalizedCodeBody, ParsingError> {
         for expression in &mut self.expressions {
             expression.effect.types.degeneric(process_manager, variables, syntax, &expression.effect.span).await?;
+            println!("Degeneric'd {:?}", expression.effect);
         }
 
         return Ok(self);

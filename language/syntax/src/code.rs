@@ -268,9 +268,10 @@ impl FinalizedEffectType {
     ) -> Result<(), ParsingError> {
         match self {
             Self::CreateVariable(name, value, types) => {
+                // TODO check if the variable should be flattened
+                variables.variables.insert(name.clone(), types.clone());
                 value.types.flatten(syntax, process_manager, variables).await?;
                 types.flatten(syntax).await?;
-                variables.variables.insert(name.clone(), types.clone());
             }
             Self::CompareJump(effect, _, _) => effect.types.flatten(syntax, process_manager, variables).await?,
             Self::CodeBody(body) => body.flatten(syntax, process_manager, variables).await?,
@@ -425,7 +426,6 @@ impl FinalizedEffectType {
         return match self {
             Self::MethodCall(_, function, args, return_type) => match function.return_type.as_ref().cloned() {
                 Some(mut inner) => {
-                    println!("{}: {}", function.data.name, inner);
                     if let Some(return_type) = return_type {
                         let generics = function
                             .generics
@@ -436,7 +436,6 @@ impl FinalizedEffectType {
                     } else if let Some(calling) = args.get(0) {
                         let other = calling.types.get_return(variables, syntax).await;
                         if let Some(found) = other {
-                            println!("Degenericing with {} and {}", found, function.parent.as_ref().unwrap());
                             let mut generics = HashMap::new();
                             function
                                 .parent
@@ -450,11 +449,9 @@ impl FinalizedEffectType {
                                 )
                                 .await
                                 .unwrap();
-                            println!("Found {:?}", generics);
                             inner.degeneric(&generics, syntax).await;
                         }
                     }
-                    println!("{}: {}", function.data.name, inner);
                     Some(FinalizedTypes::Reference(Box::new(inner)))
                 }
                 None => None,
@@ -490,20 +487,20 @@ impl FinalizedEffectType {
     ) -> Result<(), ParsingError> {
         match self {
             // Recursively searches nested effects for method calls.
-            Self::NOP
-            | Self::Jump(_)
-            | Self::LoadVariable(_)
-            | Self::Float(_)
-            | Self::UInt(_)
-            | Self::Bool(_)
-            | Self::String(_)
-            | Self::Char(_) => {}
+            Self::LoadVariable(variable) => {
+                variables.variables.get_mut(variable).unwrap().degeneric(process_manager.generics(), syntax).await
+            }
+            Self::Load(effect, _, types) => {
+                effect.types.degeneric(process_manager, variables, syntax, span).await?;
+                *types = FinalizedStruct::clone(types).degeneric(process_manager.generics(), syntax).await;
+            }
+            Self::NOP | Self::Jump(_) | Self::Float(_) | Self::UInt(_) | Self::Bool(_) | Self::String(_) | Self::Char(_) => {
+            }
             Self::CreateVariable(_, first, other) => {
                 first.types.degeneric(process_manager, variables, syntax, span).await?;
                 other.degeneric(process_manager.generics(), syntax).await;
             }
             Self::CompareJump(effect, _, _)
-            | Self::Load(effect, _, _)
             | Self::HeapStore(effect)
             | Self::ReferenceLoad(effect)
             | Self::StackStore(effect) => effect.types.degeneric(process_manager, variables, syntax, span).await?,
@@ -516,13 +513,13 @@ impl FinalizedEffectType {
                 if let Some(found) = return_type {
                     found.degeneric(process_manager.generics(), syntax).await;
                 }
+                let manager: Box<dyn ProcessManager> = process_manager.cloned();
                 if let Some(inner) = calling {
-                    inner.types.degeneric(process_manager, variables, syntax, span).await?;
+                    inner.types.degeneric(&*manager, variables, syntax, span).await?;
                 }
                 for effect in &mut *effects {
-                    effect.types.degeneric(process_manager, variables, syntax, span).await?;
+                    effect.types.degeneric(&*manager, variables, syntax, span).await?;
                 }
-                let manager: Box<dyn ProcessManager> = process_manager.cloned();
                 // Calls the degeneric method on the method.
                 *method =
                     CodelessFinalizedFunction::degeneric(method.clone(), manager, effects, syntax, variables, None).await?;

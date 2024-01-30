@@ -297,7 +297,6 @@ pub async fn check_args(
 
         inner.fix_generics(process_manager, syntax).await.unwrap();
         if !inner.of_type(other, syntax.clone()).await {
-            println!("Fail! {} ({:?}) vs {}", inner, args[i], other);
             return false;
         }
 

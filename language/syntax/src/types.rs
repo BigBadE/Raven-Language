@@ -487,8 +487,6 @@ impl FinalizedTypes {
             FinalizedTypes::Generic(name, _) => {
                 if let Some(found) = generics.get(name) {
                     self.clone_from(found);
-                } else {
-                    panic!("Missing generic type: {} and {:?}", self, generics.keys().collect::<Vec<_>>());
                 }
             }
             FinalizedTypes::GenericType(base, bounds) => {
