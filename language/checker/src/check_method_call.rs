@@ -102,16 +102,7 @@ pub async fn check_method_call(
             .await?;
             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
-            if !check_args(
-                &method,
-                code_verifier.process_manager,
-                &mut finalized_effects,
-                &code_verifier.syntax,
-                variables,
-                &effect.span,
-            )
-            .await
-            {
+            if !check_args(&method, &mut finalized_effects, &code_verifier.syntax, variables, &effect.span).await {
                 return Err(effect.span.make_error("Incorrect args to method"));
             }
 
@@ -253,7 +244,7 @@ pub async fn check_method(
     generic_returning: Option<(FinalizedTypes, Span)>,
     span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
-    if !check_args(&method, process_manager, &mut effects, syntax, variables, span).await {
+    if !check_args(&method, &mut effects, syntax, variables, span).await {
         return Err(span.make_error("Incorrect args to method!"));
     }
 
@@ -277,7 +268,6 @@ pub async fn check_method(
 /// Checks to see if arguments are valid
 pub async fn check_args(
     function: &Arc<CodelessFinalizedFunction>,
-    process_manager: &dyn ProcessManager,
     args: &mut Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
@@ -295,7 +285,6 @@ pub async fn check_args(
         let inner = returning.as_mut().unwrap();
         let other = &function.arguments[i].field.field_type;
 
-        inner.fix_generics(process_manager, syntax).await.unwrap();
         if !inner.of_type(other, syntax.clone()).await {
             return false;
         }

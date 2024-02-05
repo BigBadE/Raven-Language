@@ -15,7 +15,7 @@ use syntax::function::{display_parenless, CodelessFinalizedFunction, FinalizedCo
 use syntax::r#struct::{FinalizedStruct, StructData};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use syntax::{ProcessManager, SimpleVariableManager, TopElement};
+use syntax::{ProcessManager, SimpleVariableManager};
 
 /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
 #[async_recursion]
@@ -141,10 +141,9 @@ pub async fn degeneric_function(
 
     //Degenerics the arguments to the method
     for i in 0..method.arguments.len() {
-        let mut effect = get_return(&arguments[i].types, variables, syntax).await.unwrap();
+        let effect = get_return(&arguments[i].types, variables, syntax).await.unwrap();
 
-        println!("Degenericing for {}", method.data.name);
-        effect.fix_generics(&*manager, syntax).await?;
+        //println!("Degenericing for {}", method.data.name);
         match method.arguments[i]
             .field
             .field_type

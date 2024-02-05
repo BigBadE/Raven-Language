@@ -105,7 +105,7 @@ impl Syntax {
         syntax: &Arc<Mutex<Syntax>>,
     ) {
         {
-            let mut locked = syntax.lock().unwrap();
+            let locked = syntax.lock().unwrap();
             if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
                 for waker in found {
                     waker.wake_by_ref();

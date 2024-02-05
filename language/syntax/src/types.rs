@@ -18,7 +18,7 @@ use crate::function::{display, display_parenless, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 use crate::top_element_manager::TypeImplementsTypeWaiter;
-use crate::{is_modifier, Modifier, ParsingError, ProcessManager, StructData};
+use crate::{is_modifier, Modifier, ParsingError, StructData};
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
 /// For example, "test" is a Struct called str, which is an internal type.
@@ -97,31 +97,6 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => inner.id(),
             _ => panic!("Tried to ID generic!"),
         };
-    }
-
-    /// Fixes generics by replacing any generic references lacking bounds with their bounds
-    #[async_recursion]
-    pub async fn fix_generics(
-        &mut self,
-        resolver: &dyn ProcessManager,
-        syntax: &Arc<Mutex<Syntax>>,
-    ) -> Result<(), ParsingError> {
-        match self {
-            FinalizedTypes::Struct(_) => {}
-            FinalizedTypes::Reference(inner) => inner.fix_generics(resolver, syntax).await?,
-            FinalizedTypes::Array(inner) => inner.fix_generics(resolver, syntax).await?,
-            FinalizedTypes::Generic(name, _) => {
-                //skipcq: RS-W1070 Can't use clone_from because self is borrowed mutably
-                *self = resolver.generics()[name].clone();
-            }
-            FinalizedTypes::GenericType(base, bounds) => {
-                base.fix_generics(resolver, syntax).await?;
-                for bound in bounds {
-                    bound.fix_generics(resolver, syntax).await?;
-                }
-            }
-        }
-        return Ok(());
     }
 
     /// Gets the fields of the type. Useful for creating a new struct or getting data from a field of a struct.

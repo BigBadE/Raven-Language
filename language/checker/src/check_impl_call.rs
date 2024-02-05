@@ -38,13 +38,12 @@ pub async fn check_impl_call(
         unreachable!()
     }
 
-    let mut finding_return_type;
+    let finding_return_type;
     if matches!(calling.types, EffectType::NOP) {
         finding_return_type = FinalizedTypes::Struct(VOID.clone());
     } else {
         let found = verify_effect(code_verifier, variables, *calling).await?;
         finding_return_type = get_return(&found.types, variables, &code_verifier.syntax).await.unwrap();
-        finding_return_type.fix_generics(code_verifier.process_manager, &code_verifier.syntax).await?;
         finalized_effects.insert(0, found);
     }
 

@@ -210,7 +210,7 @@ async fn verify_create_struct(
     effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
-    let mut target = Syntax::parse_type(
+    let target = Syntax::parse_type(
         code_verifier.syntax.clone(),
         ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Verify create struct"),
         code_verifier.resolver.boxed_clone(),
