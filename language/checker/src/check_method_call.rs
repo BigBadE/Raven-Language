@@ -11,7 +11,7 @@ use syntax::{is_modifier, FinishedTraitImplementor, Modifier, ParsingError, Proc
 
 use crate::check_code::verify_effect;
 use crate::output::TypesChecker;
-use crate::CodeVerifier;
+use crate::{get_return, CodeVerifier};
 
 /// Checks a method call to make sure it's valid
 pub async fn check_method_call(
@@ -54,7 +54,7 @@ pub async fn check_method_call(
     // Finds methods based off the calling type.
     let method = if let Some(found) = calling {
         let calling = verify_effect(code_verifier, variables, *found).await?;
-        let return_type: FinalizedTypes = calling.types.get_return(variables, &code_verifier.syntax).await.unwrap();
+        let return_type: FinalizedTypes = get_return(&calling.types, variables, &code_verifier.syntax).await.unwrap();
 
         // If it's generic, check its trait bounds for the method
         if return_type.name_safe().is_none() {
@@ -288,7 +288,7 @@ pub async fn check_args(
     }
 
     for i in 0..function.arguments.len() {
-        let mut returning = args[i].types.get_return(variables, syntax).await;
+        let mut returning = get_return(&args[i].types, variables, syntax).await;
         if !returning.is_some() {
             return false;
         }
@@ -304,7 +304,7 @@ pub async fn check_args(
         if !inner.of_type_sync(other, None).0 {
             // Handle downcasting
             let temp = args.remove(i);
-            let return_type = temp.types.get_return(variables, syntax).await.unwrap();
+            let return_type = get_return(&temp.types, variables, syntax).await.unwrap();
 
             // Assumed to only be one function
             let funcs = ImplWaiter {

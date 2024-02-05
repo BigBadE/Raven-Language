@@ -2,15 +2,20 @@
 
 extern crate core;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use async_recursion::async_recursion;
+use data::tokens::Span;
 use indexmap::IndexMap;
 
+use crate::degeneric::degeneric_type;
 use syntax::async_util::NameResolver;
+use syntax::code::FinalizedEffectType;
 use syntax::syntax::Syntax;
 use syntax::types::{FinalizedTypes, Types};
-use syntax::{ParsingError, ParsingFuture};
+use syntax::{ParsingError, ParsingFuture, SimpleVariableManager};
 
 use crate::output::TypesChecker;
 
@@ -31,7 +36,7 @@ pub mod degeneric;
 /// Used to send data to be checked by the checker and then send the result to the compiler
 pub mod output;
 
-/// Finalizes an IndexMap of generics into FinalizedTypes
+/// Finalizes an IndexMap of generics into FinalizedEffectType
 pub async fn finalize_generics(
     syntax: &Arc<Mutex<Syntax>>,
     generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
@@ -53,4 +58,63 @@ pub struct CodeVerifier<'a> {
     resolver: Box<dyn NameResolver>,
     return_type: Option<FinalizedTypes>,
     syntax: Arc<Mutex<Syntax>>,
+}
+
+/// Gets the return type of the effect, requiring a variable manager to get
+/// any variables from, or None if the effect has no return type.
+#[async_recursion]
+pub async fn get_return(
+    types: &FinalizedEffectType,
+    variables: &SimpleVariableManager,
+    syntax: &Arc<Mutex<Syntax>>,
+) -> Option<FinalizedTypes> {
+    return match types {
+        FinalizedEffectType::MethodCall(_, function, args, return_type) => match function.return_type.as_ref().cloned() {
+            Some(mut inner) => {
+                if let Some(return_type) = return_type {
+                    let generics = function
+                        .generics
+                        .iter()
+                        .map(|(name, _)| (name.clone(), return_type.clone()))
+                        .collect::<HashMap<_, _>>();
+                    degeneric_type(&mut inner, &generics, syntax).await;
+                } else if let Some(calling) = args.get(0) {
+                    let other = get_return(&calling.types, variables, syntax).await;
+                    if let Some(found) = other {
+                        let mut generics = HashMap::new();
+                        function
+                            .parent
+                            .as_ref()
+                            .unwrap()
+                            .resolve_generic(
+                                &found,
+                                syntax,
+                                &mut generics,
+                                ParsingError::new(Span::default(), "Unexpected error in get_return"),
+                            )
+                            .await
+                            .unwrap();
+                        degeneric_type(&mut inner, &generics, syntax).await;
+                    }
+                }
+                Some(FinalizedTypes::Reference(Box::new(inner)))
+            }
+            None => None,
+        },
+        FinalizedEffectType::GenericMethodCall(function, _, _)
+        | FinalizedEffectType::VirtualCall(_, function, _)
+        | FinalizedEffectType::GenericVirtualCall(_, _, function, _) => {
+            function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
+        }
+        // Stores just return their inner type.
+        FinalizedEffectType::HeapStore(inner)
+        | FinalizedEffectType::StackStore(inner)
+        | FinalizedEffectType::Set(_, inner) => get_return(&inner.types, variables, syntax).await,
+        // References return their inner type as well.
+        FinalizedEffectType::ReferenceLoad(inner) => match get_return(&inner.types, variables, syntax).await.unwrap() {
+            FinalizedTypes::Reference(inner) => Some(*inner),
+            _ => panic!("Tried to load non-reference!"),
+        },
+        _ => types.get_nongeneric_return(variables),
+    };
 }

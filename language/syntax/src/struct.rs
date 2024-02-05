@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -15,7 +14,7 @@ use data::tokens::Span;
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
 use crate::code::{FinalizedMemberField, MemberField};
-use crate::function::{display_parenless, FunctionData, UnfinalizedFunction};
+use crate::function::{FunctionData, UnfinalizedFunction};
 use crate::top_element_manager::TopElementManager;
 use crate::types::{FinalizedTypes, Types};
 use crate::{is_modifier, DataType, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};

@@ -12,8 +12,8 @@ use crate::async_util::{HandleWrapper, NameResolver};
 use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::types::FinalizedTypes;
 use crate::{
-    is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, SimpleVariableManager, Syntax,
-    TopElement, TopElementManager, Types,
+    is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, Syntax, TopElement,
+    TopElementManager, Types,
 };
 
 /// The static data of a function, which is set during parsing and immutable throughout the entire compilation process.
@@ -91,17 +91,11 @@ impl TopElement for FunctionData {
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
 
         // Finalize the code and combine it with the codeless finalized function.
-        let mut finalized_function = process_manager.verify_code(codeless_function, code, resolver, &syntax).await;
-
-        if finalized_function.generics.is_empty() {
-            finalized_function.flatten(&syntax, &*process_manager).await.unwrap();
-        }
-
+        let finalized_function = process_manager.verify_code(codeless_function.clone(), code, resolver, &syntax).await;
         let finalized_function = Arc::new(finalized_function);
-        let mut locked = syntax.lock().unwrap();
 
         // Add the finalized code to the compiling list.
-        locked.add_compiling(finalized_function.clone());
+        Syntax::add_compiling(process_manager, finalized_function.clone(), &syntax).await;
         handle.lock().unwrap().finish_task(&name);
     }
 
@@ -163,20 +157,6 @@ impl CodelessFinalizedFunction {
             data: self.data,
         };
     }
-
-    /// Flattens codeless a function
-    pub async fn flatten(&self, syntax: &Arc<Mutex<Syntax>>) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
-        let mut output = CodelessFinalizedFunction::clone(self);
-        if let Some(found) = &mut output.return_type {
-            found.flatten(syntax).await?;
-        }
-
-        for field in &mut output.arguments {
-            field.field.field_type.flatten(syntax).await?;
-        }
-
-        return Ok(Arc::new(output));
-    }
 }
 
 /// A finalized function, which is ready to be compiled and has been checked of any errors.
@@ -204,20 +184,6 @@ impl FinalizedFunction {
             data: self.data.clone(),
             parent: None,
         };
-    }
-
-    /// Flattens a function with code
-    pub async fn flatten(
-        &mut self,
-        syntax: &Arc<Mutex<Syntax>>,
-        process_manager: &dyn ProcessManager,
-    ) -> Result<(), ParsingError> {
-        let mut variables = SimpleVariableManager::for_final_function(self);
-        self.code.flatten(syntax, process_manager, &mut variables).await?;
-        for field in &mut self.fields {
-            field.field.field_type.flatten(&syntax).await?;
-        }
-        return Ok(());
     }
 }
 

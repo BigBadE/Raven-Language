@@ -64,7 +64,10 @@ impl<'ctx> CompilerImpl<'ctx> {
 
         let function = match time::timeout(Duration::from_secs(2), MainFuture { syntax: syntax.clone() }).await {
             Ok(found) => found,
-            Err(_) => panic!("Something went wrong with finding main!"),
+            Err(_) => panic!(
+                "Something went wrong with finding main! {:?}",
+                syntax.lock().unwrap().compiling.iter().map(|pair| pair.data.name.clone()).collect::<Vec<_>>()
+            ),
         };
 
         return Some(Arc::new(function.to_codeless()));

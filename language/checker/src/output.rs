@@ -7,6 +7,7 @@ use std::sync::Mutex;
 
 use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
+use crate::degeneric::degeneric_function;
 use syntax::async_util::{HandleWrapper, NameResolver};
 use syntax::function::{
     CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData, UnfinalizedFunction,
@@ -14,7 +15,7 @@ use syntax::function::{
 use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
 use syntax::syntax::Syntax;
 use syntax::types::FinalizedTypes;
-use syntax::ProcessManager;
+use syntax::{ProcessManager, SimpleVariableManager};
 
 /// Wrapper around data used by checkers
 #[derive(Clone)]
@@ -77,6 +78,14 @@ impl ProcessManager for TypesChecker {
                 data: Arc::new(FunctionData::new(Vec::default(), 0, String::default(), Span::default())),
             }
         });
+    }
+
+    async fn degeneric_code(&self, function: Arc<CodelessFinalizedFunction>, syntax: &Arc<Mutex<Syntax>>) {
+        let variables = SimpleVariableManager::for_function(&function);
+        let _ = match degeneric_function(function, Box::new(self.clone()), &vec![], syntax, &variables, None).await {
+            Ok(result) => result,
+            Err(error) => panic!("{:?}", error),
+        };
     }
 
     async fn verify_struct(

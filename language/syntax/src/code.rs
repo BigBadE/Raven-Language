@@ -1,18 +1,12 @@
-/// This file contains the representation of code in Raven and helper methods to transform that code.
-use async_recursion::async_recursion;
-use data::tokens::Span;
-use std::collections::HashMap;
-use std::mem;
 use std::sync::Arc;
-use std::sync::Mutex;
 
-use crate::async_util::{AsyncDataGetter, UnparsedType};
+use data::tokens::Span;
+
+use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
 use crate::r#struct::{FinalizedStruct, BOOL, CHAR, F64, STR, U64};
-use crate::syntax::Syntax;
-use crate::top_element_manager::ImplWaiter;
 use crate::types::{FinalizedTypes, Types};
-use crate::{Attribute, ParsingError, ProcessManager, SimpleVariableManager, VariableManager};
+use crate::{Attribute, VariableManager};
 
 /// An expression is a single line of code, containing an effect and the type of expression.
 #[derive(Clone, Debug)]
@@ -306,69 +300,8 @@ impl FinalizedEffectType {
         };
     }
 
-    /// Gets the return type of the effect, requiring a variable manager to get
-    /// any variables from, or None if the effect has no return type.
+    /* TODO verify that this all is moved to the new function in degeneric
     #[async_recursion]
-    pub async fn get_return(
-        &self,
-        variables: &SimpleVariableManager,
-        syntax: &Arc<Mutex<Syntax>>,
-    ) -> Option<FinalizedTypes> {
-        return match self {
-            Self::MethodCall(_, function, args, return_type) => match function.return_type.as_ref().cloned() {
-                Some(mut inner) => {
-                    if let Some(return_type) = return_type {
-                        let generics = function
-                            .generics
-                            .iter()
-                            .map(|(name, _)| (name.clone(), return_type.clone()))
-                            .collect::<HashMap<_, _>>();
-                        inner.degeneric(&generics, syntax).await;
-                    } else if let Some(calling) = args.get(0) {
-                        let other = calling.types.get_return(variables, syntax).await;
-                        if let Some(found) = other {
-                            let mut generics = HashMap::new();
-                            function
-                                .parent
-                                .as_ref()
-                                .unwrap()
-                                .resolve_generic(
-                                    &found,
-                                    syntax,
-                                    &mut generics,
-                                    ParsingError::new(Span::default(), "Unexpected error in get_return"),
-                                )
-                                .await
-                                .unwrap();
-                            inner.degeneric(&generics, syntax).await;
-                        }
-                    }
-                    Some(FinalizedTypes::Reference(Box::new(inner)))
-                }
-                None => None,
-            },
-            Self::GenericMethodCall(function, _, _)
-            | Self::VirtualCall(_, function, _)
-            | Self::GenericVirtualCall(_, _, function, _) => {
-                function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
-            }
-            // Stores just return their inner type.
-            Self::HeapStore(inner) | Self::StackStore(inner) | Self::Set(_, inner) => {
-                inner.types.get_return(variables, syntax).await
-            }
-            // References return their inner type as well.
-            Self::ReferenceLoad(inner) => match inner.types.get_return(variables, syntax).await.unwrap() {
-                FinalizedTypes::Reference(inner) => Some(*inner),
-                _ => panic!("Tried to load non-reference!"),
-            },
-            _ => self.get_nongeneric_return(variables),
-        };
-    }
-
-    /// Degenericing replaces every instance of a generic function with its actual type.
-    /// This mostly targets FinalizedTypes or function calls and calls the degeneric function on them.
-    #[async_recursion]
-    // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
     pub async fn degeneric(
         &mut self,
         process_manager: &dyn ProcessManager,
@@ -491,5 +424,5 @@ impl FinalizedEffectType {
             }
         }
         return Ok(());
-    }
+    }*/
 }

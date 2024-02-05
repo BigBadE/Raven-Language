@@ -99,25 +99,39 @@ impl Syntax {
     }
 
     /// Adds a function to the compiling list
-    pub fn add_compiling(&mut self, function: Arc<FinalizedFunction>) {
-        if let Some(found) = self.compiling_wakers.get(&function.data.name) {
-            for waker in found {
-                waker.wake_by_ref();
+    pub async fn add_compiling(
+        process_manager: Box<dyn ProcessManager>,
+        function: Arc<FinalizedFunction>,
+        syntax: &Arc<Mutex<Syntax>>,
+    ) {
+        {
+            let mut locked = syntax.lock().unwrap();
+            if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
+                for waker in found {
+                    waker.wake_by_ref();
+                }
             }
-        }
 
-        if function.data.name == self.async_manager.target {
-            println!("Adding main!");
-            if let Some(found) = self.async_manager.target_waker.as_ref() {
+            if function.data.name != locked.async_manager.target {
+                if function.code.expressions.len() == 0 && locked.compiling.contains_key(&function.data.name) {
+                    return;
+                }
+
+                locked.compiling.insert(function.data.name.clone(), function);
+                return;
+            } else {
+                locked.compiling.insert(function.data.name.clone(), function.clone());
+            }
+
+            if !function.generics.is_empty() || !function.fields.is_empty() {
+                panic!("Invalid main function!");
+            }
+
+            if let Some(found) = locked.async_manager.target_waker.as_ref() {
                 found.wake_by_ref();
             }
         }
-
-        if function.code.expressions.len() == 0 && self.compiling.contains_key(&function.data.name) {
-            return;
-        }
-
-        self.compiling.insert(function.data.name.clone(), function);
+        process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
     }
 
     /// Checks if the implementations are finished parsing.

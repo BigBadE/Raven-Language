@@ -12,7 +12,7 @@ use syntax::{ParsingError, SimpleVariableManager};
 use crate::check_impl_call::check_impl_call;
 use crate::check_method_call::check_method_call;
 use crate::check_operator::check_operator;
-use crate::CodeVerifier;
+use crate::{get_return, CodeVerifier};
 
 /// Verifies a block of code, linking all method calls and types, and making sure the code is ready to compile.
 pub async fn verify_code(
@@ -67,7 +67,7 @@ async fn check_return_type(
 
     let last = body.pop().unwrap();
     let last_type;
-    if let Some(found) = last.effect.types.get_return(variables, syntax).await {
+    if let Some(found) = get_return(&last.effect.types, variables, syntax).await {
         last_type = found;
     } else {
         // This is an if/for/while block, skip it
@@ -146,13 +146,13 @@ pub async fn verify_effect(
         EffectType::Load(inner_effect, target) => {
             let output = verify_effect(code_verifier, variables, *inner_effect).await?;
 
-            let types = output.types.get_return(variables, &code_verifier.syntax).await.unwrap().inner_struct().clone();
+            let types = get_return(&output.types, variables, &code_verifier.syntax).await.unwrap().inner_struct().clone();
             FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::Load(Box::new(output), target.clone(), types))
         }
         EffectType::CreateVariable(name, inner_effect) => {
             let effect = verify_effect(code_verifier, variables, *inner_effect).await?;
             let found;
-            if let Some(temp_found) = effect.types.get_return(variables, &code_verifier.syntax).await {
+            if let Some(temp_found) = get_return(&effect.types, variables, &code_verifier.syntax).await {
                 found = temp_found;
             } else {
                 return Err(effect.span.make_error("No return type!"));
@@ -171,7 +171,7 @@ pub async fn verify_effect(
             }
 
             let types = match output.first() {
-                Some(found) => found.types.get_return(variables, &code_verifier.syntax).await,
+                Some(found) => get_return(&found.types, variables, &code_verifier.syntax).await,
                 None => None,
             };
 
@@ -220,17 +220,7 @@ async fn verify_create_struct(
     .await?
     .finalize(code_verifier.syntax.clone())
     .await;
-    let mut generics = code_verifier.process_manager.generics.clone();
 
-    if let Some((base, bounds)) = target.inner_generic_type() {
-        let mut i = 0;
-        for (name, _) in &base.inner_struct().generics {
-            generics.insert(name.clone(), bounds[i].clone());
-            i += 1;
-        }
-    }
-
-    target.degeneric(&generics, &code_verifier.syntax).await;
     let mut final_effects = vec![];
     for (field_name, effect) in effects {
         let mut i = 0;
@@ -269,7 +259,7 @@ async fn check_type(
 ) -> Result<(), ParsingError> {
     if let Some(found) = types {
         for checking in output {
-            let returning = checking.types.get_return(variables, &code_verifier.syntax).await.unwrap();
+            let returning = get_return(&checking.types, variables, &code_verifier.syntax).await.unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
                 return Err(span.make_error("Incorrect types!"));
             }
