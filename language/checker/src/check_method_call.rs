@@ -1,16 +1,15 @@
-use data::tokens::Span;
 use std::sync::{Arc, Mutex};
 
+use data::tokens::Span;
 use syntax::async_util::AsyncDataGetter;
 use syntax::code::{EffectType, Effects, FinalizedEffectType, FinalizedEffects};
 use syntax::function::{CodelessFinalizedFunction, FunctionData};
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::types::FinalizedTypes;
-use syntax::{is_modifier, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
+use syntax::{is_modifier, FinishedTraitImplementor, Modifier, ParsingError, SimpleVariableManager};
 
 use crate::check_code::verify_effect;
-use crate::output::TypesChecker;
 use crate::{get_return, CodeVerifier};
 
 /// Checks a method call to make sure it's valid
@@ -151,7 +150,7 @@ pub async fn check_method_call(
                         ),
                     )
                     .await?;
-                check_method(&process_manager, method, effects.clone(), syntax, variables, returning.clone(), span).await
+                check_method(method, effects.clone(), syntax, variables, returning.clone(), span).await
             };
 
             return TraitImplWaiter {
@@ -191,7 +190,6 @@ pub async fn check_method_call(
                         if function.name.split("::").last().unwrap() == possible[possible.len() - 1] {
                             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
                             match check_method(
-                                &code_verifier.process_manager,
                                 method,
                                 finalized_effects.clone(),
                                 &code_verifier.syntax,
@@ -221,22 +219,12 @@ pub async fn check_method_call(
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
-    return check_method(
-        &code_verifier.process_manager,
-        method,
-        finalized_effects,
-        &code_verifier.syntax,
-        variables,
-        returning,
-        &effect.span,
-    )
-    .await;
+    return check_method(method, finalized_effects, &code_verifier.syntax, variables, returning, &effect.span).await;
 }
 
 /// Checks if a method call is valid
 /// The CheckerVariableManager here is used for the effects calling the method
 pub async fn check_method(
-    process_manager: &TypesChecker,
     method: Arc<CodelessFinalizedFunction>,
     mut effects: Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
@@ -289,8 +277,8 @@ pub async fn check_args(
             return false;
         }
 
-        // Only downcast if an implementation was found. Don't downcast if they're of the same type.
-        if !inner.of_type_sync(other, None).0 {
+        // Only downcast if an implementation was found and it's not generic. Don't downcast if they're of the same type.
+        if !inner.of_type_sync(other, None).0 && other.name_safe().is_some() {
             // Handle downcasting
             let temp = args.remove(i);
             let return_type = get_return(&temp.types, variables, syntax).await.unwrap();

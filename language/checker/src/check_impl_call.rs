@@ -205,7 +205,6 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
             };
 
             match check_method(
-                &data.code_verifier.process_manager,
                 method.clone(),
                 data.finalized_effects.clone(),
                 &data.code_verifier.syntax,

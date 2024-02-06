@@ -43,6 +43,7 @@ pub async fn degeneric_effect(
             }
             *function =
                 degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, None).await?;
+
             for argument in arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
@@ -125,6 +126,7 @@ pub async fn degeneric_function(
     variables: &SimpleVariableManager,
     returning: Option<(FinalizedTypes, Span)>,
 ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
+    println!("Degenericing {}", method.data.name);
     *manager.mut_generics() = method
         .generics
         .clone()
@@ -143,7 +145,6 @@ pub async fn degeneric_function(
     for i in 0..method.arguments.len() {
         let effect = get_return(&arguments[i].types, variables, syntax).await.unwrap();
 
-        //println!("Degenericing for {}", method.data.name);
         match method.arguments[i]
             .field
             .field_type
@@ -225,10 +226,10 @@ async fn degeneric_code(
     manager: Box<dyn ProcessManager>,
 ) {
     // This has to wait until the original is ready to be compiled.
-    GenericWaiter { syntax: syntax.clone(), data: original.data.clone() }.await;
+    FunctionWaiter { syntax: syntax.clone(), data: original.data.clone() }.await;
 
     // Gets a clone of the code of the original.
-    let mut code = syntax.lock().unwrap().compiling.get(&original.data.name).unwrap().code.clone();
+    let mut code = syntax.lock().unwrap().generics.get(&original.data.name).unwrap().code.clone();
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
 
@@ -244,25 +245,25 @@ async fn degeneric_code(
     let handle = manager.handle().clone();
 
     // Sends the finalized function to be compiled.
-    Syntax::add_compiling(manager, Arc::new(output), &syntax).await;
+    Syntax::add_compiling(manager, Arc::new(output), &syntax, false).await;
 
     handle.lock().unwrap().finish_task(&degenericed_method.data.name);
 }
 
 /// A waiter used by generics trying to degeneric a function that returns when the target function's
 /// code is in the compiling list
-struct GenericWaiter {
+struct FunctionWaiter {
     /// The program
     syntax: Arc<Mutex<Syntax>>,
     /// Name of the function to wait for
     data: Arc<FunctionData>,
 }
 
-impl Future for GenericWaiter {
+impl Future for FunctionWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().compiling.contains_key(&self.data.name) {
+        return if self.syntax.lock().unwrap().generics.contains_key(&self.data.name) {
             Poll::Ready(())
         } else {
             self.syntax

@@ -95,7 +95,7 @@ impl TopElement for FunctionData {
         let finalized_function = Arc::new(finalized_function);
 
         // Add the finalized code to the compiling list.
-        Syntax::add_compiling(process_manager, finalized_function.clone(), &syntax).await;
+        Syntax::add_compiling(process_manager, finalized_function.clone(), &syntax, true).await;
         handle.lock().unwrap().finish_task(&name);
     }
 

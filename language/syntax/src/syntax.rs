@@ -39,10 +39,12 @@ use crate::{
 /// to it at the same time.
 /// This is done so that the whole compiler can safely run multithreaded.
 pub struct Syntax {
-    /// The compiling functions, accessed from the compiler.
+    /// The compiled functions.
     pub compiling: Arc<DashMap<String, Arc<FinalizedFunction>>>,
     /// The compiling functions, accessed from the compiler.
     pub compiling_wakers: HashMap<String, Vec<Waker>>,
+    /// The generic functions in the program, uses the compiling wakers.
+    pub generics: Arc<DashMap<String, Arc<FinalizedFunction>>>,
     /// The compiling structs, accessed from the compiler.
     pub strut_compiling: Arc<DashMap<String, Arc<FinalizedStruct>>>,
     /// All parsing errors on the entire program
@@ -71,6 +73,7 @@ impl Syntax {
     pub fn new(process_manager: Box<dyn ProcessManager>) -> Self {
         return Self {
             compiling: Arc::new(DashMap::default()),
+            generics: Arc::new(DashMap::default()),
             compiling_wakers: HashMap::default(),
             strut_compiling: Arc::new(DashMap::default()),
             errors: Vec::default(),
@@ -103,7 +106,9 @@ impl Syntax {
         process_manager: Box<dyn ProcessManager>,
         function: Arc<FinalizedFunction>,
         syntax: &Arc<Mutex<Syntax>>,
+        generic: bool,
     ) {
+        let waker;
         {
             let locked = syntax.lock().unwrap();
             if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
@@ -113,25 +118,36 @@ impl Syntax {
             }
 
             if function.data.name != locked.async_manager.target {
-                if function.code.expressions.len() == 0 && locked.compiling.contains_key(&function.data.name) {
+                if function.code.expressions.len() == 0
+                    && (locked.compiling.contains_key(&function.data.name)
+                        || locked.generics.contains_key(&function.data.name))
+                {
                     return;
                 }
 
-                locked.compiling.insert(function.data.name.clone(), function);
+                if generic {
+                    locked.generics.insert(function.data.name.clone(), function);
+                } else {
+                    locked.compiling.insert(function.data.name.clone(), function);
+                }
                 return;
-            } else {
-                locked.compiling.insert(function.data.name.clone(), function.clone());
             }
 
             if !function.generics.is_empty() || !function.fields.is_empty() {
                 panic!("Invalid main function!");
             }
 
-            if let Some(found) = locked.async_manager.target_waker.as_ref() {
-                found.wake_by_ref();
+            if generic {
+                locked.generics.insert(function.data.name.clone(), function.clone());
+            } else {
+                locked.compiling.insert(function.data.name.clone(), function.clone());
             }
+            waker = locked.async_manager.target_waker.clone();
         }
         process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
+        if let Some(found) = waker {
+            found.wake();
+        }
     }
 
     /// Checks if the implementations are finished parsing.
