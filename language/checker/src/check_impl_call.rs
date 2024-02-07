@@ -7,7 +7,6 @@ use syntax::r#struct::VOID;
 use syntax::syntax::Syntax;
 use syntax::top_element_manager::ImplWaiter;
 use syntax::types::FinalizedTypes;
-use syntax::ProcessManager;
 use syntax::{ParsingError, SimpleVariableManager};
 
 use crate::check_code::verify_effect;
@@ -21,11 +20,12 @@ pub async fn check_impl_call(
     variables: &mut SimpleVariableManager,
     effect: Effects,
 ) -> Result<FinalizedEffects, ParsingError> {
+    // Get all the ImplementationCall variables
     let mut finalized_effects = Vec::default();
     let calling;
     let traits;
     let method;
-    let returning;
+    let explicit_generics;
     if let EffectType::ImplementationCall(new_calling, new_traits, new_method, effects, new_returning) = effect.types {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
@@ -33,21 +33,23 @@ pub async fn check_impl_call(
         calling = new_calling;
         traits = new_traits;
         method = new_method;
-        returning = new_returning;
+        explicit_generics = new_returning;
     } else {
         unreachable!()
     }
 
-    let finding_return_type;
+    // Get the return type, or VOID if there is none
+    let calling_type;
     if matches!(calling.types, EffectType::NOP) {
-        finding_return_type = FinalizedTypes::Struct(VOID.clone());
+        calling_type = FinalizedTypes::Struct(VOID.clone());
     } else {
-        let found = verify_effect(code_verifier, variables, *calling).await?;
-        finding_return_type = get_return(&found.types, variables, &code_verifier.syntax).await.unwrap();
-        finalized_effects.insert(0, found);
+        let calling_effect = verify_effect(code_verifier, variables, *calling).await?;
+        calling_type = get_return(&calling_effect.types, variables, &code_verifier.syntax).await.unwrap();
+        finalized_effects.insert(0, calling_effect);
     }
 
-    if let Ok(inner) = Syntax::get_struct(
+    // Get the trait
+    if let Ok(trait_type) = Syntax::get_struct(
         code_verifier.syntax.clone(),
         ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Check impl call"),
         traits.clone(),
@@ -56,32 +58,37 @@ pub async fn check_impl_call(
     )
     .await
     {
-        let data = inner.finalize(code_verifier.syntax.clone()).await;
+        let trait_type = trait_type.finalize(code_verifier.syntax.clone()).await;
 
+        // Simple container for all the data that needs to be stored
         let mut impl_checker = ImplCheckerData {
             code_verifier,
-            data: &data,
-            returning: &returning,
+            trait_type: &trait_type,
+            explicit_generics: &explicit_generics,
             method: &method,
-            finding_return_type: &finding_return_type,
+            calling_type: &calling_type,
             finalized_effects: &mut finalized_effects,
             variables,
         };
+
+        // Check if the trait_type matches the calling_type. If so, it's a virtual call (a method call on a trait)
         if let Some(found) = check_virtual_type(&mut impl_checker, &effect.span).await? {
             return Ok(found);
         }
 
+        // If not, wait for an impl to be parsed that fits the criteria
         let mut output = None;
         while output.is_none() && !code_verifier.syntax.lock().unwrap().finished_impls() {
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
 
+        // Do one last check after impls finish parsing
         if output.is_none() {
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
-
+        // Failed to find an impl
         if output.is_none() {
-            panic!("Failed for {} and {}", finding_return_type, data);
+            panic!("Failed for {} and {}", calling_type, trait_type);
         }
         return Ok(output.unwrap());
     } else {
@@ -93,80 +100,86 @@ pub async fn check_impl_call(
 pub struct ImplCheckerData<'a> {
     /// The code verified fields
     code_verifier: &'a CodeVerifier<'a>,
-    /// Type being checked
-    data: &'a FinalizedTypes,
+    /// Trait being checked
+    trait_type: &'a FinalizedTypes,
     /// The generic return type
-    returning: &'a Option<UnparsedType>,
+    explicit_generics: &'a Option<UnparsedType>,
     /// The name of the method, can be empty to just return the first found method
     method: &'a String,
     /// The trait to find
-    finding_return_type: &'a FinalizedTypes,
+    calling_type: &'a FinalizedTypes,
     /// The arguments
     finalized_effects: &'a mut Vec<FinalizedEffects>,
     /// The current variables
     variables: &'a SimpleVariableManager,
 }
 
-/// Checks an implementation call to see if it should be a virtual call
+/// Checks an implementation call to see if it should be a virtual call (a method call on a trait instead of a struct)
 async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Result<Option<FinalizedEffects>, ParsingError> {
-    if data.finding_return_type.of_type_sync(data.data, None).0 {
-        let mut i = 0;
-        for found in &data.data.inner_struct().data.functions {
-            if found.name == *data.method {
-                let mut temp = vec![];
-                mem::swap(&mut temp, data.finalized_effects);
-                let function = AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await;
+    // If calling_type doesn't extend trait_type, then it's not a virtual call
+    if !data.calling_type.of_type_sync(data.trait_type, None).0 {
+        return Ok(None);
+    }
 
-                return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, function, temp))));
-            } else if found.name.split("::").last().unwrap() == data.method {
-                let mut target = data.finding_return_type.find_method(&data.method).unwrap();
-                if target.len() > 1 {
-                    return Err(token.make_error("Ambiguous function!"));
-                } else if target.is_empty() {
-                    return Err(token.make_error("Unknown function!"));
-                }
-                let (_, target) = target.pop().unwrap();
-
-                let return_type =
-                    get_return(&data.finalized_effects[0].types, data.variables, &data.code_verifier.syntax).await.unwrap();
-                if matches!(return_type, FinalizedTypes::Generic(_, _)) {
-                    let mut temp = vec![];
-                    mem::swap(&mut temp, data.finalized_effects);
-                    return Ok(Some(FinalizedEffects::new(
-                        token.clone(),
-                        FinalizedEffectType::GenericVirtualCall(
-                            i,
-                            target,
-                            AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
-                            temp,
-                        ),
-                    )));
-                }
-
-                data.code_verifier.syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
-                    target.name.clone(),
-                    degeneric_header(
-                        target.clone(),
-                        found.clone(),
-                        data.code_verifier.syntax.clone(),
-                        data.code_verifier.process_manager.cloned(),
-                        data.finalized_effects.clone(),
-                        data.variables.clone(),
-                        token.clone(),
-                    ),
-                );
-
-                let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
-                let mut temp = vec![];
-                mem::swap(&mut temp, data.finalized_effects);
-                return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp))));
-            }
+    let mut i = 0;
+    for found in &data.trait_type.inner_struct().data.functions {
+        // If the names match, it works
+        if found.name == *data.method {
+            let mut temp = vec![];
+            mem::swap(&mut temp, data.finalized_effects);
+            let function = AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await;
+            return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, function, temp))));
+        } else if found.name.split("::").last().unwrap() != data.method {
             i += 1;
+            continue;
         }
 
-        if !data.method.is_empty() {
-            return Err(token.make_error("Unknown method!"));
+        // Now, try and check the calling type's functions to try and find the method.
+        // This assumes that calling_type is a generic type, because that's the only way this can happen.
+        let mut target = data.calling_type.find_method(&data.method).unwrap();
+        if target.len() > 1 {
+            return Err(token.make_error("Ambiguous function!"));
+        } else if target.is_empty() {
+            return Err(token.make_error("Unknown function!"));
         }
+        let (_, target) = target.pop().unwrap();
+
+        // Create a GenericVirtualCall on the generic type
+        if data.calling_type.inner_generic_type().is_some() {
+            let mut temp = vec![];
+            mem::swap(&mut temp, data.finalized_effects);
+            return Ok(Some(FinalizedEffects::new(
+                token.clone(),
+                FinalizedEffectType::GenericVirtualCall(
+                    i,
+                    target,
+                    AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
+                    temp,
+                ),
+            )));
+        }
+
+        data.code_verifier.syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+            target.name.clone(),
+            degeneric_header(
+                target.clone(),
+                found.clone(),
+                data.code_verifier.syntax.clone(),
+                Box::new(data.code_verifier.process_manager.clone()),
+                data.finalized_effects.clone(),
+                data.variables.clone(),
+                token.clone(),
+            ),
+        );
+
+        let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
+        let mut temp = vec![];
+        mem::swap(&mut temp, data.finalized_effects);
+        return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp))));
+    }
+
+    if !data.method.is_empty() {
+        return Err(token.make_error("Unknown method!"));
     }
     return Ok(None);
 }
@@ -176,9 +189,9 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
     let result = ImplWaiter {
         syntax: data.code_verifier.syntax.clone(),
         // [Dependency]
-        return_type: data.finding_return_type.clone(),
+        return_type: data.calling_type.clone(),
         // CreateArray
-        data: data.data.clone(),
+        data: data.trait_type.clone(),
         error: span.make_error("Nothing implements the given trait!"),
     }
     .await?;
@@ -187,7 +200,7 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
         if temp.name.split("::").last().unwrap() == data.method || data.method.is_empty() {
             let method = AsyncDataGetter::new(data.code_verifier.syntax.clone(), temp.clone()).await;
 
-            let returning = match &data.returning {
+            let returning = match &data.explicit_generics {
                 Some(inner) => Some((
                     Syntax::parse_type(
                         data.code_verifier.syntax.clone(),

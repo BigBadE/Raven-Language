@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::mem;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -14,6 +15,7 @@ use syntax::code::{FinalizedEffectType, FinalizedEffects};
 use syntax::function::{display_parenless, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
 use syntax::r#struct::{FinalizedStruct, StructData};
 use syntax::syntax::Syntax;
+use syntax::top_element_manager::ImplWaiter;
 use syntax::types::FinalizedTypes;
 use syntax::{ProcessManager, SimpleVariableManager};
 
@@ -50,12 +52,32 @@ pub async fn degeneric_effect(
             }
         }
         FinalizedEffectType::GenericMethodCall(function, types, arguments) => {
-            degeneric_type(types, process_manager.generics(), syntax).await;
-            *function =
-                degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, None).await?;
-            for argument in arguments {
+            let mut calling = arguments.remove(0);
+            degeneric_effect(&mut calling.types, syntax, process_manager, variables, span).await?;
+
+            let implementor = get_return(&calling.types, variables, syntax).await.unwrap();
+            let implementation = ImplWaiter {
+                syntax: syntax.clone(),
+                return_type: implementor.clone(),
+                data: types.clone(),
+                error: ParsingError::new(
+                    Span::default(),
+                    "You shouldn't see this! Report this please! Location: Degeneric generic method call",
+                ),
+            }
+            .await?;
+
+            let name = function.data.name.split("::").last().unwrap();
+            let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
+
+            for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
+            arguments.insert(0, calling.clone());
+            let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
+            let function =
+                degeneric_function(function.clone(), process_manager.cloned(), &arguments, syntax, variables, None).await?;
+            *effect = FinalizedEffectType::MethodCall(None, function, arguments.clone(), None);
         }
         FinalizedEffectType::Set(base, value) => {
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
@@ -89,10 +111,28 @@ pub async fn degeneric_effect(
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
         }
-        FinalizedEffectType::GenericVirtualCall(_, _, _, effects) => {
-            for effect in effects {
+        FinalizedEffectType::GenericVirtualCall(index, target, found, effects) => {
+            syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                target.name.clone(),
+                degeneric_header(
+                    target.clone(),
+                    found.data.clone(),
+                    syntax.clone(),
+                    process_manager.cloned(),
+                    effects.clone(),
+                    variables.clone(),
+                    span.clone(),
+                ),
+            );
+
+            let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
+            let mut temp = vec![];
+            mem::swap(&mut temp, effects);
+            let output = degeneric_function(output, process_manager.cloned(), &temp, &syntax, variables, None).await?;
+            for effect in &mut *effects {
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
+            *effect = FinalizedEffectType::VirtualCall(*index, output, temp);
         }
         FinalizedEffectType::Downcast(base, target, _) => {
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
@@ -388,7 +428,8 @@ pub async fn degeneric_header(
 ) -> Result<(), ParsingError> {
     let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
 
-    let return_type = get_return(&arguments[0].types, &variables, &syntax).await.unwrap();
+    let return_type = arguments[0].types.get_nongeneric_return(&variables).unwrap();
+    println!("Found {:?}", variables.variables["$iter1"]);
     let (_, generics) = return_type.inner_generic_type().unwrap();
     assert_eq!(function.generics.len(), generics.len());
 

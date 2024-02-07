@@ -334,41 +334,6 @@ impl FinalizedEffectType {
                 *method = degeneric_function(method.clone(), manager, effects, syntax, variables, None).await?;
             }
             Self::GenericMethodCall(function, found_trait, effects) => {
-                let mut calling = effects.remove(0);
-                calling.types.degeneric(process_manager, variables, syntax, span).await?;
-
-                let implementor = calling.types.get_return(variables, syntax).await.unwrap();
-                let implementation = ImplWaiter {
-                    syntax: syntax.clone(),
-                    return_type: implementor.clone(),
-                    data: found_trait.clone(),
-                    error: ParsingError::new(
-                        Span::default(),
-                        "You shouldn't see this! Report this please! Location: Degeneric generic method call",
-                    ),
-                }
-                .await?;
-
-                let name = function.data.name.split("::").last().unwrap();
-                let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
-
-                for effect in &mut *effects {
-                    effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-                let mut effects = effects.clone();
-                effects.insert(0, calling.clone());
-                let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
-                let function = CodelessFinalizedFunction::degeneric(
-                    function.clone(),
-                    process_manager.cloned(),
-                    &effects,
-                    syntax,
-                    variables,
-                    None,
-                )
-                .await?;
-                // TODO verify if none works here
-                *self = Self::MethodCall(None, function, effects.clone(), None);
             }
             // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
             Self::VirtualCall(_, _, effects) => {
