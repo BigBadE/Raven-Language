@@ -41,6 +41,7 @@ pub async fn degeneric_effect(
             if let Some(found) = calling {
                 degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
             }
+
             *function =
                 degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, None).await?;
 
@@ -126,7 +127,6 @@ pub async fn degeneric_function(
     variables: &SimpleVariableManager,
     returning: Option<(FinalizedTypes, Span)>,
 ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
-    println!("Degenericing {}", method.data.name);
     *manager.mut_generics() = method
         .generics
         .clone()
@@ -172,11 +172,10 @@ pub async fn degeneric_function(
     };
 
     // If this function has already been degenericed, use the previous one.
-    // TODO fix this
-    /*if syntax.lock().unwrap().functions.types.contains_key(&name) {
+    if syntax.lock().unwrap().compiling.contains_key(&name) {
         let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
         return Ok(AsyncDataGetter::new(syntax.clone(), data).await);
-    }*/
+    }
 
     // Copy the method and degeneric every type inside of it.
     let mut new_method = CodelessFinalizedFunction::clone(&method);
