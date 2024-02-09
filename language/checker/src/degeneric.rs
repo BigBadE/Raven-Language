@@ -32,9 +32,8 @@ pub async fn degeneric_effect(
 ) -> Result<(), ParsingError> {
     match effect {
         FinalizedEffectType::CreateVariable(name, value, types) => {
-            let mut variable_type = types.clone();
-            degeneric_type_no_generic_types(&mut variable_type, process_manager.generics(), syntax).await;
-            variables.variables.insert(name.clone(), variable_type);
+            *types = get_return(&value.types, variables, syntax).await.unwrap();
+            variables.variables.insert(name.clone(), types.clone());
             degeneric_effect(&mut value.types, syntax, process_manager, variables, span).await?;
             degeneric_type(types, process_manager.generics(), syntax).await;
         }
@@ -206,13 +205,6 @@ pub async fn degeneric_function(
             break;
         }
         let effect = get_return(&arguments[i].types, variables, syntax).await.unwrap();
-
-        if method.data.name.split("$").next().unwrap() == "math::AddAndAssign<E + T>_T::add_assign" {
-            println!(
-                "Found it! {:?}",
-                manager.generics().iter().map(|(key, value)| format!("{}: ({})", key, value)).collect::<Vec<_>>()
-            );
-        }
 
         match method.arguments[i]
             .field

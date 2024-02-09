@@ -101,11 +101,33 @@ pub async fn get_return(
             }
             None => None,
         },
-        FinalizedEffectType::GenericMethodCall(function, _, _)
-        | FinalizedEffectType::VirtualCall(_, function, _)
-        | FinalizedEffectType::GenericVirtualCall(_, _, function, _) => {
-            function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
-        }
+        FinalizedEffectType::GenericMethodCall(function, _, args)
+        | FinalizedEffectType::VirtualCall(_, function, args)
+        | FinalizedEffectType::GenericVirtualCall(_, _, function, args) => match function.return_type.as_ref().cloned() {
+            Some(mut inner) => {
+                if let Some(calling) = args.get(0) {
+                    let other = get_return(&calling.types, variables, syntax).await;
+                    if let Some(found) = other {
+                        let mut generics = HashMap::new();
+                        function
+                            .parent
+                            .as_ref()
+                            .unwrap()
+                            .resolve_generic(
+                                &found,
+                                syntax,
+                                &mut generics,
+                                ParsingError::new(Span::default(), "Unexpected error in get_return"),
+                            )
+                            .await
+                            .unwrap();
+                        degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
+                    }
+                }
+                Some(FinalizedTypes::Reference(Box::new(inner)))
+            }
+            None => None,
+        },
         // Stores just return their inner type.
         FinalizedEffectType::HeapStore(inner)
         | FinalizedEffectType::StackStore(inner)

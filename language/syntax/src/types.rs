@@ -18,7 +18,7 @@ use crate::function::{display, display_parenless, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 use crate::top_element_manager::TypeImplementsTypeWaiter;
-use crate::{is_modifier, Modifier, ParsingError, ProcessManager, StructData};
+use crate::{is_modifier, Modifier, ParsingError, StructData};
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
 /// For example, "test" is a Struct called str, which is an internal type.
