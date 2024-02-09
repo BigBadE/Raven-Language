@@ -31,6 +31,9 @@ pub async fn degeneric_effect(
 ) -> Result<(), ParsingError> {
     match effect {
         FinalizedEffectType::CreateVariable(name, value, types) => {
+            if name == "$iter1" {
+                println!("Degeneric'd iter!");
+            }
             variables.variables.insert(name.clone(), types.clone());
             degeneric_effect(&mut value.types, syntax, process_manager, variables, span).await?;
             degeneric_type(types, process_manager.generics(), syntax).await;

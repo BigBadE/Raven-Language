@@ -152,7 +152,7 @@ pub async fn verify_effect(
         EffectType::CreateVariable(name, inner_effect) => {
             let effect = verify_effect(code_verifier, variables, *inner_effect).await?;
             let found;
-            if let Some(temp_found) = get_return(&effect.types, variables, &code_verifier.syntax).await {
+            if let Some(temp_found) = effect.types.get_nongeneric_return(variables) {
                 found = temp_found;
             } else {
                 return Err(effect.span.make_error("No return type!"));
