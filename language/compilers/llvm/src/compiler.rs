@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use inkwell::builder::Builder;
@@ -82,8 +82,16 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) {
         instance_function(main, type_getter);
 
+        let start = Instant::now();
         while !type_getter.compiling.borrow().is_empty() {
             let (function_type, function) = type_getter.compiling.borrow_mut().remove(0);
+
+            if start.elapsed().as_secs() > 5 {
+                panic!(
+                    "Failed: {:?}",
+                    type_getter.compiling.borrow().iter().map(|(_, func)| &func.data.name).collect::<Vec<_>>()
+                )
+            }
 
             if function.data.name.is_empty() {
                 // The checker handles the poisoned functions

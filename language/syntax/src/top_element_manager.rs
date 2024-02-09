@@ -35,9 +35,9 @@ pub struct ImplWaiter {
     /// The program
     pub syntax: Arc<Mutex<Syntax>>,
     /// The type being checked
-    pub return_type: FinalizedTypes,
+    pub base_type: FinalizedTypes,
     /// The base type
-    pub data: FinalizedTypes,
+    pub trait_type: FinalizedTypes,
     /// Error if the type isn't found
     pub error: ParsingError,
 }
@@ -47,7 +47,7 @@ impl Future for ImplWaiter {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
-        return match locked.get_implementation_methods(&self.return_type, &self.data) {
+        return match locked.get_implementation_methods(&self.base_type, &self.trait_type) {
             Some(found) => Poll::Ready(Ok(found.into_iter().map(|(_, inner)| inner).flatten().collect())),
             None => {
                 if locked.finished_impls() {

@@ -189,9 +189,9 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
     let result = ImplWaiter {
         syntax: data.code_verifier.syntax.clone(),
         // [Dependency]
-        return_type: data.calling_type.clone(),
+        base_type: data.calling_type.clone(),
         // CreateArray
-        data: data.trait_type.clone(),
+        trait_type: data.trait_type.clone(),
         error: span.make_error("Nothing implements the given trait!"),
     }
     .await?;

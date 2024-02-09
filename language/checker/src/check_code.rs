@@ -5,7 +5,6 @@ use syntax::async_util::UnparsedType;
 use syntax::code::{EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody};
 use syntax::syntax::Syntax;
-use syntax::top_element_manager::ImplWaiter;
 use syntax::types::FinalizedTypes;
 use syntax::{ParsingError, SimpleVariableManager};
 
@@ -65,38 +64,27 @@ async fn check_return_type(
         None => return Ok(false),
     };
 
-    let last = body.pop().unwrap();
-    let last_type;
-    if let Some(found) = get_return(&last.effect.types, variables, syntax).await {
-        last_type = found;
+    let last_effect = body.pop().unwrap();
+    let last_effect_type;
+    if let Some(found) = get_return(&last_effect.effect.types, variables, syntax).await {
+        last_effect_type = found;
     } else {
         // This is an if/for/while block, skip it
         return Ok(true);
     }
 
     // Only downcast types that don't match and aren't generic
-    if last_type == *return_type || !last_type.name_safe().is_some() {
-        body.push(last);
+    if last_effect_type == *return_type || !last_effect_type.name_safe().is_some() {
+        body.push(last_effect);
         return Ok(true);
     }
 
-    return if last_type.of_type(return_type, code_verifier.syntax.clone()).await {
-        let value = ImplWaiter {
-            syntax: code_verifier.syntax.clone(),
-            return_type: last_type.clone(),
-            data: return_type.clone(),
-            error: ParsingError::new(
-                Span::default(),
-                "You shouldn't see this! Report this please! Location: Return type check",
-            ),
-        }
-        .await?;
-
+    return if last_effect_type.of_type(return_type, code_verifier.syntax.clone()).await {
         body.push(FinalizedExpression::new(
             line,
             FinalizedEffects::new(
                 Span::default(),
-                FinalizedEffectType::Downcast(Box::new(last.effect), return_type.clone(), value),
+                FinalizedEffectType::Downcast(Box::new(last_effect.effect), return_type.clone(), vec![]),
             ),
         ));
         Ok(true)
@@ -152,7 +140,7 @@ pub async fn verify_effect(
         EffectType::CreateVariable(name, inner_effect) => {
             let effect = verify_effect(code_verifier, variables, *inner_effect).await?;
             let found;
-            if let Some(temp_found) = effect.types.get_nongeneric_return(variables) {
+            if let Some(temp_found) = get_return(&effect.types, variables, &code_verifier.syntax).await {
                 found = temp_found;
             } else {
                 return Err(effect.span.make_error("No return type!"));

@@ -18,7 +18,7 @@ use crate::function::{display, display_parenless, FunctionData};
 use crate::r#struct::{ChalkData, FinalizedStruct};
 use crate::syntax::Syntax;
 use crate::top_element_manager::TypeImplementsTypeWaiter;
-use crate::{is_modifier, Modifier, ParsingError, StructData};
+use crate::{is_modifier, Modifier, ParsingError, ProcessManager, StructData};
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
 /// For example, "test" is a Struct called str, which is an internal type.
@@ -289,13 +289,15 @@ impl FinalizedTypes {
                 FinalizedTypes::GenericType(other_base, other_generics) => {
                     let mut fails = Vec::default();
                     if generics.len() != other_generics.len() {
-                        let (result, future) = base.of_type_sync(other_base, syntax.clone());
-                        if !result {
-                            if let Some(found) = future {
-                                fails.push(found);
-                            } else {
-                                return (false, None);
-                            }
+                        return (false, None);
+                    }
+
+                    let (result, future) = base.of_type_sync(other_base, syntax.clone());
+                    if !result {
+                        if let Some(found) = future {
+                            fails.push(found);
+                        } else {
+                            return (false, None);
                         }
                     }
 

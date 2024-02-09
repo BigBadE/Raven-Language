@@ -239,7 +239,8 @@ pub enum FinalizedEffectType {
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on EffectType::ImplementationCall
     GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
-    Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<FunctionData>>),
+    /// The functions are empty until after degenericing
+    Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<CodelessFinalizedFunction>>),
     /// Internally used by low-level verifier to store a type on the heap.
     HeapStore(Box<FinalizedEffects>),
     /// Allocates space on the heap.

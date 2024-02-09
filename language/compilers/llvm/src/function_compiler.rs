@@ -39,6 +39,9 @@ pub fn instance_function<'a, 'ctx>(
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
         value = create_function_value(&function, type_getter, None);
+        if function.data.name == "iter::Iter<u64>_NumberIter::next" {
+            println!("Adding it!");
+        }
         type_getter.compiling.borrow_mut().push((value, function));
     }
     return value;
@@ -539,9 +542,9 @@ pub fn compile_effect<'ctx>(
                 .left()
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
-            let found = base.types.get_nongeneric_return(type_getter).unwrap();
-            if is_modifier(found.inner_struct().data.modifiers, Modifier::Trait) {
-                if !target.eq(&found) {
+            let base_return_types = base.types.get_nongeneric_return(type_getter).unwrap();
+            if is_modifier(base_return_types.inner_struct().data.modifiers, Modifier::Trait) {
+                if !target.eq(&base_return_types) {
                     panic!("Downcasting to a trait that doesn't match! Not implemented yet!")
                 } else {
                     compile_effect(type_getter, function, base, id)
@@ -549,7 +552,7 @@ pub fn compile_effect<'ctx>(
             } else {
                 let table = type_getter.vtable.clone();
                 let base = compile_effect(type_getter, function, base, id).unwrap();
-                let table = table.borrow_mut().get_vtable(type_getter, target, &found, functions);
+                let table = table.borrow_mut().get_vtable(type_getter, target, &base_return_types, functions);
                 *id += 1;
 
                 let structure = type_getter

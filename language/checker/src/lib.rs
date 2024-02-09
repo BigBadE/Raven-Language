@@ -10,7 +10,7 @@ use async_recursion::async_recursion;
 use data::tokens::Span;
 use indexmap::IndexMap;
 
-use crate::degeneric::degeneric_type;
+use crate::degeneric::degeneric_type_no_generic_types;
 use syntax::async_util::NameResolver;
 use syntax::code::FinalizedEffectType;
 use syntax::syntax::Syntax;
@@ -77,7 +77,7 @@ pub async fn get_return(
                         .iter()
                         .map(|(name, _)| (name.clone(), return_type.clone()))
                         .collect::<HashMap<_, _>>();
-                    degeneric_type(&mut inner, &generics, syntax).await;
+                    degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                 } else if let Some(calling) = args.get(0) {
                     let other = get_return(&calling.types, variables, syntax).await;
                     if let Some(found) = other {
@@ -94,7 +94,7 @@ pub async fn get_return(
                             )
                             .await
                             .unwrap();
-                        degeneric_type(&mut inner, &generics, syntax).await;
+                        degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
                 Some(FinalizedTypes::Reference(Box::new(inner)))

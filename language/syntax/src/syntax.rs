@@ -222,14 +222,13 @@ impl Syntax {
     /// Finds an implementation method for the given trait.
     pub fn get_implementation_methods(
         &self,
-        implementing_trait: &FinalizedTypes,
-        implementor_struct: &FinalizedTypes,
+        struct_type: &FinalizedTypes,
+        trait_type: &FinalizedTypes,
     ) -> Option<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>> {
         let mut output = Vec::default();
         for implementation in &self.implementations {
-            if implementor_struct.of_type_sync(&implementation.target, None).0
-                && (implementing_trait.of_type_sync(&implementation.base, None).0
-                    || self.solve(&implementing_trait, &implementation.base))
+            if trait_type.of_type_sync(&implementation.target, None).0
+                && (struct_type.of_type_sync(&implementation.base, None).0 || self.solve(&struct_type, &implementation.base))
             {
                 output.push((implementation.clone(), implementation.functions.clone()));
             }

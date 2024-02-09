@@ -5,7 +5,7 @@ use syntax::async_util::AsyncDataGetter;
 use syntax::code::{EffectType, Effects, FinalizedEffectType, FinalizedEffects};
 use syntax::function::{CodelessFinalizedFunction, FunctionData};
 use syntax::syntax::Syntax;
-use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
+use syntax::top_element_manager::TraitImplWaiter;
 use syntax::types::FinalizedTypes;
 use syntax::{is_modifier, FinishedTraitImplementor, Modifier, ParsingError, SimpleVariableManager};
 
@@ -101,7 +101,7 @@ pub async fn check_method_call(
             .await?;
             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
-            if !check_args(&method, &mut finalized_effects, &code_verifier.syntax, variables, &effect.span).await {
+            if !check_args(&method, &mut finalized_effects, &code_verifier.syntax, variables).await {
                 return Err(effect.span.make_error("Incorrect args to method"));
             }
 
@@ -232,7 +232,7 @@ pub async fn check_method(
     generic_returning: Option<(FinalizedTypes, Span)>,
     span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
-    if !check_args(&method, &mut effects, syntax, variables, span).await {
+    if !check_args(&method, &mut effects, syntax, variables).await {
         return Err(span.make_error("Incorrect args to method!"));
     }
 
@@ -259,52 +259,33 @@ pub async fn check_args(
     args: &mut Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    span: &Span,
 ) -> bool {
     if function.arguments.len() != args.len() {
         return false;
     }
 
     for i in 0..function.arguments.len() {
-        let mut returning = get_return(&args[i].types, variables, syntax).await;
-        if !returning.is_some() {
+        let mut arg_return_type = get_return(&args[i].types, variables, syntax).await;
+        if !arg_return_type.is_some() {
             return false;
         }
-        let inner = returning.as_mut().unwrap();
-        let other = &function.arguments[i].field.field_type;
+        let arg_return_type = arg_return_type.as_mut().unwrap();
+        let base_field_type = &function.arguments[i].field.field_type;
 
-        if !inner.of_type(other, syntax.clone()).await {
+        if !arg_return_type.of_type(base_field_type, syntax.clone()).await {
             return false;
         }
 
         // Only downcast if an implementation was found and it's not generic. Don't downcast if they're of the same type.
-        if !inner.of_type_sync(other, None).0 && other.name_safe().is_some() {
+        if !arg_return_type.of_type_sync(base_field_type, None).0 && base_field_type.name_safe().is_some() {
             // Handle downcasting
-            let temp = args.remove(i);
-            let return_type = get_return(&temp.types, variables, syntax).await.unwrap();
-
-            // Assumed to only be one function
-            let funcs = ImplWaiter {
-                syntax: syntax.clone(),
-                // u64
-                return_type,
-                // T: Number
-                data: other.clone(),
-                error: span.make_error("Failed to find impl! Report this!"),
-            }
-            .await
-            .unwrap();
-
-            // Make sure every function is finished adding
-            for func in &funcs {
-                AsyncDataGetter::new(syntax.clone(), func.clone()).await;
-            }
+            let argument = args.remove(i);
 
             args.insert(
                 i,
                 FinalizedEffects::new(
-                    temp.span.clone(),
-                    FinalizedEffectType::Downcast(Box::new(temp), other.clone(), funcs),
+                    argument.span.clone(),
+                    FinalizedEffectType::Downcast(Box::new(argument), base_field_type.clone(), vec![]),
                 ),
             );
         }

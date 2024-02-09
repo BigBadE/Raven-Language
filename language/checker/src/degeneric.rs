@@ -6,7 +6,6 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
-use crate::get_return;
 use async_recursion::async_recursion;
 use data::tokens::Span;
 use data::ParsingError;
@@ -18,6 +17,8 @@ use syntax::syntax::Syntax;
 use syntax::top_element_manager::ImplWaiter;
 use syntax::types::FinalizedTypes;
 use syntax::{ProcessManager, SimpleVariableManager};
+
+use crate::get_return;
 
 /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
 #[async_recursion]
@@ -31,10 +32,9 @@ pub async fn degeneric_effect(
 ) -> Result<(), ParsingError> {
     match effect {
         FinalizedEffectType::CreateVariable(name, value, types) => {
-            if name == "$iter1" {
-                println!("Degeneric'd iter!");
-            }
-            variables.variables.insert(name.clone(), types.clone());
+            let mut variable_type = types.clone();
+            degeneric_type_no_generic_types(&mut variable_type, process_manager.generics(), syntax).await;
+            variables.variables.insert(name.clone(), variable_type);
             degeneric_effect(&mut value.types, syntax, process_manager, variables, span).await?;
             degeneric_type(types, process_manager.generics(), syntax).await;
         }
@@ -61,8 +61,8 @@ pub async fn degeneric_effect(
             let implementor = get_return(&calling.types, variables, syntax).await.unwrap();
             let implementation = ImplWaiter {
                 syntax: syntax.clone(),
-                return_type: implementor.clone(),
-                data: types.clone(),
+                base_type: implementor.clone(),
+                trait_type: types.clone(),
                 error: ParsingError::new(
                     Span::default(),
                     "You shouldn't see this! Report this please! Location: Degeneric generic method call",
@@ -137,9 +137,25 @@ pub async fn degeneric_effect(
             }
             *effect = FinalizedEffectType::VirtualCall(*index, output, temp);
         }
-        FinalizedEffectType::Downcast(base, target, _) => {
+        FinalizedEffectType::Downcast(base, target, functions) => {
+            let impl_functions = ImplWaiter {
+                syntax: syntax.clone(),
+                trait_type: target.clone(),
+                base_type: get_return(&base.types, variables, syntax).await.unwrap(),
+                error: ParsingError::new(
+                    Span::default(),
+                    "You shouldn't see this! Report this please! Location: Return type check",
+                ),
+            }
+            .await?;
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
             degeneric_type(target, process_manager.generics(), syntax).await;
+
+            for function in impl_functions {
+                let function = AsyncDataGetter::new(syntax.clone(), function).await;
+                functions
+                    .push(degeneric_function(function, process_manager.cloned(), &vec![], syntax, variables, None).await?)
+            }
         }
         FinalizedEffectType::HeapStore(storing) => {
             degeneric_effect(&mut storing.types, syntax, process_manager, variables, span).await?
@@ -186,7 +202,17 @@ pub async fn degeneric_function(
 
     //Degenerics the arguments to the method
     for i in 0..method.arguments.len() {
+        if method.arguments.len() != 0 && arguments.len() == 0 {
+            break;
+        }
         let effect = get_return(&arguments[i].types, variables, syntax).await.unwrap();
+
+        if method.data.name.split("$").next().unwrap() == "math::AddAndAssign<E + T>_T::add_assign" {
+            println!(
+                "Found it! {:?}",
+                manager.generics().iter().map(|(key, value)| format!("{}: ({})", key, value)).collect::<Vec<_>>()
+            );
+        }
 
         match method.arguments[i]
             .field
@@ -278,7 +304,7 @@ async fn degeneric_code(
     // Degenerics the code body.
     match degeneric_code_body(&mut code, &*manager, &mut variables, &syntax).await {
         Ok(inner) => inner,
-        Err(error) => panic!("Error degenericing code: {}", error.message),
+        Err(error) => panic!("Error degenericing code: {} for {}", error.message, degenericed_method.data.name),
     };
 
     // Combines the degenericed function with the degenericed code to finalize it.
@@ -419,6 +445,39 @@ pub async fn degeneric_type(
     };
 }
 
+/// Degenerics the type by replacing all generics with their solidified value.
+/// Ignores generic types
+#[async_recursion]
+pub async fn degeneric_type_no_generic_types(
+    types: &mut FinalizedTypes,
+    generics: &HashMap<String, FinalizedTypes>,
+    syntax: &Arc<Mutex<Syntax>>,
+) {
+    return match types {
+        FinalizedTypes::Generic(name, _) => {
+            if let Some(found) = generics.get(name) {
+                types.clone_from(found);
+            }
+        }
+        FinalizedTypes::GenericType(base, bounds) => {
+            degeneric_type_no_generic_types(base, generics, syntax).await;
+
+            for bound in &mut *bounds {
+                degeneric_type_no_generic_types(bound, generics, syntax).await;
+            }
+        }
+        FinalizedTypes::Reference(inner) => degeneric_type_no_generic_types(inner, generics, syntax).await,
+        FinalizedTypes::Array(inner) => degeneric_type_no_generic_types(inner, generics, syntax).await,
+        FinalizedTypes::Struct(inner) => {
+            let mut temp = FinalizedStruct::clone(inner);
+            for field in &mut temp.fields {
+                degeneric_type_no_generic_types(&mut field.field.field_type, generics, syntax).await;
+            }
+            *inner = degeneric_struct(temp, generics, syntax).await;
+        }
+    };
+}
+
 /// Degenerics a function header, for virtual function calls
 pub async fn degeneric_header(
     degenericed: Arc<FunctionData>,
@@ -432,7 +491,6 @@ pub async fn degeneric_header(
     let function: Arc<CodelessFinalizedFunction> = AsyncDataGetter { getting: base, syntax: syntax.clone() }.await;
 
     let return_type = arguments[0].types.get_nongeneric_return(&variables).unwrap();
-    println!("Found {:?}", variables.variables["$iter1"]);
     let (_, generics) = return_type.inner_generic_type().unwrap();
     assert_eq!(function.generics.len(), generics.len());
 

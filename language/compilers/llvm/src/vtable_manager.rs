@@ -3,7 +3,7 @@ use inkwell::values::{BasicValue, GlobalValue};
 use inkwell::AddressSpace;
 use std::collections::HashMap;
 use std::sync::Arc;
-use syntax::function::FunctionData;
+use syntax::function::CodelessFinalizedFunction;
 use syntax::r#struct::StructData;
 use syntax::types::FinalizedTypes;
 
@@ -21,18 +21,15 @@ impl<'ctx> VTableManager<'ctx> {
         type_getter: &mut CompilerTypeGetter<'ctx>,
         target: &FinalizedTypes,
         structure: &FinalizedTypes,
-        functions: &Vec<Arc<FunctionData>>,
+        functions: &Vec<Arc<CodelessFinalizedFunction>>,
     ) -> GlobalValue<'ctx> {
         if let Some(found) = self.data.get(&(structure.inner_struct().data.clone(), target.inner_struct().data.clone())) {
             return *found;
         }
         let mut values = Vec::default();
         {
-            let locked = type_getter.syntax.clone();
-            let locked = locked.lock().unwrap();
-
             for found in functions {
-                let func = type_getter.get_function(locked.functions.data.get(found).unwrap());
+                let func = type_getter.get_function(found);
                 values.push(func.as_global_value().as_basic_value_enum());
             }
         }
