@@ -4,7 +4,7 @@ use data::tokens::Span;
 
 use crate::async_util::UnparsedType;
 use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
-use crate::r#struct::{FinalizedStruct, BOOL, CHAR, F64, STR, U64};
+use crate::r#struct::{BOOL, CHAR, F64, STR, U64};
 use crate::types::{FinalizedTypes, Types};
 use crate::{Attribute, VariableManager};
 
@@ -218,7 +218,7 @@ pub enum FinalizedEffectType {
     /// Loads variable with the given name.
     LoadVariable(String),
     /// Loads a field reference from the given struct with the given type.
-    Load(Box<FinalizedEffects>, String, Arc<FinalizedStruct>),
+    Load(Box<FinalizedEffects>, String, FinalizedTypes),
     /// Creates a struct at the given reference, of the given type with a tuple of the index of the argument and the argument.
     CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
     /// Create an array with the type and values
@@ -274,9 +274,12 @@ impl FinalizedEffectType {
                 panic!("Unresolved variable {} from {:?}", name, variables);
             }
             // Gets the type of the field in the program with that name.
-            Self::Load(_, name, loading) => {
-                loading.fields.iter().find(|field| &field.field.name == name).map(|field| field.field.field_type.clone())
-            }
+            Self::Load(_, name, loading) => loading
+                .inner_struct()
+                .fields
+                .iter()
+                .find(|field| &field.field.name == name)
+                .map(|field| field.field.field_type.clone()),
             // Returns the program type.
             Self::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             // Returns the internal constant type.

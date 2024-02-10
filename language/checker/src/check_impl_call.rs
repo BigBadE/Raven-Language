@@ -43,7 +43,7 @@ pub async fn check_impl_call(
     if matches!(calling.types, EffectType::NOP) {
         calling_type = FinalizedTypes::Struct(VOID.clone());
     } else {
-        let calling_effect = verify_effect(code_verifier, variables, *calling).await?;
+        let calling_effect = verify_effect(code_verifier, variables, *calling.clone()).await?;
         calling_type = get_return(&calling_effect.types, variables, &code_verifier.syntax).await.unwrap();
         finalized_effects.insert(0, calling_effect);
     }
@@ -87,6 +87,7 @@ pub async fn check_impl_call(
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
         // Failed to find an impl
+        let types = verify_effect(code_verifier, variables, *calling).await?.types;
         if output.is_none() {
             panic!("Failed for {} and {}", calling_type, trait_type);
         }

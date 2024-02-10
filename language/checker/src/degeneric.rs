@@ -87,16 +87,30 @@ pub async fn degeneric_effect(
         }
         FinalizedEffectType::Load(base, _, types) => {
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
-            *types = degeneric_struct(FinalizedStruct::clone(types), process_manager.generics(), syntax).await;
+            degeneric_type(types, process_manager.generics(), syntax).await;
         }
         FinalizedEffectType::CreateStruct(storing, types, effects) => {
             if let Some(found) = storing {
                 degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
             }
-            degeneric_type(types, process_manager.generics(), syntax).await;
-            for (_, found) in effects {
+            let fields = types.get_fields();
+            let mut type_generics = process_manager.generics().clone();
+            for i in 0..fields.len() {
+                let found = &mut effects[i].1;
+                found
+                    .types
+                    .get_nongeneric_return(variables)
+                    .unwrap()
+                    .resolve_generic(
+                        &fields[i].field.field_type,
+                        syntax,
+                        &mut type_generics,
+                        span.make_error("Type doesn't match struct field bounds!"),
+                    )
+                    .await?;
                 degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
             }
+            degeneric_type(types, &type_generics, syntax).await;
         }
         FinalizedEffectType::CreateArray(types, effects) => {
             if let Some(found) = types {
@@ -464,6 +478,46 @@ pub async fn degeneric_type_no_generic_types(
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {
                 degeneric_type_no_generic_types(&mut field.field.field_type, generics, syntax).await;
+            }
+            *inner = degeneric_struct(temp, generics, syntax).await;
+        }
+    };
+}
+
+/// Degenerics the type's fields
+#[async_recursion]
+pub async fn degeneric_type_fields(
+    types: &mut FinalizedTypes,
+    generics: &HashMap<String, FinalizedTypes>,
+    syntax: &Arc<Mutex<Syntax>>,
+) {
+    return match types {
+        FinalizedTypes::Generic(name, _) => {
+            if let Some(found) = generics.get(name) {
+                types.clone_from(found);
+            }
+        }
+        FinalizedTypes::GenericType(base, bounds) => {
+            let mut i = 0;
+            let mut base_generics = HashMap::new();
+            for (generic, _bound) in &base.inner_struct().generics {
+                base_generics.insert(generic.clone(), bounds[i].clone());
+                i += 1;
+            }
+
+            degeneric_type_fields(base, &base_generics, syntax).await;
+            degeneric_type_fields(base, generics, syntax).await;
+
+            for bound in &mut *bounds {
+                degeneric_type_fields(bound, generics, syntax).await;
+            }
+        }
+        FinalizedTypes::Reference(inner) => degeneric_type_fields(inner, generics, syntax).await,
+        FinalizedTypes::Array(inner) => degeneric_type_fields(inner, generics, syntax).await,
+        FinalizedTypes::Struct(inner) => {
+            let mut temp = FinalizedStruct::clone(inner);
+            for field in &mut temp.fields {
+                degeneric_type_fields(&mut field.field.field_type, generics, syntax).await;
             }
             *inner = degeneric_struct(temp, generics, syntax).await;
         }

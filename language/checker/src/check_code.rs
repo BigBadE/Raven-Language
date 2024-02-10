@@ -1,6 +1,7 @@
+use std::sync::{Arc, Mutex};
+
 use async_recursion::async_recursion;
 use data::tokens::Span;
-use std::sync::{Arc, Mutex};
 use syntax::async_util::UnparsedType;
 use syntax::code::{EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
 use syntax::function::{CodeBody, FinalizedCodeBody};
@@ -11,6 +12,7 @@ use syntax::{ParsingError, SimpleVariableManager};
 use crate::check_impl_call::check_impl_call;
 use crate::check_method_call::check_method_call;
 use crate::check_operator::check_operator;
+use crate::degeneric::{degeneric_type_fields, degeneric_type_no_generic_types};
 use crate::{get_return, CodeVerifier};
 
 /// Verifies a block of code, linking all method calls and types, and making sure the code is ready to compile.
@@ -133,8 +135,8 @@ pub async fn verify_effect(
         EffectType::CreateStruct(target, effects) => verify_create_struct(code_verifier, target, effects, variables).await?,
         EffectType::Load(inner_effect, target) => {
             let output = verify_effect(code_verifier, variables, *inner_effect).await?;
+            let types = get_return(&output.types, variables, &code_verifier.syntax).await.unwrap();
 
-            let types = get_return(&output.types, variables, &code_verifier.syntax).await.unwrap().inner_struct().clone();
             FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::Load(Box::new(output), target.clone(), types))
         }
         EffectType::CreateVariable(name, inner_effect) => {
@@ -198,7 +200,7 @@ async fn verify_create_struct(
     effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
-    let target = Syntax::parse_type(
+    let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
         ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Verify create struct"),
         code_verifier.resolver.boxed_clone(),
@@ -209,10 +211,11 @@ async fn verify_create_struct(
     .finalize(code_verifier.syntax.clone())
     .await;
 
+    let mut generics = code_verifier.process_manager.generics.clone();
     let mut final_effects = vec![];
+    let fields = target.get_fields();
     for (field_name, effect) in effects {
         let mut i = 0;
-        let fields = target.get_fields();
         for field in fields {
             if field.field.name == field_name {
                 break;
@@ -224,9 +227,17 @@ async fn verify_create_struct(
             return Err(effect.span.make_error("Unknown field!"));
         }
 
-        final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));
+        let error = effect.span.make_error("Invalid bounds for generic");
+        let final_effect = verify_effect(code_verifier, variables, effect).await?;
+        get_return(&final_effect.types, variables, &code_verifier.syntax)
+            .await
+            .unwrap()
+            .resolve_generic(&fields[i].field.field_type, &code_verifier.syntax, &mut generics, error)
+            .await?;
+        final_effects.push((i, final_effect));
     }
 
+    degeneric_type_fields(&mut target, &mut generics, &code_verifier.syntax).await;
     return Ok(FinalizedEffects::new(
         Span::default(),
         FinalizedEffectType::CreateStruct(
