@@ -87,7 +87,7 @@ pub async fn check_impl_call(
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
         // Failed to find an impl
-        let types = verify_effect(code_verifier, variables, *calling).await?.types;
+        verify_effect(code_verifier, variables, *calling).await?.types;
         if output.is_none() {
             panic!("Failed for {} and {}", calling_type, trait_type);
         }

@@ -12,7 +12,7 @@ use syntax::{ParsingError, SimpleVariableManager};
 use crate::check_impl_call::check_impl_call;
 use crate::check_method_call::check_method_call;
 use crate::check_operator::check_operator;
-use crate::degeneric::{degeneric_type_fields, degeneric_type_no_generic_types};
+use crate::degeneric::degeneric_type_fields;
 use crate::{get_return, CodeVerifier};
 
 /// Verifies a block of code, linking all method calls and types, and making sure the code is ready to compile.

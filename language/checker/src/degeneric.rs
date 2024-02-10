@@ -6,6 +6,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
+use crate::get_return;
 use async_recursion::async_recursion;
 use data::tokens::Span;
 use data::ParsingError;
@@ -17,8 +18,6 @@ use syntax::syntax::Syntax;
 use syntax::top_element_manager::ImplWaiter;
 use syntax::types::FinalizedTypes;
 use syntax::{ProcessManager, SimpleVariableManager};
-
-use crate::get_return;
 
 /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
 #[async_recursion]

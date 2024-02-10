@@ -119,8 +119,8 @@ impl Syntax {
 
             if function.data.name != locked.async_manager.target {
                 if function.code.expressions.len() == 0
-                    && (locked.compiling.contains_key(&function.data.name)
-                        || locked.generics.contains_key(&function.data.name))
+                    && ((locked.compiling.contains_key(&function.data.name) && !generic)
+                        || (locked.generics.contains_key(&function.data.name) && generic))
                 {
                     return;
                 }
