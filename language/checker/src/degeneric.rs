@@ -217,12 +217,13 @@ pub async fn degeneric_function(
         if method.arguments.len() != 0 && arguments.len() == 0 {
             break;
         }
-        let effect = get_return(&arguments[i].types, variables, syntax).await.unwrap();
+
+        let argument_type = get_return(&arguments[i].types, variables, syntax).await.unwrap();
 
         match method.arguments[i]
             .field
             .field_type
-            .resolve_generic(&effect, syntax, manager.mut_generics(), arguments[i].span.make_error("Invalid bounds!"))
+            .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.make_error("Invalid bounds!"))
             .await
         {
             Ok(_) => {}

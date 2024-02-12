@@ -137,6 +137,15 @@ pub async fn get_return(
             FinalizedTypes::Reference(inner) => Some(*inner),
             _ => panic!("Tried to load non-reference!"),
         },
+        // Gets the type of the field in the program with that name.
+        FinalizedEffectType::Load(effect, name, _) => get_return(&effect.types, variables, syntax)
+            .await
+            .unwrap()
+            .inner_struct()
+            .fields
+            .iter()
+            .find(|field| &field.field.name == name)
+            .map(|field| field.field.field_type.clone()),
         _ => types.get_nongeneric_return(variables),
     };
 }

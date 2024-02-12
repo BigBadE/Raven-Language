@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::ops::AsyncFn;
+use std::ops::AsyncFnMut;
 use std::pin::{pin, Pin};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -49,7 +49,9 @@ impl Future for ImplWaiter {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock().unwrap();
         return match locked.get_implementation_methods(&self.base_type, &self.trait_type) {
-            Some(found) => Poll::Ready(Ok(found.into_iter().map(|(_, inner)| inner).flatten().collect())),
+            Some(implementation_methods) => {
+                Poll::Ready(Ok(implementation_methods.into_iter().map(|(_, inner)| inner).flatten().collect()))
+            }
             None => {
                 if locked.finished_impls() {
                     Poll::Ready(Err(self.error.clone()))
@@ -78,14 +80,15 @@ pub struct TraitImplWaiter<F> {
     pub error: ParsingError,
 }
 
-impl<F: AsyncFn(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<FinalizedEffects, ParsingError>> Future
+impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<FinalizedEffects, ParsingError>> Future
     for TraitImplWaiter<F>
 {
     type Output = Result<FinalizedEffects, ParsingError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return match pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx)
-        {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let value =
+            pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx).clone();
+        return match value {
             Poll::Ready(inner) => match inner {
                 Ok(inner) => {
                     match inner {
@@ -121,6 +124,8 @@ impl<F: AsyncFn(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<Fina
         };
     }
 }
+
+impl<T> Unpin for TraitImplWaiter<T> {}
 
 /// Finds all the implementations of the type
 pub async fn find_trait_implementation(

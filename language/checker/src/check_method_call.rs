@@ -126,23 +126,16 @@ pub async fn check_method_call(
         {
             value
         } else {
-            let effects = &finalized_effects;
-            let variables = &variables;
-            let returning = &returning;
-            let return_type = &return_type;
-            let process_manager = code_verifier.process_manager;
-            let syntax = &code_verifier.syntax;
-            let span = &effect.span;
-            let checker = async move |implementor: Arc<FinishedTraitImplementor>,
-                                      method: Arc<FunctionData>|
-                        -> Result<FinalizedEffects, ParsingError> {
-                let method = AsyncDataGetter::new(syntax.clone(), method).await;
-                let mut process_manager = process_manager.clone();
+            let checker = async |implementor: Arc<FinishedTraitImplementor>,
+                                 method: Arc<FunctionData>|
+                   -> Result<FinalizedEffects, ParsingError> {
+                let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
+                let mut process_manager = code_verifier.process_manager.clone();
                 implementor
                     .base
                     .resolve_generic(
-                        return_type,
-                        syntax,
+                        &return_type,
+                        &code_verifier.syntax,
                         &mut process_manager.generics,
                         ParsingError::new(
                             Span::default(),
@@ -150,7 +143,15 @@ pub async fn check_method_call(
                         ),
                     )
                     .await?;
-                check_method(method, effects.clone(), syntax, variables, returning.clone(), span).await
+                check_method(
+                    method,
+                    finalized_effects.clone(),
+                    &code_verifier.syntax,
+                    variables,
+                    returning.clone(),
+                    &effect.span,
+                )
+                .await
             };
 
             return TraitImplWaiter {
