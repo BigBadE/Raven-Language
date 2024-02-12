@@ -1,6 +1,8 @@
 #![feature(box_into_inner)]
 #![feature(get_mut_unchecked)]
 #![feature(fn_traits)]
+#![feature(unboxed_closures)]
+#![feature(async_fn_traits)]
 
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};

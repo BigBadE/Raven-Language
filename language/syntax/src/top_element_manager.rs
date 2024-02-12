@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::ops::AsyncFn;
 use std::pin::{pin, Pin};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -77,10 +78,8 @@ pub struct TraitImplWaiter<F> {
     pub error: ParsingError,
 }
 
-impl<
-        T: Future<Output = Result<FinalizedEffects, ParsingError>>,
-        F: Fn(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> T,
-    > Future for TraitImplWaiter<F>
+impl<F: AsyncFn(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<FinalizedEffects, ParsingError>> Future
+    for TraitImplWaiter<F>
 {
     type Output = Result<FinalizedEffects, ParsingError>;
 
