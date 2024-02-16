@@ -8,7 +8,6 @@ use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
-
 use tokio::time;
 
 use data::tokens::Span;

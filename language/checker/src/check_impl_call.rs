@@ -125,12 +125,32 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
 
     let mut i = 0;
     for found in &data.trait_type.inner_struct().data.functions {
+        let returning = match data.explicit_generics {
+            Some(inner) => Some((
+                Syntax::parse_type(
+                    data.code_verifier.syntax.clone(),
+                    token.clone(),
+                    data.code_verifier.resolver.boxed_clone(),
+                    inner.clone(),
+                    vec![],
+                )
+                .await?
+                .finalize(data.code_verifier.syntax.clone())
+                .await,
+                token.clone(),
+            )),
+            None => None,
+        };
         // If the names match, it works
         if found.name == *data.method {
             let mut temp = vec![];
             mem::swap(&mut temp, data.finalized_effects);
             let function = AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await;
-            return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, function, temp))));
+
+            return Ok(Some(FinalizedEffects::new(
+                token.clone(),
+                FinalizedEffectType::VirtualCall(i, function, temp, returning),
+            )));
         } else if found.name.split("::").last().unwrap() != data.method {
             i += 1;
             continue;
@@ -157,6 +177,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
                     target,
                     AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
                     temp,
+                    returning,
                 ),
             )));
         }
@@ -177,7 +198,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
         let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
         let mut temp = vec![];
         mem::swap(&mut temp, data.finalized_effects);
-        return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp))));
+        return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp, returning))));
     }
 
     if !data.method.is_empty() {

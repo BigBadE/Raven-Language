@@ -57,7 +57,7 @@ pub async fn check_method_call(
         let return_type: FinalizedTypes = get_return(&calling.types, variables, &code_verifier.syntax).await.unwrap();
 
         // If it's generic, check its trait bounds for the method
-        if return_type.name_safe().is_none() {
+        if return_type.inner_struct_safe().is_none() {
             if let Some(mut found) = return_type.find_method(&method) {
                 let span = calling.span.clone();
                 finalized_effects.insert(0, calling);
@@ -105,10 +105,9 @@ pub async fn check_method_call(
             check_args(&method, &mut finalized_effects, &code_verifier.syntax, variables, &effect.span).await?;
 
             let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
-
             return Ok(FinalizedEffects::new(
                 effect.span.clone(),
-                FinalizedEffectType::VirtualCall(index, method, finalized_effects),
+                FinalizedEffectType::VirtualCall(index, method, finalized_effects, returning),
             ));
         }
 

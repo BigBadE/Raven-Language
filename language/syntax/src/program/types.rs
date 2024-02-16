@@ -199,6 +199,16 @@ impl FinalizedTypes {
         };
     }
 
+    /// Assumes the type is a struct and returns that struct.
+    pub fn inner_struct_safe(&self) -> Option<&Arc<FinalizedStruct>> {
+        return match self {
+            FinalizedTypes::Struct(structure) => Some(structure),
+            FinalizedTypes::Reference(inner) => inner.inner_struct_safe(),
+            FinalizedTypes::GenericType(inner, _) => inner.inner_struct_safe(),
+            _ => None,
+        };
+    }
+
     /// Gets the inner generic type from a type
     pub fn inner_generic_type(&self) -> Option<(&Box<FinalizedTypes>, &Vec<FinalizedTypes>)> {
         return match self {
@@ -418,6 +428,7 @@ impl FinalizedTypes {
                         return Err(bounds_error.make_error(ParsingMessage::MismatchedTypes(other.clone(), bound.clone())));
                     }
                 }
+
                 generics.insert(name.clone(), other.clone());
             }
             FinalizedTypes::GenericType(base, bounds) => {

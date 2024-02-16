@@ -68,13 +68,13 @@ pub async fn degeneric_effect(
             let name = function.data.name.split("::").last().unwrap();
             let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
 
-            for argument in &mut *arguments {
-                degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
-            }
             arguments.insert(0, calling.clone());
             let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
             let function =
                 degeneric_function(function.clone(), process_manager.cloned(), &arguments, syntax, variables, None).await?;
+            for argument in &mut *arguments {
+                degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
+            }
             *effect = FinalizedEffectType::MethodCall(None, function, arguments.clone(), None);
         }
         FinalizedEffectType::Set(base, value) => {
@@ -111,14 +111,21 @@ pub async fn degeneric_effect(
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
         }
-        FinalizedEffectType::VirtualCall(_, function, effects) => {
-            *function =
-                degeneric_function(function.clone(), process_manager.cloned(), effects, syntax, variables, None).await?;
+        FinalizedEffectType::VirtualCall(_, function, effects, returning) => {
+            *function = degeneric_function(
+                function.clone(),
+                process_manager.cloned(),
+                effects,
+                syntax,
+                variables,
+                returning.clone(),
+            )
+            .await?;
             for effect in effects {
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
         }
-        FinalizedEffectType::GenericVirtualCall(index, target, found, effects) => {
+        FinalizedEffectType::GenericVirtualCall(index, target, found, effects, returning) => {
             syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
                 target.name.clone(),
                 degeneric_header(
@@ -135,11 +142,8 @@ pub async fn degeneric_effect(
             let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
             let mut temp = vec![];
             mem::swap(&mut temp, effects);
-            let output = degeneric_function(output, process_manager.cloned(), &temp, &syntax, variables, None).await?;
-            for effect in &mut *effects {
-                degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
-            }
-            *effect = FinalizedEffectType::VirtualCall(*index, output, temp);
+            *effect = FinalizedEffectType::VirtualCall(*index, output, temp, returning.clone());
+            degeneric_effect(effect, syntax, process_manager, variables, span).await?;
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
             let impl_functions = ImplWaiter {
@@ -187,13 +191,14 @@ pub async fn degeneric_function(
     variables: &SimpleVariableManager,
     returning: Option<(FinalizedTypes, Span)>,
 ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
-    *manager.mut_generics() = method
-        .generics
-        .clone()
-        .into_iter()
-        .map(|(name, types)| (name.clone(), FinalizedTypes::Generic(name, types)))
-        .collect::<HashMap<_, _>>();
-
+    /*
+    TODO properly merge generics? needs more research
+    manager.mut_generics() = method
+    .generics
+    .clone()
+    .into_iter()
+    .map(|(name, types)| (name.clone(), FinalizedTypes::Generic(name, types)))
+    .collect::<HashMap<_, _>>();*/
     // Degenerics the return type if there is one and returning is some.
     if let Some(inner) = method.return_type.clone() {
         if let Some((returning, span)) = returning {

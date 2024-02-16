@@ -477,7 +477,7 @@ pub fn compile_effect<'ctx>(
 
             Some(malloc.as_basic_value_enum())
         }
-        FinalizedEffectType::VirtualCall(func_offset, method, args) => {
+        FinalizedEffectType::VirtualCall(func_offset, method, args, _) => {
             let table = compile_effect(type_getter, function, &args[0], id).unwrap();
 
             let mut compiled_args = Vec::default();
@@ -573,7 +573,7 @@ pub fn compile_effect<'ctx>(
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
-        FinalizedEffectType::GenericVirtualCall(_, _, _, _) => {
+        FinalizedEffectType::GenericVirtualCall(_, _, _, _, _) => {
             panic!("Generic virtual call not degeneric'd!")
         }
     };

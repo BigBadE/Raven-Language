@@ -40,9 +40,6 @@ pub fn create_function_value<'ctx>(
     let mut params = Vec::default();
 
     for param in &function.arguments {
-        if param.field.field_type.name_safe().is_none() {
-            println!("Failed for {}", function.data.name);
-        }
         params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }
 

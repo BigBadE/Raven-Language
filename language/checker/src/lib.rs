@@ -98,8 +98,8 @@ pub async fn get_return(
             None => None,
         },
         FinalizedEffectType::GenericMethodCall(function, _, args)
-        | FinalizedEffectType::VirtualCall(_, function, args)
-        | FinalizedEffectType::GenericVirtualCall(_, _, function, args) => match function.return_type.as_ref().cloned() {
+        | FinalizedEffectType::VirtualCall(_, function, args, _)
+        | FinalizedEffectType::GenericVirtualCall(_, _, function, args, _) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
                 if let Some(calling) = args.get(0) {
                     let other = get_return(&calling.types, variables, syntax).await;

@@ -233,11 +233,17 @@ pub enum FinalizedEffectType {
     String(String),
     /// Creates a character
     Char(char),
-    /// Calls a virtual method, usually a downcasted trait, with the given function index, function,
+    /// Calls a virtual method, usually a downcasted trait, with the given function index, function, and generic return type (if any)
     /// and on the given arguments (first argument must be the downcased trait).
-    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, Option<(FinalizedTypes, Span)>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on EffectType::ImplementationCall
-    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    GenericVirtualCall(
+        usize,
+        Arc<FunctionData>,
+        Arc<CodelessFinalizedFunction>,
+        Vec<FinalizedEffects>,
+        Option<(FinalizedTypes, Span)>,
+    ),
     /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
     /// The functions are empty until after degenericing
     Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<CodelessFinalizedFunction>>),
@@ -261,8 +267,8 @@ impl FinalizedEffectType {
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
             Self::MethodCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
-            | Self::VirtualCall(_, function, _)
-            | Self::GenericVirtualCall(_, _, function, _) => {
+            | Self::VirtualCall(_, function, _, _)
+            | Self::GenericVirtualCall(_, _, function, _, _) => {
                 function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
             }
             Self::LoadVariable(name) => {
