@@ -13,10 +13,10 @@ use data::tokens::Span;
 
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::chalk_interner::ChalkIr;
-use crate::code::{FinalizedMemberField, MemberField};
-use crate::function::{FunctionData, UnfinalizedFunction};
+use crate::program::code::{FinalizedMemberField, MemberField};
+use crate::program::function::{FunctionData, UnfinalizedFunction};
+use crate::program::types::{FinalizedTypes, Types};
 use crate::top_element_manager::TopElementManager;
-use crate::types::{FinalizedTypes, Types};
 use crate::{is_modifier, DataType, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
 use crate::{Attribute, ParsingError};
 
@@ -168,7 +168,10 @@ impl PartialEq for StructData {
 
 impl PartialEq for FinalizedStruct {
     fn eq(&self, other: &Self) -> bool {
-        return self.data.name == other.data.name;
+        if self.data.name.starts_with("collections::array_list") && other.data.name.starts_with("collections::array_list") {
+            println!("{}", self.data.name.split('$').next().unwrap());
+        }
+        return self.data.name.splitn(2, '$').next().unwrap() == other.data.name.splitn(2, '$').next().unwrap();
     }
 }
 

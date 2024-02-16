@@ -3,10 +3,9 @@
 use std::fmt::Debug;
 use std::path::PathBuf;
 
-use colored::Colorize;
 use tokio::runtime::{Builder, Runtime};
 
-use crate::tokens::{Span, Token};
+use crate::tokens::Token;
 
 /// The type of the main LLVM function called by the program
 pub type Main<T> = unsafe extern "C" fn() -> T;
@@ -100,72 +99,6 @@ pub trait SourceSet: Debug + Send + Sync {
 
     /// Clones the source set and boxes it
     fn cloned(&self) -> Box<dyn SourceSet>;
-}
-
-/// An error somewhere in a source file, with exact location.
-#[derive(Clone, Debug)]
-pub struct ParsingError {
-    /// The location of the error
-    pub span: Span,
-    /// The error message
-    pub message: &'static str,
-}
-
-impl ParsingError {
-    /// Creates a new error
-    pub fn new(span: Span, message: &'static str) -> Self {
-        return Self { span, message };
-    }
-
-    /// Prints the error to console
-    pub fn print(&self, sources: &Vec<Box<dyn SourceSet>>) {
-        let mut file = None;
-        'outer: for source in sources {
-            for readable in source.get_files() {
-                if self.span.file == readable.hash() {
-                    file = Some(readable);
-                    break 'outer;
-                }
-            }
-        }
-
-        if file.is_none() {
-            println!("Missing file: {}", self.message);
-            return;
-        }
-        let file = file.unwrap();
-        let contents = file.contents();
-        let tokens = file.read();
-        let mut token = tokens[self.span.start].clone();
-        if self.span.start != self.span.end {
-            let end = &tokens[self.span.end];
-            token.end = end.end;
-            token.end_offset = end.end_offset;
-        }
-
-        // Multi-line tokens aren't supported, set the end to the start
-        if token.start.0 != token.end.0 {
-            token.start_offset = token.end_offset - token.end.1 as usize;
-            token.start = (token.end.0, 0);
-        }
-
-        if token.end_offset == token.start_offset {
-            token.start_offset -= 1;
-        }
-
-        let line = contents.lines().nth((token.start.0 as usize).max(1) - 1).unwrap_or("???");
-        println!("{}", self.message.bright_red());
-        println!("{}", format!("in file {}:{}:{}", file.path(), token.start.0, token.start.1).bright_red());
-        println!("{} {}", " ".repeat(token.start.0.to_string().len()), "|".bright_cyan());
-        println!("{} {} {}", token.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
-        println!(
-            "{} {} {}{}",
-            " ".repeat(token.start.0.to_string().len()),
-            "|".bright_cyan(),
-            " ".repeat(token.start.1 as usize),
-            "^".repeat(token.end_offset - token.start_offset).bright_red()
-        );
-    }
 }
 
 /// A small type for translating external Raven types into Rust types

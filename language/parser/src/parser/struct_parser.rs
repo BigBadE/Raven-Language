@@ -4,11 +4,12 @@ use indexmap::IndexMap;
 
 use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::{NameResolver, UnparsedType};
-use syntax::code::{Field, MemberField};
-use syntax::r#struct::{get_internal, StructData, UnfinalizedStruct};
-use syntax::syntax::Syntax;
-use syntax::types::Types;
-use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, ParsingFuture, TraitImplementor};
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{Field, MemberField};
+use syntax::program::r#struct::{get_internal, StructData, UnfinalizedStruct};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::Types;
+use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingFuture, TraitImplementor};
 
 use crate::parser::function_parser::parse_function;
 use crate::parser::top_parser::{parse_attribute, parse_import, parse_modifier};
@@ -50,7 +51,7 @@ pub fn parse_structure(
             TokenTypes::InvalidCharacters => {
                 parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
                     format!("{}", parser_utils.file_name),
-                    Span::new(parser_utils.file, parser_utils.index).make_error("Unexpected top element!"),
+                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedTopElement()),
                 )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
@@ -189,7 +190,9 @@ pub fn parse_implementor(
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
             TokenTypes::InvalidCharacters => {
-                return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error("Invalid characters!"))
+                return Err(
+                    Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedCharacters())
+                )
             }
             _ => panic!(
                 "How'd you get here? {} - {:?} ({}, {})",
@@ -203,7 +206,7 @@ pub fn parse_implementor(
 
     let base = Box::pin(Syntax::parse_type(
         parser_utils.syntax.clone(),
-        base_span.unwrap().make_error("Failed to find type"),
+        base_span.unwrap(),
         parser_utils.imports.boxed_clone(),
         base.unwrap(),
         vec![],
@@ -212,7 +215,7 @@ pub fn parse_implementor(
     let implementor = if let Some(implementor) = implementor {
         Some(Syntax::parse_type(
             parser_utils.syntax.clone(),
-            implementor_span.unwrap().make_error("Failed to find type"),
+            implementor_span.unwrap(),
             parser_utils.imports.boxed_clone(),
             implementor,
             vec![],
@@ -289,7 +292,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 unparsed_bounds.push(unparsed.clone());
                 bounds.push(Syntax::parse_type(
                     parser_utils.syntax.clone(),
-                    Span::new(parser_utils.file, parser_utils.index - 1).make_error("Bounds error!"),
+                    Span::new(parser_utils.file, parser_utils.index - 1),
                     parser_utils.imports.boxed_clone(),
                     unparsed,
                     vec![],

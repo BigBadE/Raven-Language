@@ -1,4 +1,3 @@
-use crate::ParsingError;
 use std::convert::Infallible;
 use std::ops::{ControlFlow, FromResidual, Try};
 
@@ -87,9 +86,9 @@ impl Span {
         return Self { file, start: index, end: index };
     }
 
-    /// Makes an error from the span with the static message
-    pub fn make_error(&self, message: &'static str) -> ParsingError {
-        return ParsingError::new(self.clone(), message);
+    /// Extends the span to encompass more tokens
+    pub fn extend_span_backwards(&mut self, start: usize) {
+        self.start = start;
     }
 
     /// Extends the span to encompass more tokens

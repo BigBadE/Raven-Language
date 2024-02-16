@@ -14,9 +14,9 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
-use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::syntax::{Main, Syntax};
-use syntax::types::FinalizedTypes;
+use syntax::program::function::{CodelessFinalizedFunction, FinalizedFunction};
+use syntax::program::syntax::{Main, Syntax};
+use syntax::program::types::FinalizedTypes;
 use syntax::VariableManager;
 
 /// Data used when compiling a function

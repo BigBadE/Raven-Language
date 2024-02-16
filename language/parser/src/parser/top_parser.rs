@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::NameResolver;
-use syntax::function::FunctionData;
-use syntax::r#struct::StructData;
+use syntax::errors::{ErrorSource, ParsingMessage};
+use syntax::program::function::FunctionData;
+use syntax::program::r#struct::StructData;
 use syntax::{Attribute, Modifier, TopElement, MODIFIERS};
 
 use crate::parser::function_parser::parse_function;
@@ -22,7 +23,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::InvalidCharacters => {
                 parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
                     format!("${}", parser_utils.file),
-                    Span::new(parser_utils.file, parser_utils.index - 1).make_error("Invalid top element!"),
+                    Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedTopElement()),
                 )))
             }
             TokenTypes::ImportStart => parse_import(parser_utils),
@@ -55,16 +56,6 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             }
             TokenTypes::TraitStart => {
                 let span = Span::new(parser_utils.file, parser_utils.index - 1);
-                if modifiers.contains(&Modifier::Internal) || modifiers.contains(&Modifier::Extern) {
-                    let error = span.make_error("Traits can't be internal/external!");
-                    drop(parse_structure(parser_utils, attributes, modifiers));
-                    parser_utils
-                        .syntax
-                        .lock()
-                        .unwrap()
-                        .add_poison(Arc::new(StructData::new_poisoned(format!("${}", parser_utils.file_name), error)));
-                    break;
-                }
                 modifiers.push(Modifier::Trait);
                 let structure = parse_structure(parser_utils, attributes, modifiers);
                 parser_utils.add_struct(&span, structure);

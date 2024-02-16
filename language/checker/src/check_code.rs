@@ -3,11 +3,14 @@ use std::sync::{Arc, Mutex};
 use async_recursion::async_recursion;
 use data::tokens::Span;
 use syntax::async_util::UnparsedType;
-use syntax::code::{EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, FinalizedCodeBody};
-use syntax::syntax::Syntax;
-use syntax::types::FinalizedTypes;
-use syntax::{ParsingError, SimpleVariableManager};
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{
+    EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression,
+};
+use syntax::program::function::{CodeBody, FinalizedCodeBody};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
+use syntax::SimpleVariableManager;
 
 use crate::check_impl_call::check_impl_call;
 use crate::check_method_call::check_method_call;
@@ -91,7 +94,7 @@ async fn check_return_type(
         ));
         Ok(true)
     } else {
-        Err(span.make_error("Incorrect return type!"))
+        Err(span.make_error(ParsingMessage::UnexpectedReturnType(last_effect_type, return_type.clone())))
     };
 }
 
@@ -145,7 +148,7 @@ pub async fn verify_effect(
             if let Some(temp_found) = get_return(&effect.types, variables, &code_verifier.syntax).await {
                 found = temp_found;
             } else {
-                return Err(effect.span.make_error("No return type!"));
+                return Err(effect.span.make_error(ParsingMessage::UnexpectedVoid()));
             };
 
             variables.variables.insert(name.clone(), found.clone());
@@ -202,7 +205,7 @@ async fn verify_create_struct(
 ) -> Result<FinalizedEffects, ParsingError> {
     let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
-        ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Verify create struct"),
+        Span::default(),
         code_verifier.resolver.boxed_clone(),
         target,
         vec![],
@@ -224,10 +227,10 @@ async fn verify_create_struct(
         }
 
         if i == fields.len() {
-            return Err(effect.span.make_error("Unknown field!"));
+            return Err(effect.span.make_error(ParsingMessage::UnknownField(field_name)));
         }
 
-        let error = effect.span.make_error("Invalid bounds for generic");
+        let error = effect.span.clone();
         let final_effect = verify_effect(code_verifier, variables, effect).await?;
         get_return(&final_effect.types, variables, &code_verifier.syntax)
             .await
@@ -260,7 +263,7 @@ async fn check_type(
         for checking in output {
             let returning = get_return(&checking.types, variables, &code_verifier.syntax).await.unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
-                return Err(span.make_error("Incorrect types!"));
+                return Err(span.make_error(ParsingMessage::MismatchedTypes(returning, found.clone())));
             }
         }
     }

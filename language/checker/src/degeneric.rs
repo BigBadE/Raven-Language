@@ -9,14 +9,14 @@ use std::task::{Context, Poll};
 use crate::get_return;
 use async_recursion::async_recursion;
 use data::tokens::Span;
-use data::ParsingError;
 use syntax::async_util::AsyncDataGetter;
-use syntax::code::{FinalizedEffectType, FinalizedEffects};
-use syntax::function::{display_parenless, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
-use syntax::r#struct::{FinalizedStruct, StructData};
-use syntax::syntax::Syntax;
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{FinalizedEffectType, FinalizedEffects};
+use syntax::program::function::{display_parenless, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
+use syntax::program::r#struct::{FinalizedStruct, StructData};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
 use syntax::top_element_manager::ImplWaiter;
-use syntax::types::FinalizedTypes;
 use syntax::{ProcessManager, SimpleVariableManager};
 
 /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
@@ -61,10 +61,7 @@ pub async fn degeneric_effect(
                 syntax: syntax.clone(),
                 base_type: implementor.clone(),
                 trait_type: types.clone(),
-                error: ParsingError::new(
-                    Span::default(),
-                    "You shouldn't see this! Report this please! Location: Degeneric generic method call",
-                ),
+                error: Span::default().make_error(ParsingMessage::ShouldntSee("Degeneric generic method call")),
             }
             .await?;
 
@@ -100,12 +97,7 @@ pub async fn degeneric_effect(
                     .types
                     .get_nongeneric_return(variables)
                     .unwrap()
-                    .resolve_generic(
-                        &fields[i].field.field_type,
-                        syntax,
-                        &mut type_generics,
-                        span.make_error("Type doesn't match struct field bounds!"),
-                    )
+                    .resolve_generic(&fields[i].field.field_type, syntax, &mut type_generics, span.clone())
                     .await?;
                 degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
             }
@@ -154,10 +146,7 @@ pub async fn degeneric_effect(
                 syntax: syntax.clone(),
                 trait_type: target.clone(),
                 base_type: get_return(&base.types, variables, syntax).await.unwrap(),
-                error: ParsingError::new(
-                    Span::default(),
-                    "You shouldn't see this! Report this please! Location: Return type check",
-                ),
+                error: Span::default().make_error(ParsingMessage::ShouldntSee("Return type check")),
             }
             .await?;
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
@@ -208,7 +197,7 @@ pub async fn degeneric_function(
     // Degenerics the return type if there is one and returning is some.
     if let Some(inner) = method.return_type.clone() {
         if let Some((returning, span)) = returning {
-            inner.resolve_generic(&returning, syntax, manager.mut_generics(), span.make_error("Invalid bounds!")).await?;
+            inner.resolve_generic(&returning, syntax, manager.mut_generics(), span).await?;
         }
     }
 
@@ -223,7 +212,7 @@ pub async fn degeneric_function(
         match method.arguments[i]
             .field
             .field_type
-            .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.make_error("Invalid bounds!"))
+            .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.clone())
             .await
         {
             Ok(_) => {}
@@ -545,7 +534,8 @@ pub async fn degeneric_header(
         let (name, bounds) = iterator.next().unwrap();
         for bound in bounds {
             if !generic.of_type(bound, syntax.clone()).await {
-                return Err(span.make_error("Failed bounds sanity check!"));
+                // TODO see if this is needed
+                return Err(span.make_error(ParsingMessage::ShouldntSee("Bounds sanity check!")));
             }
         }
         manager.mut_generics().insert(name.clone(), generic.clone());

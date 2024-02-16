@@ -1,6 +1,6 @@
-use syntax::code::{EffectType, Effects, Expression, ExpressionType};
-use syntax::function::CodeBody;
-use syntax::ParsingError;
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{EffectType, Effects, Expression, ExpressionType};
+use syntax::program::function::CodeBody;
 
 use crate::parser::code_parser::{parse_code, parse_line, ParseState};
 use crate::ParserUtils;
@@ -15,12 +15,12 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     // This gets value == 2
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
 
     // Make sure the if statement ended with a bracket
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
 
     parser_utils.index += 1;
@@ -39,11 +39,11 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
             let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
             if effect.is_none() {
-                return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
+                return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
             }
 
             if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-                return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
+                return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
             }
 
             parser_utils.index += 1;
@@ -67,7 +67,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             else_body = Some(body);
             break;
         } else {
-            return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected block!"));
+            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedCodeBlock()));
         }
     }
 
@@ -90,12 +90,12 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     parser_utils.index += 1;
     // Gets the name of the for loop variable
     if name.token_type != TokenTypes::Variable {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected variable name!"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedVariableName()));
     }
 
     // Checks for the "in" keyword
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::In {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Missing \"in\" in for loop."));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedIn()));
     }
     parser_utils.index += 1;
 
@@ -105,13 +105,13 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     let mut error_token = Span::new(parser_utils.file, parser_utils.index);
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected iterator, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
     error_token.extend_span(parser_utils.index);
 
     // Checks for the code start
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error("Missing code body for loop."));
+        return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::ExpectedCodeBlock()));
     }
     parser_utils.index += 1;
 
@@ -127,11 +127,11 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
 pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
 
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
 
     parser_utils.index += 1;
@@ -144,7 +144,7 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
 /// Parses a do while into a single expression
 pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected body, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
 
     parser_utils.index += 1;
@@ -152,14 +152,14 @@ pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, Parsing
     let (_returning, body) = parse_code(parser_utils)?;
 
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::While {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected while!"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedWhile()));
     }
 
     parser_utils.index += 1;
 
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected condition, found void"));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
     }
 
     parser_utils.imports.last_id += 1;

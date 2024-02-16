@@ -4,8 +4,8 @@ use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
 use std::ops::Deref;
 use std::sync::Arc;
-use syntax::function::CodelessFinalizedFunction;
-use syntax::types::FinalizedTypes;
+use syntax::program::function::CodelessFinalizedFunction;
+use syntax::program::types::FinalizedTypes;
 
 /// Prints an unformatted string (like the one returned by LLVM's to_string method
 pub fn print_formatted(input: String) {

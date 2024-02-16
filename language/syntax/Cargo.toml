@@ -9,6 +9,7 @@ anyhow = "1.0.70"
 async-trait = { version = "0.1.69", path = "../../crates/async-trait" }
 lazy_static = "1.4.0"
 indexmap = "2.1.0"
+colored = "2.0.4"
 
 chalk-solve = "0.94.0"
 chalk-ir = "0.94.0"

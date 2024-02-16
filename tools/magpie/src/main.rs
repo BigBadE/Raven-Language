@@ -7,9 +7,10 @@ use std::{env, path};
 use include_dir::{include_dir, Dir, DirEntry, File};
 
 use data::tokens::{Token, TokenTypes};
-use data::{Arguments, CompilerArguments, ParsingError, RavenExtern, Readable, RunnerSettings, SourceSet};
+use data::{Arguments, CompilerArguments, RavenExtern, Readable, RunnerSettings, SourceSet};
 use parser::tokens::tokenizer::Tokenizer;
 use parser::FileSourceSet;
+use syntax::errors::ParsingError;
 
 use crate::project::RavenProject;
 

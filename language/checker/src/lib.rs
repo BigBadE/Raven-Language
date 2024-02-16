@@ -12,10 +12,11 @@ use indexmap::IndexMap;
 
 use crate::degeneric::degeneric_type_no_generic_types;
 use syntax::async_util::NameResolver;
-use syntax::code::FinalizedEffectType;
-use syntax::syntax::Syntax;
-use syntax::types::{FinalizedTypes, Types};
-use syntax::{ParsingError, ParsingFuture, SimpleVariableManager};
+use syntax::errors::ParsingError;
+use syntax::program::code::FinalizedEffectType;
+use syntax::program::syntax::Syntax;
+use syntax::program::types::{FinalizedTypes, Types};
+use syntax::{ParsingFuture, SimpleVariableManager};
 
 use crate::output::TypesChecker;
 
@@ -86,12 +87,7 @@ pub async fn get_return(
                             .parent
                             .as_ref()
                             .unwrap()
-                            .resolve_generic(
-                                &found,
-                                syntax,
-                                &mut generics,
-                                ParsingError::new(Span::default(), "Unexpected error in get_return"),
-                            )
+                            .resolve_generic(&found, syntax, &mut generics, Span::default())
                             .await
                             .unwrap();
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
@@ -113,12 +109,7 @@ pub async fn get_return(
                             .parent
                             .as_ref()
                             .unwrap()
-                            .resolve_generic(
-                                &found,
-                                syntax,
-                                &mut generics,
-                                ParsingError::new(Span::default(), "Unexpected error in get_return"),
-                            )
+                            .resolve_generic(&found, syntax, &mut generics, Span::default())
                             .await
                             .unwrap();
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;

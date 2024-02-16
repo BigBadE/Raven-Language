@@ -2,11 +2,11 @@ use crate::finalize_generics;
 use crate::output::TypesChecker;
 use std::sync::Arc;
 use std::sync::Mutex;
-use syntax::code::{FinalizedField, FinalizedMemberField};
-use syntax::r#struct::{FinalizedStruct, UnfinalizedStruct};
-use syntax::syntax::Syntax;
-use syntax::types::FinalizedTypes;
-use syntax::ParsingError;
+use syntax::errors::ParsingError;
+use syntax::program::code::{FinalizedField, FinalizedMemberField};
+use syntax::program::r#struct::{FinalizedStruct, UnfinalizedStruct};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
 
 /// Verifies if a struct is valid
 pub async fn verify_struct(

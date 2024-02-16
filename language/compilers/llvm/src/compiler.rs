@@ -14,10 +14,9 @@ use tokio::time;
 use data::tokens::Span;
 use data::CompilerArguments;
 use syntax::async_util::EmptyNameResolver;
-use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::Syntax;
-use syntax::ParsingError;
+use syntax::program::function::{CodelessFinalizedFunction, FinalizedFunction};
+use syntax::program::r#struct::FinalizedStruct;
+use syntax::program::syntax::Syntax;
 
 use crate::function_compiler::{compile_block, instance_function};
 use crate::main_future::MainFuture;
@@ -51,7 +50,7 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) -> Option<Arc<CodelessFinalizedFunction>> {
         match Syntax::get_function(
             syntax.clone(),
-            ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: compile"),
+            Span::default(),
             arguments.target.clone(),
             Box::new(EmptyNameResolver {}),
             false,

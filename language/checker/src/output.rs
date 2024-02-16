@@ -9,12 +9,12 @@ use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
 use crate::degeneric::degeneric_function;
 use syntax::async_util::{HandleWrapper, NameResolver};
-use syntax::function::{
+use syntax::program::function::{
     CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, FunctionData, UnfinalizedFunction,
 };
-use syntax::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
-use syntax::syntax::Syntax;
-use syntax::types::FinalizedTypes;
+use syntax::program::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
 use syntax::{ProcessManager, SimpleVariableManager};
 
 /// Wrapper around data used by checkers

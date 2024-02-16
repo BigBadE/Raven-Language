@@ -1,5 +1,5 @@
-use crate::r#struct::StructData;
-use crate::syntax::Syntax;
+use crate::program::r#struct::StructData;
+use crate::program::syntax::Syntax;
 use crate::ParsingError;
 use std::future::Future;
 use std::pin::Pin;

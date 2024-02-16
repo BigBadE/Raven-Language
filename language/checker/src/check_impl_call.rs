@@ -2,12 +2,13 @@ use std::mem;
 
 use data::tokens::Span;
 use syntax::async_util::{AsyncDataGetter, UnparsedType};
-use syntax::code::{EffectType, Effects, FinalizedEffectType, FinalizedEffects};
-use syntax::r#struct::VOID;
-use syntax::syntax::Syntax;
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{EffectType, Effects, FinalizedEffectType, FinalizedEffects};
+use syntax::program::r#struct::VOID;
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
 use syntax::top_element_manager::ImplWaiter;
-use syntax::types::FinalizedTypes;
-use syntax::{ParsingError, SimpleVariableManager};
+use syntax::SimpleVariableManager;
 
 use crate::check_code::verify_effect;
 use crate::check_method_call::check_method;
@@ -51,7 +52,7 @@ pub async fn check_impl_call(
     // Get the trait
     if let Ok(trait_type) = Syntax::get_struct(
         code_verifier.syntax.clone(),
-        ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Check impl call"),
+        Span::default(),
         traits.clone(),
         code_verifier.resolver.boxed_clone(),
         vec![],
@@ -139,9 +140,9 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
         // This assumes that calling_type is a generic type, because that's the only way this can happen.
         let mut target = data.calling_type.find_method(&data.method).unwrap();
         if target.len() > 1 {
-            return Err(token.make_error("Ambiguous function!"));
+            return Err(token.make_error(ParsingMessage::AmbiguousMethod(data.method.clone())));
         } else if target.is_empty() {
-            return Err(token.make_error("Unknown function!"));
+            return Err(token.make_error(ParsingMessage::UnknownFunction()));
         }
         let (_, target) = target.pop().unwrap();
 
@@ -180,7 +181,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
     }
 
     if !data.method.is_empty() {
-        return Err(token.make_error("Unknown method!"));
+        return Err(token.make_error(ParsingMessage::UnknownFunction()));
     }
     return Ok(None);
 }
@@ -189,11 +190,9 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
 async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<FinalizedEffects>, ParsingError> {
     let result = ImplWaiter {
         syntax: data.code_verifier.syntax.clone(),
-        // [Dependency]
         base_type: data.calling_type.clone(),
-        // CreateArray
         trait_type: data.trait_type.clone(),
-        error: span.make_error("Nothing implements the given trait!"),
+        error: span.make_error(ParsingMessage::NoTraitImpl(data.calling_type.clone(), data.trait_type.clone())),
     }
     .await?;
 
@@ -205,7 +204,7 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
                 Some(inner) => Some((
                     Syntax::parse_type(
                         data.code_verifier.syntax.clone(),
-                        span.make_error("Incorrect bounds!"),
+                        span.clone(),
                         data.code_verifier.resolver.boxed_clone(),
                         inner.clone(),
                         vec![],

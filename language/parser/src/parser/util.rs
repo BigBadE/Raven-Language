@@ -2,13 +2,13 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 
 use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
-use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
-use syntax::r#struct::{StructData, UnfinalizedStruct};
-use syntax::syntax::Syntax;
-use syntax::types::{FinalizedTypes, Types};
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::function::{CodeBody, FunctionData, UnfinalizedFunction};
+use syntax::program::r#struct::{StructData, UnfinalizedStruct};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::{FinalizedTypes, Types};
 use syntax::{
-    FinishedStructImplementor, FinishedTraitImplementor, ParsingError, ParsingFuture, ProcessManager, TopElement,
-    TraitImplementor,
+    FinishedStructImplementor, FinishedTraitImplementor, ParsingFuture, ProcessManager, TopElement, TraitImplementor,
 };
 
 use std::sync::Mutex;
@@ -47,7 +47,7 @@ impl<'a> ParserUtils<'a> {
 
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(),
-            span.make_error("Failed to find type!"),
+            span.clone(),
             name,
             Box::new(self.imports.clone()),
             vec![],
@@ -63,7 +63,7 @@ impl<'a> ParserUtils<'a> {
             data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
         });
 
-        Syntax::add::<StructData>(&self.syntax, span.make_error("Duplicate structure"), &mut structure.data);
+        Syntax::add::<StructData>(&self.syntax, span.make_error(ParsingMessage::DuplicateStructure()), &mut structure.data);
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
         self.handle.lock().unwrap().spawn(
@@ -215,7 +215,7 @@ impl<'a> ParserUtils<'a> {
             },
         };
 
-        Syntax::add(syntax, adding.data.span.make_error("Duplicate function"), &mut adding.data);
+        Syntax::add(syntax, adding.data.span.make_error(ParsingMessage::DuplicateFunction()), &mut adding.data);
         return adding;
     }
 }
@@ -234,10 +234,7 @@ pub fn parse_generics(input: String, parser_utils: &mut ParserUtils) -> (Unparse
                     UnparsedType::Basic(token.to_string(parser_utils.buffer)),
                     Box::pin(Syntax::get_struct(
                         parser_utils.syntax.clone(),
-                        ParsingError::new(
-                            Span::default(),
-                            "You shouldn't see this! Report this please! Location: Parse generics",
-                        ),
+                        Span::default(),
                         token.to_string(parser_utils.buffer),
                         Box::new(parser_utils.imports.clone()),
                         vec![],
@@ -304,10 +301,7 @@ fn inner_generic(
                     UnparsedType::Basic(token.to_string(parser_utils.buffer)),
                     Box::pin(Syntax::get_struct(
                         parser_utils.syntax.clone(),
-                        ParsingError::new(
-                            Span::default(),
-                            "You shouldn't see this! Report this please! Location: Inner generics",
-                        ),
+                        Span::default(),
                         token.to_string(parser_utils.buffer),
                         Box::new(parser_utils.imports.clone()),
                         vec![],

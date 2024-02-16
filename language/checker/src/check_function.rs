@@ -5,13 +5,16 @@ use data::tokens::Span;
 use std::sync::Arc;
 use std::sync::Mutex;
 use syntax::async_util::NameResolver;
-use syntax::code::{
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{
     ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression, FinalizedField, FinalizedMemberField,
 };
-use syntax::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction};
-use syntax::syntax::Syntax;
-use syntax::types::FinalizedTypes;
-use syntax::{is_modifier, Modifier, ParsingError, ProcessManager, SimpleVariableManager};
+use syntax::program::function::{
+    CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction,
+};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
+use syntax::{is_modifier, Modifier, ProcessManager, SimpleVariableManager};
 
 /// Verifies a function and returns its code, which is verified seperate to prevent deadlocks
 pub async fn verify_function(
@@ -84,19 +87,10 @@ pub async fn verify_function_code(
         let mut output = vec![];
         for bound in bounds {
             output.push(
-                Syntax::parse_type(
-                    syntax.clone(),
-                    ParsingError::new(
-                        Span::default(),
-                        "You shouldn't see this! Report this please! Location: Verify function code",
-                    ),
-                    resolver.boxed_clone(),
-                    bound.clone(),
-                    vec![],
-                )
-                .await?
-                .finalize(syntax.clone())
-                .await,
+                Syntax::parse_type(syntax.clone(), Span::default(), resolver.boxed_clone(), bound.clone(), vec![])
+                    .await?
+                    .finalize(syntax.clone())
+                    .await,
             )
         }
         process_manager.mut_generics().insert(name.clone(), FinalizedTypes::Generic(name.clone(), output));
@@ -118,7 +112,7 @@ pub async fn verify_function_code(
                 FinalizedEffects::new(Span::default(), FinalizedEffectType::NOP),
             ));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
-            return Err(codeless.data.span.make_error("Function returns void instead of the correct type!"));
+            return Err(codeless.data.span.make_error(ParsingMessage::UnexpectedVoid()));
         }
     }
 

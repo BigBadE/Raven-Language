@@ -8,9 +8,9 @@ use std::sync::Arc;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue, FunctionValue};
 
-use syntax::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
-use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
-use syntax::types::FinalizedTypes;
+use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
+use syntax::program::function::{CodelessFinalizedFunction, FinalizedCodeBody};
+use syntax::program::types::FinalizedTypes;
 use syntax::{is_modifier, Attribute, Modifier};
 
 use crate::internal::instructions::{compile_internal, malloc_type};

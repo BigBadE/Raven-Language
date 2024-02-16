@@ -3,9 +3,9 @@ use inkwell::values::{BasicValue, GlobalValue};
 use inkwell::AddressSpace;
 use std::collections::HashMap;
 use std::sync::Arc;
-use syntax::function::CodelessFinalizedFunction;
-use syntax::r#struct::StructData;
-use syntax::types::FinalizedTypes;
+use syntax::program::function::CodelessFinalizedFunction;
+use syntax::program::r#struct::StructData;
+use syntax::program::types::FinalizedTypes;
 
 /// A struct to manage Virtual Tables
 #[derive(Default)]

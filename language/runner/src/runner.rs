@@ -11,8 +11,8 @@ use checker::output::TypesChecker;
 use data::{Arguments, CompilerArguments};
 use parser::parse;
 use syntax::async_util::HandleWrapper;
-use syntax::syntax::Syntax;
-use syntax::ParsingError;
+use syntax::errors::ParsingError;
+use syntax::program::syntax::Syntax;
 
 use crate::{get_compiler, JoinWaiter};
 

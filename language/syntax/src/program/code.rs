@@ -3,9 +3,9 @@ use std::sync::Arc;
 use data::tokens::Span;
 
 use crate::async_util::UnparsedType;
-use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
-use crate::r#struct::{BOOL, CHAR, F64, STR, U64};
-use crate::types::{FinalizedTypes, Types};
+use crate::program::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
+use crate::program::r#struct::{BOOL, CHAR, F64, STR, U64};
+use crate::program::types::{FinalizedTypes, Types};
 use crate::{Attribute, VariableManager};
 
 /// An expression is a single line of code, containing an effect and the type of expression.

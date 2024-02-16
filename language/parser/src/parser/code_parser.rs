@@ -4,9 +4,10 @@ use crate::parser::util::{parse_generics, ParserUtils};
 use data::tokens::{Span, Token, TokenTypes};
 use std::mem;
 use syntax::async_util::UnparsedType;
-use syntax::code::{EffectType, Effects, Expression, ExpressionType};
-use syntax::function::CodeBody;
-use syntax::ParsingError;
+use syntax::errors::ParsingError;
+use syntax::errors::{ErrorSource, ParsingMessage};
+use syntax::program::code::{EffectType, Effects, Expression, ExpressionType};
+use syntax::program::function::CodeBody;
 
 /// Parsers a block of code into its return type (if all code paths lead to a single type, or else a line) and the code body.
 pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, CodeBody), ParsingError> {
@@ -72,7 +73,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                 | TokenTypes::For
                 | TokenTypes::While
                 | TokenTypes::Do => {
-                    return Err(span.make_error("Unexpected value! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedValue()));
                 }
                 _ => {}
             }
@@ -112,7 +113,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     }
                 } else {
                     if effect.is_some() {
-                        return Err(span.make_error("Unexpected value! Did you forget a semicolon?"));
+                        return Err(span.make_error(ParsingMessage::UnexpectedValue()));
                     }
                     effect = Some(Effects::new(
                         Span::new(parser_utils.file, parser_utils.index),
@@ -123,7 +124,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             TokenTypes::Return => expression_type = ExpressionType::Return(Span::new(parser_utils.file, parser_utils.index)),
             TokenTypes::New => {
                 if effect.is_some() {
-                    return Err(span.make_error("Unexpected new! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedValue()));
                 }
                 effect = Some(parse_new(parser_utils, &span)?);
             }
@@ -133,7 +134,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     break;
                 } else {
                     if effect.is_some() {
-                        return Err(span.make_error("Unexpected block! Did you forget a semicolon?"));
+                        return Err(span.make_error(ParsingMessage::UnexpectedValue()));
                     }
 
                     // Get the code in the next block.
@@ -148,12 +149,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
             TokenTypes::Let => {
                 if effect.is_some() {
-                    return Err(span.make_error("Unexpected let! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedLet()));
                 }
             }
             TokenTypes::If => {
                 if effect.is_some() {
-                    return Err(span.make_error("Unexpected if! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedIf()));
                 }
 
                 let expression = parse_if(parser_utils)?;
@@ -165,19 +166,19 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
             TokenTypes::For => {
                 if effect.is_some() {
-                    return Err(span.make_error("Unexpected for! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedFor()));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)));
             }
             TokenTypes::While => {
                 if effect.is_some() {
-                    return Err(span.make_error("Unexpected for! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedFor()));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)));
             }
             TokenTypes::Do => {
                 if effect.is_some() {
-                    return Err(span.make_error("Unexpected for! Did you forget a semicolon?"));
+                    return Err(span.make_error(ParsingMessage::UnexpectedFor()));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)));
             }
@@ -192,7 +193,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                             EffectType::Set(Box::new(effect.unwrap()), Box::new(value.effect)),
                         ));
                     } else {
-                        return Err(span.make_error("Tried to assign a void value!"));
+                        return Err(span.make_error(ParsingMessage::UnexpectedVoid()));
                     }
                     break;
                 } else {
@@ -233,7 +234,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     // Ignored, ParenOpen or Operator handles this
                 } else {
                     if effect.is_none() {
-                        return Err(span.make_error("Extra symbol!"));
+                        return Err(span.make_error(ParsingMessage::ExtraSymbol()));
                     }
                     effect = Some(Effects::new(
                         Span::new(parser_utils.file, parser_utils.index),
@@ -241,7 +242,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     ))
                 }
             }
-            TokenTypes::Else => return Err(span.make_error("Unexpected Else!")),
+            TokenTypes::Else => return Err(span.make_error(ParsingMessage::UnexpectedElse())),
             _ => panic!("How'd you get here? {:?}", token.token_type),
         }
     }
@@ -459,9 +460,11 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     // Get the type being expressed. Should only be one type.
     let returning: Option<(UnparsedType, Span)> =
         if let UnparsedType::Generic(_, bounds) = parse_generics(String::default(), parser_utils).0 {
+            /*
+            TODO figure out how to check for ungotten generics with generic method calls
             if bounds.len() != 1 {
                 Span::new(parser_utils.file, parser_utils.index - 1).make_error("Expected one generic argument!");
-            }
+            }*/
             let types: &UnparsedType = bounds.first().unwrap();
             Some((types.clone(), Span::new(parser_utils.file, parser_utils.index - 1)))
         } else {
@@ -485,10 +488,11 @@ fn get_effects(parser_utils: &mut ParserUtils) -> Result<Vec<Effects>, ParsingEr
     let mut effects = Vec::default();
     // Parse the method call arguments
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::ParenClose {
-        while let Some(expression) = parse_line(parser_utils, ParseState::None)? {
+        let start = parser_utils.index;
+        while let Some(mut expression) = parse_line(parser_utils, ParseState::None)? {
+            expression.effect.span.extend_span_backwards(start);
             effects.push(expression.effect);
-            if parser_utils.tokens[parser_utils.index - 1].token_type == TokenTypes::ArgumentEnd {
-            } else {
+            if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::ArgumentEnd {
                 break;
             }
         }
@@ -507,13 +511,11 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
         if TokenTypes::Variable == next.token_type {
             name = next.to_string(parser_utils.buffer);
         } else {
-            return Err(
-                Span::new(parser_utils.file, parser_utils.index).make_error("Unexpected token, expected variable name!")
-            );
+            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedToken()));
         }
 
         if TokenTypes::Equals != parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {
-            return Err(Span::new(parser_utils.file, parser_utils.index).make_error("Unexpected symbol, expected equals!"));
+            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedSymbol()));
         }
         parser_utils.index += 2;
         error_token = Span::new(parser_utils.file, parser_utils.index);
@@ -525,7 +527,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             error_token.extend_span(parser_utils.index - 2);
             Ok(Effects::new(error_token, EffectType::CreateVariable(name, Box::new(line.effect))))
         }
-        None => Err(Span::new(parser_utils.file, parser_utils.index).make_error("Expected value, found void!")),
+        None => Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid())),
     };
 }
 
@@ -571,7 +573,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(St
                 let effect = if TokenTypes::Colon == token.token_type {
                     match parse_line(parser_utils, ParseState::New)? {
                         Some(inner) => inner.effect,
-                        None => return Err(span.make_error("Expected effect!")),
+                        None => return Err(span.make_error(ParsingMessage::ExpectedEffect())),
                     }
                 } else {
                     Effects::new(

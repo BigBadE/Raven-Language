@@ -4,11 +4,12 @@ use indexmap::IndexMap;
 
 use data::tokens::{Span, TokenTypes};
 use syntax::async_util::NameResolver;
-use syntax::code::MemberField;
-use syntax::function::{CodeBody, FunctionData, UnfinalizedFunction};
-use syntax::syntax::Syntax;
-use syntax::types::Types;
-use syntax::{get_modifier, is_modifier, Attribute, Modifier, ParsingError, ParsingFuture};
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::MemberField;
+use syntax::program::function::{CodeBody, FunctionData, UnfinalizedFunction};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::Types;
+use syntax::{get_modifier, Attribute, Modifier, ParsingFuture};
 
 use crate::parser::code_parser::parse_code;
 use crate::parser::struct_parser::{parse_generics, to_field};
@@ -45,14 +46,14 @@ pub fn parse_function(
                 if last_arg_type.is_empty() {
                     if !parser_utils.imports.parent.is_some() {
                         return Err(
-                            Span::new(parser_utils.file, parser_utils.index - 1).make_error("self in static function!")
+                            Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::SelfInStatic())
                         );
                     }
 
                     fields.push(Box::pin(to_field(
                         Syntax::parse_type(
                             parser_utils.syntax.clone(),
-                            ParsingError::new(Span::default(), "You shouldn't see this! At function parser"),
+                            Span::default(),
                             Box::new(parser_utils.imports.clone()),
                             parser_utils.imports.parent.clone().unwrap(),
                             vec![],
@@ -93,13 +94,7 @@ pub fn parse_function(
     let mut modifiers = get_modifier(modifiers.as_slice());
 
     if trait_function {
-        if is_modifier(modifiers, Modifier::Internal) || is_modifier(modifiers, Modifier::Extern) {
-            return Err(
-                Span::new(parser_utils.file, parser_utils.index - 1).make_error("Traits can't be internal/external!")
-            );
-        } else {
-            modifiers += Modifier::Trait as u8;
-        }
+        modifiers += Modifier::Trait as u8;
     }
 
     for (key, generic) in &parser_utils.imports.generics {
@@ -107,7 +102,7 @@ pub fn parse_function(
         for bound in generic {
             bounds.push(Syntax::parse_type(
                 parser_utils.syntax.clone(),
-                ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Parse function"),
+                Span::default(),
                 parser_utils.imports.boxed_clone(),
                 bound.clone(),
                 vec![],
@@ -124,13 +119,7 @@ pub fn parse_function(
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name, span.clone())),
         parent: parser_utils.imports.parent.clone().map(|types| {
-            Syntax::parse_type(
-                parser_utils.syntax.clone(),
-                span.make_error("Invalid type!"),
-                Box::new(parser_utils.imports.clone()),
-                types,
-                vec![],
-            )
+            Syntax::parse_type(parser_utils.syntax.clone(), span, Box::new(parser_utils.imports.clone()), types, vec![])
         }),
     });
 }

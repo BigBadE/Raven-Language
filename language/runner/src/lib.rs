@@ -7,9 +7,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 use syntax::async_util::HandleWrapper;
-use syntax::function::FinalizedFunction;
-use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::Compiler;
+use syntax::program::function::FinalizedFunction;
+use syntax::program::r#struct::FinalizedStruct;
+use syntax::program::syntax::Compiler;
 
 /// The main Raven runner
 pub mod runner;

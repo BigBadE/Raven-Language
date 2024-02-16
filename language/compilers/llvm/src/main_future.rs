@@ -1,11 +1,11 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use syntax::syntax::Syntax;
+use syntax::program::syntax::Syntax;
 
 use std::sync::Mutex;
 use std::task::{Context, Poll};
-use syntax::function::FinalizedFunction;
+use syntax::program::function::FinalizedFunction;
 
 /// Future for finding the main function
 pub struct MainFuture {
