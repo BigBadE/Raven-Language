@@ -1,2 +1,4 @@
 ignore:
   - "crates"  # Crates that have been modified for Raven
+
+github_checks: false
