@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use data::tokens::Span;
 
 use crate::async_util::{HandleWrapper, NameResolver};
-use crate::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
-use crate::types::FinalizedTypes;
+use crate::program::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
+use crate::program::types::FinalizedTypes;
 use crate::{
     is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, Syntax, TopElement,
     TopElementManager, Types,

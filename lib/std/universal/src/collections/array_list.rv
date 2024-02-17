@@ -1,6 +1,7 @@
 import list;
 import array;
 import stdio;
+import array::Index;
 
 pub struct ArrayList<T> {
     array: [T];

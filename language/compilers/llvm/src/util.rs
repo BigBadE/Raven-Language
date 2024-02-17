@@ -4,8 +4,8 @@ use inkwell::types::BasicType;
 use inkwell::values::FunctionValue;
 use std::ops::Deref;
 use std::sync::Arc;
-use syntax::function::CodelessFinalizedFunction;
-use syntax::types::FinalizedTypes;
+use syntax::program::function::CodelessFinalizedFunction;
+use syntax::program::types::FinalizedTypes;
 
 /// Prints an unformatted string (like the one returned by LLVM's to_string method
 pub fn print_formatted(input: String) {
@@ -40,9 +40,6 @@ pub fn create_function_value<'ctx>(
     let mut params = Vec::default();
 
     for param in &function.arguments {
-        if param.field.field_type.name_safe().is_none() {
-            println!("Failed for {}", function.data.name);
-        }
         params.push(From::from(type_getter.get_type(&param.field.field_type)));
     }
 

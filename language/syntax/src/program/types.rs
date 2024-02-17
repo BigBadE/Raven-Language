@@ -10,14 +10,16 @@ use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind
 use chalk_solve::rust_ir::TraitDatum;
 
 use async_recursion::async_recursion;
+use data::tokens::Span;
 
 use crate::async_util::AsyncDataGetter;
 use crate::chalk_interner::ChalkIr;
-use crate::code::FinalizedMemberField;
-use crate::function::{display, display_parenless, FunctionData};
-use crate::r#struct::{ChalkData, FinalizedStruct};
-use crate::syntax::Syntax;
-use crate::top_element_manager::TypeImplementsTypeWaiter;
+use crate::errors::{ErrorSource, ParsingMessage};
+use crate::program::code::FinalizedMemberField;
+use crate::program::function::{display, display_parenless, FunctionData};
+use crate::program::r#struct::{ChalkData, FinalizedStruct};
+use crate::program::syntax::Syntax;
+use crate::top_element_manager::{ImplWaiter, TypeImplementsTypeWaiter};
 use crate::{is_modifier, Modifier, ParsingError, StructData};
 
 /// A type is assigned to every value at compilation-time in Raven because it's statically typed.
@@ -197,6 +199,16 @@ impl FinalizedTypes {
         };
     }
 
+    /// Assumes the type is a struct and returns that struct.
+    pub fn inner_struct_safe(&self) -> Option<&Arc<FinalizedStruct>> {
+        return match self {
+            FinalizedTypes::Struct(structure) => Some(structure),
+            FinalizedTypes::Reference(inner) => inner.inner_struct_safe(),
+            FinalizedTypes::GenericType(inner, _) => inner.inner_struct_safe(),
+            _ => None,
+        };
+    }
+
     /// Gets the inner generic type from a type
     pub fn inner_generic_type(&self) -> Option<(&Box<FinalizedTypes>, &Vec<FinalizedTypes>)> {
         return match self {
@@ -232,10 +244,6 @@ impl FinalizedTypes {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
                     if found == other_struct {
-                        (true, None)
-                    } else if found.data.name.contains('<')
-                        && found.data.name.split('<').next().unwrap() == other_struct.data.name
-                    {
                         (true, None)
                     } else if is_modifier(other.inner_struct().data.modifiers, Modifier::Trait) {
                         if syntax.is_none() {
@@ -287,16 +295,13 @@ impl FinalizedTypes {
             },
             FinalizedTypes::GenericType(base, generics) => match other {
                 FinalizedTypes::GenericType(other_base, other_generics) => {
+                    if base != other_base {
+                        return (false, Some(Box::pin(Self::get_has_impl(syntax, self.clone(), other.clone()))));
+                    }
+
                     let mut fails = Vec::default();
                     if generics.len() != other_generics.len() {
-                        let (result, future) = base.of_type_sync(other_base, syntax.clone());
-                        if !result {
-                            if let Some(found) = future {
-                                fails.push(found);
-                            } else {
-                                return (false, None);
-                            }
-                        }
+                        return (false, None);
                     }
 
                     for i in 0..generics.len() {
@@ -384,6 +389,17 @@ impl FinalizedTypes {
         };
     }
 
+    pub async fn get_has_impl(syntax: Option<Arc<Mutex<Syntax>>>, base: FinalizedTypes, trait_type: FinalizedTypes) -> bool {
+        return ImplWaiter {
+            syntax: syntax.unwrap(),
+            base_type: base,
+            trait_type,
+            error: Span::default().make_error(ParsingMessage::ShouldntSee("get_has_impl")),
+        }
+        .await
+        .is_ok();
+    }
+
     /// Joins a vec of futures, waiting for all to finish and returning true if they all returned true
     pub async fn join(joining: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) -> bool {
         for temp in joining {
@@ -402,16 +418,17 @@ impl FinalizedTypes {
         other: &FinalizedTypes,
         syntax: &Arc<Mutex<Syntax>>,
         generics: &mut HashMap<String, FinalizedTypes>,
-        bounds_error: ParsingError,
+        bounds_error: Span,
     ) -> Result<(), ParsingError> {
         match self {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.
                 for bound in bounds {
                     if !other.of_type(bound, syntax.clone()).await {
-                        return Err(bounds_error);
+                        return Err(bounds_error.make_error(ParsingMessage::MismatchedTypes(other.clone(), bound.clone())));
                     }
                 }
+
                 generics.insert(name.clone(), other.clone());
             }
             FinalizedTypes::GenericType(base, bounds) => {
@@ -423,7 +440,7 @@ impl FinalizedTypes {
 
                 if let FinalizedTypes::GenericType(other_base, other_bounds) = other {
                     if other_bounds.len() != bounds.len() {
-                        return Err(bounds_error);
+                        return Err(bounds_error.make_error(ParsingMessage::IncorrectBoundsLength()));
                     }
                     base.resolve_generic(other_base, syntax, generics, bounds_error.clone()).await?;
 
@@ -447,7 +464,7 @@ impl FinalizedTypes {
                     return inner.resolve_generic(other, syntax, generics, bounds_error).await;
                 }
 
-                return Err(bounds_error);
+                return Err(bounds_error.make_error(ParsingMessage::MismatchedTypes(other.clone(), *inner.clone())));
             }
             _ => {}
         }
@@ -512,6 +529,10 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name_safe().map_or(false, |inner| other.name_safe().map_or(false, |other| inner == other));
+        return self.name_safe().map_or(false, |inner| {
+            other
+                .name_safe()
+                .map_or(false, |other| inner.splitn(2, '$').next().unwrap() == other.splitn(2, '$').next().unwrap())
+        });
     }
 }

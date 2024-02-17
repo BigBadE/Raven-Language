@@ -10,9 +10,9 @@ use tokio::sync::mpsc::Receiver;
 
 use async_trait::async_trait;
 use data::CompilerArguments;
-use syntax::function::FinalizedFunction;
-use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::{Compiler, Syntax};
+use syntax::program::function::FinalizedFunction;
+use syntax::program::r#struct::FinalizedStruct;
+use syntax::program::syntax::{Compiler, Syntax};
 
 use crate::compiler::CompilerImpl;
 use crate::type_getter::CompilerTypeGetter;

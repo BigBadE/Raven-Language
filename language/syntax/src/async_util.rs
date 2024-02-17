@@ -9,12 +9,14 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
 
+use data::tokens::Span;
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, JoinHandle};
 
-use crate::function::display_parenless;
-use crate::syntax::Syntax;
-use crate::types::FinalizedTypes;
+use crate::errors::{ErrorSource, ParsingMessage};
+use crate::program::function::display_parenless;
+use crate::program::syntax::Syntax;
+use crate::program::types::FinalizedTypes;
 use crate::{FinishedStructImplementor, ParsingError, TopElement};
 
 /// A future that asynchronously gets a type from its respective AsyncGetter.
@@ -125,12 +127,19 @@ impl<T: TopElement> AsyncTypesGetter<T> {
     /// Creates a new types getter
     pub fn new(
         syntax: Arc<Mutex<Syntax>>,
-        error: ParsingError,
+        error: Span,
         getting: String,
         name_resolver: Box<dyn NameResolver>,
         not_trait: bool,
     ) -> Self {
-        return Self { syntax, error, getting, name_resolver, finished: None, not_trait };
+        return Self {
+            syntax,
+            error: error.make_error(ParsingMessage::FailedToFind(getting.clone())),
+            getting,
+            name_resolver,
+            finished: None,
+            not_trait,
+        };
     }
 }
 

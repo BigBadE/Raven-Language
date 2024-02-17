@@ -1,5 +1,5 @@
-use syntax::code::{EffectType, Effects};
-use syntax::ParsingError;
+use syntax::errors::ParsingError;
+use syntax::program::code::{EffectType, Effects};
 
 use crate::parser::code_parser::{parse_line, ParseState};
 use crate::ParserUtils;

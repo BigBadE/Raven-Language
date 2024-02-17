@@ -1,13 +1,15 @@
 #![feature(box_into_inner)]
 #![feature(get_mut_unchecked)]
 #![feature(fn_traits)]
+#![feature(unboxed_closures)]
+#![feature(async_fn_traits)]
 
 use crate::async_util::{HandleWrapper, NameResolver};
-use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
-use crate::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
-use crate::syntax::Syntax;
+use crate::program::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
+use crate::program::r#struct::{FinalizedStruct, StructData, UnfinalizedStruct};
+use crate::program::syntax::Syntax;
+use crate::program::types::{FinalizedTypes, Types};
 use crate::top_element_manager::TopElementManager;
-use crate::types::{FinalizedTypes, Types};
 use async_trait::async_trait;
 use chalk_solve::rust_ir::ImplDatum;
 use indexmap::IndexMap;
@@ -35,25 +37,19 @@ pub mod async_util;
 pub mod chalk_interner;
 /// Implements the chalk types for Syntax
 pub mod chalk_support;
-/// Types used to represent code
-pub mod code;
-/// Types used to represent functions
-pub mod function;
+/// Has all the error-related structs
+pub mod errors;
 /// Utility functions for operations
 pub mod operation_util;
-/// Types used to represent structs
-pub mod r#struct;
-/// The syntax type, used to represent the entire program
-pub mod syntax;
+/// Handles the types required to hold the program in memory
+pub mod program;
 /// Top element manager is a utility type used to manage top elements like funcs or structs
 pub mod top_element_manager;
-/// Types used to represent types
-pub mod types;
 
 //Re-export ParsingError
 use crate::chalk_interner::ChalkIr;
+use crate::errors::ParsingError;
 use data::tokens::Span;
-pub use data::ParsingError;
 
 /// An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
 /// for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.

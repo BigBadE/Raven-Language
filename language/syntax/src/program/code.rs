@@ -3,9 +3,9 @@ use std::sync::Arc;
 use data::tokens::Span;
 
 use crate::async_util::UnparsedType;
-use crate::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
-use crate::r#struct::{FinalizedStruct, BOOL, CHAR, F64, STR, U64};
-use crate::types::{FinalizedTypes, Types};
+use crate::program::function::{CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
+use crate::program::r#struct::{BOOL, CHAR, F64, STR, U64};
+use crate::program::types::{FinalizedTypes, Types};
 use crate::{Attribute, VariableManager};
 
 /// An expression is a single line of code, containing an effect and the type of expression.
@@ -218,7 +218,7 @@ pub enum FinalizedEffectType {
     /// Loads variable with the given name.
     LoadVariable(String),
     /// Loads a field reference from the given struct with the given type.
-    Load(Box<FinalizedEffects>, String, Arc<FinalizedStruct>),
+    Load(Box<FinalizedEffects>, String, FinalizedTypes),
     /// Creates a struct at the given reference, of the given type with a tuple of the index of the argument and the argument.
     CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
     /// Create an array with the type and values
@@ -233,13 +233,20 @@ pub enum FinalizedEffectType {
     String(String),
     /// Creates a character
     Char(char),
-    /// Calls a virtual method, usually a downcasted trait, with the given function index, function,
+    /// Calls a virtual method, usually a downcasted trait, with the given function index, function, and generic return type (if any)
     /// and on the given arguments (first argument must be the downcased trait).
-    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, Option<(FinalizedTypes, Span)>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on EffectType::ImplementationCall
-    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
+    GenericVirtualCall(
+        usize,
+        Arc<FunctionData>,
+        Arc<CodelessFinalizedFunction>,
+        Vec<FinalizedEffects>,
+        Option<(FinalizedTypes, Span)>,
+    ),
     /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
-    Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<FunctionData>>),
+    /// The functions are empty until after degenericing
+    Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<CodelessFinalizedFunction>>),
     /// Internally used by low-level verifier to store a type on the heap.
     HeapStore(Box<FinalizedEffects>),
     /// Allocates space on the heap.
@@ -260,8 +267,8 @@ impl FinalizedEffectType {
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
             Self::MethodCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
-            | Self::VirtualCall(_, function, _)
-            | Self::GenericVirtualCall(_, _, function, _) => {
+            | Self::VirtualCall(_, function, _, _)
+            | Self::GenericVirtualCall(_, _, function, _, _) => {
                 function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
             }
             Self::LoadVariable(name) => {
@@ -273,9 +280,12 @@ impl FinalizedEffectType {
                 panic!("Unresolved variable {} from {:?}", name, variables);
             }
             // Gets the type of the field in the program with that name.
-            Self::Load(_, name, loading) => {
-                loading.fields.iter().find(|field| &field.field.name == name).map(|field| field.field.field_type.clone())
-            }
+            Self::Load(_, name, loading) => loading
+                .inner_struct()
+                .fields
+                .iter()
+                .find(|field| &field.field.name == name)
+                .map(|field| field.field.field_type.clone()),
             // Returns the program type.
             Self::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             // Returns the internal constant type.
@@ -334,41 +344,6 @@ impl FinalizedEffectType {
                 *method = degeneric_function(method.clone(), manager, effects, syntax, variables, None).await?;
             }
             Self::GenericMethodCall(function, found_trait, effects) => {
-                let mut calling = effects.remove(0);
-                calling.types.degeneric(process_manager, variables, syntax, span).await?;
-
-                let implementor = calling.types.get_return(variables, syntax).await.unwrap();
-                let implementation = ImplWaiter {
-                    syntax: syntax.clone(),
-                    return_type: implementor.clone(),
-                    data: found_trait.clone(),
-                    error: ParsingError::new(
-                        Span::default(),
-                        "You shouldn't see this! Report this please! Location: Degeneric generic method call",
-                    ),
-                }
-                .await?;
-
-                let name = function.data.name.split("::").last().unwrap();
-                let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
-
-                for effect in &mut *effects {
-                    effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-                let mut effects = effects.clone();
-                effects.insert(0, calling.clone());
-                let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
-                let function = CodelessFinalizedFunction::degeneric(
-                    function.clone(),
-                    process_manager.cloned(),
-                    &effects,
-                    syntax,
-                    variables,
-                    None,
-                )
-                .await?;
-                // TODO verify if none works here
-                *self = Self::MethodCall(None, function, effects.clone(), None);
             }
             // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
             Self::VirtualCall(_, _, effects) => {

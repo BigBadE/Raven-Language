@@ -1,6 +1,6 @@
 use crate::chalk_interner::ChalkIr;
-use crate::r#struct::ChalkData;
-use crate::syntax::Syntax;
+use crate::program::r#struct::ChalkData;
+use crate::program::syntax::Syntax;
 use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
 use chalk_solve::rust_ir::{
     AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum, AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,

@@ -10,12 +10,13 @@ use async_recursion::async_recursion;
 use data::tokens::Span;
 use indexmap::IndexMap;
 
-use crate::degeneric::degeneric_type;
+use crate::degeneric::degeneric_type_no_generic_types;
 use syntax::async_util::NameResolver;
-use syntax::code::FinalizedEffectType;
-use syntax::syntax::Syntax;
-use syntax::types::{FinalizedTypes, Types};
-use syntax::{ParsingError, ParsingFuture, SimpleVariableManager};
+use syntax::errors::ParsingError;
+use syntax::program::code::FinalizedEffectType;
+use syntax::program::syntax::Syntax;
+use syntax::program::types::{FinalizedTypes, Types};
+use syntax::{ParsingFuture, SimpleVariableManager};
 
 use crate::output::TypesChecker;
 
@@ -77,7 +78,7 @@ pub async fn get_return(
                         .iter()
                         .map(|(name, _)| (name.clone(), return_type.clone()))
                         .collect::<HashMap<_, _>>();
-                    degeneric_type(&mut inner, &generics, syntax).await;
+                    degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                 } else if let Some(calling) = args.get(0) {
                     let other = get_return(&calling.types, variables, syntax).await;
                     if let Some(found) = other {
@@ -86,26 +87,38 @@ pub async fn get_return(
                             .parent
                             .as_ref()
                             .unwrap()
-                            .resolve_generic(
-                                &found,
-                                syntax,
-                                &mut generics,
-                                ParsingError::new(Span::default(), "Unexpected error in get_return"),
-                            )
+                            .resolve_generic(&found, syntax, &mut generics, Span::default())
                             .await
                             .unwrap();
-                        degeneric_type(&mut inner, &generics, syntax).await;
+                        degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
                 Some(FinalizedTypes::Reference(Box::new(inner)))
             }
             None => None,
         },
-        FinalizedEffectType::GenericMethodCall(function, _, _)
-        | FinalizedEffectType::VirtualCall(_, function, _)
-        | FinalizedEffectType::GenericVirtualCall(_, _, function, _) => {
-            function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
-        }
+        FinalizedEffectType::GenericMethodCall(function, _, args)
+        | FinalizedEffectType::VirtualCall(_, function, args, _)
+        | FinalizedEffectType::GenericVirtualCall(_, _, function, args, _) => match function.return_type.as_ref().cloned() {
+            Some(mut inner) => {
+                if let Some(calling) = args.get(0) {
+                    let other = get_return(&calling.types, variables, syntax).await;
+                    if let Some(found) = other {
+                        let mut generics = HashMap::new();
+                        function
+                            .parent
+                            .as_ref()
+                            .unwrap()
+                            .resolve_generic(&found, syntax, &mut generics, Span::default())
+                            .await
+                            .unwrap();
+                        degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
+                    }
+                }
+                Some(FinalizedTypes::Reference(Box::new(inner)))
+            }
+            None => None,
+        },
         // Stores just return their inner type.
         FinalizedEffectType::HeapStore(inner)
         | FinalizedEffectType::StackStore(inner)
@@ -115,6 +128,15 @@ pub async fn get_return(
             FinalizedTypes::Reference(inner) => Some(*inner),
             _ => panic!("Tried to load non-reference!"),
         },
+        // Gets the type of the field in the program with that name.
+        FinalizedEffectType::Load(effect, name, _) => get_return(&effect.types, variables, syntax)
+            .await
+            .unwrap()
+            .inner_struct()
+            .fields
+            .iter()
+            .find(|field| &field.field.name == name)
+            .map(|field| field.field.field_type.clone()),
         _ => types.get_nongeneric_return(variables),
     };
 }

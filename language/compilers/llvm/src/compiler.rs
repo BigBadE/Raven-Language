@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use inkwell::builder::Builder;
@@ -8,16 +8,14 @@ use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
-
 use tokio::time;
 
 use data::tokens::Span;
 use data::CompilerArguments;
 use syntax::async_util::EmptyNameResolver;
-use syntax::function::{CodelessFinalizedFunction, FinalizedFunction};
-use syntax::r#struct::FinalizedStruct;
-use syntax::syntax::Syntax;
-use syntax::ParsingError;
+use syntax::program::function::{CodelessFinalizedFunction, FinalizedFunction};
+use syntax::program::r#struct::FinalizedStruct;
+use syntax::program::syntax::Syntax;
 
 use crate::function_compiler::{compile_block, instance_function};
 use crate::main_future::MainFuture;
@@ -51,7 +49,7 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) -> Option<Arc<CodelessFinalizedFunction>> {
         match Syntax::get_function(
             syntax.clone(),
-            ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: compile"),
+            Span::default(),
             arguments.target.clone(),
             Box::new(EmptyNameResolver {}),
             false,
@@ -62,7 +60,7 @@ impl<'ctx> CompilerImpl<'ctx> {
             Err(_) => return None,
         };
 
-        let function = match time::timeout(Duration::from_secs(2), MainFuture { syntax: syntax.clone() }).await {
+        let function = match time::timeout(Duration::from_secs(5), MainFuture { syntax: syntax.clone() }).await {
             Ok(found) => found,
             Err(_) => panic!(
                 "Something went wrong with finding main! {:?}",
@@ -82,7 +80,15 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) {
         instance_function(main, type_getter);
 
+        let start = Instant::now();
         while !type_getter.compiling.borrow().is_empty() {
+            if start.elapsed().as_secs() > 5 {
+                panic!(
+                    "Failed: {:?}",
+                    type_getter.compiling.borrow().iter().map(|(_, func)| &func.data.name).collect::<Vec<_>>()
+                )
+            }
+
             let (function_type, function) = type_getter.compiling.borrow_mut().remove(0);
 
             if function.data.name.is_empty() {

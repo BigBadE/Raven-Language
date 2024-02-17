@@ -1,17 +1,21 @@
+use std::sync::{Arc, Mutex};
+
 use async_recursion::async_recursion;
 use data::tokens::Span;
-use std::sync::{Arc, Mutex};
 use syntax::async_util::UnparsedType;
-use syntax::code::{EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
-use syntax::function::{CodeBody, FinalizedCodeBody};
-use syntax::syntax::Syntax;
-use syntax::top_element_manager::ImplWaiter;
-use syntax::types::FinalizedTypes;
-use syntax::{ParsingError, SimpleVariableManager};
+use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::program::code::{
+    EffectType, Effects, ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression,
+};
+use syntax::program::function::{CodeBody, FinalizedCodeBody};
+use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
+use syntax::SimpleVariableManager;
 
 use crate::check_impl_call::check_impl_call;
 use crate::check_method_call::check_method_call;
 use crate::check_operator::check_operator;
+use crate::degeneric::degeneric_type_fields;
 use crate::{get_return, CodeVerifier};
 
 /// Verifies a block of code, linking all method calls and types, and making sure the code is ready to compile.
@@ -65,43 +69,32 @@ async fn check_return_type(
         None => return Ok(false),
     };
 
-    let last = body.pop().unwrap();
-    let last_type;
-    if let Some(found) = get_return(&last.effect.types, variables, syntax).await {
-        last_type = found;
+    let last_effect = body.pop().unwrap();
+    let last_effect_type;
+    if let Some(found) = get_return(&last_effect.effect.types, variables, syntax).await {
+        last_effect_type = found;
     } else {
         // This is an if/for/while block, skip it
         return Ok(true);
     }
 
     // Only downcast types that don't match and aren't generic
-    if last_type == *return_type || !last_type.name_safe().is_some() {
-        body.push(last);
+    if last_effect_type == *return_type || !last_effect_type.name_safe().is_some() {
+        body.push(last_effect);
         return Ok(true);
     }
 
-    return if last_type.of_type(return_type, code_verifier.syntax.clone()).await {
-        let value = ImplWaiter {
-            syntax: code_verifier.syntax.clone(),
-            return_type: last_type.clone(),
-            data: return_type.clone(),
-            error: ParsingError::new(
-                Span::default(),
-                "You shouldn't see this! Report this please! Location: Return type check",
-            ),
-        }
-        .await?;
-
+    return if last_effect_type.of_type(return_type, code_verifier.syntax.clone()).await {
         body.push(FinalizedExpression::new(
             line,
             FinalizedEffects::new(
                 Span::default(),
-                FinalizedEffectType::Downcast(Box::new(last.effect), return_type.clone(), value),
+                FinalizedEffectType::Downcast(Box::new(last_effect.effect), return_type.clone(), vec![]),
             ),
         ));
         Ok(true)
     } else {
-        Err(span.make_error("Incorrect return type!"))
+        Err(span.make_error(ParsingMessage::UnexpectedReturnType(last_effect_type, return_type.clone())))
     };
 }
 
@@ -145,8 +138,8 @@ pub async fn verify_effect(
         EffectType::CreateStruct(target, effects) => verify_create_struct(code_verifier, target, effects, variables).await?,
         EffectType::Load(inner_effect, target) => {
             let output = verify_effect(code_verifier, variables, *inner_effect).await?;
+            let types = get_return(&output.types, variables, &code_verifier.syntax).await.unwrap();
 
-            let types = get_return(&output.types, variables, &code_verifier.syntax).await.unwrap().inner_struct().clone();
             FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::Load(Box::new(output), target.clone(), types))
         }
         EffectType::CreateVariable(name, inner_effect) => {
@@ -155,7 +148,7 @@ pub async fn verify_effect(
             if let Some(temp_found) = get_return(&effect.types, variables, &code_verifier.syntax).await {
                 found = temp_found;
             } else {
-                return Err(effect.span.make_error("No return type!"));
+                return Err(effect.span.make_error(ParsingMessage::UnexpectedVoid()));
             };
 
             variables.variables.insert(name.clone(), found.clone());
@@ -210,9 +203,9 @@ async fn verify_create_struct(
     effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
-    let target = Syntax::parse_type(
+    let mut target = Syntax::parse_type(
         code_verifier.syntax.clone(),
-        ParsingError::new(Span::default(), "You shouldn't see this! Report this please! Location: Verify create struct"),
+        Span::default(),
         code_verifier.resolver.boxed_clone(),
         target,
         vec![],
@@ -221,10 +214,11 @@ async fn verify_create_struct(
     .finalize(code_verifier.syntax.clone())
     .await;
 
+    let mut generics = code_verifier.process_manager.generics.clone();
     let mut final_effects = vec![];
+    let fields = target.get_fields();
     for (field_name, effect) in effects {
         let mut i = 0;
-        let fields = target.get_fields();
         for field in fields {
             if field.field.name == field_name {
                 break;
@@ -233,12 +227,20 @@ async fn verify_create_struct(
         }
 
         if i == fields.len() {
-            return Err(effect.span.make_error("Unknown field!"));
+            return Err(effect.span.make_error(ParsingMessage::UnknownField(field_name)));
         }
 
-        final_effects.push((i, verify_effect(code_verifier, variables, effect).await?));
+        let error = effect.span.clone();
+        let final_effect = verify_effect(code_verifier, variables, effect).await?;
+        get_return(&final_effect.types, variables, &code_verifier.syntax)
+            .await
+            .unwrap()
+            .resolve_generic(&fields[i].field.field_type, &code_verifier.syntax, &mut generics, error)
+            .await?;
+        final_effects.push((i, final_effect));
     }
 
+    degeneric_type_fields(&mut target, &mut generics, &code_verifier.syntax).await;
     return Ok(FinalizedEffects::new(
         Span::default(),
         FinalizedEffectType::CreateStruct(
@@ -261,7 +263,7 @@ async fn check_type(
         for checking in output {
             let returning = get_return(&checking.types, variables, &code_verifier.syntax).await.unwrap();
             if !returning.of_type(found, code_verifier.syntax.clone()).await {
-                return Err(span.make_error("Incorrect types!"));
+                return Err(span.make_error(ParsingMessage::MismatchedTypes(returning, found.clone())));
             }
         }
     }

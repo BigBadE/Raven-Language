@@ -1,3 +1,11 @@
+import array::Index;
+
 pub trait List<T> {
     fn get(self, index: u64) -> T;
+}
+
+pub impl<T> Index<T> for List<T> {
+    fn index(self, index: u64) -> T {
+        return self.get(index);
+    }
 }

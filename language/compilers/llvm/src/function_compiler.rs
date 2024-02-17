@@ -8,9 +8,9 @@ use std::sync::Arc;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue, FunctionValue};
 
-use syntax::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
-use syntax::function::{CodelessFinalizedFunction, FinalizedCodeBody};
-use syntax::types::FinalizedTypes;
+use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
+use syntax::program::function::{CodelessFinalizedFunction, FinalizedCodeBody};
+use syntax::program::types::FinalizedTypes;
 use syntax::{is_modifier, Attribute, Modifier};
 
 use crate::internal::instructions::{compile_internal, malloc_type};
@@ -39,6 +39,9 @@ pub fn instance_function<'a, 'ctx>(
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
         value = create_function_value(&function, type_getter, None);
+        if function.data.name == "iter::Iter<u64>_NumberIter::next" {
+            println!("Adding it!");
+        }
         type_getter.compiling.borrow_mut().push((value, function));
     }
     return value;
@@ -474,7 +477,7 @@ pub fn compile_effect<'ctx>(
 
             Some(malloc.as_basic_value_enum())
         }
-        FinalizedEffectType::VirtualCall(func_offset, method, args) => {
+        FinalizedEffectType::VirtualCall(func_offset, method, args, _) => {
             let table = compile_effect(type_getter, function, &args[0], id).unwrap();
 
             let mut compiled_args = Vec::default();
@@ -539,9 +542,9 @@ pub fn compile_effect<'ctx>(
                 .left()
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
-            let found = base.types.get_nongeneric_return(type_getter).unwrap();
-            if is_modifier(found.inner_struct().data.modifiers, Modifier::Trait) {
-                if !target.eq(&found) {
+            let base_return_types = base.types.get_nongeneric_return(type_getter).unwrap();
+            if is_modifier(base_return_types.inner_struct().data.modifiers, Modifier::Trait) {
+                if !target.eq(&base_return_types) {
                     panic!("Downcasting to a trait that doesn't match! Not implemented yet!")
                 } else {
                     compile_effect(type_getter, function, base, id)
@@ -549,7 +552,7 @@ pub fn compile_effect<'ctx>(
             } else {
                 let table = type_getter.vtable.clone();
                 let base = compile_effect(type_getter, function, base, id).unwrap();
-                let table = table.borrow_mut().get_vtable(type_getter, target, &found, functions);
+                let table = table.borrow_mut().get_vtable(type_getter, target, &base_return_types, functions);
                 *id += 1;
 
                 let structure = type_getter
@@ -570,7 +573,7 @@ pub fn compile_effect<'ctx>(
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
-        FinalizedEffectType::GenericVirtualCall(_, _, _, _) => {
+        FinalizedEffectType::GenericVirtualCall(_, _, _, _, _) => {
             panic!("Generic virtual call not degeneric'd!")
         }
     };

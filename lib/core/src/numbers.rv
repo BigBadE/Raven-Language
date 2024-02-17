@@ -39,6 +39,7 @@ pub internal impl<T: Number, E: Number> Cast<T> for E {
     }
 }
 
+// TODO sort this out
 trait Match<T> {
     fn matches(self, other: T) -> bool;
 }

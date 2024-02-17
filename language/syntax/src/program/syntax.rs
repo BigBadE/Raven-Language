@@ -25,10 +25,11 @@ pub use data::Main;
 
 use crate::async_util::{AsyncStructImplGetter, AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
-use crate::function::{FinalizedFunction, FunctionData};
-use crate::r#struct::{FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8};
+use crate::errors::ParsingMessage;
+use crate::program::function::{FinalizedFunction, FunctionData};
+use crate::program::r#struct::{FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8};
+use crate::program::types::FinalizedTypes;
 use crate::top_element_manager::{GetterManager, TopElementManager};
-use crate::types::FinalizedTypes;
 use crate::{
     is_modifier, Attribute, FinishedStructImplementor, FinishedTraitImplementor, Modifier, ParsingError, ProcessManager,
     TopElement, Types,
@@ -119,8 +120,8 @@ impl Syntax {
 
             if function.data.name != locked.async_manager.target {
                 if function.code.expressions.len() == 0
-                    && (locked.compiling.contains_key(&function.data.name)
-                        || locked.generics.contains_key(&function.data.name))
+                    && ((locked.compiling.contains_key(&function.data.name) && !generic)
+                        || (locked.generics.contains_key(&function.data.name) && generic))
                 {
                     return;
                 }
@@ -144,7 +145,9 @@ impl Syntax {
             }
             waker = locked.async_manager.target_waker.clone();
         }
-        process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
+        if generic {
+            process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
+        }
         if let Some(found) = waker {
             found.wake();
         }
@@ -218,16 +221,20 @@ impl Syntax {
     }
 
     /// Finds an implementation method for the given trait.
-    pub fn get_implementation_methods(
-        &self,
-        implementing_trait: &FinalizedTypes,
-        implementor_struct: &FinalizedTypes,
+    pub async fn get_implementation_methods(
+        syntax: &Arc<Mutex<Syntax>>,
+        struct_type: &FinalizedTypes,
+        trait_type: &FinalizedTypes,
     ) -> Option<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>> {
         let mut output = Vec::default();
-        for implementation in &self.implementations {
-            if implementor_struct.of_type_sync(&implementation.target, None).0
-                && (implementing_trait.of_type_sync(&implementation.base, None).0
-                    || self.solve(&implementing_trait, &implementation.base))
+        let implementations = {
+            let locked = syntax.lock().unwrap();
+            locked.implementations.clone()
+        };
+
+        for implementation in &implementations {
+            if trait_type.of_type_sync(&implementation.target, None).0
+                && (struct_type.of_type(&implementation.base, syntax.clone()).await/* || self.solve(&struct_type, &implementation.base)*/)
             {
                 output.push((implementation.clone(), implementation.functions.clone()));
             }
@@ -338,7 +345,7 @@ impl Syntax {
                 if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
                     name.replace("{+}", "{}").clone()
                 } else {
-                    locked.errors.push(ParsingError::new(Span::default(), "Expected a string with the attribute operator!"));
+                    locked.errors.push(ParsingError::new(Span::default(), ParsingMessage::StringAttribute()));
                     return;
                 };
 
@@ -387,7 +394,7 @@ impl Syntax {
     /// Asynchronously gets a function, or returns the error if that function isn't found.
     pub async fn get_function(
         syntax: Arc<Mutex<Syntax>>,
-        error: ParsingError,
+        error: Span,
         getting: String,
         name_resolver: Box<dyn NameResolver>,
         not_trait: bool,
@@ -407,7 +414,7 @@ impl Syntax {
     #[async_recursion]
     pub async fn get_struct(
         syntax: Arc<Mutex<Syntax>>,
-        error: ParsingError,
+        error: Span,
         getting: String,
         name_resolver: Box<dyn NameResolver>,
         mut resolved_generics: Vec<String>,
@@ -455,7 +462,7 @@ impl Syntax {
     async fn parse_bounds(
         input: &[u8],
         syntax: &Arc<Mutex<Syntax>>,
-        error: &ParsingError,
+        error: &Span,
         name_resolver: &dyn NameResolver,
     ) -> Result<Vec<Types>, ParsingError> {
         let mut last = 0;
@@ -518,7 +525,7 @@ impl Syntax {
     #[async_recursion]
     pub async fn parse_type(
         syntax: Arc<Mutex<Syntax>>,
-        error: ParsingError,
+        error: Span,
         resolver: Box<dyn NameResolver>,
         types: UnparsedType,
         resolved_generics: Vec<String>,

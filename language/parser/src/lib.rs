@@ -15,7 +15,7 @@ use anyhow::Error;
 use data::tokens::{Token, TokenTypes};
 use data::{Readable, SourceSet};
 use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
-use syntax::syntax::Syntax;
+use syntax::program::syntax::Syntax;
 
 use crate::parser::top_parser::parse_top;
 use crate::parser::util::ParserUtils;
