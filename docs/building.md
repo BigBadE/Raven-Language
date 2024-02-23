@@ -4,9 +4,12 @@ This project requires the latest Rust download. Download it using Rustup from ht
 
 # Building
 
+# Windows / MacOS
 Requires LLVM set with the environmental variable LLVM_SYS_130_PREFIX = (path to folder with bin). This path can only be in forward slashes (/), backslashes (\) will not be detected.
 
-Please download LLVM from https://github.com/PLC-lang/llvm-package-windows/releases/tag/v13.0.0
+For MacOS/Linux, download it from the official github: [here](https://github.com/llvm/llvm-project/releases/tag/llvmorg-13.0.0)
+
+For Windows, please download from a different link with the correct binaries: [here](https://github.com/PLC-lang/llvm-package-windows/releases/tag/v13.0.0)
 
 C++ is also required to be installed somewhere on your system, for Windows get it from https://visualstudio.microsoft.com/vs/community/.
 By default, Rustup should install this for you.
