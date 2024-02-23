@@ -420,7 +420,6 @@ impl FinalizedTypes {
         bounds_error: Span,
     ) -> Result<(), ParsingError> {
         if self != other {
-            // TODO uncheck when fixing this later
             //println!("Diff: {} vs {}", self, other);
         }
         match self {

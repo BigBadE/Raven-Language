@@ -133,7 +133,7 @@ impl Syntax {
             }
 
             if !function.generics.is_empty() || !function.fields.is_empty() {
-                panic!("Invalid main function!");
+                panic!("Invalid main function! Make sure your main function is the top function in your file");
             }
 
             if generic {

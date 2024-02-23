@@ -1,10 +1,5 @@
-import collections::array_list;
-import list::List;
 import stdio;
-import array::Index;
 
 fn main() {
-    let arraylist = ArrayList::from_existing<str>(["1", "2", "3"]);
-
-    printf(arraylist[0]);
+    printf("Hello, world!");
 }
