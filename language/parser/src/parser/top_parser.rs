@@ -48,17 +48,15 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 modifiers = vec![];
             }
             TokenTypes::StructStart => {
-                let span = Span::new(parser_utils.file, parser_utils.index - 1);
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                parser_utils.add_struct(&span, structure);
+                parser_utils.add_struct(structure);
                 attributes = vec![];
                 modifiers = vec![];
             }
             TokenTypes::TraitStart => {
-                let span = Span::new(parser_utils.file, parser_utils.index - 1);
                 modifiers.push(Modifier::Trait);
                 let structure = parse_structure(parser_utils, attributes, modifiers);
-                parser_utils.add_struct(&span, structure);
+                parser_utils.add_struct(structure);
                 attributes = Vec::default();
                 modifiers = Vec::default();
             }

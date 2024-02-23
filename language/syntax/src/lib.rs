@@ -301,7 +301,7 @@ where
         syntax: Arc<Mutex<Syntax>>,
         resolver: Box<dyn NameResolver>,
         process_manager: Box<dyn ProcessManager>,
-    );
+    ) -> Result<(), ParsingError>;
 
     /// Gets the getter for that type on the syntax
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self>;

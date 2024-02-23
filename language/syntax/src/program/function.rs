@@ -89,7 +89,7 @@ impl TopElement for FunctionData {
         syntax: Arc<Mutex<Syntax>>,
         resolver: Box<dyn NameResolver>,
         process_manager: Box<dyn ProcessManager>,
-    ) {
+    ) -> Result<(), ParsingError> {
         let name = current.data.name.clone();
 
         // Get the codeless finalized function and the code from the function.
@@ -102,6 +102,7 @@ impl TopElement for FunctionData {
         // Add the finalized code to the compiling list.
         Syntax::add_compiling(process_manager, finalized_function.clone(), &syntax, true).await;
         handle.lock().unwrap().finish_task(&name);
+        return Ok(());
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {

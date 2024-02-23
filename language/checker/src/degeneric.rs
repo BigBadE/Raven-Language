@@ -336,7 +336,7 @@ async fn degeneric_code(
     original: Arc<CodelessFinalizedFunction>,
     degenericed_method: Arc<CodelessFinalizedFunction>,
     manager: Box<dyn ProcessManager>,
-) {
+) -> Result<(), ParsingError> {
     // This has to wait until the original is ready to be compiled.
     FunctionWaiter { syntax: syntax.clone(), data: original.data.clone() }.await;
 
@@ -346,10 +346,7 @@ async fn degeneric_code(
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
 
     // Degenerics the code body.
-    match degeneric_code_body(&mut code, &*manager, &mut variables, &syntax).await {
-        Ok(inner) => inner,
-        Err(error) => panic!("Error degenericing code: {} for {}", error.message, degenericed_method.data.name),
-    };
+    degeneric_code_body(&mut code, &*manager, &mut variables, &syntax).await?;
 
     // Combines the degenericed function with the degenericed code to finalize it.
     let output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
@@ -360,6 +357,7 @@ async fn degeneric_code(
     Syntax::add_compiling(manager, Arc::new(output), &syntax, false).await;
 
     handle.lock().unwrap().finish_task(&degenericed_method.data.name);
+    return Ok(());
 }
 
 /// A waiter used by generics trying to degeneric a function that returns when the target function's

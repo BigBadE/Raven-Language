@@ -26,11 +26,11 @@ mod test {
             match entry {
                 DirEntry::File(file) => {
                     let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
-                    println!("Running {}", path);
                     if !path.ends_with(".rv") {
                         println!("File {} doesn't have the right file extension!", path);
                         continue;
                     }
+                    println!("Running {}", path);
                     let path = format!("{}::test", &path[0..path.len() - 3]);
                     let mut arguments = Arguments::build_args(
                         false,

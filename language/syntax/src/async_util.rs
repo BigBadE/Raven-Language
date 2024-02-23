@@ -2,16 +2,16 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
-use std::mem;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
 
-use data::tokens::Span;
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, JoinHandle};
+
+use data::tokens::Span;
 
 use crate::errors::{ErrorSource, ParsingMessage};
 use crate::program::function::display_parenless;
@@ -297,7 +297,7 @@ pub struct HandleWrapper {
     /// The inner handle
     handle: Handle,
     /// Tasks to join to finish
-    pub joining: Vec<JoinHandle<()>>,
+    pub joining: Vec<JoinHandle<Result<(), ParsingError>>>,
     /// The names of running tasks and a handle to abort them
     pub names: HashMap<String, AbortHandle>,
     /// A waker to wake when finished with a task
@@ -310,11 +310,11 @@ impl HandleWrapper {
         return HandleWrapper { handle, joining: vec![], names: HashMap::default(), waker: None };
     }
     /// Spawns a task and adds it to the joining vec
-    pub fn spawn<T: Send + 'static, F: Future<Output = T> + Send + 'static>(&mut self, name: String, future: F) {
+    pub fn spawn<F: Future<Output = Result<(), ParsingError>> + Send + 'static>(&mut self, name: String, future: F) {
         let handle = self.handle.spawn(future);
         self.names.insert(name, handle.abort_handle());
-        // skipcq: RS-W1117 Generic types are detected incorrectly
-        self.joining.push(unsafe { mem::transmute(handle) });
+
+        self.joining.push(handle);
     }
 
     /// Tells the wrapper that a task finished, the waker will remove the handle from the handles vec

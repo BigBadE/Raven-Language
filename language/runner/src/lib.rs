@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 use syntax::async_util::HandleWrapper;
+use syntax::errors::ParsingError;
 use syntax::program::function::FinalizedFunction;
 use syntax::program::r#struct::FinalizedStruct;
 use syntax::program::syntax::Compiler;
@@ -33,7 +34,7 @@ pub struct JoinWaiter {
 }
 
 impl Future for JoinWaiter {
-    type Output = bool;
+    type Output = Result<(), ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.handle.lock().unwrap();
@@ -48,7 +49,11 @@ impl Future for JoinWaiter {
             } else {
                 match Pin::new(&mut handle).poll(cx) {
                     Poll::Ready(inner) => match inner {
-                        Ok(_) => {
+                        Ok(result) => {
+                            match result {
+                                Err(error) => return Poll::Ready(Err(error)),
+                                _ => {}
+                            }
                             removing.push(i);
                             i += 1;
                         }
@@ -66,7 +71,7 @@ impl Future for JoinWaiter {
             locked.joining.remove(found);
         }
         return if locked.joining.is_empty() {
-            Poll::Ready(false)
+            Poll::Ready(Ok(()))
         } else {
             locked.waker = Some(cx.waker().clone());
             Poll::Pending

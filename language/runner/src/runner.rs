@@ -72,8 +72,14 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
 
     syntax.lock().unwrap().finish();
 
+    let mut errors = vec![];
     match time::timeout(Duration::from_secs(1), JoinWaiter { handle: handle.clone() }).await {
-        Ok(_) => {}
+        Ok(error) => match error {
+            Err(error) => {
+                errors.push(error);
+            }
+            _ => {}
+        },
         Err(_) => {
             for (name, _) in &handle.lock().unwrap().names {
                 println!("Infinite loop for {}", name);
@@ -82,7 +88,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
         }
     }
 
-    let errors = syntax.lock().unwrap().errors.clone();
+    errors.append(&mut syntax.lock().unwrap().errors);
     return if errors.is_empty() {
         go_sender.send(()).await.unwrap();
         Ok(receiver.recv().await.unwrap())

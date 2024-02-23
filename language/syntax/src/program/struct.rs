@@ -310,7 +310,7 @@ impl TopElement for StructData {
         syntax: Arc<Mutex<Syntax>>,
         resolver: Box<dyn NameResolver>,
         process_manager: Box<dyn ProcessManager>,
-    ) {
+    ) -> Result<(), ParsingError> {
         let data = current.data.clone();
         let functions = current.functions;
         current.functions = Vec::default();
@@ -333,6 +333,7 @@ impl TopElement for StructData {
             );
         }
         handle.lock().unwrap().finish_task(&data.name);
+        return Ok(());
     }
 
     fn get_manager(syntax: &mut Syntax) -> &mut TopElementManager<Self> {

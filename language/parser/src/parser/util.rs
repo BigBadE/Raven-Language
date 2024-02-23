@@ -1,8 +1,11 @@
-use indexmap::IndexMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 
+use indexmap::IndexMap;
+
+use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::{HandleWrapper, NameResolver, UnparsedType};
-use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
+use syntax::errors::ParsingError;
 use syntax::program::function::{CodeBody, FunctionData, UnfinalizedFunction};
 use syntax::program::r#struct::{StructData, UnfinalizedStruct};
 use syntax::program::syntax::Syntax;
@@ -11,10 +14,7 @@ use syntax::{
     FinishedStructImplementor, FinishedTraitImplementor, ParsingFuture, ProcessManager, TopElement, TraitImplementor,
 };
 
-use std::sync::Mutex;
-
 use crate::ImportNameResolver;
-use data::tokens::{Span, Token, TokenTypes};
 
 /// A struct containing the data needed for parsing
 pub struct ParserUtils<'a> {
@@ -55,7 +55,7 @@ impl<'a> ParserUtils<'a> {
     }
 
     /// Adds a struct to the syntax
-    pub fn add_struct(&mut self, span: &Span, structure: Result<UnfinalizedStruct, ParsingError>) {
+    pub fn add_struct(&mut self, structure: Result<UnfinalizedStruct, ParsingError>) {
         let mut structure = structure.unwrap_or_else(|error| UnfinalizedStruct {
             generics: IndexMap::default(),
             fields: Vec::default(),
@@ -63,7 +63,7 @@ impl<'a> ParserUtils<'a> {
             data: Arc::new(StructData::new_poisoned(format!("${}", self.file), error)),
         });
 
-        Syntax::add::<StructData>(&self.syntax, span.make_error(ParsingMessage::DuplicateStructure()), &mut structure.data);
+        Syntax::add_struct(&self.syntax, &mut structure.data);
 
         let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
         self.handle.lock().unwrap().spawn(
@@ -85,7 +85,7 @@ impl<'a> ParserUtils<'a> {
         implementor: Result<TraitImplementor, ParsingError>,
         resolver: Box<dyn NameResolver>,
         process_manager: Box<dyn ProcessManager>,
-    ) {
+    ) -> Result<(), ParsingError> {
         match implementor {
             Ok(implementor) => {
                 match Self::add_implementation(handle.clone(), syntax.clone(), implementor, resolver, process_manager).await
@@ -94,17 +94,18 @@ impl<'a> ParserUtils<'a> {
                     Err(error) => {
                         let mut locked = syntax.lock().unwrap();
                         locked.async_manager.parsing_impls -= 1;
-                        locked.errors.push(error);
+                        return Err(error);
                     }
                 };
             }
             Err(error) => {
                 let mut locked = syntax.lock().unwrap();
                 locked.async_manager.parsing_impls -= 1;
-                locked.errors.push(error);
+                return Err(error);
             }
         }
         handle.lock().unwrap().finish_task(&"temp".to_string());
+        return Ok(());
     }
 
     /// Adds an implementor to the syntax
@@ -215,7 +216,7 @@ impl<'a> ParserUtils<'a> {
             },
         };
 
-        Syntax::add(syntax, adding.data.span.make_error(ParsingMessage::DuplicateFunction()), &mut adding.data);
+        Syntax::add_function(syntax, &mut adding.data);
         return adding;
     }
 }

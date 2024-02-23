@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::mem;
-use std::ops::DerefMut;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Waker;
@@ -25,7 +23,7 @@ pub use data::Main;
 
 use crate::async_util::{AsyncStructImplGetter, AsyncTypesGetter, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
-use crate::errors::ParsingMessage;
+use crate::errors::{ErrorSource, ParsingMessage};
 use crate::program::function::{FinalizedFunction, FunctionData};
 use crate::program::r#struct::{FinalizedStruct, StructData, BOOL, F32, F64, I16, I32, I64, I8, STR, U16, U32, U64, U8};
 use crate::program::types::FinalizedTypes;
@@ -316,29 +314,15 @@ impl Syntax {
         return value;
     }
 
-    /// Adds the element to the syntax
-    pub fn add<T: TopElement + 'static>(syntax: &Arc<Mutex<Syntax>>, dupe_error: ParsingError, adding: &mut Arc<T>) {
+    pub fn add_function(syntax: &Arc<Mutex<Syntax>>, adding: &mut Arc<FunctionData>) {
         let mut locked = syntax.lock().unwrap();
-        /*if T::get_manager(locked.deref_mut()).types.contains_key(adding.name()) {
-            locked.errors.push(adding.get_span().make_error("Duplicate type!"));
-        }*/
+        locked.add(adding);
+    }
 
-        let manager = T::get_manager(locked.deref_mut());
-        manager.add_type(adding.clone());
-
-        // Add any poisons to the syntax errors list.
-        for poison in adding.errors() {
-            locked.errors.push(poison.clone());
-        }
-
-        let name = adding.name().clone();
+    pub fn add_struct(syntax: &Arc<Mutex<Syntax>>, adding: &mut Arc<StructData>) {
+        let mut locked = syntax.lock().unwrap();
+        locked.add(adding);
         if adding.is_operator() {
-            //Downcasts the generic type to be a StructData.
-            //Only traits can be operators. This will break if something else is.
-            //These is no better way to do this because Rust doesn't allow downcasting generics.
-            // skipcq: RS-W1117 Generic types are detected incorrectly
-            let adding: Arc<StructData> = unsafe { mem::transmute(adding.clone()) };
-
             // Gets the name of the operation, or errors if there isn't one.
             let name =
                 if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
@@ -350,10 +334,10 @@ impl Syntax {
 
             // Checks if there is a duplicate of that operation.
             if locked.operations.contains_key(&name) {
-                locked.errors.push(dupe_error);
+                locked.errors.push(adding.get_span().make_error(ParsingMessage::DuplicateStructure()));
             }
 
-            locked.operations.insert(name.clone(), adding);
+            locked.operations.insert(name.clone(), adding.clone());
 
             // Wakes every waker waiting for that operation.
             if let Some(wakers) = locked.operation_wakers.get(&name) {
@@ -362,9 +346,24 @@ impl Syntax {
                 }
             }
         }
+    }
+
+    /// Adds the element to the syntax
+    fn add<T: TopElement + 'static>(&mut self, adding: &mut Arc<T>) {
+        /*if T::get_manager(locked.deref_mut()).types.contains_key(adding.name()) {
+            locked.errors.push(adding.get_span().make_error("Duplicate type!"));
+        }*/
+
+        let manager = T::get_manager(self);
+        manager.add_type(adding.clone());
+
+        // Add any poisons to the syntax errors list.
+        for poison in adding.errors() {
+            self.errors.push(poison.clone());
+        }
 
         // Wakes every waker waiting for that type.
-        if let Some(wakers) = T::get_manager(locked.deref_mut()).wakers.remove(&name) {
+        if let Some(wakers) = T::get_manager(self).wakers.remove(adding.name()) {
             for waker in wakers {
                 waker.wake();
             }
