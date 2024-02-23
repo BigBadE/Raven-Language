@@ -262,20 +262,6 @@ pub async fn check_args(
         if !arg_return_type.of_type(base_field_type, syntax.clone()).await {
             return Err(span.make_error(ParsingMessage::MismatchedTypes(arg_return_type.clone(), base_field_type.clone())));
         }
-
-        // Only downcast if an implementation was found and it's not generic. Don't downcast if they're of the same type.
-        if !arg_return_type.of_type_sync(base_field_type, None).0 && base_field_type.name_safe().is_some() {
-            // Handle downcasting
-            let argument = args.remove(i);
-
-            args.insert(
-                i,
-                FinalizedEffects::new(
-                    argument.span.clone(),
-                    FinalizedEffectType::Downcast(Box::new(argument), base_field_type.clone(), vec![]),
-                ),
-            );
-        }
     }
 
     return Ok(());

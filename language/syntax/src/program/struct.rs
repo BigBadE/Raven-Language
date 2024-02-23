@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -104,7 +105,7 @@ pub struct StructData {
     /// The program's modifiers
     pub modifiers: u8,
     /// The program's chalk data
-    pub chalk_data: Option<ChalkData>,
+    pub chalk_data: ChalkData,
     /// The program's numerical ID, each struct has a unique ID that starts at 0 and increments by 1
     pub id: u64,
     /// The program's name
@@ -175,13 +176,16 @@ impl PartialEq for FinalizedStruct {
     }
 }
 
+static mut ID: AtomicU64 = AtomicU64::new(0);
+
 impl StructData {
     /// creates an empty struct data, usually for internal structs
     pub fn empty(name: String) -> Self {
+        let id = unsafe { ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst) };
         return Self {
             attributes: Vec::default(),
-            chalk_data: None,
-            id: 0,
+            chalk_data: Self::get_chalk_data(id, 0),
+            id,
             modifiers: Modifier::Internal as u8,
             name,
             span: Span::default(),
@@ -198,13 +202,24 @@ impl StructData {
         span: Span,
         name: String,
     ) -> Self {
-        return Self { attributes, chalk_data: None, id: 0, modifiers, name, span, functions, poisoned: Vec::default() };
+        let id = unsafe { ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst) };
+
+        return Self {
+            attributes,
+            chalk_data: Self::get_chalk_data(id, modifiers),
+            id,
+            modifiers,
+            name,
+            span,
+            functions,
+            poisoned: Vec::default(),
+        };
     }
 
     /// Sets the internal chalk data, used to make sure all ids are unique and incremental in an async environment
-    pub fn set_chalk_data(&mut self) {
+    pub fn get_chalk_data(id: u64, modifiers: u8) -> ChalkData {
         let temp: &[GenericArg<ChalkIr>] = &[];
-        let adt_id = AdtId(self.id as u32);
+        let adt_id = AdtId(id as u32);
         let tykind = TyKind::Adt(adt_id, Substitution::from_iter(ChalkIr, temp.into_iter())).intern(ChalkIr);
         let adt_data = AdtDatum {
             binders: Binders::empty(ChalkIr, AdtDatumBound { variants: vec![], where_clauses: vec![] }),
@@ -212,9 +227,9 @@ impl StructData {
             flags: AdtFlags { upstream: false, fundamental: false, phantom_data: false },
             kind: AdtKind::Struct,
         };
-        if is_modifier(self.modifiers, Modifier::Trait) {
-            let trait_id = TraitId(self.id as u32);
-            self.chalk_data = Some(ChalkData::Trait(
+        return if is_modifier(modifiers, Modifier::Trait) {
+            let trait_id = TraitId(id as u32);
+            ChalkData::Trait(
                 tykind,
                 adt_data,
                 TraitDatum {
@@ -231,10 +246,10 @@ impl StructData {
                     associated_ty_ids: vec![],
                     well_known: None,
                 },
-            ))
+            )
         } else {
-            self.chalk_data = Some(ChalkData::Struct(tykind, adt_data));
-        }
+            ChalkData::Struct(tykind, adt_data)
+        };
     }
 
     /// Creates a new poison'd struct data
@@ -261,17 +276,20 @@ impl TopElement for StructData {
         return &self.span;
     }
 
-    fn set_id(&mut self, id: u64) {
-        self.id = id;
-        self.set_chalk_data();
-    }
-
     fn is_operator(&self) -> bool {
         return self.is_trait() && Attribute::find_attribute("operation", &self.attributes).is_some();
     }
 
     fn is_trait(&self) -> bool {
         return is_modifier(self.modifiers, Modifier::Trait);
+    }
+
+    fn default(&self) -> Arc<Self> {
+        return VOID.data.clone();
+    }
+
+    fn id(&self) -> Option<u64> {
+        return Some(self.id);
     }
 
     fn errors(&self) -> &Vec<ParsingError> {

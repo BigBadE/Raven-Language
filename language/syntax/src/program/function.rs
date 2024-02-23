@@ -54,16 +54,20 @@ impl TopElement for FunctionData {
         return &self.span;
     }
 
-    fn set_id(&mut self, _id: u64) {
-        //Ignored. Funcs don't have IDs
-    }
-
     fn is_operator(&self) -> bool {
         return false;
     }
 
     fn is_trait(&self) -> bool {
         return is_modifier(self.modifiers, Modifier::Trait);
+    }
+
+    fn default(&self) -> Arc<Self> {
+        panic!("Functions have no default value!")
+    }
+
+    fn id(&self) -> Option<u64> {
+        None
     }
 
     fn errors(&self) -> &Vec<ParsingError> {
@@ -87,6 +91,7 @@ impl TopElement for FunctionData {
         process_manager: Box<dyn ProcessManager>,
     ) {
         let name = current.data.name.clone();
+
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
 

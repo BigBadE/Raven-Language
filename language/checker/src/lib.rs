@@ -93,6 +93,9 @@ pub async fn get_return(
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
+                if let Some(found) = variables.variables.get("arraylist") {
+                    println!("{}: {} for {:?}\n{}", function.data.name, inner, args.get(0), found);
+                }
                 Some(FinalizedTypes::Reference(Box::new(inner)))
             }
             None => None,

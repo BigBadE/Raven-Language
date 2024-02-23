@@ -44,7 +44,7 @@ pub struct ImplWaiter {
 }
 
 impl Future for ImplWaiter {
-    type Output = Result<Vec<Arc<FunctionData>>, ParsingError>;
+    type Output = Result<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let finished = self.syntax.lock().unwrap().finished_impls();
@@ -54,14 +54,16 @@ impl Future for ImplWaiter {
             Poll::Pending => return Poll::Pending,
         };
         return match output {
-            Some(implementation_methods) => {
-                Poll::Ready(Ok(implementation_methods.into_iter().map(|(_, inner)| inner).flatten().collect()))
-            }
+            Some(implementation_methods) => Poll::Ready(Ok(implementation_methods)),
             None => {
                 if finished {
                     Poll::Ready(Err(self.error.clone()))
                 } else {
                     let mut locked = self.syntax.lock().unwrap();
+                    // Locking rules means a lock can't be held from start to finish, so immediately wake if it finished in that time.
+                    if locked.finished_impls() {
+                        cx.waker().wake_by_ref();
+                    }
                     locked.async_manager.impl_waiters.push(cx.waker().clone());
                     Poll::Pending
                 }
@@ -233,18 +235,15 @@ impl<T: TopElement> TopElementManager<T> {
         }
     }
 
-    /// Sets the correct ID on the data type
-    pub fn set_id(&mut self, data: &mut T) {
-        data.set_id(
-            self.sorted.iter().position(|found| found.name() == data.name()).unwrap_or_else(|| self.sorted.len()) as u64
-        );
-    }
-
     /// Adds the type to the list of types
     pub fn add_type(&mut self, data: Arc<T>) {
         self.wake(data.name());
-        if !self.sorted.contains(&data) {
-            self.sorted.push(data.clone());
+        if let Some(id) = data.id() {
+            while self.sorted.len() <= id as usize {
+                self.sorted.push(data.default());
+            }
+            self.sorted.remove(id as usize);
+            self.sorted.insert(id as usize, data.clone());
         }
         self.types.insert(data.name().clone(), data);
     }

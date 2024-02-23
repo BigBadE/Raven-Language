@@ -6,18 +6,19 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
-use crate::get_return;
 use async_recursion::async_recursion;
 use data::tokens::Span;
 use syntax::async_util::AsyncDataGetter;
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
-use syntax::program::code::{FinalizedEffectType, FinalizedEffects};
+use syntax::program::code::{FinalizedEffectType, FinalizedEffects, FinalizedMemberField};
 use syntax::program::function::{display_parenless, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
 use syntax::program::r#struct::{FinalizedStruct, StructData};
 use syntax::program::syntax::Syntax;
 use syntax::program::types::FinalizedTypes;
 use syntax::top_element_manager::ImplWaiter;
 use syntax::{ProcessManager, SimpleVariableManager};
+
+use crate::get_return;
 
 /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
 #[async_recursion]
@@ -48,9 +49,10 @@ pub async fn degeneric_effect(
             *function =
                 degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, None).await?;
 
-            for argument in arguments {
+            for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
+            degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericMethodCall(function, types, arguments) => {
             let mut calling = arguments.remove(0);
@@ -66,7 +68,8 @@ pub async fn degeneric_effect(
             .await?;
 
             let name = function.data.name.split("::").last().unwrap();
-            let function = implementation.iter().find(|inner| inner.name.ends_with(&name)).unwrap();
+            let function =
+                implementation.iter().flat_map(|(_, inner)| inner).find(|inner| inner.name.ends_with(&name)).unwrap();
 
             arguments.insert(0, calling.clone());
             let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
@@ -75,6 +78,7 @@ pub async fn degeneric_effect(
             for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
+            degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
             *effect = FinalizedEffectType::MethodCall(None, function, arguments.clone(), None);
         }
         FinalizedEffectType::Set(base, value) => {
@@ -111,19 +115,20 @@ pub async fn degeneric_effect(
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
         }
-        FinalizedEffectType::VirtualCall(_, function, effects, returning) => {
+        FinalizedEffectType::VirtualCall(_, function, arguments, returning) => {
             *function = degeneric_function(
                 function.clone(),
                 process_manager.cloned(),
-                effects,
+                arguments,
                 syntax,
                 variables,
                 returning.clone(),
             )
             .await?;
-            for effect in effects {
+            for effect in &mut *arguments {
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
+            degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericVirtualCall(index, target, found, effects, returning) => {
             syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
@@ -150,17 +155,26 @@ pub async fn degeneric_effect(
                 syntax: syntax.clone(),
                 trait_type: target.clone(),
                 base_type: get_return(&base.types, variables, syntax).await.unwrap(),
-                error: Span::default().make_error(ParsingMessage::ShouldntSee("Return type check")),
+                error: Span::default().make_error(ParsingMessage::ShouldntSee("Downcasting failed")),
             }
             .await?;
-            degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
-            degeneric_type(target, process_manager.generics(), syntax).await;
 
-            for function in impl_functions {
-                let function = AsyncDataGetter::new(syntax.clone(), function).await;
-                functions
-                    .push(degeneric_function(function, process_manager.cloned(), &vec![], syntax, variables, None).await?)
+            if impl_functions.is_empty() {
+                return Err(span.make_error(ParsingMessage::ShouldntSee("Downcast")));
             }
+
+            let mut manager = process_manager.cloned();
+            let base_types = get_return(&base.types, variables, syntax).await.unwrap();
+            impl_functions[0].0.base.resolve_generic(&base_types, syntax, manager.mut_generics(), span.clone()).await?;
+
+            for function in &impl_functions[0].1 {
+                let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
+                let function = degeneric_function(function, manager.cloned(), &vec![], syntax, variables, None).await?;
+                functions.push(function)
+            }
+
+            degeneric_type(target, process_manager.generics(), syntax).await;
+            degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
         }
         FinalizedEffectType::HeapStore(storing) => {
             degeneric_effect(&mut storing.types, syntax, process_manager, variables, span).await?
@@ -173,6 +187,36 @@ pub async fn degeneric_effect(
             degeneric_effect(&mut storing.types, syntax, process_manager, variables, span).await?
         }
         _ => {}
+    }
+    return Ok(());
+}
+
+pub async fn degeneric_arguments(
+    base_arguments: &Vec<FinalizedMemberField>,
+    arguments: &mut Vec<FinalizedEffects>,
+    syntax: &Arc<Mutex<Syntax>>,
+    variables: &mut SimpleVariableManager,
+    process_manager: &dyn ProcessManager,
+) -> Result<(), ParsingError> {
+    for i in 0..base_arguments.len() {
+        let arg_return_type = get_return(&arguments[i].types, variables, syntax).await.unwrap();
+        let base_field_type = &base_arguments[i].field.field_type;
+        // Only downcast if an implementation was found and it's not generic. Don't downcast if they're of the same type.
+        if !arg_return_type.of_type_sync(base_field_type, None).0
+            && base_field_type.inner_struct_safe().is_some()
+            && arg_return_type.of_type(base_field_type, syntax.clone()).await
+        {
+            // Handle downcasting
+            let argument = arguments.remove(i);
+
+            let target = base_field_type.clone();
+            let span = argument.span.clone();
+
+            let mut effect =
+                FinalizedEffects::new(span.clone(), FinalizedEffectType::Downcast(Box::new(argument), target, vec![]));
+            degeneric_effect(&mut effect.types, syntax, process_manager, variables, &span).await?;
+            arguments.insert(i, effect);
+        }
     }
     return Ok(());
 }
@@ -410,12 +454,7 @@ pub async fn degeneric_type(
                     *function = temp;
                 }
 
-                let arc_other;
-                {
-                    let mut locked = syntax.lock().unwrap();
-                    locked.structures.set_id(&mut other);
-                    arc_other = Arc::new(other);
-                }
+                let arc_other = Arc::new(other);
 
                 // Get the FinalizedStruct and degeneric it.
                 let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), base.data.clone()).await.deref());
@@ -597,7 +636,6 @@ pub async fn degeneric_struct(
     }
 
     let mut locked = syntax.lock().unwrap();
-    locked.structures.set_id(&mut data);
     structure.data = Arc::new(data);
     let output = Arc::new(structure);
 

@@ -87,6 +87,7 @@ pub async fn check_impl_call(
         if output.is_none() {
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
+
         // Failed to find an impl
         verify_effect(code_verifier, variables, *calling).await?.types;
         if output.is_none() {
@@ -217,7 +218,7 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
     }
     .await?;
 
-    for temp in &result {
+    for temp in result.iter().flat_map(|(_, inner)| inner) {
         if temp.name.split("::").last().unwrap() == data.method || data.method.is_empty() {
             let method = AsyncDataGetter::new(data.code_verifier.syntax.clone(), temp.clone()).await;
 

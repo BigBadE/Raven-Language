@@ -188,6 +188,10 @@ impl Syntax {
                 waker.wake_by_ref();
             }
         }
+
+        while let Some(found) = self.async_manager.impl_waiters.pop() {
+            found.wake();
+        }
     }
 
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used
@@ -294,7 +298,7 @@ impl Syntax {
         if !is_modifier(second_ty.modifiers, Modifier::Trait) {
             return false;
         }
-        let first_ty = first.inner_struct().data.chalk_data.as_ref().unwrap().get_ty().clone();
+        let first_ty = first.inner_struct().data.chalk_data.get_ty().clone();
 
         let elements: &[GenericArg<ChalkIr>] = &[GenericArg::new(ChalkIr, GenericArgData::Ty(first_ty))];
         // Construct a goal asking if the first type is implemented by the second type.
@@ -320,11 +324,6 @@ impl Syntax {
         }*/
 
         let manager = T::get_manager(locked.deref_mut());
-        // SAFETY
-        // Technically, the data could be cloned and edited safely,
-        // but this is faster and because this should be the only reference it's faster.
-        // This adheres to Arc's two rules: The inner data type isn't casted and there are no other active borrows.
-        manager.set_id(unsafe { Arc::get_mut_unchecked(&mut adding.clone()) });
         manager.add_type(adding.clone());
 
         // Add any poisons to the syntax errors list.

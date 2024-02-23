@@ -39,9 +39,6 @@ pub fn instance_function<'a, 'ctx>(
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
         value = create_function_value(&function, type_getter, None);
-        if function.data.name == "iter::Iter<u64>_NumberIter::next" {
-            println!("Adding it!");
-        }
         type_getter.compiling.borrow_mut().push((value, function));
     }
     return value;

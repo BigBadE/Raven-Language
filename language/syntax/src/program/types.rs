@@ -144,7 +144,7 @@ impl FinalizedTypes {
     /// Assumes the type is a trait and returns its inner Chalk Trait data.
     pub fn to_chalk_trait(&self, binders: &Vec<&String>) -> TraitDatum<ChalkIr> {
         if let FinalizedTypes::Struct(inner) = self {
-            if let ChalkData::Trait(_, _, traits) = inner.data.chalk_data.as_ref().unwrap() {
+            if let ChalkData::Trait(_, _, traits) = &inner.data.chalk_data {
                 return traits.clone();
             } else {
                 panic!("Expected trait, found struct!");
@@ -163,7 +163,7 @@ impl FinalizedTypes {
     pub fn to_chalk_type(&self, binders: &Vec<&String>) -> Ty<ChalkIr> {
         return match self {
             FinalizedTypes::Struct(structure) => {
-                match &structure.data.chalk_data.as_ref().unwrap() {
+                match &structure.data.chalk_data {
                     ChalkData::Struct(types, _) => types.clone(), // skipcq: RS-W1110 types isn't Copy
                     ChalkData::Trait(types, _, _) => types.clone(), // skipcq: RS-W1110 types isn't Copy
                 }
@@ -383,8 +383,7 @@ impl FinalizedTypes {
                         }
                     }
                     return if !fails.is_empty() { (false, Some(Box::pin(Self::join(fails)))) } else { (false, None) };
-                } //T: u64 is Number
-                  //Number is T: u64
+                }
             },
         };
     }
@@ -420,6 +419,10 @@ impl FinalizedTypes {
         generics: &mut HashMap<String, FinalizedTypes>,
         bounds_error: Span,
     ) -> Result<(), ParsingError> {
+        if self != other {
+            // TODO uncheck when fixing this later
+            //println!("Diff: {} vs {}", self, other);
+        }
         match self {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.

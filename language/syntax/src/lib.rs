@@ -273,14 +273,17 @@ where
     /// Span
     fn get_span(&self) -> &Span;
 
-    /// Element id
-    fn set_id(&mut self, id: u64);
-
     /// Whether the top element is a function and has the operator modifier
     fn is_operator(&self) -> bool;
 
     /// Whether the top element is a trait or trait member
     fn is_trait(&self) -> bool;
+
+    /// Returns a default self type
+    fn default(&self) -> Arc<Self>;
+
+    /// Returns the id
+    fn id(&self) -> Option<u64>;
 
     /// All errors on the element
     fn errors(&self) -> &Vec<ParsingError>;
