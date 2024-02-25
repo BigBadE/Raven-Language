@@ -20,6 +20,7 @@ use syntax::program::syntax::Syntax;
 use crate::function_compiler::{compile_block, instance_function};
 use crate::main_future::MainFuture;
 use crate::type_getter::CompilerTypeGetter;
+//use crate::util::print_formatted;
 
 /// A compiler implementation which must wrap the context
 pub struct CompilerImpl<'ctx> {

@@ -79,12 +79,8 @@ pub async fn check_impl_call(
 
         // If not, wait for an impl to be parsed that fits the criteria
         let mut output = None;
-        while output.is_none() && !code_verifier.syntax.lock().unwrap().finished_impls() {
-            output = try_get_impl(&impl_checker, &effect.span).await?;
-        }
-
-        // Do one last check after impls finish parsing
-        if output.is_none() {
+        while output.is_none() {
+            // TODO switch this to some kind of pipeline instead of rechecking them all every single time
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
 

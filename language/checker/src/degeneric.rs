@@ -46,13 +46,38 @@ pub async fn degeneric_effect(
                 degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
             }
 
+            let mut before_arguments = function.arguments.clone();
+            let mut degenericing_process_manager = process_manager.cloned();
+
+            for i in 0..before_arguments.len() {
+                before_arguments[i]
+                    .field
+                    .field_type
+                    .resolve_generic(
+                        &get_return(&arguments[i].types, variables, syntax).await.unwrap(),
+                        syntax,
+                        degenericing_process_manager.mut_generics(),
+                        span.clone(),
+                    )
+                    .await?;
+            }
+
+            for field in &mut before_arguments {
+                degeneric_type_no_generic_types(
+                    &mut field.field.field_type,
+                    degenericing_process_manager.generics(),
+                    syntax,
+                )
+                .await;
+            }
+
             *function =
                 degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, None).await?;
 
             for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
-            degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
+            degeneric_arguments(&before_arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericMethodCall(function, types, arguments) => {
             let mut calling = arguments.remove(0);
@@ -158,7 +183,6 @@ pub async fn degeneric_effect(
                 error: Span::default().make_error(ParsingMessage::ShouldntSee("Downcasting failed")),
             }
             .await?;
-
             if impl_functions.is_empty() {
                 return Err(span.make_error(ParsingMessage::ShouldntSee("Downcast")));
             }

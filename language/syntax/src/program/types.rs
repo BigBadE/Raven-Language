@@ -373,6 +373,9 @@ impl FinalizedTypes {
                 }
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
                 FinalizedTypes::Struct(_) | FinalizedTypes::GenericType(_, _) | FinalizedTypes::Array(_) => {
+                    if bounds.is_empty() {
+                        return (true, None);
+                    }
                     let mut fails = Vec::default();
                     for bound in bounds {
                         let (result, failure) = bound.of_type_sync(other, syntax.clone());
@@ -419,9 +422,27 @@ impl FinalizedTypes {
         generics: &mut HashMap<String, FinalizedTypes>,
         bounds_error: Span,
     ) -> Result<(), ParsingError> {
-        if self != other {
-            //println!("Diff: {} vs {}", self, other);
+        if !self.of_type_sync(other, None).0 && self.inner_struct_safe().is_some() {
+            while !syntax.lock().unwrap().finished_impls() {
+                if let Some(implementors) = Syntax::get_implementation_methods(syntax, other, self).await {
+                    if implementors.len() > 1 {
+                        panic!("Ambiguous impl! Raven can't handle this yet!");
+                    }
+                    if !implementors.is_empty() {
+                        return self.resolve_generic(&implementors[0].0.base, syntax, generics, bounds_error.clone()).await;
+                    }
+                }
+            }
+            if let Some(implementors) = Syntax::get_implementation_methods(syntax, other, self).await {
+                if implementors.len() > 1 {
+                    panic!("Ambiguous impl! Raven can't handle this yet!");
+                }
+                if !implementors.is_empty() {
+                    return self.resolve_generic(&implementors[0].0.target, syntax, generics, bounds_error.clone()).await;
+                }
+            }
         }
+
         match self {
             FinalizedTypes::Generic(name, bounds) => {
                 // Check for bound errors.
