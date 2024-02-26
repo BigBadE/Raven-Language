@@ -1,12 +1,12 @@
-use inkwell::basic_block::BasicBlock;
-use inkwell::module::Linkage;
-use inkwell::AddressSpace;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use inkwell::basic_block::BasicBlock;
+use inkwell::module::Linkage;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue, FunctionValue};
+use inkwell::AddressSpace;
 
 use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
 use syntax::program::function::{CodelessFinalizedFunction, FinalizedCodeBody};
@@ -235,7 +235,12 @@ pub fn compile_effect<'ctx>(
                             let pointer = compile_effect(type_getter, function, pointer.as_ref().unwrap(), id)
                                 .unwrap()
                                 .into_pointer_value();
-                            type_getter.compiler.builder.build_store(pointer, inner);
+                            let pointer = type_getter.compiler.builder.build_bitcast(
+                                pointer,
+                                inner.get_type().ptr_type(AddressSpace::default()),
+                                &id.to_string(),
+                            );
+                            type_getter.compiler.builder.build_store(pointer.into_pointer_value(), inner);
                             Some(pointer.as_basic_value_enum())
                         }
                     }
@@ -251,6 +256,11 @@ pub fn compile_effect<'ctx>(
                 storing = type_getter.compiler.builder.build_load(storing.into_pointer_value(), &id.to_string());
                 *id += 1;
             }
+            let output = type_getter.compiler.builder.build_bitcast(
+                output,
+                storing.get_type().ptr_type(AddressSpace::default()),
+                &id.to_string(),
+            );
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing);
             Some(output)
         }
@@ -287,10 +297,16 @@ pub fn compile_effect<'ctx>(
             let pointer = compile_effect(type_getter, function, effect.as_ref().unwrap(), id).unwrap().into_pointer_value();
             *id += 1;
 
-            type_getter
-                .compiler
-                .builder
-                .build_store(pointer, type_getter.compiler.context.i64_type().const_int(structure.id(), false));
+            let id_field = type_getter.compiler.builder.build_bitcast(
+                pointer,
+                type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()),
+                &id.to_string(),
+            );
+
+            type_getter.compiler.builder.build_store(
+                id_field.into_pointer_value(),
+                type_getter.compiler.context.i64_type().const_int(structure.id(), false),
+            );
 
             let mut offset = 1;
             for argument in out_arguments {
@@ -468,6 +484,12 @@ pub fn compile_effect<'ctx>(
                 };
                 i += 1;
                 *id += 1;
+                let gep = type_getter.compiler.builder.build_pointer_cast(
+                    gep,
+                    gep.get_type().ptr_type(AddressSpace::default()),
+                    &id.to_string(),
+                );
+                *id += 1;
                 let effect = compile_effect(type_getter, function, value, id).unwrap();
                 type_getter.compiler.builder.build_store(gep, effect);
             }
@@ -479,6 +501,12 @@ pub fn compile_effect<'ctx>(
 
             let mut compiled_args = Vec::default();
             let calling = compile_effect(type_getter, function, &args[0], id).unwrap();
+            let target_type = type_getter
+                .get_type(&args[0].types.get_nongeneric_return(type_getter).unwrap())
+                .ptr_type(AddressSpace::default());
+            let calling =
+                type_getter.compiler.builder.build_bitcast(calling.into_pointer_value(), target_type, &id.to_string());
+            *id += 1;
             let calling = type_getter.compiler.builder.build_load(calling.into_pointer_value(), &id.to_string());
             compiled_args.push(BasicMetadataValueEnum::from(calling));
             *id += 1;
@@ -556,15 +584,37 @@ pub fn compile_effect<'ctx>(
                     .compiler
                     .context
                     .struct_type(&[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
+                let raw_structure = type_getter
+                    .compiler
+                    .context
+                    .struct_type(
+                        &[
+                            type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                            type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                        ],
+                        false,
+                    )
+                    .ptr_type(AddressSpace::default());
 
                 let malloc = malloc_type(type_getter, structure.ptr_type(AddressSpace::default()).const_zero(), id);
-                type_getter.compiler.builder.build_store(malloc, base);
+                let struct_field = type_getter.compiler.builder.build_bitcast(
+                    malloc,
+                    base.get_type().ptr_type(AddressSpace::default()),
+                    &id.to_string(),
+                );
+                *id += 1;
+                type_getter.compiler.builder.build_store(struct_field.into_pointer_value(), base);
 
                 let offset = type_getter.compiler.builder.build_struct_gep(malloc, 1, &id.to_string()).unwrap();
-                *id += 1;
+                *id += 2;
                 type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum());
-
-                Some(malloc.as_basic_value_enum())
+                Some(
+                    type_getter
+                        .compiler
+                        .builder
+                        .build_bitcast(malloc, raw_structure, &(*id - 1).to_string())
+                        .as_basic_value_enum(),
+                )
             }
         }
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {

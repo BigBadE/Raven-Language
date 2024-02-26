@@ -72,7 +72,7 @@ pub async fn get_return(
     return match types {
         FinalizedEffectType::MethodCall(_, function, args, return_type) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
-                if let Some(return_type) = return_type {
+                if let Some((return_type, _)) = return_type {
                     let generics = function
                         .generics
                         .iter()

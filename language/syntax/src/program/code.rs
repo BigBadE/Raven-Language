@@ -210,7 +210,12 @@ pub enum FinalizedEffectType {
     /// Nested code body.
     CodeBody(FinalizedCodeBody),
     /// Calls the function on the given value (if any) with the given arguments and the given return type (if generic). The first arg is the output location
-    MethodCall(Option<Box<FinalizedEffects>>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, Option<FinalizedTypes>),
+    MethodCall(
+        Option<Box<FinalizedEffects>>,
+        Arc<CodelessFinalizedFunction>,
+        Vec<FinalizedEffects>,
+        Option<(FinalizedTypes, Span)>,
+    ),
     /// Calls the trait's function with the given arguments.
     GenericMethodCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
     /// Sets given reference to given value.
