@@ -429,7 +429,9 @@ impl FinalizedTypes {
                         panic!("Ambiguous impl! Raven can't handle this yet!");
                     }
                     if !implementors.is_empty() {
-                        return self.resolve_generic(&implementors[0].0.base, syntax, generics, bounds_error.clone()).await;
+                        self.resolve_generic(&implementors[0].0.target, syntax, generics, bounds_error.clone()).await?;
+                        implementors[0].0.base.resolve_generic(&other, syntax, generics, bounds_error.clone()).await?;
+                        return Ok(());
                     }
                 }
             }
