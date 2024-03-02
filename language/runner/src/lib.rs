@@ -42,28 +42,25 @@ impl Future for JoinWaiter {
         let mut removing = Vec::default();
 
         let mut i = 0;
-        for mut handle in &mut locked.joining {
-            if handle.is_finished() {
-                removing.push(i);
-                i += 1;
-            } else {
-                match Pin::new(&mut handle).poll(cx) {
-                    Poll::Ready(inner) => match inner {
-                        Ok(result) => {
-                            match result {
-                                Err(error) => return Poll::Ready(Err(error)),
-                                _ => {}
+        for handle in &mut locked.joining {
+            match Pin::new(handle).poll(cx) {
+                Poll::Ready(inner) => match inner {
+                    Ok(result) => {
+                        match result {
+                            Err(error) => {
+                                return Poll::Ready(Err(error));
                             }
-                            removing.push(i);
-                            i += 1;
+                            _ => {}
                         }
-                        Err(error) => {
-                            panic!("{}", error);
-                        }
-                    },
-                    Poll::Pending => {}
-                }
+                        removing.push(i);
+                    }
+                    Err(error) => {
+                        panic!("{}", error);
+                    }
+                },
+                Poll::Pending => {}
             }
+            i += 1;
         }
 
         removing.reverse();

@@ -169,9 +169,6 @@ impl PartialEq for StructData {
 
 impl PartialEq for FinalizedStruct {
     fn eq(&self, other: &Self) -> bool {
-        if self.data.name.starts_with("collections::array_list") && other.data.name.starts_with("collections::array_list") {
-            println!("{}", self.data.name.split('$').next().unwrap());
-        }
         return self.data.name.splitn(2, '$').next().unwrap() == other.data.name.splitn(2, '$').next().unwrap();
     }
 }

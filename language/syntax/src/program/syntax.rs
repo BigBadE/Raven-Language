@@ -223,6 +223,7 @@ impl Syntax {
     }
 
     /// Finds an implementation method for the given trait.
+    /// Can return multiple implementations in cases where generic bounds allow for different implementations of the same thing
     pub async fn get_implementation_methods(
         syntax: &Arc<Mutex<Syntax>>,
         struct_type: &FinalizedTypes,
@@ -236,7 +237,7 @@ impl Syntax {
 
         for implementation in &implementations {
             if trait_type.of_type_sync(&implementation.target, None).0
-                && (struct_type.of_type(&implementation.base, syntax.clone()).await/* || self.solve(&struct_type, &implementation.base)*/)
+                && struct_type.of_type(&implementation.base, syntax.clone()).await
             {
                 output.push((implementation.clone(), implementation.functions.clone()));
             }

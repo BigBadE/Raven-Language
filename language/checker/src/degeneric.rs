@@ -41,18 +41,50 @@ pub async fn degeneric_effect(
             degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?
         }
         FinalizedEffectType::CodeBody(body) => degeneric_code_body(body, process_manager, variables, syntax).await?,
-        FinalizedEffectType::MethodCall(calling, function, arguments, _return_type) => {
+        FinalizedEffectType::MethodCall(calling, function, arguments, return_type) => {
             if let Some(found) = calling {
                 degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
             }
 
-            *function =
-                degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, None).await?;
+            let mut before_arguments = function.arguments.clone();
+            let mut degenericing_process_manager = process_manager.cloned();
+
+            for i in 0..before_arguments.len() {
+                before_arguments[i]
+                    .field
+                    .field_type
+                    .resolve_generic(
+                        &get_return(&arguments[i].types, variables, syntax).await.unwrap(),
+                        syntax,
+                        degenericing_process_manager.mut_generics(),
+                        span.clone(),
+                    )
+                    .await?;
+            }
+
+            for field in &mut before_arguments {
+                degeneric_type_no_generic_types(
+                    &mut field.field.field_type,
+                    degenericing_process_manager.generics(),
+                    syntax,
+                )
+                .await;
+            }
+
+            *function = degeneric_function(
+                function.clone(),
+                process_manager.cloned(),
+                arguments,
+                syntax,
+                variables,
+                return_type.clone(),
+            )
+            .await?;
 
             for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
-            degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
+            degeneric_arguments(&before_arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericMethodCall(function, types, arguments) => {
             let mut calling = arguments.remove(0);
@@ -158,7 +190,6 @@ pub async fn degeneric_effect(
                 error: Span::default().make_error(ParsingMessage::ShouldntSee("Downcasting failed")),
             }
             .await?;
-
             if impl_functions.is_empty() {
                 return Err(span.make_error(ParsingMessage::ShouldntSee("Downcast")));
             }
@@ -258,17 +289,11 @@ pub async fn degeneric_function(
 
         let argument_type = get_return(&arguments[i].types, variables, syntax).await.unwrap();
 
-        match method.arguments[i]
+        method.arguments[i]
             .field
             .field_type
             .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.clone())
-            .await
-        {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(error);
-            }
-        }
+            .await?;
     }
 
     // Now all the generic types have been resolved, it's time to replace them with

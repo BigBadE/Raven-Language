@@ -102,6 +102,7 @@ pub async fn verify_function_code(
         return_type: codeless.return_type.clone(),
         syntax: syntax.clone(),
     };
+
     let mut code = verify_code(&mut code_verifier, &mut variable_manager, code, true).await?;
 
     // Checks the return type exists

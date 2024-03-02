@@ -174,6 +174,7 @@ pub async fn verify_effect(
         }
         _ => unreachable!(),
     };
+
     return Ok(output);
 }
 

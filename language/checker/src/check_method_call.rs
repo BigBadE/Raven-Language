@@ -229,13 +229,12 @@ pub async fn check_method(
                 Some(Box::new(FinalizedEffects::new(Span::default(), FinalizedEffectType::HeapAllocate(returning.clone())))),
                 method,
                 effects,
-                generic_returning.map(|(inner, _)| inner),
+                generic_returning,
             ),
         ),
-        None => FinalizedEffects::new(
-            span.clone(),
-            FinalizedEffectType::MethodCall(None, method, effects, generic_returning.map(|(inner, _)| inner)),
-        ),
+        None => {
+            FinalizedEffects::new(span.clone(), FinalizedEffectType::MethodCall(None, method, effects, generic_returning))
+        }
     });
 }
 
