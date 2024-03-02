@@ -1,7 +1,0 @@
-import numbers::Cast;
-
-fn test() -> bool {
-    let test1 = 12.cast<str>();
-    return test1 == "12";
-    
-}

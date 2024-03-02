@@ -23,18 +23,6 @@ internal impl Cast<str> for char {
     }
 }
 
-impl Cast<str> for u64 {
-	pub fn cast(self, number: u64) -> str {
-		let output = "";
-		while number > 0 {
-			let digit = '0' + (number % 10);
-			output = digit + output; 
-			number /= 10;
-		}
-		return output;
-	}
-}
-
 
 internal impl Add<str, str> for str {
     pub fn add(self, other: str) -> str {
