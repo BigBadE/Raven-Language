@@ -117,7 +117,7 @@ pub fn parse_implementor(
     parser_utils: &mut ParserUtils,
     attributes: Vec<Attribute>,
     modifiers: Vec<Modifier>,
-) -> Result<TraitImplementor, ParsingError> {
+) -> (Result<TraitImplementor, ParsingError>, String, String) {
     let mut base = None;
     let mut base_span = None;
     let mut implementor = None;
@@ -150,13 +150,16 @@ pub fn parse_implementor(
                 if state == 0 {
                     parse_generics(parser_utils, &mut generics);
                 } else {
+                    let type_generics = match parse_type_generics(parser_utils) {
+                        Ok(generics) => generics,
+                        Err(error) => return (Err(error), "error".to_string(), "error".to_string()),
+                    };
                     if state == 1 {
-                        let found = UnparsedType::Generic(Box::new(base.unwrap()), parse_type_generics(parser_utils)?);
+                        let found = UnparsedType::Generic(Box::new(base.unwrap()), type_generics);
                         base = Some(found);
                         base_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     } else {
-                        let found =
-                            Some(UnparsedType::Generic(Box::new(implementor.unwrap()), parse_type_generics(parser_utils)?));
+                        let found = Some(UnparsedType::Generic(Box::new(implementor.unwrap()), type_generics));
                         parser_utils.imports.parent = found.clone();
                         implementor = found;
                         implementor_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
@@ -181,8 +184,11 @@ pub fn parse_implementor(
                 } else {
                     parser_utils.file_name = format!("{}::{}", parser_utils.file_name, base.as_ref().unwrap());
                 }
-                let function = parse_function(parser_utils, false, member_attributes, member_modifiers);
-                functions.push(function?);
+                let function = match parse_function(parser_utils, false, member_attributes, member_modifiers) {
+                    Ok(inner) => inner,
+                    Err(error) => return (Err(error), "error".to_string(), "error".to_string()),
+                };
+                functions.push(function);
                 parser_utils.file_name = file;
                 member_attributes = Vec::default();
                 member_modifiers = Vec::default();
@@ -190,8 +196,11 @@ pub fn parse_implementor(
             TokenTypes::StructTopElement => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
             TokenTypes::InvalidCharacters => {
-                return Err(
-                    Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedCharacters())
+                return (
+                    Err(Span::new(parser_utils.file, parser_utils.index - 1)
+                        .make_error(ParsingMessage::UnexpectedCharacters())),
+                    "error".to_string(),
+                    "error".to_string(),
                 )
             }
             _ => panic!(
@@ -204,15 +213,15 @@ pub fn parse_implementor(
         }
     }
 
-    let base = Box::pin(Syntax::parse_type(
+    let base_future = Box::pin(Syntax::parse_type(
         parser_utils.syntax.clone(),
         base_span.unwrap(),
         parser_utils.imports.boxed_clone(),
-        base.unwrap(),
+        base.clone().unwrap(),
         vec![],
     ));
 
-    let implementor = if let Some(implementor) = implementor {
+    let implementor_future = if let Some(implementor) = implementor.clone() {
         Some(Syntax::parse_type(
             parser_utils.syntax.clone(),
             implementor_span.unwrap(),
@@ -224,7 +233,11 @@ pub fn parse_implementor(
         None
     };
 
-    return Ok(TraitImplementor { base, generics, implementor, functions, attributes });
+    return (
+        Ok(TraitImplementor { base: base_future, generics, implementor: implementor_future, functions, attributes }),
+        base.unwrap().to_string(),
+        implementor.map(|inner| inner.to_string()).unwrap_or("none".to_string()),
+    );
 }
 
 /// Parses the generic bounds on a type
