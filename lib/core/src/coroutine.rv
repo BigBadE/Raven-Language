@@ -5,3 +5,20 @@ pub trait CoroutineHandler<O, D: CoroutineValue<O>> {
 pub trait CoroutineValue<O> {
 
 }
+
+/// Internal methods used in the coroutine implementation
+
+/// Starts a coroutine with the given function pointer and data value pointer, and returns the coroutine id
+pub internal fn start_coroutine(coroutine: u64, data: u64) -> u64 {
+
+}
+
+/// Resumes a coroutine with the given id
+pub internal fn resume_coroutine(coroutine_id: u64) {
+
+}
+
+/// Gets the data within the coroutine
+pub internal fn get_coroutine_data() -> u64 {
+
+}
