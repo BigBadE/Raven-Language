@@ -1,4 +1,4 @@
-use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_while};
+use crate::parser::control_parser::{parse_do_while, parse_for, parse_if, parse_while, parse_with};
 use crate::parser::operator_parser::parse_operator;
 use crate::parser::util::{parse_generics, ParserUtils};
 use data::tokens::{Span, Token, TokenTypes};
@@ -323,6 +323,14 @@ fn parse_basic_line(
         TokenTypes::For => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_for(parser_utils)?)),
         TokenTypes::While => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_while(parser_utils)?)),
         TokenTypes::Do => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_do_while(parser_utils)?)),
+        TokenTypes::With => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_with(parser_utils)?)),
+        TokenTypes::Yield => {
+            let inner = parse_line(parser_utils, ParseState::ControlVariable)?.unwrap().effect;
+            ControlFlow::Returning(Expression::new(
+                expression_type.clone(),
+                Effects::new(inner.span.clone(), EffectType::CoroutineYield(Box::new(inner))),
+            ))
+        }
         TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::ArgumentEnd => ControlFlow::Finish,
         TokenTypes::Comment => ControlFlow::Skipping,
         TokenTypes::ParenOpen => {

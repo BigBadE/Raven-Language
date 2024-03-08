@@ -250,4 +250,8 @@ pub enum TokenTypes {
     Char = 70,
     /// A blank line
     BlankLine = 71,
+    /// The yield keyword
+    Yield = 72,
+    /// The with keyword
+    With = 73,
 }

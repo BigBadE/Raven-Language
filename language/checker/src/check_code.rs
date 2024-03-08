@@ -10,6 +10,7 @@ use syntax::program::code::{
 use syntax::program::function::{CodeBody, FinalizedCodeBody};
 use syntax::program::syntax::Syntax;
 use syntax::program::types::FinalizedTypes;
+use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::SimpleVariableManager;
 
 use crate::check_impl_call::check_impl_call;
@@ -171,6 +172,10 @@ pub async fn verify_effect(
             check_type(&types, &output, variables, code_verifier, &effect.span).await?;
 
             FinalizedEffects::new(effect.span.clone(), store(FinalizedEffectType::CreateArray(types, output)))
+        }
+        EffectType::CoroutineYield(effects) => {
+            let new_effect = verify_effect(code_verifier, variables, *effects).await?;
+            FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::CoroutineYield(Box::new(new_effect), None))
         }
         _ => unreachable!(),
     };

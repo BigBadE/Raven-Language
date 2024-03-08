@@ -174,6 +174,9 @@ pub fn compile_effect<'ctx>(
         FinalizedEffectType::NOP => {
             panic!("Tried to compile a NOP! For {}", function.get_name().to_str().unwrap())
         }
+        FinalizedEffectType::CoroutineYield(_, _) => {
+            panic!("Tried to compile a coroutine yield! For {}", function.get_name().to_str().unwrap())
+        }
         FinalizedEffectType::CreateVariable(name, inner, types) => {
             let compiled = compile_effect(type_getter, function, inner, id).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));

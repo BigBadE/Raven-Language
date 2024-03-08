@@ -191,7 +191,7 @@ pub trait ProcessManager: Send + Sync {
     ) -> FinalizedFunction;
 
     /// Degenerics the code of a function
-    async fn degeneric_code(&self, function: Arc<CodelessFinalizedFunction>, syntax: &Arc<Mutex<Syntax>>);
+    async fn finish_code(&self, function: Arc<CodelessFinalizedFunction>, syntax: &Arc<Mutex<Syntax>>);
 
     /// Verifies a struct, returning the finalized type
     async fn verify_struct(

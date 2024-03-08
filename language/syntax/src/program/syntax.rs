@@ -143,9 +143,11 @@ impl Syntax {
             }
             waker = locked.async_manager.target_waker.clone();
         }
+
         if generic {
-            process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
+            process_manager.finish_code(Arc::new(function.to_codeless()), syntax).await;
         }
+
         if let Some(found) = waker {
             found.wake();
         }

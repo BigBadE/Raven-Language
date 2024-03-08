@@ -141,6 +141,36 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
     return create_while(effect.unwrap().effect, body, parser_utils.imports.last_id - 1);
 }
 
+/// Parses a with statement into a single expression
+pub fn parse_with(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
+    let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
+    if effect.is_none() {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+    }
+
+    if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+    }
+
+    let index = parser_utils.index;
+    parser_utils.index += 1;
+
+    let (_returning, mut body) = parse_code(parser_utils)?;
+    let name = format!("$yield{}", parser_utils.imports.last_id);
+    parser_utils.imports.last_id += 1;
+
+    body.expressions.insert(
+        0,
+        Expression::new(
+            ExpressionType::Line,
+            Effects::new(Span::default(), EffectType::CreateVariable(name.clone(), Box::new(effect.unwrap().effect))),
+        ),
+    );
+    body.yield_handlers.push(name);
+
+    return Ok(Effects::new(Span::new(parser_utils.file, index), EffectType::CodeBody(body)));
+}
+
 /// Parses a do while into a single expression
 pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {

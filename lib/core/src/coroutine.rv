@@ -1,0 +1,7 @@
+pub trait CoroutineHandler<O, D: CoroutineValue<O>> {
+    fn handle(self, data: D) -> O;
+}
+
+pub trait CoroutineValue<O> {
+
+}

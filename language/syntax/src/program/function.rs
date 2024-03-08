@@ -201,6 +201,8 @@ pub struct CodeBody {
     pub label: String,
     /// The code in this code body
     pub expressions: Vec<Expression>,
+    /// The yield handlers in this code body
+    pub yield_handlers: Vec<String>,
 }
 
 /// A finalized body of code.
@@ -217,7 +219,7 @@ pub struct FinalizedCodeBody {
 impl CodeBody {
     /// Creates a new code body
     pub fn new(expressions: Vec<Expression>, label: String) -> Self {
-        return Self { label, expressions };
+        return Self { label, expressions, ..Default::default() };
     }
 }
 

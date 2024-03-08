@@ -106,6 +106,10 @@ pub fn check_keywords(tokenizer: &mut Tokenizer) -> Option<Token> {
         tokenizer.make_token(TokenTypes::Let)
     } else if tokenizer.matches("=") {
         tokenizer.make_token(TokenTypes::Equals)
+    } else if tokenizer.matches("yield") {
+        tokenizer.make_token(TokenTypes::Yield)
+    } else if tokenizer.matches("with") {
+        tokenizer.make_token(TokenTypes::With)
     } else {
         return None;
     });

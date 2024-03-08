@@ -80,7 +80,7 @@ impl ProcessManager for TypesChecker {
         });
     }
 
-    async fn degeneric_code(&self, function: Arc<CodelessFinalizedFunction>, syntax: &Arc<Mutex<Syntax>>) {
+    async fn finish_code(&self, function: Arc<CodelessFinalizedFunction>, syntax: &Arc<Mutex<Syntax>>) {
         let variables = SimpleVariableManager::for_function(&function);
         let _ = match degeneric_function(function, Box::new(self.clone()), &vec![], syntax, &variables, None).await {
             Ok(result) => result,

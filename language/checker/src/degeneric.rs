@@ -6,15 +6,16 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
+use crate::finalize_code::finalize_code;
 use async_recursion::async_recursion;
 use data::tokens::Span;
-use syntax::async_util::AsyncDataGetter;
+use syntax::async_util::{AsyncDataGetter, AsyncTypesGetter, EmptyNameResolver};
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
 use syntax::program::code::{FinalizedEffectType, FinalizedEffects, FinalizedMemberField};
 use syntax::program::function::{display_parenless, CodelessFinalizedFunction, FinalizedCodeBody, FunctionData};
 use syntax::program::r#struct::{FinalizedStruct, StructData};
 use syntax::program::syntax::Syntax;
-use syntax::program::types::FinalizedTypes;
+use syntax::program::types::{FinalizedTypes, Types};
 use syntax::top_element_manager::ImplWaiter;
 use syntax::{ProcessManager, SimpleVariableManager};
 
@@ -217,6 +218,37 @@ pub async fn degeneric_effect(
         FinalizedEffectType::StackStore(storing) => {
             degeneric_effect(&mut storing.types, syntax, process_manager, variables, span).await?
         }
+        FinalizedEffectType::CoroutineYield(effect, returning) => {
+            degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
+            let handler_type = Types::Struct(
+                AsyncTypesGetter::new(
+                    syntax.clone(),
+                    Span::default(),
+                    "coroutine::CoroutineValue".to_string(),
+                    Box::new(EmptyNameResolver {}),
+                    false,
+                )
+                .await?,
+            )
+            .finalize(syntax.clone())
+            .await;
+            let impls = ImplWaiter {
+                syntax: syntax.clone(),
+                base_type: effect.types.get_nongeneric_return(variables).unwrap(),
+                trait_type: handler_type.clone(),
+                error: Span::default().make_error(ParsingMessage::ShouldntSee("Coroutine yield")),
+            }
+            .await;
+
+            if impls.is_err() {
+                return Err(span.make_error(ParsingMessage::NoTraitImpl(
+                    effect.types.get_nongeneric_return(variables).unwrap(),
+                    handler_type,
+                )));
+            }
+            let coroutine_type = impls.unwrap()[0].0.target.inner_generic_type().unwrap().1[0].clone();
+            *returning = Some(coroutine_type);
+        }
         _ => {}
     }
     return Ok(());
@@ -274,6 +306,7 @@ pub async fn degeneric_function(
     .into_iter()
     .map(|(name, types)| (name.clone(), FinalizedTypes::Generic(name, types)))
     .collect::<HashMap<_, _>>();*/
+
     // Degenerics the return type if there is one and returning is some.
     if let Some(inner) = method.return_type.clone() {
         if let Some((returning, span)) = returning {
@@ -374,7 +407,9 @@ async fn degeneric_code(
     degeneric_code_body(&mut code, &*manager, &mut variables, &syntax).await?;
 
     // Combines the degenericed function with the degenericed code to finalize it.
-    let output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
+    let mut output = CodelessFinalizedFunction::clone(degenericed_method.deref()).add_code(code);
+
+    finalize_code(&mut output);
 
     let handle = manager.handle().clone();
 

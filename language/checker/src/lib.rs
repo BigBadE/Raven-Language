@@ -34,6 +34,7 @@ pub mod check_operator;
 pub mod check_struct;
 /// Degenerics types
 pub mod degeneric;
+mod finalize_code;
 /// Used to send data to be checked by the checker and then send the result to the compiler
 pub mod output;
 
