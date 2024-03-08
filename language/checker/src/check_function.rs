@@ -101,6 +101,8 @@ pub async fn verify_function_code(
         resolver,
         return_type: codeless.return_type.clone(),
         syntax: syntax.clone(),
+        handled_yields: vec![],
+        yields: vec![],
     };
 
     let mut code = verify_code(&mut code_verifier, &mut variable_manager, code, true).await?;
@@ -117,5 +119,7 @@ pub async fn verify_function_code(
         }
     }
 
-    return Ok(codeless.clone().add_code(code));
+    let mut finalized = codeless.clone().add_code(code);
+    finalized.yields = code_verifier.yields;
+    return Ok(finalized);
 }

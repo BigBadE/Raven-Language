@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use data::tokens::Span;
 
 use crate::async_util::{HandleWrapper, NameResolver};
-use crate::program::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
+use crate::program::code::{Effects, Expression, FinalizedEffects, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::program::types::FinalizedTypes;
 use crate::{
     is_modifier, Attribute, DataType, Modifier, ParsingError, ParsingFuture, ProcessManager, Syntax, TopElement,
@@ -161,6 +161,7 @@ impl CodelessFinalizedFunction {
             code,
             return_type: self.return_type,
             data: self.data,
+            yields: vec![],
         };
     }
 }
@@ -178,6 +179,8 @@ pub struct FinalizedFunction {
     pub return_type: Option<FinalizedTypes>,
     /// The function's data
     pub data: Arc<FunctionData>,
+    /// All yields in this function
+    pub yields: Vec<FinalizedTypes>,
 }
 
 impl FinalizedFunction {
@@ -202,7 +205,7 @@ pub struct CodeBody {
     /// The code in this code body
     pub expressions: Vec<Expression>,
     /// The yield handlers in this code body
-    pub yield_handlers: Vec<String>,
+    pub yield_handlers: Vec<Effects>,
 }
 
 /// A finalized body of code.
@@ -214,6 +217,8 @@ pub struct FinalizedCodeBody {
     pub expressions: Vec<FinalizedExpression>,
     /// Whether every code path in this code body returns
     pub returns: bool,
+    /// The yield handlers in this code body
+    pub yield_handlers: Vec<FinalizedEffects>,
 }
 
 impl CodeBody {
@@ -226,7 +231,7 @@ impl CodeBody {
 impl FinalizedCodeBody {
     /// Creates a new code body
     pub fn new(expressions: Vec<FinalizedExpression>, label: String, returns: bool) -> Self {
-        return Self { label, expressions, returns };
+        return Self { label, expressions, returns, yield_handlers: vec![] };
     }
 }
 

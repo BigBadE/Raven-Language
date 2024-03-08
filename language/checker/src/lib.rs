@@ -13,7 +13,7 @@ use indexmap::IndexMap;
 use crate::degeneric::degeneric_type_no_generic_types;
 use syntax::async_util::NameResolver;
 use syntax::errors::ParsingError;
-use syntax::program::code::FinalizedEffectType;
+use syntax::program::code::{FinalizedEffectType, FinalizedEffects};
 use syntax::program::syntax::Syntax;
 use syntax::program::types::{FinalizedTypes, Types};
 use syntax::{ParsingFuture, SimpleVariableManager};
@@ -60,6 +60,8 @@ pub struct CodeVerifier<'a> {
     resolver: Box<dyn NameResolver>,
     return_type: Option<FinalizedTypes>,
     syntax: Arc<Mutex<Syntax>>,
+    handled_yields: Vec<FinalizedEffects>,
+    yields: Vec<FinalizedTypes>,
 }
 
 /// Gets the return type of the effect, requiring a variable manager to get

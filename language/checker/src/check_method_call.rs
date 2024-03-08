@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use data::tokens::Span;
 use syntax::async_util::AsyncDataGetter;
@@ -102,7 +102,7 @@ pub async fn check_method_call(
             .await?;
             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
-            check_args(&method, &mut finalized_effects, &code_verifier.syntax, variables, &effect.span).await?;
+            check_args(&method, &mut finalized_effects, code_verifier, variables, &effect.span).await?;
 
             let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
             return Ok(FinalizedEffects::new(
@@ -133,15 +133,8 @@ pub async fn check_method_call(
                     .base
                     .resolve_generic(&return_type, &code_verifier.syntax, &mut process_manager.generics, Span::default())
                     .await?;
-                check_method(
-                    method,
-                    finalized_effects.clone(),
-                    &code_verifier.syntax,
-                    variables,
-                    returning.clone(),
-                    &effect.span,
-                )
-                .await
+                check_method(method, finalized_effects.clone(), &code_verifier, variables, returning.clone(), &effect.span)
+                    .await
             };
 
             return TraitImplWaiter {
@@ -180,7 +173,7 @@ pub async fn check_method_call(
                             match check_method(
                                 method,
                                 finalized_effects.clone(),
-                                &code_verifier.syntax,
+                                code_verifier,
                                 variables,
                                 returning.clone(),
                                 &effect.span,
@@ -207,7 +200,7 @@ pub async fn check_method_call(
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
-    return check_method(method, finalized_effects, &code_verifier.syntax, variables, returning, &effect.span).await;
+    return check_method(method, finalized_effects, code_verifier, variables, returning, &effect.span).await;
 }
 
 /// Checks if a method call is valid
@@ -215,12 +208,12 @@ pub async fn check_method_call(
 pub async fn check_method(
     method: Arc<CodelessFinalizedFunction>,
     mut effects: Vec<FinalizedEffects>,
-    syntax: &Arc<Mutex<Syntax>>,
+    code_verifier: &CodeVerifier<'_>,
     variables: &SimpleVariableManager,
     generic_returning: Option<(FinalizedTypes, Span)>,
     span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
-    check_args(&method, &mut effects, syntax, variables, span).await?;
+    check_args(&method, &mut effects, code_verifier, variables, span).await?;
 
     return Ok(match method.return_type.as_ref() {
         Some(returning) => FinalizedEffects::new(
@@ -242,7 +235,7 @@ pub async fn check_method(
 pub async fn check_args(
     function: &Arc<CodelessFinalizedFunction>,
     args: &mut Vec<FinalizedEffects>,
-    syntax: &Arc<Mutex<Syntax>>,
+    code_verifier: &CodeVerifier<'_>,
     variables: &SimpleVariableManager,
     span: &Span,
 ) -> Result<(), ParsingError> {
@@ -251,14 +244,14 @@ pub async fn check_args(
     }
 
     for i in 0..function.arguments.len() {
-        let mut arg_return_type = get_return(&args[i].types, variables, syntax).await;
+        let mut arg_return_type = get_return(&args[i].types, variables, &code_verifier.syntax).await;
         if !arg_return_type.is_some() {
             return Err(span.make_error(ParsingMessage::UnexpectedVoid()));
         }
         let arg_return_type = arg_return_type.as_mut().unwrap();
         let base_field_type = &function.arguments[i].field.field_type;
 
-        if !arg_return_type.of_type(base_field_type, syntax.clone()).await {
+        if !arg_return_type.of_type(base_field_type, code_verifier.syntax.clone()).await {
             return Err(span.make_error(ParsingMessage::MismatchedTypes(arg_return_type.clone(), base_field_type.clone())));
         }
     }

@@ -18,6 +18,11 @@ pub internal fn resume_coroutine(coroutine_id: u64) {
 
 }
 
+/// Pauses the currently running coroutine
+pub internal fn pause_coroutine() {
+
+}
+
 /// Gets the data within the coroutine
 pub internal fn get_coroutine_data() -> u64 {
 

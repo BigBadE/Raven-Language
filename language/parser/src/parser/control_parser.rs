@@ -166,7 +166,7 @@ pub fn parse_with(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErro
             Effects::new(Span::default(), EffectType::CreateVariable(name.clone(), Box::new(effect.unwrap().effect))),
         ),
     );
-    body.yield_handlers.push(name);
+    body.yield_handlers.push(Effects::new(Span::default(), EffectType::LoadVariable(name)));
 
     return Ok(Effects::new(Span::new(parser_utils.file, index), EffectType::CodeBody(body)));
 }

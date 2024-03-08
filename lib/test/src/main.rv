@@ -1,5 +1,20 @@
 import stdio;
+import coroutine;
 
 fn main() {
     printf("Hello, world!");
+    test();
+}
+
+fn test() {
+    yield new TestValue { value: 2, };
+    //printf("Number: " + ('a' + number));
+}
+
+pub struct TestValue {
+    value: u64;
+}
+
+impl CoroutineValue<u64> for TestValue {
+
 }

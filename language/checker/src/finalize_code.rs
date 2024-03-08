@@ -1,4 +1,4 @@
-use syntax::program::code::{FinalizedEffects, FinalizedEffectType};
+use syntax::program::code::{FinalizedEffectType, FinalizedEffects};
 use syntax::program::function::FinalizedFunction;
 use syntax::SimpleVariableManager;
 
@@ -11,9 +11,8 @@ pub fn finalize_code(function: &mut FinalizedFunction) {
 
 pub fn finalize_effect(effect: &mut FinalizedEffects, variables: &mut SimpleVariableManager) {
     match &mut effect.types {
-        FinalizedEffectType::CoroutineYield(inner, return_types) {
+        FinalizedEffectType::CoroutineYield(inner, return_types) => {
             finalize_effect(inner, variables);
-
         }
         FinalizedEffectType::CreateVariable(name, value, types) => {
             *types = value.types.get_nongeneric_return(variables).unwrap();
@@ -32,7 +31,7 @@ pub fn finalize_effect(effect: &mut FinalizedEffects, variables: &mut SimpleVari
                 finalize_effect(&mut expression.effect, variables);
             }
         }
-        FinalizedEffectType::MethodCall(calling, _, arguments, _) => {
+        FinalizedEffectType::MethodCall(calling, function, arguments, _) => {
             if let Some(found) = calling {
                 finalize_effect(found, variables);
             }

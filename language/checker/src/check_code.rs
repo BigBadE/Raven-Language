@@ -10,7 +10,6 @@ use syntax::program::code::{
 use syntax::program::function::{CodeBody, FinalizedCodeBody};
 use syntax::program::syntax::Syntax;
 use syntax::program::types::FinalizedTypes;
-use syntax::top_element_manager::{ImplWaiter, TraitImplWaiter};
 use syntax::SimpleVariableManager;
 
 use crate::check_impl_call::check_impl_call;
@@ -28,6 +27,12 @@ pub async fn verify_code(
 ) -> Result<FinalizedCodeBody, ParsingError> {
     let mut body = Vec::default();
     let mut found_end = false;
+    let start = code.yield_handlers.len();
+    for handled_yield in code.yield_handlers {
+        let effect = verify_effect(code_verifier, variables, handled_yield).await?;
+        code_verifier.handled_yields.push(effect);
+    }
+
     for line in code.expressions {
         match &line.effect.types {
             EffectType::CompareJump(_, _, _) => found_end = true,
@@ -43,6 +48,10 @@ pub async fn verify_code(
         if check_return_type(line.expression_type, code_verifier, &mut body, variables, &code_verifier.syntax).await? {
             return Ok(FinalizedCodeBody::new(body.clone(), code.label.clone(), true));
         }
+    }
+
+    for _ in start..code_verifier.handled_yields.len() {
+        code_verifier.handled_yields.remove(start);
     }
 
     if !found_end && !top {
@@ -175,6 +184,7 @@ pub async fn verify_effect(
         }
         EffectType::CoroutineYield(effects) => {
             let new_effect = verify_effect(code_verifier, variables, *effects).await?;
+
             FinalizedEffects::new(effect.span.clone(), FinalizedEffectType::CoroutineYield(Box::new(new_effect), None))
         }
         _ => unreachable!(),

@@ -76,6 +76,7 @@ impl ProcessManager for TypesChecker {
                 code: FinalizedCodeBody::default(),
                 return_type: None,
                 data: Arc::new(FunctionData::new(Vec::default(), 0, String::default(), Span::default())),
+                yields: vec![],
             }
         });
     }
