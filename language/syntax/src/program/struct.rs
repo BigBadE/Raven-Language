@@ -281,8 +281,17 @@ impl TopElement for StructData {
         return is_modifier(self.modifiers, Modifier::Trait);
     }
 
-    fn default(&self) -> Arc<Self> {
-        return VOID.data.clone();
+    fn default(&self, id: u64) -> Arc<Self> {
+        return Arc::new(StructData {
+            modifiers: 0,
+            chalk_data: Self::get_chalk_data(id, 0),
+            id,
+            name: "empty".to_string(),
+            span: Default::default(),
+            attributes: vec![],
+            functions: vec![],
+            poisoned: vec![],
+        });
     }
 
     fn id(&self) -> Option<u64> {

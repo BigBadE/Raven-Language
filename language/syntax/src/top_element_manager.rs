@@ -241,7 +241,7 @@ impl<T: TopElement> TopElementManager<T> {
         self.wake(data.name());
         if let Some(id) = data.id() {
             while self.sorted.len() <= id as usize {
-                self.sorted.push(data.default());
+                self.sorted.push(data.default(self.sorted.len() as u64));
             }
             self.sorted.remove(id as usize);
             self.sorted.insert(id as usize, data.clone());

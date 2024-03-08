@@ -60,7 +60,7 @@ impl<'ctx> CompilerImpl<'ctx> {
             Err(_) => return None,
         };
 
-        let function = match time::timeout(Duration::from_secs(5), MainFuture { syntax: syntax.clone() }).await {
+        let function = match time::timeout(Duration::from_secs(60), MainFuture { syntax: syntax.clone() }).await {
             Ok(found) => found,
             Err(_) => panic!(
                 "Something went wrong with finding main! {:?}",

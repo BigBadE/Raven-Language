@@ -280,7 +280,7 @@ where
     fn is_trait(&self) -> bool;
 
     /// Returns a default self type
-    fn default(&self) -> Arc<Self>;
+    fn default(&self, id: u64) -> Arc<Self>;
 
     /// Returns the id
     fn id(&self) -> Option<u64>;

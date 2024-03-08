@@ -62,7 +62,7 @@ impl TopElement for FunctionData {
         return is_modifier(self.modifiers, Modifier::Trait);
     }
 
-    fn default(&self) -> Arc<Self> {
+    fn default(&self, _id: u64) -> Arc<Self> {
         panic!("Functions have no default value!")
     }
 

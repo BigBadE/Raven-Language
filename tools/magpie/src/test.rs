@@ -17,7 +17,9 @@ mod test {
     /// Main test
     #[test]
     pub fn test_magpie() {
-        test_recursive(&TESTS);
+        loop {
+            test_recursive(&TESTS);
+        }
     }
 
     /// Recursively searches for files in the test folder to run as a test
