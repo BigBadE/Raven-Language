@@ -26,7 +26,7 @@ pub async fn check_operator(
         unreachable!()
     }
 
-    let error = effect.span.make_error(ParsingMessage::UnknownOperation());
+    let error = effect.span.make_error(ParsingMessage::UnknownOperation(operation.replace("{}", "").replace("{+}", "")));
     // Check if it's two operations that should be combined, like a list ([])
     let outer_operation = combine_operation(&operation, &mut values, code_verifier, &effect.span).await?;
 
@@ -71,7 +71,7 @@ async fn combine_operation(
     code_verifier: &mut CodeVerifier<'_>,
     span: &Span,
 ) -> Result<Option<Arc<StructData>>, ParsingError> {
-    let error = span.make_error(ParsingMessage::UnknownOperation());
+    let error = span.make_error(ParsingMessage::UnknownOperation(operation.replace("{}", "").replace("{+}", "")));
 
     if values.len() > 0 {
         let mut reading_array = None;

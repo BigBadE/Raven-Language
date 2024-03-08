@@ -423,26 +423,23 @@ impl FinalizedTypes {
         bounds_error: Span,
     ) -> Result<(), ParsingError> {
         if !self.of_type_sync(other, None).0 && self.inner_struct_safe().is_some() {
-            while !syntax.lock().unwrap().finished_impls() {
-                if let Some(implementors) = Syntax::get_implementation_methods(syntax, other, self).await {
-                    if implementors.len() > 1 {
-                        panic!("Ambiguous impl! Raven can't handle this yet!");
-                    }
-                    if !implementors.is_empty() {
+            loop {
+                let waiter = ImplWaiter {
+                    syntax: syntax.clone(),
+                    base_type: other.clone(),
+                    trait_type: self.clone(),
+                    error: bounds_error.make_error(ParsingMessage::ShouldntSee("Resolve generic")),
+                };
+                match waiter.await {
+                    Ok(implementors) => {
+                        if implementors.len() > 1 {
+                            panic!("Ambiguous impl! Raven can't handle this yet!");
+                        }
                         self.resolve_generic(&implementors[0].0.target, syntax, generics, bounds_error.clone()).await?;
                         implementors[0].0.base.resolve_generic(&other, syntax, generics, bounds_error.clone()).await?;
                         return Ok(());
                     }
-                }
-            }
-            if let Some(implementors) = Syntax::get_implementation_methods(syntax, other, self).await {
-                if implementors.len() > 1 {
-                    panic!("Ambiguous impl! Raven can't handle this yet!");
-                }
-                if !implementors.is_empty() {
-                    self.resolve_generic(&implementors[0].0.target, syntax, generics, bounds_error.clone()).await?;
-                    implementors[0].0.base.resolve_generic(&other, syntax, generics, bounds_error.clone()).await?;
-                    return Ok(());
+                    Err(_) => break,
                 }
             }
         }

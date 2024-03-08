@@ -33,7 +33,7 @@ pub enum ParsingMessage {
     UnknownField(String),
     IncorrectBoundsLength(),
     MismatchedTypes(FinalizedTypes, FinalizedTypes),
-    UnknownOperation(),
+    UnknownOperation(String),
     UnknownFunction(),
     MissingArgument(),
     AmbiguousMethod(String),
@@ -75,7 +75,7 @@ impl Display for ParsingMessage {
             ParsingMessage::MismatchedTypes(found, bound) => {
                 write!(f, "{} isn't of type {}", fix_type(found), fix_type(bound))
             }
-            ParsingMessage::UnknownOperation() => write!(f, "Unknown operation!"),
+            ParsingMessage::UnknownOperation(operation) => write!(f, "Unknown operation '{}'", operation),
             ParsingMessage::UnknownFunction() => write!(f, "Unknown function!"),
             ParsingMessage::MissingArgument() => write!(f, "Incorrect arguments length!"),
             ParsingMessage::AmbiguousMethod(name) => write!(f, "Ambiguous method {}!", name),

@@ -57,7 +57,7 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     let mut errors = Vec::default();
     //Join any parsing errors
     for handle in handles {
-        match time::timeout(Duration::from_secs(1), handle).await {
+        match time::timeout(Duration::from_secs(60), handle).await {
             Err(error) => errors.push(Error::new(error)),
             Ok(_) => {}
         }
@@ -73,7 +73,9 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     syntax.lock().unwrap().finish();
 
     let mut errors = vec![];
-    match time::timeout(Duration::from_secs(1), JoinWaiter { handle: handle.clone() }).await {
+
+    let waiter = JoinWaiter { handle: handle.clone() };
+    match time::timeout(Duration::from_secs(60), waiter).await {
         Ok(error) => match error {
             Err(error) => {
                 errors.push(error);
@@ -81,10 +83,15 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
             _ => {}
         },
         Err(_) => {
+            println!("Detected infinite loops:");
             for (name, _) in &handle.lock().unwrap().names {
                 println!("Infinite loop for {}", name);
             }
-            panic!();
+            panic!(
+                "Failed to parse with {} ({}) infinite loops",
+                handle.lock().unwrap().joining.len(),
+                handle.lock().unwrap().names.len()
+            );
         }
     }
 

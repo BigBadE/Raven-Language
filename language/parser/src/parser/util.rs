@@ -82,13 +82,16 @@ impl<'a> ParserUtils<'a> {
     pub async fn add_implementor(
         handle: Arc<Mutex<HandleWrapper>>,
         syntax: Arc<Mutex<Syntax>>,
-        implementor: Result<TraitImplementor, ParsingError>,
+        implementor_trait: Result<TraitImplementor, ParsingError>,
         resolver: Box<dyn NameResolver>,
         process_manager: Box<dyn ProcessManager>,
+        base: String,
+        implementor: String,
     ) -> Result<(), ParsingError> {
-        match implementor {
-            Ok(implementor) => {
-                match Self::add_implementation(handle.clone(), syntax.clone(), implementor, resolver, process_manager).await
+        match implementor_trait {
+            Ok(implementor_trait) => {
+                match Self::add_implementation(handle.clone(), syntax.clone(), implementor_trait, resolver, process_manager)
+                    .await
                 {
                     Ok(_) => {}
                     Err(error) => {
@@ -104,7 +107,7 @@ impl<'a> ParserUtils<'a> {
                 return Err(error);
             }
         }
-        handle.lock().unwrap().finish_task(&"temp".to_string());
+        handle.lock().unwrap().finish_task(&format!("{}_{}", base, implementor));
         return Ok(());
     }
 

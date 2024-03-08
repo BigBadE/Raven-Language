@@ -61,7 +61,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 modifiers = Vec::default();
             }
             TokenTypes::ImplStart => {
-                let implementor = parse_implementor(parser_utils, attributes, modifiers);
+                let (trait_implementor, base, implementor) = parse_implementor(parser_utils, attributes, modifiers);
                 let process_manager = {
                     let mut locked = parser_utils.syntax.lock().unwrap();
                     locked.async_manager.parsing_impls += 1;
@@ -69,13 +69,15 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
                 };
 
                 parser_utils.handle.lock().unwrap().spawn(
-                    "implementor".to_string(),
+                    format!("{}_{}", base, implementor),
                     ParserUtils::add_implementor(
                         parser_utils.handle.clone(),
                         parser_utils.syntax.clone(),
-                        implementor,
+                        trait_implementor,
                         parser_utils.imports.boxed_clone(),
                         process_manager,
+                        base,
+                        implementor,
                     ),
                 );
                 attributes = Vec::default();

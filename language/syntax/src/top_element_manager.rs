@@ -109,7 +109,7 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
                                             Ok(found) => return Poll::Ready(Ok(found)),
                                             Err(_) => {}
                                         },
-                                        Poll::Pending => {}
+                                        Poll::Pending => return Poll::Pending,
                                     }
                                 }
                             }
@@ -117,6 +117,7 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
                         None => {}
                     }
                     if finished {
+                        println!("Failed!");
                         Poll::Ready(Err(self.error.clone()))
                     } else {
                         self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());

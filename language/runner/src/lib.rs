@@ -67,6 +67,7 @@ impl Future for JoinWaiter {
         for found in removing {
             locked.joining.remove(found);
         }
+
         return if locked.joining.is_empty() {
             Poll::Ready(Ok(()))
         } else {
