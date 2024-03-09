@@ -48,12 +48,10 @@ pub fn parse_structure(
                 ));
             }
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
-            TokenTypes::InvalidCharacters => {
-                parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
-                    format!("{}", parser_utils.file_name),
-                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedTopElement()),
-                )))
-            }
+            TokenTypes::InvalidCharacters => parser_utils.syntax.lock().add_poison(Arc::new(StructData::new_poisoned(
+                format!("{}", parser_utils.file_name),
+                Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedTopElement()),
+            ))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
             TokenTypes::ModifiersStart => {

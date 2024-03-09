@@ -1,8 +1,8 @@
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::Error;
+use parking_lot::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time;
@@ -70,10 +70,9 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
         panic!("Error detected!");
     }
 
-    syntax.lock().unwrap().finish();
+    syntax.lock().finish();
 
     let mut errors = vec![];
-
     let waiter = JoinWaiter { handle: handle.clone() };
     match time::timeout(Duration::from_secs(60), waiter).await {
         Ok(error) => match error {
@@ -84,18 +83,15 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
         },
         Err(_) => {
             println!("Detected infinite loops:");
-            for (name, _) in &handle.lock().unwrap().names {
+            for (name, _) in &handle.lock().names {
                 println!("Infinite loop for {}", name);
             }
-            panic!(
-                "Failed to parse with {} ({}) infinite loops",
-                handle.lock().unwrap().joining.len(),
-                handle.lock().unwrap().names.len()
-            );
+            let length = handle.lock().joining.len();
+            panic!("Failed to parse with {} ({}) infinite loops", length, handle.lock().names.len());
         }
     }
 
-    errors.append(&mut syntax.lock().unwrap().errors);
+    errors.append(&mut syntax.lock().errors);
     return if errors.is_empty() {
         go_sender.send(()).await.unwrap();
         Ok(receiver.recv().await.unwrap())
@@ -113,7 +109,7 @@ pub async fn start<T>(
 ) {
     let code_compiler;
     {
-        let locked = syntax.lock().unwrap();
+        let locked = syntax.lock();
         code_compiler = get_compiler(locked.compiling.clone(), locked.strut_compiling.clone(), compiler_arguments);
     }
 

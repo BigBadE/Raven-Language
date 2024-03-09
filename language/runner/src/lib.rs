@@ -1,10 +1,10 @@
 use compiler_llvm::LLVMCompiler;
 use dashmap::DashMap;
 use data::CompilerArguments;
+use parking_lot::Mutex;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::{Context, Poll};
 use syntax::async_util::HandleWrapper;
 use syntax::errors::ParsingError;
@@ -37,7 +37,7 @@ impl Future for JoinWaiter {
     type Output = Result<(), ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.handle.lock().unwrap();
+        let mut locked = self.handle.lock();
 
         let mut removing = Vec::default();
 

@@ -1,10 +1,10 @@
+use parking_lot::Mutex;
 /// Contains all the code for interacting with types in Raven.
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use chalk_ir::{BoundVar, DebruijnIndex, GenericArgData, Substitution, Ty, TyKind};
 use chalk_solve::rust_ir::TraitDatum;

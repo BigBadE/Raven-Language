@@ -13,6 +13,7 @@ use crate::top_element_manager::TopElementManager;
 use async_trait::async_trait;
 use chalk_solve::rust_ir::ImplDatum;
 use indexmap::IndexMap;
+use parking_lot::Mutex;
 /// A file containing various structures used throughout the language:
 /// - Modifiers: modifiers on structures, traits, and functions. Like public, internal, etc...
 ///     - Modifier helper functions for compressing to/from and checking modifier lists in u8 form
@@ -29,7 +30,6 @@ use std::future::Future;
 use std::hash::Hash;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 /// Utility async functions for things like getting types
 pub mod async_util;

@@ -1,9 +1,9 @@
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::future::Future;
 use std::ops::AsyncFnMut;
 use std::pin::{pin, Pin};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
 
 use data::tokens::Span;
@@ -47,7 +47,7 @@ impl Future for ImplWaiter {
     type Output = Result<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>, ParsingError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let finished = self.syntax.lock().unwrap().finished_impls();
+        let finished = self.syntax.lock().finished_impls();
         let output = match pin!(Syntax::get_implementation_methods(&self.syntax, &self.base_type, &self.trait_type)).poll(cx)
         {
             Poll::Ready(inner) => inner,
@@ -59,7 +59,7 @@ impl Future for ImplWaiter {
                 if finished {
                     Poll::Ready(Err(self.error.clone()))
                 } else {
-                    let mut locked = self.syntax.lock().unwrap();
+                    let mut locked = self.syntax.lock();
                     // Locking rules means a lock can't be held from start to finish, so immediately wake if it finished in that time.
                     if locked.finished_impls() {
                         cx.waker().wake_by_ref();
@@ -94,7 +94,7 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
     type Output = Result<FinalizedEffects, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let finished = self.syntax.lock().unwrap().finished_impls();
+        let finished = self.syntax.lock().finished_impls();
         let value =
             pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx).clone();
         return match value {
@@ -120,14 +120,14 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
                         println!("Failed!");
                         Poll::Ready(Err(self.error.clone()))
                     } else {
-                        self.syntax.lock().unwrap().async_manager.impl_waiters.push(cx.waker().clone());
+                        self.syntax.lock().async_manager.impl_waiters.push(cx.waker().clone());
                         Poll::Pending
                     }
                 }
                 Err(error) => return Poll::Ready(Err(error)),
             },
             Poll::Pending => {
-                let mut locked = self.syntax.lock().unwrap();
+                let mut locked = self.syntax.lock();
                 locked.async_manager.impl_waiters.push(cx.waker().clone());
                 Poll::Pending
             }
@@ -193,7 +193,7 @@ impl Future for TypeImplementsTypeWaiter {
     type Output = bool;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.syntax.lock().unwrap();
+        let mut locked = self.syntax.lock();
         // Only check for implementations if being compared against a trait.
         // Wait for the implementation to finish.
         if locked.solve(&self.current, &self.other) {

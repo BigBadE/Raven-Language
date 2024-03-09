@@ -2,9 +2,9 @@
 
 extern crate core;
 
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use async_recursion::async_recursion;
 use data::tokens::Span;

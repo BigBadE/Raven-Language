@@ -1,6 +1,6 @@
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::Waker;
 
 use chalk_ir::{
@@ -34,7 +34,7 @@ use crate::{
 };
 
 /// The entire program's syntax. Contains all the data passed to every step of the program.
-/// This program is usually in a mutex lock, which prevents multiple functions from reading/writing
+/// This program is usually in a Mutex lock, which prevents multiple functions from reading/writing
 /// to it at the same time.
 /// This is done so that the whole compiler can safely run multithreaded.
 pub struct Syntax {
@@ -109,7 +109,7 @@ impl Syntax {
     ) {
         let waker;
         {
-            let locked = syntax.lock().unwrap();
+            let locked = syntax.lock();
             if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
                 for waker in found {
                     waker.wake_by_ref();
@@ -231,7 +231,7 @@ impl Syntax {
     ) -> Option<Vec<(Arc<FinishedTraitImplementor>, Vec<Arc<FunctionData>>)>> {
         let mut output = Vec::default();
         let implementations = {
-            let locked = syntax.lock().unwrap();
+            let locked = syntax.lock();
             locked.implementations.clone()
         };
 
@@ -316,12 +316,12 @@ impl Syntax {
     }
 
     pub fn add_function(syntax: &Arc<Mutex<Syntax>>, adding: &mut Arc<FunctionData>) {
-        let mut locked = syntax.lock().unwrap();
+        let mut locked = syntax.lock();
         locked.add(adding);
     }
 
     pub fn add_struct(syntax: &Arc<Mutex<Syntax>>, adding: &mut Arc<StructData>) {
-        let mut locked = syntax.lock().unwrap();
+        let mut locked = syntax.lock();
         locked.add(adding);
         if adding.is_operator() {
             // Gets the name of the operation, or errors if there isn't one.

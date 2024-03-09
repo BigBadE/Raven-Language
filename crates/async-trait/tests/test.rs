@@ -1,7 +1,4 @@
-#![cfg_attr(
-    async_trait_nightly_testing,
-    feature(impl_trait_in_assoc_type, min_specialization)
-)]
+#![cfg_attr(async_trait_nightly_testing, feature(impl_trait_in_assoc_type, min_specialization))]
 #![deny(rust_2021_compatibility)]
 #![allow(
     clippy::let_underscore_untyped,
@@ -605,7 +602,7 @@ pub mod issue45 {
             event.record(&mut visitor);
             if let Some((s, v)) = visitor.0 {
                 let current_depth = self.inner.current_depth.load(Ordering::Acquire);
-                *self.inner.value.lock().unwrap() = Some((s, v, current_depth));
+                *self.inner.value.lock() = Some((s, v, current_depth));
             }
         }
         fn enter(&self, _span: &Id) {
@@ -636,7 +633,7 @@ pub mod issue45 {
         assert_eq!(subscriber.inner.max_span_id.load(Ordering::Acquire) - 1, 2);
         // Was the value recorded at the right depth i.e. in the right function?
         // If so, was it the expected value?
-        assert_eq!(*subscriber.inner.value.lock().unwrap(), Some(("val", 5, 2)));
+        assert_eq!(*subscriber.inner.value.lock(), Some(("val", 5, 2)));
     }
 }
 
@@ -1452,12 +1449,7 @@ pub mod issue226 {
 
         async fn cfg_param_wildcard(&self, #[cfg(any())] _: u8, #[cfg(all())] _: u8) {}
 
-        async fn cfg_param_tuple(
-            &self,
-            #[cfg(any())] (left, right): (u8, u8),
-            #[cfg(all())] (_left, _right): (u8, u8),
-        ) {
-        }
+        async fn cfg_param_tuple(&self, #[cfg(any())] (left, right): (u8, u8), #[cfg(all())] (_left, _right): (u8, u8)) {}
     }
 }
 

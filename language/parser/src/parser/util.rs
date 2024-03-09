@@ -1,5 +1,5 @@
+use parking_lot::Mutex;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use indexmap::IndexMap;
 
@@ -65,8 +65,8 @@ impl<'a> ParserUtils<'a> {
 
         Syntax::add_struct(&self.syntax, &mut structure.data);
 
-        let process_manager = self.syntax.lock().unwrap().process_manager.cloned();
-        self.handle.lock().unwrap().spawn(
+        let process_manager = self.syntax.lock().process_manager.cloned();
+        self.handle.lock().spawn(
             structure.data.name.clone(),
             StructData::verify(
                 self.handle.clone(),
@@ -95,19 +95,19 @@ impl<'a> ParserUtils<'a> {
                 {
                     Ok(_) => {}
                     Err(error) => {
-                        let mut locked = syntax.lock().unwrap();
+                        let mut locked = syntax.lock();
                         locked.async_manager.parsing_impls -= 1;
                         return Err(error);
                     }
                 };
             }
             Err(error) => {
-                let mut locked = syntax.lock().unwrap();
+                let mut locked = syntax.lock();
                 locked.async_manager.parsing_impls -= 1;
                 return Err(error);
             }
         }
-        handle.lock().unwrap().finish_task(&format!("{}_{}", base, implementor));
+        handle.lock().finish_task(&format!("{}_{}", base, implementor));
         return Ok(());
     }
 
@@ -152,7 +152,7 @@ impl<'a> ParserUtils<'a> {
             };
 
             {
-                let mut locked = syntax.lock().unwrap();
+                let mut locked = syntax.lock();
                 locked.implementations.push(Arc::new(output));
 
                 locked.async_manager.parsing_impls -= 1;
@@ -165,7 +165,7 @@ impl<'a> ParserUtils<'a> {
             let output = FinishedStructImplementor { target, attributes: implementor.attributes, functions, generics };
 
             {
-                let mut locked = syntax.lock().unwrap();
+                let mut locked = syntax.lock();
                 for function in &output.functions {
                     locked.functions.add_type(function.clone());
                 }
@@ -186,7 +186,7 @@ impl<'a> ParserUtils<'a> {
         }
 
         for function in implementor.functions {
-            handle.lock().unwrap().spawn(
+            handle.lock().spawn(
                 function.data.name.clone(),
                 FunctionData::verify(
                     handle.clone(),

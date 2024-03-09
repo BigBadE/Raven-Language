@@ -1,7 +1,7 @@
 use crate::finalize_generics;
 use crate::output::TypesChecker;
+use parking_lot::Mutex;
 use std::sync::Arc;
-use std::sync::Mutex;
 use syntax::errors::ParsingError;
 use syntax::program::code::{FinalizedField, FinalizedMemberField};
 use syntax::program::r#struct::{FinalizedStruct, UnfinalizedStruct};

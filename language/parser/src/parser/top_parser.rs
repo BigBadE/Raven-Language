@@ -20,20 +20,18 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Start | TokenTypes::AttributeEnd => {}
-            TokenTypes::InvalidCharacters => {
-                parser_utils.syntax.lock().unwrap().add_poison(Arc::new(StructData::new_poisoned(
-                    format!("${}", parser_utils.file),
-                    Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedTopElement()),
-                )))
-            }
+            TokenTypes::InvalidCharacters => parser_utils.syntax.lock().add_poison(Arc::new(StructData::new_poisoned(
+                format!("${}", parser_utils.file),
+                Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedTopElement()),
+            ))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
             TokenTypes::ModifiersStart => parse_modifier(parser_utils, &mut modifiers),
             TokenTypes::FunctionStart => {
                 let function = parse_function(parser_utils, false, attributes, modifiers);
                 let function = ParserUtils::add_function(&parser_utils.syntax, parser_utils.file_name.clone(), function);
-                let process_manager = parser_utils.syntax.lock().unwrap().process_manager.cloned();
-                parser_utils.handle.lock().unwrap().spawn(
+                let process_manager = parser_utils.syntax.lock().process_manager.cloned();
+                parser_utils.handle.lock().spawn(
                     function.data.name.clone(),
                     FunctionData::verify(
                         parser_utils.handle.clone(),
@@ -63,12 +61,12 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::ImplStart => {
                 let (trait_implementor, base, implementor) = parse_implementor(parser_utils, attributes, modifiers);
                 let process_manager = {
-                    let mut locked = parser_utils.syntax.lock().unwrap();
+                    let mut locked = parser_utils.syntax.lock();
                     locked.async_manager.parsing_impls += 1;
                     locked.process_manager.cloned()
                 };
 
-                parser_utils.handle.lock().unwrap().spawn(
+                parser_utils.handle.lock().spawn(
                     format!("{}_{}", base, implementor),
                     ParserUtils::add_implementor(
                         parser_utils.handle.clone(),

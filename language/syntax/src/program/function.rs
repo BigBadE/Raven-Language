@@ -1,7 +1,7 @@
+use parking_lot::Mutex;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use indexmap::IndexMap;
 
@@ -101,7 +101,7 @@ impl TopElement for FunctionData {
 
         // Add the finalized code to the compiling list.
         Syntax::add_compiling(process_manager, finalized_function.clone(), &syntax, true).await;
-        handle.lock().unwrap().finish_task(&name);
+        handle.lock().finish_task(&name);
         return Ok(());
     }
 

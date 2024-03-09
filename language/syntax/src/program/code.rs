@@ -381,7 +381,7 @@ impl FinalizedEffectType {
                 target.degeneric(process_manager.generics(), syntax).await
             }
             Self::GenericVirtualCall(index, target, found, effects) => {
-                syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+                syntax.lock().process_manager.handle().lock().spawn(
                     target.name.clone(),
                     degeneric_header(
                         target.clone(),

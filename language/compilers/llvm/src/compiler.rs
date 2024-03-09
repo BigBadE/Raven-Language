@@ -1,5 +1,5 @@
+use parking_lot::Mutex;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
@@ -64,7 +64,7 @@ impl<'ctx> CompilerImpl<'ctx> {
             Ok(found) => found,
             Err(_) => panic!(
                 "Something went wrong with finding main! {:?}",
-                syntax.lock().unwrap().compiling.iter().map(|pair| pair.data.name.clone()).collect::<Vec<_>>()
+                syntax.lock().compiling.iter().map(|pair| pair.data.name.clone()).collect::<Vec<_>>()
             ),
         };
 
