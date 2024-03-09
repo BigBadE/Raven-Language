@@ -109,12 +109,13 @@ impl Syntax {
     ) {
         let waker;
         {
-            let locked = syntax.lock();
+            let mut locked = syntax.lock();
             if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
                 for waker in found {
                     waker.wake_by_ref();
                 }
             }
+            locked.compiling_wakers.remove(&function.data.name);
 
             if function.data.name != locked.async_manager.target {
                 if function.code.expressions.len() == 0

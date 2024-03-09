@@ -17,7 +17,7 @@ use syntax::program::r#struct::{FinalizedStruct, StructData};
 use syntax::program::syntax::Syntax;
 use syntax::program::types::FinalizedTypes;
 use syntax::top_element_manager::ImplWaiter;
-use syntax::{ProcessManager, SimpleVariableManager};
+use syntax::{ProcessManager, SimpleVariableManager, TopElement};
 
 use crate::get_return;
 
@@ -396,10 +396,11 @@ impl Future for FunctionWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().generics.contains_key(&self.data.name) {
+        let mut locked = self.syntax.lock();
+        return if locked.generics.contains_key(&self.data.name) {
             Poll::Ready(())
         } else {
-            self.syntax.lock().compiling_wakers.entry(self.data.name.clone()).or_insert(vec![]).push(cx.waker().clone());
+            locked.compiling_wakers.entry(self.data.name.clone()).or_insert(vec![]).push(cx.waker().clone());
             Poll::Pending
         };
     }
@@ -618,14 +619,11 @@ pub async fn degeneric_header(
 
     let new_method = Arc::new(new_method);
 
-    //let mut code =
-    //    CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(vec![], "empty".to_string(), true));
-
     let mut locked = syntax.lock();
     locked.functions.add_type(new_method.data.clone());
     locked.functions.add_data(new_method.data.clone(), new_method.clone());
+    locked.process_manager.handle().lock().finish_task(new_method.data.name());
 
-    // Give the compiler the empty body
     return Ok(());
 }
 

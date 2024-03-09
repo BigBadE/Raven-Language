@@ -11,7 +11,7 @@ indexmap = "2.2.5"
 
 # CPU-bound async tasks
 tokio = { version = "1.36.0", features = ["rt", "sync", "time"] }
-parking_lot = { version = "0.12.1", features = ["deadlock_detection"] }
+parking_lot = "0.12.1"
 
 # Utility / Code Cleanliness
 anyhow = "1.0.80"

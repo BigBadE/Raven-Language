@@ -10,7 +10,7 @@ data = { path = "../../data" }
 async-trait = { path = "../../../crates/async-trait" }
 
 tokio = { version = "1.36.0", features = ["rt", "sync", "time"] }
-parking_lot = { version = "0.12.1", features = ["deadlock_detection"] }
+parking_lot = "0.12.1"
 
 llvm-sys = "130.1.2"
 inkwell = { version = "0.4.0", features = ["llvm13-0"] }
