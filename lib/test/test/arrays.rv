@@ -1,0 +1,4 @@
+fn test() -> bool {
+    let testing = [123];
+    return testing[0] == 123;
+}
