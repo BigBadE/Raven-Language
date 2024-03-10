@@ -1,3 +1,4 @@
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
@@ -5,7 +6,6 @@ use std::hash::Hash;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
 
 use tokio::runtime::Handle;
@@ -155,7 +155,7 @@ impl<T: TopElement> Future for AsyncTypesGetter<T> {
 
         let not_trait = self.not_trait;
         let locked = self.syntax.clone();
-        let mut locked = locked.lock().unwrap();
+        let mut locked = locked.lock();
 
         // Check if an element directly referenced with that name exists.
         if let Some(output) = self.get_types(&mut locked, String::default(), cx.waker().clone(), not_trait) {
@@ -197,7 +197,7 @@ where
     /// Look for the finalized element given the data.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let locked = self.syntax.clone();
-        let mut locked = locked.lock().unwrap();
+        let mut locked = locked.lock();
 
         let manager = T::get_manager(locked.deref_mut());
 
@@ -218,7 +218,7 @@ impl Future for AsyncStructImplGetter {
     type Output = Vec<Arc<FinishedStructImplementor>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut locked = self.syntax.lock().unwrap();
+        let mut locked = self.syntax.lock();
 
         if let Some(found) = locked.struct_implementations.get(&self.getting) {
             return Poll::Ready(found.clone());

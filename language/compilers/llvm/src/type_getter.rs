@@ -1,9 +1,9 @@
+use parking_lot::Mutex;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use crate::compiler::CompilerImpl;
 use crate::function_compiler::{instance_function, instance_types};

@@ -2,8 +2,8 @@ use crate::check_code::verify_code;
 use crate::output::TypesChecker;
 use crate::{finalize_generics, CodeVerifier};
 use data::tokens::Span;
+use parking_lot::Mutex;
 use std::sync::Arc;
-use std::sync::Mutex;
 use syntax::async_util::NameResolver;
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
 use syntax::program::code::{
@@ -72,7 +72,7 @@ pub async fn verify_function_code(
     syntax: &Arc<Mutex<Syntax>>,
 ) -> Result<FinalizedFunction, ParsingError> {
     {
-        let mut locked = syntax.lock().unwrap();
+        let mut locked = syntax.lock();
         locked.functions.add_data(codeless.data.clone(), Arc::new(codeless.clone()));
     }
 

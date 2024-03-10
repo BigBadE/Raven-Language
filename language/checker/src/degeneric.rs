@@ -1,9 +1,10 @@
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::future::Future;
 use std::mem;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use async_recursion::async_recursion;
@@ -16,7 +17,7 @@ use syntax::program::r#struct::{FinalizedStruct, StructData};
 use syntax::program::syntax::Syntax;
 use syntax::program::types::FinalizedTypes;
 use syntax::top_element_manager::ImplWaiter;
-use syntax::{ProcessManager, SimpleVariableManager};
+use syntax::{ProcessManager, SimpleVariableManager, TopElement};
 
 use crate::get_return;
 
@@ -163,7 +164,7 @@ pub async fn degeneric_effect(
             degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericVirtualCall(index, target, found, effects, returning) => {
-            syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+            syntax.lock().process_manager.handle().lock().spawn(
                 target.name.clone(),
                 degeneric_header(
                     target.clone(),
@@ -310,8 +311,8 @@ pub async fn degeneric_function(
     };
 
     // If this function has already been degenericed, use the previous one.
-    if syntax.lock().unwrap().compiling.contains_key(&name) {
-        let data = syntax.lock().unwrap().functions.types.get(&name).unwrap().clone();
+    if syntax.lock().compiling.contains_key(&name) {
+        let data = syntax.lock().functions.types.get(&name).unwrap().clone();
         return Ok(AsyncDataGetter::new(syntax.clone(), data).await);
     }
 
@@ -335,11 +336,11 @@ pub async fn degeneric_function(
     // Add the new degenericed static data to the locked function.
     let original = method;
     let new_method = Arc::new(new_method);
-    let mut locked = syntax.lock().unwrap();
+    let mut locked = syntax.lock();
     // Since Syntax can't be locked this whole time, sometimes someone else can beat this method to the punch.
     // It's super rare to happen, but if it does just give up
     // TODO figure out of this is required
-    /*if syntax.lock().unwrap().functions.types.contains_key(&name) {
+    /*if syntax.lock().functions.types.contains_key(&name) {
         return Ok(new_method);
     }*/
     locked.functions.add_type(new_method.data.clone());
@@ -347,10 +348,7 @@ pub async fn degeneric_function(
 
     // Spawn a thread to asynchronously degeneric the code inside the function.
     let handle = manager.handle().clone();
-    handle
-        .lock()
-        .unwrap()
-        .spawn(new_method.data.name.clone(), degeneric_code(syntax.clone(), original, new_method.clone(), manager));
+    handle.lock().spawn(new_method.data.name.clone(), degeneric_code(syntax.clone(), original, new_method.clone(), manager));
 
     return Ok(new_method);
 }
@@ -366,7 +364,7 @@ async fn degeneric_code(
     FunctionWaiter { syntax: syntax.clone(), data: original.data.clone() }.await;
 
     // Gets a clone of the code of the original.
-    let mut code = syntax.lock().unwrap().generics.get(&original.data.name).unwrap().code.clone();
+    let mut code = syntax.lock().generics.get(&original.data.name).unwrap().code.clone();
 
     let mut variables = SimpleVariableManager::for_function(degenericed_method.deref());
 
@@ -381,7 +379,7 @@ async fn degeneric_code(
     // Sends the finalized function to be compiled.
     Syntax::add_compiling(manager, Arc::new(output), &syntax, false).await;
 
-    handle.lock().unwrap().finish_task(&degenericed_method.data.name);
+    handle.lock().finish_task(&degenericed_method.data.name);
     return Ok(());
 }
 
@@ -398,16 +396,11 @@ impl Future for FunctionWaiter {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        return if self.syntax.lock().unwrap().generics.contains_key(&self.data.name) {
+        let mut locked = self.syntax.lock();
+        return if locked.generics.contains_key(&self.data.name) {
             Poll::Ready(())
         } else {
-            self.syntax
-                .lock()
-                .unwrap()
-                .compiling_wakers
-                .entry(self.data.name.clone())
-                .or_insert(vec![])
-                .push(cx.waker().clone());
+            locked.compiling_wakers.entry(self.data.name.clone()).or_insert(vec![]).push(cx.waker().clone());
             Poll::Pending
         };
     }
@@ -455,10 +448,10 @@ pub async fn degeneric_type(
             }
             let name = format!("{}<{}>", base.data.name, display_parenless(&bounds, ", "));
             // If this type has already been flattened with these args, return that.
-            if syntax.lock().unwrap().structures.types.contains_key(&name) {
+            if syntax.lock().structures.types.contains_key(&name) {
                 let data;
                 {
-                    let locked = syntax.lock().unwrap();
+                    let locked = syntax.lock();
                     // skipcq: RS-W1070 Initialization of a value can't use clone_from
                     data = locked.structures.types.get(&name).unwrap().clone();
                 }
@@ -490,7 +483,7 @@ pub async fn degeneric_type(
 
                 let data = Arc::new(data);
                 // Add the flattened type to the syntax
-                let mut locked = syntax.lock().unwrap();
+                let mut locked = syntax.lock();
                 locked.structures.add_data(arc_other, data.clone());
                 *types = FinalizedTypes::Struct(data.clone());
             }
@@ -626,14 +619,11 @@ pub async fn degeneric_header(
 
     let new_method = Arc::new(new_method);
 
-    //let mut code =
-    //    CodelessFinalizedFunction::clone(&new_method).add_code(FinalizedCodeBody::new(vec![], "empty".to_string(), true));
-
-    let mut locked = syntax.lock().unwrap();
+    let mut locked = syntax.lock();
     locked.functions.add_type(new_method.data.clone());
     locked.functions.add_data(new_method.data.clone(), new_method.clone());
+    locked.process_manager.handle().lock().finish_task(new_method.data.name());
 
-    // Give the compiler the empty body
     return Ok(());
 }
 
@@ -658,7 +648,7 @@ pub async fn degeneric_struct(
         degeneric_type(&mut field.field.field_type, generics, syntax).await;
     }
 
-    let mut locked = syntax.lock().unwrap();
+    let mut locked = syntax.lock();
     structure.data = Arc::new(data);
     let output = Arc::new(structure);
 

@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use data::tokens::Span;
 use indexmap::IndexMap;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use crate::check_function::{verify_function, verify_function_code};
 use crate::check_struct::verify_struct;
@@ -47,7 +47,7 @@ impl ProcessManager for TypesChecker {
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody) {
         return verify_function(function, syntax, self.include_refs).await.unwrap_or_else(|error| {
-            syntax.lock().unwrap().errors.push(error.clone());
+            syntax.lock().errors.push(error.clone());
             (
                 CodelessFinalizedFunction {
                     generics: IndexMap::default(),
@@ -69,7 +69,7 @@ impl ProcessManager for TypesChecker {
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedFunction {
         return verify_function_code(self, resolver, code, function, syntax).await.unwrap_or_else(|error| {
-            syntax.lock().unwrap().errors.push(error.clone());
+            syntax.lock().errors.push(error.clone());
             FinalizedFunction {
                 generics: IndexMap::default(),
                 fields: vec![],
@@ -97,7 +97,7 @@ impl ProcessManager for TypesChecker {
         match verify_struct(self, structure, &syntax, self.include_refs).await {
             Ok(output) => return output,
             Err(error) => {
-                syntax.lock().unwrap().errors.push(error.clone());
+                syntax.lock().errors.push(error.clone());
                 FinalizedStruct {
                     generics: IndexMap::default(),
                     fields: vec![],

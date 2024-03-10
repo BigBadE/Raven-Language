@@ -6,8 +6,8 @@ exclude = [
 members = [
     "language/*",
     "language/compilers/*",
-
     "tools/*",
     "tools/magpie/magpie-wrapper",
+    "tools/ide-plugins/raven-language-server"
 ]
 resolver = "2"

@@ -1,8 +1,8 @@
 #![feature(get_mut_unchecked, box_into_inner)]
 
+use parking_lot::Mutex;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use dashmap::DashMap;
 use inkwell::context::Context;

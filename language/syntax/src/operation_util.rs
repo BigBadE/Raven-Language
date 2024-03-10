@@ -1,10 +1,10 @@
 use crate::program::r#struct::StructData;
 use crate::program::syntax::Syntax;
 use crate::ParsingError;
+use parking_lot::Mutex;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 /// An asynchronous getter for operations given the operation.
@@ -22,7 +22,7 @@ impl Future for OperationGetter {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let locked = self.syntax.clone();
-        let mut locked = locked.lock().unwrap();
+        let mut locked = locked.lock();
 
         for operation in &self.operation {
             if let Some(output) = locked.operations.get(operation) {

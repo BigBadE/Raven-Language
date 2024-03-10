@@ -1,8 +1,8 @@
+use parking_lot::Mutex;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use chalk_ir::{AdtId, Binders, GenericArg, Substitution, TraitId, Ty, TyKind};
 use chalk_solve::rust_ir::{AdtDatum, AdtDatumBound, AdtFlags, AdtKind, TraitDatum, TraitDatumBound, TraitFlags};
@@ -281,8 +281,17 @@ impl TopElement for StructData {
         return is_modifier(self.modifiers, Modifier::Trait);
     }
 
-    fn default(&self) -> Arc<Self> {
-        return VOID.data.clone();
+    fn default(&self, id: u64) -> Arc<Self> {
+        return Arc::new(StructData {
+            modifiers: 0,
+            chalk_data: Self::get_chalk_data(id, 0),
+            id,
+            name: "empty".to_string(),
+            span: Default::default(),
+            attributes: vec![],
+            functions: vec![],
+            poisoned: vec![],
+        });
     }
 
     fn id(&self) -> Option<u64> {
@@ -313,12 +322,12 @@ impl TopElement for StructData {
         current.functions = Vec::default();
         let structure = Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);
         {
-            let mut locked = syntax.lock().unwrap();
+            let mut locked = syntax.lock();
             locked.structures.add_data(data.clone(), structure.clone());
         }
 
         for function in functions {
-            handle.lock().unwrap().spawn(
+            handle.lock().spawn(
                 function.data.name.clone(),
                 FunctionData::verify(
                     handle.clone(),
@@ -329,7 +338,7 @@ impl TopElement for StructData {
                 ),
             );
         }
-        handle.lock().unwrap().finish_task(&data.name);
+        handle.lock().finish_task(&data.name);
         return Ok(());
     }
 

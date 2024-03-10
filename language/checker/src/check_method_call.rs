@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 use data::tokens::Span;
 use syntax::async_util::AsyncDataGetter;

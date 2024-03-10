@@ -179,7 +179,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
             )));
         }
 
-        data.code_verifier.syntax.lock().unwrap().process_manager.handle().lock().unwrap().spawn(
+        data.code_verifier.syntax.lock().process_manager.handle().lock().spawn(
             target.name.clone(),
             degeneric_header(
                 target.clone(),

@@ -1,10 +1,10 @@
 use crate::chalk_interner::ChalkIr;
 use crate::program::r#struct::ChalkData;
 use crate::program::syntax::Syntax;
-use chalk_ir::{AdtId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
+use chalk_ir::{AdtId, CoroutineId, FnDefId, ImplId, ProgramClause, ProgramClauses, UnificationDatabase, Variances};
 use chalk_solve::rust_ir::{
-    AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum, AssociatedTyValue, AssociatedTyValueId, ClosureKind, FnDefDatum,
-    FnDefInputsAndOutputDatum, GeneratorDatum, GeneratorWitnessDatum, ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait,
+    AdtDatum, AdtRepr, AdtSizeAlign, AssociatedTyDatum, AssociatedTyValue, AssociatedTyValueId, ClosureKind, CoroutineDatum,
+    CoroutineWitnessDatum, FnDefDatum, FnDefInputsAndOutputDatum, ImplDatum, OpaqueTyDatum, TraitDatum, WellKnownTrait,
 };
 use chalk_solve::RustIrDatabase;
 use std::fmt::{Debug, Formatter};
@@ -30,7 +30,9 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     /// Gets the trait given the ID.
     fn trait_datum(&self, trait_id: chalk_ir::TraitId<ChalkIr>) -> Arc<TraitDatum<ChalkIr>> {
         let found = self.structures.sorted.get(trait_id.0 as usize).unwrap();
-        assert_eq!(found.id as u32, trait_id.0);
+        if found.name.is_empty() {
+            panic!("Got an empty structure!");
+        }
         if let ChalkData::Trait(_, _, inner) = found.chalk_data.clone() {
             return Arc::new(inner);
         }
@@ -40,15 +42,17 @@ impl RustIrDatabase<ChalkIr> for Syntax {
     /// Gets the program given the ID.
     fn adt_datum(&self, adt_id: AdtId<ChalkIr>) -> Arc<AdtDatum<ChalkIr>> {
         let found = self.structures.sorted.get(adt_id.0 as usize).unwrap();
-        assert_eq!(found.id as u32, adt_id.0);
+        if found.name.is_empty() {
+            panic!("Got an empty structure!");
+        }
         return Arc::new(found.chalk_data.get_adt().clone());
     }
 
-    fn generator_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorDatum<ChalkIr>> {
+    fn coroutine_datum(&self, _coroutine_id: CoroutineId<ChalkIr>) -> Arc<CoroutineDatum<ChalkIr>> {
         unreachable!()
     }
 
-    fn generator_witness_datum(&self, _generator_id: chalk_ir::GeneratorId<ChalkIr>) -> Arc<GeneratorWitnessDatum<ChalkIr>> {
+    fn coroutine_witness_datum(&self, _coroutine_id: CoroutineId<ChalkIr>) -> Arc<CoroutineWitnessDatum<ChalkIr>> {
         unreachable!()
     }
 
