@@ -1,86 +1,64 @@
-use crate::FileWrapper;
-use data::{Readable, SourceSet};
-use include_dir::File;
-use std::path;
-
 #[cfg(test)]
 mod test {
     use crate::build;
-    use crate::test::InnerFileSourceSet;
+    use parser::FileSourceSet;
     use data::{Arguments, CompilerArguments, RunnerSettings};
-    use include_dir::{include_dir, Dir, DirEntry};
-    use std::{env, path};
+    use std::{env, path, fs};
+    use std::path::PathBuf;
 
     /// Tests directory
-    static TESTS: Dir = include_dir!("lib/test/test");
+    //static TESTS: str = "../lib/test/test:";
 
     /// Main test
     #[test]
     pub fn test_magpie() {
-        test_recursive(&TESTS);
+        let test_folder: PathBuf = ["..", "..", "lib", "test", "test"].iter().collect();
+        test_recursive(test_folder);
     }
 
     /// Recursively searches for files in the test folder to run as a test
-    fn test_recursive(dir: &'static Dir<'_>) {
-        for entry in dir.entries() {
-            match entry {
-                DirEntry::File(file) => {
-                    let path = file.path().to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
-                    if !path.ends_with(".rv") {
-                        println!("File {} doesn't have the right file extension!", path);
-                        continue;
-                    }
-                    println!("Running {}", path);
-                    let path = format!("{}::test", &path[0..path.len() - 3]);
-                    let mut arguments = Arguments::build_args(
-                        false,
-                        RunnerSettings {
-                            sources: vec![],
-                            compiler_arguments: CompilerArguments {
-                                compiler: "llvm".to_string(),
-                                target: path.clone(),
-                                temp_folder: env::current_dir().unwrap().join("target"),
-                            },
-                        },
-                    );
+    fn test_recursive(path: PathBuf) {
+        for entry in fs::read_dir(path).unwrap() {
 
-                    match build::<bool>(&mut arguments, vec![Box::new(InnerFileSourceSet { set: file })]) {
-                        Ok(inner) => match inner {
-                            Some(found) => {
-                                if !found {
-                                    assert!(false, "Failed test {}!", path)
-                                }
-                            }
-                            None => assert!(false, "Failed to find method test in test {}", path),
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_file() { // supposedly, this is a test file
+                let mod_path = path.to_str().unwrap().replace(path::MAIN_SEPARATOR, "::");
+                if !mod_path.ends_with(".rv") {
+                    println!("File {} doesn't have the right file extension!", mod_path);
+                    continue;
+                }
+                let mod_path = format!("{}::test", &mod_path[path.parent().unwrap().to_str().unwrap().len()+6..mod_path.len() - 3]);
+                println!("Running {}", mod_path);
+                let mut arguments = Arguments::build_args(
+                    false,
+                    RunnerSettings {
+                        sources: vec![],
+                        compiler_arguments: CompilerArguments {
+                            compiler: "llvm".to_string(),
+                            target: mod_path.clone(),
+                            temp_folder: env::current_dir().unwrap().join("target"),
                         },
-                        Err(()) => assert!(false, "Failed to compile test {}!", path),
-                    }
+                    },
+                );
+
+                match build::<bool>(&mut arguments, vec![Box::new(FileSourceSet { root: path })]) {
+                    Ok(inner) => match inner {
+                        Some(found) => {
+                            if !found {
+                                assert!(false, "Failed test {}!", mod_path)
+                            }
+                        }
+                        None => assert!(false, "Failed to find method test in test {}", mod_path),
+                    },
+                    Err(()) => assert!(false, "Failed to compile test {}!", mod_path),
                 }
-                DirEntry::Dir(dir) => {
-                    test_recursive(dir);
-                }
+            } else if path.is_dir() { // supposedly, this is a sub-directory in the test folder
+                test_recursive(path);
+            } else {
+                println!("Unknown element in test folder!");
+                continue;
             }
         }
-    }
-}
-
-/// A source set of an internal file
-#[derive(Clone, Debug)]
-pub struct InnerFileSourceSet {
-    set: &'static File<'static>,
-}
-
-impl SourceSet for InnerFileSourceSet {
-    fn get_files(&self) -> Vec<Box<dyn Readable>> {
-        return vec![Box::new(FileWrapper { file: self.set })];
-    }
-
-    fn relative(&self, other: &dyn Readable) -> String {
-        let name = other.path().replace(path::MAIN_SEPARATOR, "::").replace('/', "::");
-        return name[0..name.len() - 3].to_string();
-    }
-
-    fn cloned(&self) -> Box<dyn SourceSet> {
-        return Box::new(self.clone());
     }
 }
