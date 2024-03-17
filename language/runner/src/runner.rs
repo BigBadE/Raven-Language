@@ -16,24 +16,15 @@ use syntax::program::syntax::Syntax;
 
 use crate::{get_compiler, JoinWaiter};
 
-/// Runs Raven to completion with the given arguments
-pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, Vec<ParsingError>> {
+pub fn create_syntax(settings: &Arguments) -> Arc<Mutex<Syntax>> {
     let handle = Arc::new(Mutex::new(HandleWrapper::new(settings.cpu_runtime.handle().clone())));
     let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
     syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
+    return Arc::new(Mutex::new(syntax));
+}
 
-    let syntax = Arc::new(Mutex::new(syntax));
-
-    let (sender, mut receiver) = mpsc::channel(1);
-    let (go_sender, go_receiver) = mpsc::channel(1);
-
-    // Starts the compiler in anticipation of parsing
-    settings.cpu_runtime.spawn(start(
-        settings.runner_settings.compiler_arguments.clone(),
-        sender,
-        go_receiver,
-        syntax.clone(),
-    ));
+pub async fn build(syntax: Arc<Mutex<Syntax>>, settings: &Arguments) -> Result<(), Vec<ParsingError>> {
+    let handle = syntax.lock().process_manager.handle().clone();
 
     let mut handles = Vec::default();
     // Parses source, getting handles and building into the unresolved syntax.
@@ -92,12 +83,29 @@ pub async fn run<T: Send + 'static>(settings: &Arguments) -> Result<Option<T>, V
     }
 
     errors.append(&mut syntax.lock().errors);
-    return if errors.is_empty() {
-        go_sender.send(()).await.unwrap();
-        Ok(receiver.recv().await.unwrap())
-    } else {
-        Err(errors)
-    };
+    return if errors.is_empty() { Ok(()) } else { Err(errors) };
+}
+
+/// Runs Raven to completion with the given arguments
+pub async fn run<T: Send + 'static>(
+    syntax: Arc<Mutex<Syntax>>,
+    settings: &Arguments,
+) -> Result<Option<T>, Vec<ParsingError>> {
+    let (sender, mut receiver) = mpsc::channel(1);
+    let (go_sender, go_receiver) = mpsc::channel(1);
+
+    // Starts the compiler in anticipation of parsing
+    settings.cpu_runtime.spawn(start(
+        settings.runner_settings.compiler_arguments.clone(),
+        sender,
+        go_receiver,
+        syntax.clone(),
+    ));
+
+    build(syntax.clone(), settings).await?;
+
+    go_sender.send(()).await.unwrap();
+    return Ok(receiver.recv().await.unwrap());
 }
 
 /// Runs the compiler, waiting for the receiver before running the main function then sending the result on the sender.

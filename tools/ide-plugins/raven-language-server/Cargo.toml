@@ -7,11 +7,13 @@ edition = "2021"
 syntax = { path = "../../../language/syntax" }
 data = { path = "../../../language/data" }
 parser = { path = "../../../language/parser" }
+magpie-lib = { path = "../../magpie/magpie-lib" }
 
 lsp-server = "0.7.6"
 lsp-types = { version = "0.95.0", features = ["proposed"] }
 
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "sync", "time"] }
+parking_lot = "0.12.1"
 
 crossbeam-channel = "0.5.9"
 

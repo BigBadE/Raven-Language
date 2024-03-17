@@ -1,20 +1,25 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::Arc;
 
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId};
 use lsp_types::notification::{DidChangeTextDocument, DidOpenTextDocument};
-use lsp_types::request::SemanticTokensFullRequest;
+use lsp_types::request::{GotoDeclaration, SemanticTokensFullRequest};
 use lsp_types::{
-    InitializeParams, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    DeclarationCapability, InitializeParams, SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
 };
+use parking_lot::Mutex;
+use syntax::program::syntax::Syntax;
 use tokio::runtime::Builder;
 
 use crate::semantic_tokens::parse_semantic_tokens;
+use crate::syntax_manager::SyntaxManager;
 
 /// This file is templated from Rust's LSP example.
 mod semantic_tokens;
+mod syntax_manager;
 
 /// The main function, which sets up the server and starts the main loop
 pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
@@ -24,6 +29,7 @@ pub fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
+        declaration_provider: Some(DeclarationCapability::Simple(true)),
         // Semantic tokens provider gives the coloring of tokens
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
             work_done_progress_options: WorkDoneProgressOptions::default(),
@@ -85,6 +91,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
     let pool = Builder::new_multi_thread().build().unwrap();
     let mut documents: HashMap<Url, String> = HashMap::new();
     let params: InitializeParams = serde_json::from_value(params).unwrap();
+    let syntax = SyntaxManager::default();
 
     // If augments_syntax_tokens is true, the IDE screws up handling semantic tokens
     if params.capabilities.text_document.clone().unwrap().semantic_tokens.unwrap().augments_syntax_tokens.unwrap() {
@@ -99,13 +106,20 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                 }
 
                 // Parse semantic tokens on another thread
-                match cast::<SemanticTokensFullRequest>(req) {
+                let req = match cast::<SemanticTokensFullRequest>(req) {
                     Ok((id, params)) => {
                         pool.spawn(parse_semantic_tokens(
                             id,
                             documents[&params.text_document.uri].clone(),
                             connection.sender.clone(),
                         ));
+                        continue;
+                    }
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
+                    Err(ExtractError::MethodMismatch(req)) => req,
+                };
+                match cast::<GotoDeclaration>(req) {
+                    Ok((id, params)) => {
                         continue;
                     }
                     Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),

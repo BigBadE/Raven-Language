@@ -1,13 +1,10 @@
 #[cfg(test)]
 mod test {
-    use crate::build;
-    use parser::FileSourceSet;
     use data::{Arguments, CompilerArguments, RunnerSettings};
-    use std::{env, path, fs};
+    use magpie_lib::build_project;
+    use parser::FileSourceSet;
     use std::path::PathBuf;
-
-    /// Tests directory
-    //static TESTS: str = "../lib/test/test:";
+    use std::{env, fs, path};
 
     /// Main test
     #[test]
@@ -43,8 +40,8 @@ mod test {
                     },
                 );
 
-                match build::<bool>(&mut arguments, vec![Box::new(FileSourceSet { root: path })]) {
-                    Ok(inner) => match inner {
+                match build_project::<bool>(&mut arguments, vec![Box::new(FileSourceSet { root: path })], true) {
+                    Ok((_, inner)) => match inner {
                         Some(found) => {
                             if !found {
                                 assert!(false, "Failed test {}!", mod_path)

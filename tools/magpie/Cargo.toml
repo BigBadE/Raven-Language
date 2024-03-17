@@ -11,14 +11,9 @@ name = "benchmark"
 harness = false
 
 [dependencies]
-syntax = { path = "../../language/syntax" }
-runner = { path = "../../language/runner" }
 data = { path = "../../language/data" }
 parser = { path = "../../language/parser" }
-
-magpie-derive = { path = "../magpie-derive" }
-
-async-recursion = { path = "../../crates/async-recursion" }
+magpie-lib = { path = "magpie-lib" }
 
 include_dir = "0.7.3"
 
