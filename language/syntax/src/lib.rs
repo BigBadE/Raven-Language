@@ -53,7 +53,7 @@ use data::tokens::Span;
 
 /// An alias for parsing types, which must be pinned and boxed because Rust generates different impl Futures
 /// for different functions, so they must be box'd into one type to be passed correctly to ParsingTypes.
-pub type ParsingFuture<T> = Pin<Box<dyn Future<Output = Result<T, ParsingError>> + Send + Sync>>;
+pub type ParsingFuture<T> = Pin<Box<dyn Future<Output = Result<T, ParsingError>> + Send>>;
 
 /// All the modifiers, used for modifier parsing and debug output.
 pub static MODIFIERS: [Modifier; 4] = [Modifier::Public, Modifier::Protected, Modifier::Extern, Modifier::Internal];
