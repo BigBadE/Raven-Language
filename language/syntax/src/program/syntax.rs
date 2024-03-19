@@ -411,7 +411,7 @@ impl Syntax {
     }
 
     /// Asynchronously gets a struct, or returns the error if that struct isn't found.
-    #[async_recursion]
+    #[async_recursion(Sync)]
     pub async fn get_struct(
         syntax: Arc<Mutex<Syntax>>,
         error: Span,
@@ -458,7 +458,7 @@ impl Syntax {
 
     /// Parses generic bounds on a type, returning the length parsed and the types found.
     /// TODO should probably be mostly moved to the tokenizer
-    #[async_recursion]
+    #[async_recursion(Sync)]
     async fn parse_bounds(
         input: &[u8],
         syntax: &Arc<Mutex<Syntax>>,
@@ -522,7 +522,7 @@ impl Syntax {
     }
 
     /// Parses an UnparsedType into a Types
-    #[async_recursion]
+    #[async_recursion(Sync)]
     pub async fn parse_type(
         syntax: Arc<Mutex<Syntax>>,
         error: Span,

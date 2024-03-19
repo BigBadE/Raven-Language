@@ -18,5 +18,5 @@ chalk-recursive = "0.96.0"
 dashmap = "5.5.3"
 
 tokio = { version = "1.36.0", features = ["rt", "sync", "time"] }
-async-recursion = { version = "1.0.5", path = "../../crates/async-recursion" }
+async-recursion = "1.1.0"
 parking_lot = "0.12.1"

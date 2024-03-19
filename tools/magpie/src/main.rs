@@ -1,4 +1,4 @@
-use std::{env, path};
+use std::env;
 
 use data::{Arguments, CompilerArguments, RunnerSettings};
 use magpie_lib::project::RavenProject;
@@ -38,9 +38,10 @@ fn main() {
     println!("Setting up build...");
     let project = match build_project::<RavenProject>(
         &mut arguments,
-        vec![Box::new(FileSourceSet { root: build_path }), Box::new(InnerSourceSet { set: &MAGPIE })],
+        &mut vec![Box::new(FileSourceSet { root: build_path }), Box::new(InnerSourceSet { set: &MAGPIE })],
+        true,
     ) {
-        Ok(found) => match found {
+        Ok((_, found)) => match found {
             Some(found) => RavenProject::from(found),
             None => {
                 println!("No project method in build file!");
@@ -59,7 +60,7 @@ fn main() {
     }
 
     println!("Building and running {}...", project.name);
-    match build_project::<()>(&mut arguments, vec![Box::new(FileSourceSet { root: source })]) {
+    match build_project::<()>(&mut arguments, &mut vec![Box::new(FileSourceSet { root: source })], true) {
         _ => {}
     }
 }

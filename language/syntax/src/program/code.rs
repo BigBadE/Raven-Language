@@ -316,7 +316,7 @@ impl FinalizedEffectType {
     }
 
     /* TODO verify that this all is moved to the new function in degeneric
-    #[async_recursion]
+    #[async_recursion(Sync)]
     pub async fn degeneric(
         &mut self,
         process_manager: &dyn ProcessManager,

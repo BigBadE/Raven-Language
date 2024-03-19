@@ -22,7 +22,7 @@ use syntax::{ProcessManager, SimpleVariableManager, TopElement};
 use crate::get_return;
 
 /// Flattens a type, which is the final step before compilation that gets rid of all generics in the type
-#[async_recursion]
+#[async_recursion(Sync)]
 // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub async fn degeneric_effect(
     effect: &mut FinalizedEffectType,
@@ -421,7 +421,7 @@ pub async fn degeneric_code_body(
 }
 
 /// Degenerics the type by replacing all generics with their solidified value.
-#[async_recursion]
+#[async_recursion(Sync)]
 pub async fn degeneric_type(
     types: &mut FinalizedTypes,
     generics: &HashMap<String, FinalizedTypes>,
@@ -502,7 +502,7 @@ pub async fn degeneric_type(
 
 /// Degenerics the type by replacing all generics with their solidified value.
 /// Ignores generic types
-#[async_recursion]
+#[async_recursion(Sync)]
 pub async fn degeneric_type_no_generic_types(
     types: &mut FinalizedTypes,
     generics: &HashMap<String, FinalizedTypes>,
@@ -534,7 +534,7 @@ pub async fn degeneric_type_no_generic_types(
 }
 
 /// Degenerics the type's fields
-#[async_recursion]
+#[async_recursion(Sync)]
 pub async fn degeneric_type_fields(
     types: &mut FinalizedTypes,
     generics: &HashMap<String, FinalizedTypes>,

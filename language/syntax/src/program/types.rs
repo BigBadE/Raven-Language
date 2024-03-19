@@ -67,7 +67,7 @@ impl Types {
     }
 
     /// Finalized the type by waiting for the FinalizedStruct to be avalible.
-    #[async_recursion]
+    #[async_recursion(Sync)]
     pub async fn finalize(&self, syntax: Arc<Mutex<Syntax>>) -> FinalizedTypes {
         return match self {
             Types::Struct(structs) => FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
@@ -414,7 +414,7 @@ impl FinalizedTypes {
 
     /// Compares one type against another type to try and solidify any generic types.
     /// Errors if the other type isn't of this type.
-    #[async_recursion]
+    #[async_recursion(Sync)]
     pub async fn resolve_generic(
         &self,
         other: &FinalizedTypes,

@@ -11,7 +11,7 @@ parser = { path = "../../../language/parser" }
 
 magpie-derive = { path = "../../magpie-derive" }
 
-async-recursion = { path = "../../../crates/async-recursion" }
+async-recursion = "1.1.0"
 
 include_dir = "0.7.3"
 

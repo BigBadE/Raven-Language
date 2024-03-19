@@ -16,4 +16,4 @@ parking_lot = "0.12.1"
 # Utility / Code Cleanliness
 anyhow = "1.0.80"
 async-trait = { path = "../../crates/async-trait" }
-async-recursion = { path = "../../crates/async-recursion" }
+async-recursion = "1.1.0"

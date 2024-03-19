@@ -63,7 +63,7 @@ pub struct CodeVerifier<'a> {
 
 /// Gets the return type of the effect, requiring a variable manager to get
 /// any variables from, or None if the effect has no return type.
-#[async_recursion]
+#[async_recursion(Sync)]
 pub async fn get_return(
     types: &FinalizedEffectType,
     variables: &SimpleVariableManager,

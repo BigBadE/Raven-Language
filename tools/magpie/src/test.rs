@@ -40,7 +40,7 @@ mod test {
                     },
                 );
 
-                match build_project::<bool>(&mut arguments, vec![Box::new(FileSourceSet { root: path })], true) {
+                match build_project::<bool>(&mut arguments, &mut vec![Box::new(FileSourceSet { root: path })], true) {
                     Ok((_, inner)) => match inner {
                         Some(found) => {
                             if !found {
