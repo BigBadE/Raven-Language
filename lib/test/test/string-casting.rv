@@ -1,7 +1,0 @@
-import stdio;
-import numbers::Cast;
-
-fn test() -> bool {
-    printf(12.cast<str>());
-    return true;
-}
