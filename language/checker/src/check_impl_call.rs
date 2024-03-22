@@ -60,7 +60,6 @@ pub async fn check_impl_call(
     .await
     {
         let trait_type = trait_type.finalize(code_verifier.syntax.clone()).await;
-
         // Simple container for all the data that needs to be stored
         let mut impl_checker = ImplCheckerData {
             code_verifier,
@@ -79,20 +78,22 @@ pub async fn check_impl_call(
 
         // If not, wait for an impl to be parsed that fits the criteria
         let mut output = None;
-        while output.is_none() {
+        while output.is_none() && !impl_checker.code_verifier.syntax.lock().finished_impls() {
             // TODO switch this to some kind of pipeline instead of rechecking them all every single time
             output = try_get_impl(&impl_checker, &effect.span).await?;
         }
 
         // Failed to find an impl
-        verify_effect(code_verifier, variables, *calling).await?.types;
         if output.is_none() {
-            panic!("Failed for {} and {}", calling_type, trait_type);
+            output = try_get_impl(&impl_checker, &effect.span).await?;
+            if output.is_none() {
+                return Err(calling.span.make_error(ParsingMessage::NoTraitImpl(trait_type, calling_type)));
+            }
         }
+
         return Ok(output.unwrap());
-    } else {
-        panic!("Screwed up trait! {} for {:?}", traits, code_verifier.resolver.imports());
     }
+    panic!("Screwed up trait! {} for {:?}", traits, code_verifier.resolver.imports());
 }
 
 /// All the data used by implementation checkers
