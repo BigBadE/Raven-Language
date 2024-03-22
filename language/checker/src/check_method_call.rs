@@ -223,6 +223,19 @@ pub async fn check_method(
 ) -> Result<FinalizedEffects, ParsingError> {
     check_args(&method, &mut effects, syntax, variables, span).await?;
 
+    if let Some((generic_returning, span)) = generic_returning.as_ref() {
+        match method.return_type.as_ref() {
+            Some(method_return) => {
+                if !method_return.of_type(generic_returning, syntax.clone()).await {
+                    return Err(
+                        span.make_error(ParsingMessage::MismatchedTypes(generic_returning.clone(), method_return.clone()))
+                    );
+                }
+            }
+            None => return Err(span.make_error(ParsingMessage::UnexpectedVoid())),
+        }
+    }
+
     return Ok(match method.return_type.as_ref() {
         Some(returning) => FinalizedEffects::new(
             span.clone(),
