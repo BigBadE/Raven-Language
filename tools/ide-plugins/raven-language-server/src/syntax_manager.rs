@@ -22,21 +22,17 @@ impl SyntaxManager {
     }
 
     pub fn update_syntax(&self, file: PathBuf) -> &Arc<Mutex<Syntax>> {
-        let mut directory = Self::get_project(file);
+        let mut directory = Self::get_project(&file);
         let mut project = true;
         if directory.is_none() {
-            directory = Some(&*env::temp_dir().join(format!("{}_temp", file.file_name().unwrap().to_str().unwrap())));
+            directory = Some(file);
             project = false;
         }
         let mut arguments = Arguments::build_args(
             false,
             RunnerSettings {
                 sources: vec![],
-                compiler_arguments: CompilerArguments {
-                    target: "unused".to_string(),
-                    compiler: "llvm".to_string(),
-                    temp_folder: directory.unwrap().join("target"),
-                },
+                compiler_arguments: CompilerArguments { compiler: "llvm".to_string(), ..Default::default() },
             },
         );
 
@@ -44,7 +40,7 @@ impl SyntaxManager {
         setup_arguments(&mut arguments, &mut sources);
     }
 
-    fn get_project<'a>(file: PathBuf) -> Option<&'a Path> {
+    fn get_project(file: &PathBuf) -> Option<PathBuf> {
         let mut directory = file.parent();
         while let Some(dir) = directory {
             if dir.join("build.rv").exists() {
@@ -52,6 +48,6 @@ impl SyntaxManager {
             }
             directory = dir.parent();
         }
-        return directory;
+        return directory.map(|inner| inner.to_path_buf());
     }
 }

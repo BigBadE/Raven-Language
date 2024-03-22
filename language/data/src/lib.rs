@@ -24,7 +24,7 @@ pub struct RunnerSettings {
 }
 
 /// Arguments used when configuring the compiler
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CompilerArguments {
     /// Which compiler to use, defaults to LLVM
     pub compiler: String,
