@@ -87,7 +87,7 @@ pub async fn check_impl_call(
         if output.is_none() {
             output = try_get_impl(&impl_checker, &effect.span).await?;
             if output.is_none() {
-                return Err(calling.span.make_error(ParsingMessage::NoTraitImpl(trait_type, calling_type)));
+                return Err(calling.span.make_error(ParsingMessage::NoTraitImpl(calling_type, trait_type)));
             }
         }
 
