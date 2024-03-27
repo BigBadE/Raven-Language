@@ -27,6 +27,12 @@ trait LessThan<T> {
     fn less_than(self, other: T) -> bool;
 }
 
+// TODO: Uncomment after number-casting is implemented
+//#[priority(-10)]
+//trait Order<T> {
+//    fn order(self, other: T) -> i8;
+//}
+
 #[priority(-10)]
 #[operation({}<={})]
 trait LessOrEqual<T> {
@@ -370,6 +376,19 @@ pub internal impl<T: Number, E: Number> LessThan<E> for T {
 
     }
 }
+
+// TODO: Uncomment after number-casting is implemented
+//pub impl<T: Number, E: Number> Order<E> for T {
+//    fn order(self, other: E) -> i8 {
+//        if (self.greater_than(other)) {
+//            return 1;
+//        } else if (self.equal(other)) {
+//            return 0;
+//        } else {
+//            return -1;
+//        }
+//    }
+//}
 
 pub impl<T: GreaterThan<Number>, E: Number> LessOrEqual<E> for T {
     fn less_or_equal(self, other: E) -> bool {
