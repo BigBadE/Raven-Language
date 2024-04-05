@@ -1,11 +1,12 @@
-use data::{Arguments, CompilerArguments, RunnerSettings};
-use magpie_lib::setup_arguments;
-use parking_lot::Mutex;
-use parser::FileSourceSet;
 use std::collections::HashMap;
-use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
+
+use data::{Arguments, CompilerArguments, RunnerSettings, SourceSet};
+use magpie_lib::build_project;
+use parser::FileSourceSet;
 use syntax::program::syntax::Syntax;
 
 #[derive(Default)]
@@ -14,20 +15,16 @@ pub struct SyntaxManager {
 }
 
 impl SyntaxManager {
-    pub fn get_syntax<'a>(&self, file: PathBuf) -> &Arc<Mutex<Syntax>> {
+    pub fn get_syntax(&mut self, file: PathBuf) -> Arc<Mutex<Syntax>> {
         if let Some(found) = self.parents.get(&file) {
-            return found;
+            return found.clone();
         }
         return self.update_syntax(file);
     }
 
-    pub fn update_syntax(&self, file: PathBuf) -> &Arc<Mutex<Syntax>> {
+    pub fn update_syntax(&mut self, file: PathBuf) -> Arc<Mutex<Syntax>> {
         let mut directory = Self::get_project(&file);
-        let mut project = true;
-        if directory.is_none() {
-            directory = Some(file);
-            project = false;
-        }
+
         let mut arguments = Arguments::build_args(
             false,
             RunnerSettings {
@@ -36,11 +33,11 @@ impl SyntaxManager {
             },
         );
 
-        let mut sources = vec![Box::new(FileSourceSet { root: directory.unwrap().to_path_buf() })];
-        setup_arguments(&mut arguments, &mut sources);
+        self.parents.insert(file.clone(), build_project::<()>(&mut arguments, &mut directory, false).unwrap().0);
+        return self.parents.get(&file).unwrap().clone();
     }
 
-    fn get_project(file: &PathBuf) -> Option<PathBuf> {
+    fn get_project(file: &PathBuf) -> Vec<Box<dyn SourceSet>> {
         let mut directory = file.parent();
         while let Some(dir) = directory {
             if dir.join("build.rv").exists() {
@@ -48,6 +45,6 @@ impl SyntaxManager {
             }
             directory = dir.parent();
         }
-        return directory.map(|inner| inner.to_path_buf());
+        return vec![Box::new(FileSourceSet { root: directory.map(|inner| inner.to_path_buf()).unwrap_or(file.clone()) })];
     }
 }
