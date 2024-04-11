@@ -7,20 +7,9 @@ use parser::tokens::tokenizer::Tokenizer;
 
 /// Parses the semantic tokens from the file and sends it to the IDE
 pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<Message>) {
-    // Gets the tokens
-    let mut tokenizer = Tokenizer::new(file.as_bytes());
-    let mut tokens = Vec::new();
-    loop {
-        tokens.push(tokenizer.next());
-        if tokens.last().unwrap().token_type == TokenTypes::EOF {
-            break;
-        }
-    }
-
     // Converts the tokens into semantic tokens
     let mut last: Option<Token> = None;
-    let data = tokens
-        .into_iter()
+    let data = TokenIterator::new(file.as_bytes())
         .map(|mut token| {
             // Multi-line tokens aren't supported, set the end to the start
             if token.start.0 != token.end.0 {
@@ -52,6 +41,32 @@ pub async fn parse_semantic_tokens(id: RequestId, file: String, sender: Sender<M
     let result = serde_json::to_value(&result).unwrap();
     let resp = Response { id, result: Some(result), error: None };
     sender.send(Message::Response(resp)).unwrap();
+}
+
+pub struct TokenIterator<'a> {
+    tokenizer: Tokenizer<'a>,
+    ended: bool,
+}
+
+impl<'a> TokenIterator<'a> {
+    pub fn new(file: &'a [u8]) -> Self {
+        return TokenIterator { tokenizer: Tokenizer::new(file), ended: false };
+    }
+}
+
+impl Iterator for TokenIterator<'_> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ended {
+            return None;
+        }
+        let token = self.tokenizer.next();
+        if token.token_type == TokenTypes::EOF {
+            self.ended = true;
+        }
+        return Some(token);
+    }
 }
 
 /// Gets the token's type from the last token and the current token

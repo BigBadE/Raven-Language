@@ -29,8 +29,8 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "cd client && npm install && cd .. && npm run compile",
-		"compile": "tsc -b && cd .. && cargo build --bin raven-language-server && mv ../../target/debug/raven-language-server.exe raven-vscode-plugin/server/raven-language-server.exe",
-		"watch": "tsc -b -w && cd .. && cargo build --bin raven-language-server && mv ../../target/debug/raven-language-server.exe raven-vscode-plugin/server/raven-language-server.exe",
+		"compile": "tsc -b && cd .. && cargo build --bin raven-language-server && rm -f raven-vscode-plugin/server/raven-language-server.exe && cp ../../target/debug/raven-language-server.exe raven-vscode-plugin/server/raven-language-server.exe",
+		"watch": "tsc -b -w && cd .. && cargo build --bin raven-language-server && rm -f raven-vscode-plugin/server/raven-language-server.exe && cp ../../target/debug/raven-language-server.exe raven-vscode-plugin/server/raven-language-server.exe",
 		"lint": "eslint ./client/src --ext .ts,.tsx",
 		"postinstall": "cd client && npm install"
 	},

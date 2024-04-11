@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
+use std::fs;
 
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId};
 use lsp_types::notification::{DidChangeTextDocument, DidOpenTextDocument};
@@ -10,11 +10,9 @@ use lsp_types::{
     SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
 };
-use parking_lot::Mutex;
-use syntax::program::syntax::Syntax;
 use tokio::runtime::Builder;
 
-use crate::semantic_tokens::parse_semantic_tokens;
+use crate::semantic_tokens::{parse_semantic_tokens, TokenIterator};
 use crate::syntax_manager::SyntaxManager;
 
 /// This file is templated from Rust's LSP example.
@@ -91,7 +89,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
     let pool = Builder::new_multi_thread().build().unwrap();
     let mut documents: HashMap<Url, String> = HashMap::new();
     let params: InitializeParams = serde_json::from_value(params).unwrap();
-    let syntax = SyntaxManager::default();
+    let mut syntax = SyntaxManager::default();
 
     // If augments_syntax_tokens is true, the IDE screws up handling semantic tokens
     if params.capabilities.text_document.clone().unwrap().semantic_tokens.unwrap().augments_syntax_tokens.unwrap() {
@@ -120,6 +118,32 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                 };
                 match cast::<GotoDeclaration>(req) {
                     Ok((id, params)) => {
+                        syntax.get_syntax(params.text_document_position_params.text_document.uri.to_file_path().unwrap());
+                        let mut position = params.text_document_position_params.position;
+                        position.line += 1;
+                        let token = TokenIterator::new(
+                            fs::read(params.text_document_position_params.text_document.uri.to_file_path().unwrap())
+                                .unwrap()
+                                .as_slice(),
+                        )
+                        .find(|token| {
+                            token.start.0 <= position.line
+                                && token.end.0 >= position.line
+                                && token.start.1 <= position.character
+                                && token.end.1 >= position.character
+                        });
+                        if token.is_none() {
+                            panic!("Failed to find token, server file view must be incorrect. Crashing to re-sync.");
+                        }
+                        let token = token.unwrap();
+                        panic!(
+                            "Found token {}",
+                            token.to_string(
+                                fs::read(params.text_document_position_params.text_document.uri.to_file_path().unwrap())
+                                    .unwrap()
+                                    .as_slice()
+                            )
+                        );
                         continue;
                     }
                     Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
@@ -131,6 +155,9 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                 // Syncing is done on the main thread
                 let not = match cast_not::<DidOpenTextDocument>(not) {
                     Ok(params) => {
+                        if params.text_document.text.contains("ending") {
+                            panic!("Ending");
+                        }
                         documents.insert(params.text_document.uri, params.text_document.text);
                         continue;
                     }
@@ -139,6 +166,9 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                 };
                 let _not = match cast_not::<DidChangeTextDocument>(not) {
                     Ok(params) => {
+                        if params.content_changes[0].text.contains("ending") {
+                            panic!("Ending");
+                        }
                         // Assume it's only one thing being changed across the whole document
                         documents.insert(params.text_document.uri, params.content_changes[0].text.clone());
                         continue;

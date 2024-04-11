@@ -3,7 +3,6 @@ fn test() -> bool {
         return true;
     }
     return false;
- 
  }
 
 fn test_greater() -> bool {
