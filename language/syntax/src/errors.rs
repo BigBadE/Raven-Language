@@ -136,7 +136,7 @@ impl ParsingError {
         }
 
         if file.is_none() {
-            println!("Missing file: {}", self.message);
+            eprintln!("Missing file: {}", self.message);
             return;
         }
         let file = file.unwrap();
@@ -160,11 +160,11 @@ impl ParsingError {
         }
 
         let line = contents.lines().nth((token.start.0 as usize).max(1) - 1).unwrap_or("???");
-        println!("{}", self.message.to_string().bright_red());
-        println!("{}", format!("in file {}:{}:{}", file.path(), token.start.0, token.start.1).bright_red());
-        println!("{} {}", " ".repeat(token.start.0.to_string().len()), "|".bright_cyan());
-        println!("{} {} {}", token.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
-        println!(
+        eprintln!("{}", self.message.to_string().bright_red());
+        eprintln!("{}", format!("in file {}:{}:{}", file.path(), token.start.0, token.start.1).bright_red());
+        eprintln!("{} {}", " ".repeat(token.start.0.to_string().len()), "|".bright_cyan());
+        eprintln!("{} {} {}", token.start.0.to_string().bright_cyan(), "|".bright_cyan(), line.bright_red());
+        eprintln!(
             "{} {} {}{}",
             " ".repeat(token.start.0.to_string().len()),
             "|".bright_cyan(),

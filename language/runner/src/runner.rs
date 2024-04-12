@@ -56,7 +56,7 @@ pub async fn build(syntax: Arc<Mutex<Syntax>>, settings: &Arguments) -> Result<(
 
     if !errors.is_empty() {
         for error in errors {
-            println!("Error: {}", error);
+            eprintln!("Error: {}", error);
         }
         panic!("Error detected!");
     }
@@ -73,9 +73,9 @@ pub async fn build(syntax: Arc<Mutex<Syntax>>, settings: &Arguments) -> Result<(
             _ => {}
         },
         Err(_) => {
-            println!("Detected infinite loops:");
+            eprintln!("Detected infinite loops:");
             for (name, _) in &handle.lock().names {
-                println!("Infinite loop for {}", name);
+                eprintln!("Infinite loop for {}", name);
             }
             let length = handle.lock().joining.len();
             panic!("Failed to parse with {} ({}) infinite loops", length, handle.lock().names.len());

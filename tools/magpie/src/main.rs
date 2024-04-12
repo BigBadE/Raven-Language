@@ -1,8 +1,7 @@
 use std::env;
 
 use data::{Arguments, CompilerArguments, RunnerSettings};
-use magpie_lib::project::RavenProject;
-use magpie_lib::{build_project, InnerSourceSet, MAGPIE};
+use magpie_lib::{build_project, build_project_file};
 use parser::FileSourceSet;
 
 mod test;
@@ -28,7 +27,7 @@ fn main() {
         RunnerSettings {
             sources: vec![],
             compiler_arguments: CompilerArguments {
-                target: "build::project".to_string(),
+                target: String::default(),
                 compiler: "llvm".to_string(),
                 temp_folder: env::current_dir().unwrap().join("target"),
             },
@@ -36,21 +35,13 @@ fn main() {
     );
 
     println!("Setting up build...");
-    let project = match build_project::<RavenProject>(
-        &mut arguments,
-        &mut vec![Box::new(FileSourceSet { root: build_path }), Box::new(InnerSourceSet { set: &MAGPIE })],
-        true,
-    ) {
-        Ok((_, found)) => match found {
-            Some(found) => RavenProject::from(found),
-            None => {
-                println!("No project method in build file!");
-                return;
-            }
-        },
-        Err(()) => return,
+    let project = match build_project_file(&mut arguments, build_path) {
+        Ok(project) => project,
+        Err(error) => {
+            println!("{}", error);
+            return;
+        }
     };
-
     arguments.runner_settings.compiler_arguments.target = "main::main".to_string();
 
     let source = env::current_dir().unwrap().join("src");

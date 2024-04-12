@@ -1,3 +1,4 @@
+use anyhow::Error;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -14,7 +15,7 @@ pub fn build_file<T: RavenExtern + 'static>(
     sources: &mut Vec<Box<dyn SourceSet>>,
     compile: bool,
     project: bool,
-) -> Result<(Arc<Mutex<Syntax>>, Option<T>), ()> {
+) -> Result<(Arc<Mutex<Syntax>>, Option<T>), Error> {
     if !project {
         return build_project::<T>(arguments, sources, compile);
     }

@@ -13,6 +13,7 @@ magpie-derive = { path = "../../magpie-derive" }
 
 async-recursion = "1.1.0"
 
+anyhow = "1.0.82"
 include_dir = "0.7.3"
 
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros", "time", "sync"] }

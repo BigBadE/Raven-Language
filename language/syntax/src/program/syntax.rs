@@ -548,7 +548,7 @@ impl Syntax {
                 }
 
                 if generics.is_empty() {
-                    println!("Found with no generics!");
+                    eprintln!("Found with no generics!");
                 }
                 Ok(Types::GenericType(
                     Box::new(Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?),

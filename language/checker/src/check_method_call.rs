@@ -189,7 +189,7 @@ pub async fn check_method_call(
                             .await
                             {
                                 Ok(result) => return Ok(result),
-                                Err(error) => println!("Error: {}", error.message),
+                                Err(error) => eprintln!("Error: {}", error.message),
                             }
                         }
                     }

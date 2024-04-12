@@ -1,4 +1,6 @@
+use anyhow::Error;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Arc;
 use std::{env, path};
@@ -7,9 +9,11 @@ use ::runner::runner::{build, create_syntax, run};
 use include_dir::{include_dir, Dir, DirEntry, File};
 use parking_lot::Mutex;
 
+use crate::project::RavenProject;
 use data::tokens::{Token, TokenTypes};
-use data::{Arguments, RavenExtern, Readable, SourceSet};
+use data::{Arguments, CompilerArguments, RavenExtern, Readable, RunnerSettings, SourceSet};
 use parser::tokens::tokenizer::Tokenizer;
+use parser::FileSourceSet;
 use syntax::errors::ParsingError;
 use syntax::program::syntax::Syntax;
 
@@ -46,12 +50,31 @@ pub fn setup_arguments(arguments: &mut Arguments, source: &mut Vec<Box<dyn Sourc
     arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();
 }
 
+pub fn build_project_file(arguments: &mut Arguments, file: PathBuf) -> Result<RavenProject, Error> {
+    arguments.runner_settings.compiler_arguments.target = "build::project".to_string();
+    return match build_project::<RavenProject>(
+        arguments,
+        &mut vec![Box::new(FileSourceSet { root: file }), Box::new(InnerSourceSet { set: &MAGPIE })],
+        true,
+    ) {
+        Ok((_, found)) => match found {
+            Some(found) => Ok(RavenProject::from(found)),
+            None => {
+                return Err(Error::msg("No project method in build file!"));
+            }
+        },
+        Err(err) => {
+            return Err(err);
+        }
+    };
+}
+
 /// Builds a Raven project, adding the needed dependencies
 pub fn build_project<T: RavenExtern + 'static>(
     arguments: &mut Arguments,
     source: &mut Vec<Box<dyn SourceSet>>,
     compile: bool,
-) -> Result<(Arc<Mutex<Syntax>>, Option<T>), ()> {
+) -> Result<(Arc<Mutex<Syntax>>, Option<T>), Error> {
     setup_arguments(arguments, source);
     let value = if compile {
         build_run::<T>(&arguments)
@@ -62,11 +85,11 @@ pub fn build_project<T: RavenExtern + 'static>(
     return match value {
         Ok(inner) => Ok(inner),
         Err(errors) => {
-            println!("Errors:");
+            eprintln!("Errors:");
             for error in errors {
                 error.print(&source);
             }
-            Err(())
+            Err(Error::msg("Failed to parse"))
         }
     };
 }
