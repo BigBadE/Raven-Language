@@ -49,7 +49,7 @@ mod test {
                         }
                         None => assert!(false, "Failed to find method test in test {}", mod_path),
                     },
-                    Err(()) => assert!(false, "Failed to compile test {}!", mod_path),
+                    Err(_) => assert!(false, "Failed to compile test {}!", mod_path),
                 }
             } else if path.is_dir() {
                 // supposedly, this is a sub-directory in the test folder
