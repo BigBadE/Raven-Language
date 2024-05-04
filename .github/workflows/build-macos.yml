@@ -1,14 +1,14 @@
 name: Raven-MacOS
 
-# Currently doesn't work, no clue where the LLVM install for MacOS is.
-# Probably need to compile the whole thing.
-on:
-   schedule:
-    - cron: "0 0 * * *"
-   push:
-    branches: [ "master" ]
-   pull_request:
-    branches: [ "master" ]
+# Currently doesn't work, since our LLVM version is outdated and doesn't have an arm64 version for MacOS
+
+#on:
+#   schedule:
+#    - cron: "0 0 * * *"
+#   push:
+#    branches: [ "master" ]
+#   pull_request:
+#    branches: [ "master" ]
 
 # Cancel any other build tasks running right now to prevent stale uploads
 concurrency:
@@ -24,39 +24,39 @@ jobs:
     permissions: write-all
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-    - name: Download LLVM
-      shell: bash
-      run: wget https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.0/clang%2Bllvm-13.0.0-x86_64-apple-darwin.tar.xz
-    - name: Unzip LLVM
-      shell: bash
-      run: tar -xf clang+llvm-13.0.0-x86_64-apple-darwin.tar.xz
-    - name: Fix LLVM Name
-      shell: bash
-      run: mv clang+llvm-13.0.0-x86_64-apple-darwin llvm
-    - name: Add Nightly
-      run: rustup toolchain install nightly
-    - name: Test
-      run: cargo +nightly test --verbose --bin magpie
-    - name: Build
-      run: cargo +nightly build --verbose --release --bin magpie
-    - name: Build Wrapper
-      run: cargo +nightly build --verbose --release --bin magpie-wrapper
-    - name: Release Raven
-      uses: shogo82148/actions-upload-release-asset@v1
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      with:
-        upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
-        asset_path: target/release/magpie
-        asset_name: Magpie-macos
-        overwrite: true
-    - name: Release Magpie Wrapper
-      uses: shogo82148/actions-upload-release-asset@v1
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      with:
-        upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
-        asset_path: target/release/magpie-wrapper
-        asset_name: Magpie-wrapper-macos
-        overwrite: true
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Download LLVM
+        shell: bash
+        run: wget https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.0/clang%2Bllvm-13.0.0-x86_64-apple-darwin.tar.xz
+      - name: Unzip LLVM
+        shell: bash
+        run: tar -xf clang+llvm-13.0.0-x86_64-apple-darwin.tar.xz
+      - name: Fix LLVM Name
+        shell: bash
+        run: mv clang+llvm-13.0.0-x86_64-apple-darwin llvm
+      - name: Add Nightly
+        run: rustup toolchain install nightly
+      - name: Test
+        run: cargo +nightly test --verbose --bin magpie
+      - name: Build
+        run: cargo +nightly build --verbose --release --bin magpie
+      - name: Build Wrapper
+        run: cargo +nightly build --verbose --release --bin magpie-wrapper
+      - name: Release Raven
+        uses: shogo82148/actions-upload-release-asset@v1
+        if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+        with:
+          upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
+          asset_path: target/release/magpie
+          asset_name: Magpie-macos
+          overwrite: true
+      - name: Release Magpie Wrapper
+        uses: shogo82148/actions-upload-release-asset@v1
+        if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+        with:
+          upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
+          asset_path: target/release/magpie-wrapper
+          asset_name: Magpie-wrapper-macos
+          overwrite: true
