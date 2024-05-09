@@ -5,7 +5,7 @@ use std::sync::Arc;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue, FunctionValue};
+use inkwell::values::{AsValueRef, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
 
 use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
@@ -56,8 +56,8 @@ pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTy
                     .context
                     .struct_type(
                         &[
-                            type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                            type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
                         ],
                         false,
                     )
@@ -193,7 +193,11 @@ pub fn compile_effect<'ctx>(
                 type_getter
                     .compiler
                     .builder
-                    .build_load(effect.into_pointer_value(), &(*id - 1).to_string())
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        effect.into_pointer_value(),
+                        &(*id - 1).to_string(),
+                    )
                     .unwrap()
                     .into_int_value()
             } else {
@@ -248,7 +252,11 @@ pub fn compile_effect<'ctx>(
                             let pointer = type_getter
                                 .compiler
                                 .builder
-                                .build_bitcast(pointer, inner.get_type().ptr_type(AddressSpace::default()), &id.to_string())
+                                .build_bit_cast(
+                                    pointer,
+                                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                                    &id.to_string(),
+                                )
                                 .unwrap();
                             type_getter.compiler.builder.build_store(pointer.into_pointer_value(), inner).unwrap();
                             Some(pointer.as_basic_value_enum())
@@ -263,13 +271,21 @@ pub fn compile_effect<'ctx>(
             let output = compile_effect(type_getter, function, setting, id).unwrap();
             let mut storing = compile_effect(type_getter, function, value, id).unwrap();
             if storing.is_pointer_value() {
-                storing = type_getter.compiler.builder.build_load(storing.into_pointer_value(), &id.to_string()).unwrap();
+                storing = type_getter
+                    .compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        storing.into_pointer_value(),
+                        &id.to_string(),
+                    )
+                    .unwrap();
                 *id += 1;
             }
             let output = type_getter
                 .compiler
                 .builder
-                .build_bitcast(output, storing.get_type().ptr_type(AddressSpace::default()), &id.to_string())
+                .build_bit_cast(output, storing.get_type().ptr_type(AddressSpace::default()), &id.to_string())
                 .unwrap();
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing).unwrap();
             Some(output)
@@ -290,10 +306,24 @@ pub fn compile_effect<'ctx>(
                 }
             }
 
-            let gep =
-                type_getter.compiler.builder.build_struct_gep(from.into_pointer_value(), offset, &id.to_string()).unwrap();
+            let gep = type_getter
+                .compiler
+                .builder
+                .build_struct_gep(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    from.into_pointer_value(),
+                    offset,
+                    &id.to_string(),
+                )
+                .unwrap();
             *id += 2;
-            Some(type_getter.compiler.builder.build_load(gep, &(*id - 1).to_string()).unwrap())
+            Some(
+                type_getter
+                    .compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), gep, &(*id - 1).to_string())
+                    .unwrap(),
+            )
         }
         //Struct to create and a tuple of the index of the argument and the argument
         FinalizedEffectType::CreateStruct(effect, structure, arguments) => {
@@ -310,18 +340,14 @@ pub fn compile_effect<'ctx>(
             let id_field = type_getter
                 .compiler
                 .builder
-                .build_bitcast(
-                    pointer,
-                    type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()),
-                    &id.to_string(),
-                )
+                .build_bit_cast(pointer, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
                 .unwrap();
 
             type_getter
                 .compiler
                 .builder
                 .build_store(
-                    id_field.into_pointer_value(),
+                    id_field.into_pointer_value(), //Pointer to the id field
                     type_getter.compiler.context.i64_type().const_int(structure.id(), false),
                 )
                 .unwrap();
@@ -330,7 +356,16 @@ pub fn compile_effect<'ctx>(
             for argument in out_arguments {
                 let value = unsafe { argument.assume_init() };
 
-                let pointer = type_getter.compiler.builder.build_struct_gep(pointer, offset, &id.to_string()).unwrap();
+                let pointer = type_getter
+                    .compiler
+                    .builder
+                    .build_struct_gep(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        pointer,
+                        offset,
+                        &id.to_string(),
+                    )
+                    .unwrap();
                 *id += 1;
                 type_getter.compiler.builder.build_store(pointer, value).unwrap();
                 offset += 1;
@@ -367,6 +402,7 @@ pub fn compile_effect<'ctx>(
                     .compiler
                     .builder
                     .build_gep(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
                         pointer_type.const_zero(),
                         &[type_getter.compiler.context.i64_type().const_int(1, false)],
                         &id.to_string(),
@@ -398,7 +434,15 @@ pub fn compile_effect<'ctx>(
             *id += 1;
 
             if output.is_pointer_value() {
-                output = type_getter.compiler.builder.build_load(output.into_pointer_value(), &id.to_string()).unwrap();
+                output = type_getter
+                    .compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        output.into_pointer_value(),
+                        &id.to_string(),
+                    )
+                    .unwrap();
                 *id += 1;
             }
             type_getter.compiler.builder.build_store(malloc, output).unwrap();
@@ -414,7 +458,15 @@ pub fn compile_effect<'ctx>(
         }
         FinalizedEffectType::ReferenceLoad(inner) => {
             let inner = compile_effect(type_getter, function, inner, id).unwrap();
-            let output = type_getter.compiler.builder.build_load(inner.into_pointer_value(), &id.to_string()).unwrap();
+            let output = type_getter
+                .compiler
+                .builder
+                .build_load(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    inner.into_pointer_value(),
+                    &id.to_string(),
+                )
+                .unwrap();
             *id += 1;
             Some(output)
         }
@@ -429,6 +481,7 @@ pub fn compile_effect<'ctx>(
                     .compiler
                     .builder
                     .build_gep(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
                         pointer_type.const_zero(),
                         &[type_getter.compiler.context.i64_type().const_int(1, false)],
                         &id.to_string(),
@@ -441,11 +494,7 @@ pub fn compile_effect<'ctx>(
             let size = type_getter
                 .compiler
                 .builder
-                .build_bitcast(
-                    size,
-                    type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()),
-                    &id.to_string(),
-                )
+                .build_bit_cast(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
                 .unwrap()
                 .into_pointer_value();
 
@@ -484,6 +533,7 @@ pub fn compile_effect<'ctx>(
                             .compiler
                             .builder
                             .build_gep(
+                                type_getter.compiler.context.ptr_type(AddressSpace::default()),
                                 if inner.is_pointer_type() {
                                     inner.into_pointer_type()
                                 } else {
@@ -513,7 +563,12 @@ pub fn compile_effect<'ctx>(
                     type_getter
                         .compiler
                         .builder
-                        .build_gep(malloc, &[type_getter.compiler.context.i64_type().const_int(i, false)], &id.to_string())
+                        .build_gep(
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                            malloc,
+                            &[type_getter.compiler.context.i64_type().const_int(i, false)],
+                            &id.to_string(),
+                        )
                         .unwrap()
                 };
                 i += 1;
@@ -541,10 +596,18 @@ pub fn compile_effect<'ctx>(
             let calling = type_getter
                 .compiler
                 .builder
-                .build_bitcast(calling.into_pointer_value(), target_type, &id.to_string())
+                .build_bit_cast(calling.into_pointer_value(), target_type, &id.to_string())
                 .unwrap();
             *id += 1;
-            let calling = type_getter.compiler.builder.build_load(calling.into_pointer_value(), &id.to_string()).unwrap();
+            let calling = type_getter
+                .compiler
+                .builder
+                .build_load(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    calling.into_pointer_value(),
+                    &id.to_string(),
+                )
+                .unwrap();
             compiled_args.push(BasicMetadataValueEnum::from(calling));
             *id += 1;
             for i in 1..args.len() {
@@ -561,7 +624,7 @@ pub fn compile_effect<'ctx>(
             let table = type_getter
                 .compiler
                 .builder
-                .build_bitcast(
+                .build_bit_cast(
                     table.into_pointer_value(),
                     type_getter
                         .compiler
@@ -588,24 +651,50 @@ pub fn compile_effect<'ctx>(
                 )
                 .unwrap();
             *id += 1;
-            let offset =
-                type_getter.compiler.builder.build_struct_gep(table.into_pointer_value(), 1, &id.to_string()).unwrap();
+            let table_pointer = type_getter
+                .compiler
+                .builder
+                .build_struct_gep(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    table.into_pointer_value(),
+                    1,
+                    &id.to_string(),
+                )
+                .unwrap();
             *id += 1;
-            let offset = type_getter.compiler.builder.build_load(offset, &id.to_string()).unwrap();
+            let vtable = type_getter
+                .compiler
+                .builder
+                .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), table_pointer, &id.to_string())
+                .unwrap();
+            *id += 1;
+            let function_pointer = type_getter
+                .compiler
+                .builder
+                .build_struct_gep(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    vtable.into_pointer_value(),
+                    *func_offset as u32,
+                    &id.to_string(),
+                )
+                .unwrap();
             *id += 1;
             let offset = type_getter
                 .compiler
                 .builder
-                .build_struct_gep(offset.into_pointer_value(), *func_offset as u32, &id.to_string())
-                .unwrap();
-            *id += 1;
-            let offset = type_getter.compiler.builder.build_load(offset, &id.to_string()).unwrap().into_pointer_value();
+                .build_load(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    function_pointer,
+                    &id.to_string(),
+                )
+                .unwrap()
+                .into_pointer_value();
             *id += 2;
             type_getter
                 .compiler
                 .builder
                 .build_call(
-                    CallableValue::try_from(offset).unwrap(),
+                    unsafe { FunctionValue::new(offset.as_value_ref()).unwrap() },
                     compiled_args.into_boxed_slice().deref(),
                     &(*id - 1).to_string(),
                 )
@@ -636,8 +725,8 @@ pub fn compile_effect<'ctx>(
                     .context
                     .struct_type(
                         &[
-                            type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                            type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
                         ],
                         false,
                     )
@@ -647,19 +736,28 @@ pub fn compile_effect<'ctx>(
                 let struct_field = type_getter
                     .compiler
                     .builder
-                    .build_bitcast(malloc, base.get_type().ptr_type(AddressSpace::default()), &id.to_string())
+                    .build_bit_cast(malloc, base.get_type().ptr_type(AddressSpace::default()), &id.to_string())
                     .unwrap();
                 *id += 1;
                 type_getter.compiler.builder.build_store(struct_field.into_pointer_value(), base).unwrap();
 
-                let offset = type_getter.compiler.builder.build_struct_gep(malloc, 1, &id.to_string()).unwrap();
+                let offset = type_getter
+                    .compiler
+                    .builder
+                    .build_struct_gep(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        malloc,
+                        1,
+                        &id.to_string(),
+                    )
+                    .unwrap();
                 *id += 2;
                 type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum()).unwrap();
                 Some(
                     type_getter
                         .compiler
                         .builder
-                        .build_bitcast(malloc, raw_structure, &(*id - 1).to_string())
+                        .build_bit_cast(malloc, raw_structure, &(*id - 1).to_string())
                         .unwrap()
                         .as_basic_value_enum(),
                 )

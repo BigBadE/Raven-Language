@@ -3,6 +3,8 @@ name = "compiler-llvm"
 version = "0.1.0"
 edition = "2021"
 
+build = "build.rs"
+
 [dependencies]
 syntax = { path = "../../syntax" }
 data = { path = "../../data" }
@@ -12,7 +14,16 @@ async-trait = "0.1.78"
 tokio = { version = "1.36.0", features = ["rt", "sync", "time"] }
 parking_lot = "0.12.1"
 
-llvm-sys = "130.1.2"
-inkwell = { version = "0.4.0", features = ["llvm13-0"] }
+llvm-sys = { version = "180.0.0", features = ["no-llvm-linking"] }
+inkwell = { git = "https://github.com/TheDan64/inkwell/", features = ["llvm18-0-no-llvm-linking"] }
 
 dashmap = "5.5.3"
+
+[build-dependencies]
+anyhow = "1.0.83"
+cc = "1.0.97"
+lazy_static = "1.4.0"
+regex-lite = "0.1.5"
+semver = "1.0.23"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+zip = { version = "1.1.4", default-features = false, features = ["deflate"] }

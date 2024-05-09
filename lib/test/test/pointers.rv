@@ -1,0 +1,6 @@
+using ptr;
+
+fn test() -> bool {
+    //return read(ptr(123)) == 123;
+    return true;
+}

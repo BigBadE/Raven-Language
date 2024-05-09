@@ -30,8 +30,20 @@ pub fn compile_internal<'ctx>(
         let returning = compiler
             .builder
             .build_right_shift(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 true,
                 "1",
             )
@@ -45,8 +57,20 @@ pub fn compile_internal<'ctx>(
         let returning = compiler
             .builder
             .build_right_shift(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 false,
                 "1",
             )
@@ -60,24 +84,44 @@ pub fn compile_internal<'ctx>(
         let returning = compiler
             .builder
             .build_left_shift(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("array::Index") {
-        let offset = get_loaded(&compiler.builder, params.get(1).unwrap()).into_int_value();
+        let offset = get_loaded(&compiler, params.get(1).unwrap()).into_int_value();
         let offset = compiler.builder.build_int_add(offset, compiler.context.i64_type().const_int(1, false), "3").unwrap();
 
         let gep;
         unsafe {
-            gep =
-                compiler.builder.build_in_bounds_gep(params.first().unwrap().into_pointer_value(), &[offset], "1").unwrap();
+            gep = compiler
+                .builder
+                .build_in_bounds_gep(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    params.first().unwrap().into_pointer_value(),
+                    &[offset],
+                    "1",
+                )
+                .unwrap();
         }
 
-        let gep = compiler.builder.build_load(gep, "2").unwrap();
+        let gep =
+            compiler.builder.build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), gep, "2").unwrap();
         compiler.builder.build_return(Some(&gep)).unwrap();
     } else if name.starts_with("array::Empty") {
         let size = unsafe {
@@ -85,6 +129,7 @@ pub fn compile_internal<'ctx>(
                 .compiler
                 .builder
                 .build_gep(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
                     value.get_type().get_return_type().unwrap().ptr_type(AddressSpace::default()).const_zero(),
                     &[type_getter.compiler.context.i64_type().const_int(1, false)],
                     "0",
@@ -121,14 +166,19 @@ pub fn malloc_type<'a>(
         type_getter
             .compiler
             .builder
-            .build_gep(pointer_type, &[type_getter.compiler.context.i64_type().const_int(1, false)], &id.to_string())
+            .build_gep(
+                type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                pointer_type,
+                &[type_getter.compiler.context.i64_type().const_int(1, false)],
+                &id.to_string(),
+            )
             .unwrap()
     };
     *id += 1;
     let size = type_getter
         .compiler
         .builder
-        .build_bitcast(size, type_getter.compiler.context.i64_type().ptr_type(AddressSpace::default()), &id.to_string())
+        .build_bit_cast(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
         .unwrap()
         .into_pointer_value();
     *id += 1;
@@ -153,16 +203,19 @@ pub fn malloc_type<'a>(
     let malloc = type_getter
         .compiler
         .builder
-        .build_bitcast(malloc.as_basic_value_enum(), pointer_type.as_basic_value_enum().get_type(), &id.to_string())
+        .build_bit_cast(malloc.as_basic_value_enum(), pointer_type.as_basic_value_enum().get_type(), &id.to_string())
         .unwrap();
     *id += 1;
     return malloc.into_pointer_value();
 }
 
 /// Loads the type if it's a pointer
-fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+fn get_loaded<'ctx>(compiler: &CompilerImpl<'ctx>, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
     if value.is_pointer_value() {
-        return compiler.build_load(value.into_pointer_value(), "0").unwrap();
+        return compiler
+            .builder
+            .build_load(compiler.context.ptr_type(AddressSpace::default()), value.into_pointer_value(), "0")
+            .unwrap();
     }
     return *value;
 }
@@ -170,5 +223,13 @@ fn get_loaded<'ctx>(compiler: &Builder<'ctx>, value: &BasicValueEnum<'ctx>) -> B
 /// Casts a number from one type to another
 fn build_cast(first: &BasicValueEnum, _second: BasicTypeEnum, compiler: &CompilerImpl) {
     //TODO float casting
-    compiler.builder.build_return(Some(&compiler.builder.build_load(first.into_pointer_value(), "1").unwrap())).unwrap();
+    compiler
+        .builder
+        .build_return(Some(
+            &compiler
+                .builder
+                .build_load(compiler.context.ptr_type(AddressSpace::default()), first.into_pointer_value(), "1")
+                .unwrap(),
+        ))
+        .unwrap();
 }

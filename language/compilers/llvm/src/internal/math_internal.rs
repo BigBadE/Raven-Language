@@ -19,8 +19,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_int_add(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -32,8 +44,24 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_int_sub(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "2",
+                    )
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -45,8 +73,24 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_int_mul(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "2",
+                    )
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -57,14 +101,46 @@ pub fn math_internal<'ctx>(
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_div(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "2",
+                    )
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
         } else {
             compiler.builder.build_int_signed_div(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "2",
+                    )
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
         }
@@ -76,14 +152,46 @@ pub fn math_internal<'ctx>(
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_rem(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "2",
+                    )
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
         } else {
             compiler.builder.build_int_signed_rem(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "2",
+                    )
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
         }
@@ -113,7 +221,15 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_not(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "1").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "1",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "0",
             )
             .unwrap();
@@ -125,7 +241,15 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_not(
-                compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "1").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.first().unwrap().into_pointer_value(),
+                        "1",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "0",
             )
             .unwrap();
@@ -138,8 +262,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_xor(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -152,8 +288,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_or(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -166,8 +314,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_and(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -180,8 +340,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_xor(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -198,8 +370,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_and(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -216,8 +400,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_xor(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -234,8 +430,20 @@ pub fn math_internal<'ctx>(
         let returning = compiler
             .builder
             .build_or(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -263,8 +471,24 @@ fn compile_relational_op(
         .builder
         .build_int_compare(
             op,
-            compiler.builder.build_load(params.first().unwrap().into_pointer_value(), "2").unwrap().into_int_value(),
-            compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+            compiler
+                .builder
+                .build_load(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    params.first().unwrap().into_pointer_value(),
+                    "2",
+                )
+                .unwrap()
+                .into_int_value(),
+            compiler
+                .builder
+                .build_load(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    params.get(1).unwrap().into_pointer_value(),
+                    "3",
+                )
+                .unwrap()
+                .into_int_value(),
             "1",
         )
         .unwrap();

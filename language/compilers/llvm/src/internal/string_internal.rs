@@ -20,14 +20,26 @@ pub fn string_internal<'ctx>(
         let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
         let pointer_type = compiler
             .builder
-            .build_bitcast(pointer_type, compiler.context.i64_type().ptr_type(AddressSpace::default()), "1")
+            .build_bit_cast(pointer_type, compiler.context.ptr_type(AddressSpace::default()), "1")
             .unwrap()
             .into_pointer_value();
         let returning = compiler
             .builder
             .build_int_add(
-                compiler.builder.build_load(pointer_type, "2").unwrap().into_int_value(),
-                compiler.builder.build_load(params.get(1).unwrap().into_pointer_value(), "3").unwrap().into_int_value(),
+                compiler
+                    .builder
+                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .unwrap()
+                    .into_int_value(),
+                compiler
+                    .builder
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        params.get(1).unwrap().into_pointer_value(),
+                        "3",
+                    )
+                    .unwrap()
+                    .into_int_value(),
                 "1",
             )
             .unwrap();
@@ -183,11 +195,26 @@ pub fn string_internal<'ctx>(
             .compiler
             .builder
             .build_store(
-                unsafe { type_getter.compiler.builder.build_in_bounds_gep(malloc, &[length], "7").unwrap() },
+                unsafe {
+                    type_getter
+                        .compiler
+                        .builder
+                        .build_in_bounds_gep(
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                            malloc,
+                            &[length],
+                            "7",
+                        )
+                        .unwrap()
+                },
                 type_getter
                     .compiler
                     .builder
-                    .build_load(value.get_params().get(1).unwrap().into_pointer_value(), "8")
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        value.get_params().get(1).unwrap().into_pointer_value(),
+                        "8",
+                    )
                     .unwrap(),
             )
             .unwrap();
@@ -200,7 +227,18 @@ pub fn string_internal<'ctx>(
             .compiler
             .builder
             .build_store(
-                unsafe { type_getter.compiler.builder.build_in_bounds_gep(malloc, &[plus_one], "10").unwrap() },
+                unsafe {
+                    type_getter
+                        .compiler
+                        .builder
+                        .build_in_bounds_gep(
+                            type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                            malloc,
+                            &[plus_one],
+                            "10",
+                        )
+                        .unwrap()
+                },
                 type_getter.compiler.context.i8_type().const_zero(),
             )
             .unwrap();

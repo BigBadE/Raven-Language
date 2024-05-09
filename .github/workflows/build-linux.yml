@@ -5,6 +5,7 @@ on:
     - cron: "0 0 * * *"
   push:
     branches: [ "master" ]
+  # TODO move to a seperate action without write-all permission
   pull_request:
     branches: [ "master" ]
 
@@ -22,38 +23,38 @@ jobs:
     permissions: write-all
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-    - name: Add Nightly
-      run: rustup toolchain install nightly
-    - name: Install Code Coverage
-      run: cargo +nightly install cargo-llvm-cov
-    - name: Test
-      run: cargo +nightly llvm-cov --lcov --output-path coverage.info --bin magpie --verbose -- --nocapture
-    - name: Upload Coverage Report To Codecov
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./coverage.info
-        verbose: true
-    - name: Build
-      run: cargo +nightly build --verbose --release --bin magpie
-    - name: Build Wrapper
-      run: cargo +nightly build --verbose --release --bin magpie-wrapper
-    - name: Release Raven
-      uses: shogo82148/actions-upload-release-asset@v1
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      with:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Add Nightly
+        run: rustup toolchain install nightly
+      - name: Install Code Coverage
+        run: cargo +nightly install cargo-llvm-cov
+      - name: Test
+        run: cargo +nightly llvm-cov --lcov --output-path coverage.info --bin magpie --verbose -- --nocapture
+      - name: Upload Coverage Report To Codecov
+        if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.info
+          verbose: true
+      - name: Build
+        run: cargo +nightly build --verbose --release --bin magpie
+      - name: Build Wrapper
+        run: cargo +nightly build --verbose --release --bin magpie-wrapper
+      - name: Release Raven
+        uses: shogo82148/actions-upload-release-asset@v1
+        if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+        with:
           upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
           asset_path: target/release/magpie
           asset_name: Magpie-linux
           overwrite: true
-    - name: Release Magpie Wrapper
-      uses: shogo82148/actions-upload-release-asset@v1
-      if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
-      with:
+      - name: Release Magpie Wrapper
+        uses: shogo82148/actions-upload-release-asset@v1
+        if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
+        with:
           upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
           asset_path: target/release/magpie-wrapper
           asset_name: Magpie-wrapper-linux
