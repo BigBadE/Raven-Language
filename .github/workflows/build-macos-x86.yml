@@ -15,7 +15,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  LLVM_SYS_130_PREFIX: ${{github.workspace}}/llvm
 
 jobs:
   build:
@@ -25,15 +24,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - name: Download LLVM
-        shell: bash
-        run: wget https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.0/clang%2Bllvm-13.0.0-x86_64-apple-darwin.tar.xz
-      - name: Unzip LLVM
-        shell: bash
-        run: tar -xf clang+llvm-13.0.0-x86_64-apple-darwin.tar.xz
-      - name: Fix LLVM Name
-        shell: bash
-        run: mv clang+llvm-13.0.0-x86_64-apple-darwin llvm
       - name: Add Nightly
         run: rustup toolchain install nightly
       - name: Test

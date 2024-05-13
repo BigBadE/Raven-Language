@@ -1,4 +1,4 @@
-name: Raven-Windows
+name: Raven-MacOS-x86_64
 
 on:
   schedule:
@@ -15,20 +15,20 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  LLVM_SYS_130_PREFIX: ${{github.workspace}}/llvm
 
 jobs:
   build:
     permissions: write-all
-    runs-on: windows-latest
+    runs-on: macos-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - name: Add Nightly
         run: rustup toolchain install nightly
       - name: Test
-        run: cargo +nightly test --verbose --bin magpie -- --nocapture
+        run: cargo +nightly test --verbose --bin magpie
       - name: Build
         run: cargo +nightly build --verbose --release --bin magpie
       - name: Build Wrapper
@@ -38,14 +38,14 @@ jobs:
         if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
         with:
           upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
-          asset_path: target/release/magpie.exe
-          asset_name: Magpie-windows.exe
+          asset_path: target/release/magpie
+          asset_name: Magpie-macos-arm
           overwrite: true
       - name: Release Magpie Wrapper
         uses: shogo82148/actions-upload-release-asset@v1
         if: github.event_name == 'push' && github.repository == 'BigBadE/Raven-Language'
         with:
           upload_url: https://uploads.github.com/repos/BigBadE/Raven-Language/releases/123226271/assets
-          asset_path: target/release/magpie-wrapper.exe
-          asset_name: Magpie-wrapper-windows.exe
+          asset_path: target/release/magpie-wrapper
+          asset_name: Magpie-wrapper-macos-arm
           overwrite: true
