@@ -30,7 +30,7 @@ fn main() {
         },
         _ => panic!("Unsupported architecture: {}. Make sure to download LLVM yourself and follow llvm-sys's instructions or make an issue on the github", env::consts::ARCH)
     }
-    build(target.join("llvm"));
+    build(target.join("llvm").join("target"));
 }
 
 fn setup_llvm(mut target: PathBuf, url: &'static str) {
