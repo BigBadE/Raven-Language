@@ -575,6 +575,7 @@ fn build(llvm_path: PathBuf) {
         println!("cargo:rerun-if-changed={}", path);
     }
 
+    println!("cargo:rustc-link-arg=/ignore:4099");
     println!("cargo:rerun-if-env-changed={}", &*ENV_IGNORE_BLOCKLIST);
     println!("cargo:rerun-if-env-changed={}", &*ENV_STRICT_VERSIONING);
     println!("cargo:rerun-if-env-changed={}", &*ENV_NO_CLEAN_CFLAGS);
