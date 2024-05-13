@@ -142,8 +142,7 @@ fn target_os_is(name: &str) -> bool {
 /// If $LLVM_SYS_<VERSION>_PREFIX is NOT set, then look for llvm-config in $PATH.
 ///
 /// Returns None on failure.
-fn locate_llvm_config(path: PathBuf) -> Option<PathBuf> {
-    let prefix = path.join("bin");
+fn locate_llvm_config(prefix: PathBuf) -> Option<PathBuf> {
     for binary_name in llvm_config_binary_names() {
         let binary_name = prefix.join(binary_name);
         match llvm_version(&binary_name) {
@@ -559,20 +558,39 @@ fn get_llvm_cflags(llvm_config_path: &Path) -> String {
     output.split(&[' ', '\n'][..]).filter(|word| !word.starts_with("-W")).collect::<Vec<_>>().join(" ")
 }
 
-fn build(path: PathBuf) {
-    let llvm_config_path = match locate_llvm_config(path.clone()) {
+fn is_llvm_debug(llvm_config_path: &Path) -> bool {
+    // Has to be either Debug or Release
+    llvm_config(llvm_config_path, ["--build-mode"]).contains("Debug")
+}
+
+fn build(llvm_path: PathBuf) {
+    // Behavior can be significantly affected by these vars.
+    println!("cargo:rerun-if-env-changed={}", &*ENV_LLVM_PREFIX);
+    if let Ok(path) = env::var(&*ENV_LLVM_PREFIX) {
+        println!("cargo:rerun-if-changed={}", path);
+    }
+
+    println!("cargo:rerun-if-env-changed={}", &*ENV_IGNORE_BLOCKLIST);
+    println!("cargo:rerun-if-env-changed={}", &*ENV_STRICT_VERSIONING);
+    println!("cargo:rerun-if-env-changed={}", &*ENV_NO_CLEAN_CFLAGS);
+    println!("cargo:rerun-if-env-changed={}", &*ENV_USE_DEBUG_MSVCRT);
+    println!("cargo:rerun-if-env-changed={}", &*ENV_FORCE_FFI);
+
+    if cfg!(feature = "no-llvm-linking") && cfg!(feature = "disable-alltargets-init") {
+        // exit early as we don't need to do anything and llvm-config isn't needed at all
+        return;
+    }
+
+    let llvm_config_path = match locate_llvm_config(llvm_path) {
         None => {
-            fs::remove_dir_all(path).unwrap();
-            panic!("LLVM not found! There may have been an issue downloading, deleteing LLVM install...");
+            panic!("Failed to find LLVM at {}", llvm_path.to_str().unwrap());
             return;
         }
         Some(llvm_config_path) => llvm_config_path,
     };
 
-    // Build the extra wrapper functions.
-    if !cfg!(feature = "disable-alltargets-init") {
-        std::env::set_var("CFLAGS", get_llvm_cflags(&llvm_config_path));
-        cc::Build::new().file("wrappers/target.c").compile("targetwrappers");
+    if cfg!(feature = "no-llvm-linking") {
+        return;
     }
 
     let libdir = llvm_config(&llvm_config_path, ["--libdir"]);
@@ -598,7 +616,20 @@ fn build(path: PathBuf) {
     // Link system libraries
     // We get the system libraries based on the kind of LLVM libraries we link to, but we link to
     // system libs based on the target environment.
+    let sys_lib_kind = if cfg!(target_feature = "crt-static") { LibraryKind::Static } else { LibraryKind::Dynamic };
     for name in get_system_libraries(&llvm_config_path, kind) {
-        println!("cargo:rustc-link-lib={}={}", LibraryKind::Static.string(), name);
+        println!("cargo:rustc-link-lib={}={}", sys_lib_kind.string(), name);
+    }
+
+    let use_debug_msvcrt = env::var_os(&*ENV_USE_DEBUG_MSVCRT).is_some();
+    if target_env_is("msvc") && (use_debug_msvcrt || is_llvm_debug(&llvm_config_path)) {
+        println!("cargo:rustc-link-lib={}", "msvcrtd");
+    }
+
+    // Link libffi if the user requested this workaround.
+    // See https://bitbucket.org/tari/llvm-sys.rs/issues/12/
+    let force_ffi = env::var_os(&*ENV_FORCE_FFI).is_some();
+    if force_ffi {
+        println!("cargo:rustc-link-lib=dylib={}", "ffi");
     }
 }

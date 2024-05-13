@@ -14,7 +14,7 @@ async-trait = "0.1.78"
 tokio = { version = "1.36.0", features = ["rt", "sync", "time"] }
 parking_lot = "0.12.1"
 
-llvm-sys = { version = "180.0.0", features = ["no-llvm-linking"] }
+llvm-sys = { version = "180.0.0" }
 inkwell = { git = "https://github.com/TheDan64/inkwell/", features = ["llvm18-0-no-llvm-linking"] }
 
 dashmap = "5.5.3"
