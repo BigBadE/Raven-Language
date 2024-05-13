@@ -581,7 +581,7 @@ fn build(llvm_path: PathBuf) {
         return;
     }
 
-    let llvm_config_path = match locate_llvm_config(llvm_path) {
+    let llvm_config_path = match locate_llvm_config(llvm_path.clone()) {
         None => {
             panic!("Failed to find LLVM at {}", llvm_path.to_str().unwrap());
             return;
