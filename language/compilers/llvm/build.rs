@@ -24,7 +24,7 @@ fn main() {
             "macos" => setup_llvm(target.clone(), "https://github.com/BigBadE/LLVMBinaryBuilder/releases/download/release/MacOS-x86_64.zip"),
             _ => panic!("Unsupported architecture: {}. Make sure to download LLVM yourself and follow llvm-sys's instructions or make an issue on the github", env::consts::ARCH)
         },
-        "arm" => match env::consts::OS {
+        "aarch64" => match env::consts::OS {
             "macos" => setup_llvm(target.clone(), "https://github.com/BigBadE/LLVMBinaryBuilder/releases/download/release/MacOS-ARM.zip"),
             _ => panic!("Unsupported architecture: {}. Make sure to download LLVM yourself and follow llvm-sys's instructions or make an issue on the github", env::consts::ARCH)
         },
