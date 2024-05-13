@@ -575,8 +575,6 @@ fn build(llvm_path: PathBuf) {
         println!("cargo:rerun-if-changed={}", path);
     }
 
-    std::env::set_var("CFLAGS", get_llvm_cflags(&llvm_config_path));
-    cc::Build::new().file("wrappers/target.c").compile("targetwrappers");
     println!("cargo:rustc-link-arg=/ignore:4099");
     println!("cargo:rerun-if-env-changed={}", &*ENV_IGNORE_BLOCKLIST);
     println!("cargo:rerun-if-env-changed={}", &*ENV_STRICT_VERSIONING);
@@ -596,6 +594,9 @@ fn build(llvm_path: PathBuf) {
         }
         Some(llvm_config_path) => llvm_config_path,
     };
+
+    std::env::set_var("CFLAGS", get_llvm_cflags(&llvm_config_path));
+    cc::Build::new().file("wrappers/target.c").compile("targetwrappers");
 
     if cfg!(feature = "no-llvm-linking") {
         return;
