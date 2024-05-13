@@ -7,7 +7,7 @@ use reqwest::blocking::Client;
 use zip::ZipArchive;
 
 fn main() {
-    let target = PathBuf::from(env::var("OUT_DIR").unwrap())
+    let mut target = PathBuf::from(env::var("OUT_DIR").unwrap())
         .parent()
         .unwrap()
         .parent()
