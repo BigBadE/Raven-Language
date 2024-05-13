@@ -142,7 +142,8 @@ fn target_os_is(name: &str) -> bool {
 /// If $LLVM_SYS_<VERSION>_PREFIX is NOT set, then look for llvm-config in $PATH.
 ///
 /// Returns None on failure.
-fn locate_llvm_config(prefix: PathBuf) -> Option<PathBuf> {
+fn locate_llvm_config(prefix: &PathBuf) -> Option<PathBuf> {
+    let prefix = prefix.join("bin");
     for binary_name in llvm_config_binary_names() {
         let binary_name = prefix.join(binary_name);
         match llvm_version(&binary_name) {
@@ -581,7 +582,7 @@ fn build(llvm_path: PathBuf) {
         return;
     }
 
-    let llvm_config_path = match locate_llvm_config(llvm_path.clone()) {
+    let llvm_config_path = match locate_llvm_config(&llvm_path) {
         None => {
             panic!("Failed to find LLVM at {}", llvm_path.to_str().unwrap());
             return;
