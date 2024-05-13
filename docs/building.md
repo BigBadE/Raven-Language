@@ -4,22 +4,6 @@ This project requires the latest Rust download. Download it using Rustup from ht
 
 # Building
 
-# Windows / MacOS
-Requires LLVM set with the environmental variable LLVM_SYS_130_PREFIX = (path to folder with bin). This path can only be in forward slashes (/), backslashes (\) will not be detected.
-
-For MacOS/Linux, download it from the official github: [here](https://github.com/llvm/llvm-project/releases/tag/llvmorg-13.0.0)
-
-For Windows, please download from a different link with the correct binaries: [here](https://github.com/PLC-lang/llvm-package-windows/releases/tag/v13.0.0)
-
-C++ is also required to be installed somewhere on your system, for Windows get it from https://visualstudio.microsoft.com/vs/community/.
-By default, Rustup should install this for you.
-
-Nightly is required for building the compiler, you can set the project to nightly with ```rustup override set nightly```.
-
-After downloading everything and setting LLVM_SYS_130_PREFIX, restart your computer to make sure everything is properly setup.
-
-# Running
-
 Run this in the lib/test folder (or whatever Raven project in the repository you want to run)
 ```cargo run --bin magpie```
 
@@ -30,13 +14,11 @@ Magpie can also be passed individual files, for example you can run this from th
 
 # Common Issues
 
-## LLVM_SYS_130_PREFIX not detected
+## /usr/bin/ld: cannot find -lzstd: No such file or directory
 
-Make sure that your LLVM_SYS_130_PREFIX is set with no backslashes "\" or spaces. If you installed to a path with spaces, change it.
+Install zstd
 
-Double check that the bin folder exists in the LLVM_SYS_130_PREFIX path, along with an executable named "llvm_config"
-
-Restart you computer to make sure the environmental variable change takes place.
+``sudo apt-get install zstd``
 
 ## /usr/bin/ld: cannot find -lz: No such file or directory
 
