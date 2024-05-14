@@ -26,7 +26,7 @@ jobs:
         with:
           submodules: true
       - name: Install zstd
-        run: brew install zstd
+        run: brew install lib-zstddev
       - name: Add Nightly
         run: rustup toolchain install nightly
       - name: Test
