@@ -16,12 +16,20 @@ Magpie can also be passed individual files, for example you can run this from th
 
 ## /usr/bin/ld: cannot find -lzstd: No such file or directory
 
-Install zstd
+Install zstd-dev
 
-``sudo apt-get install zstd``
+``sudo apt-get install zstd-dev``
+
+(It could also be called libzstd, libzstd-dev, or other variations)
 
 ## /usr/bin/ld: cannot find -lz: No such file or directory
 
 Install zlib1g-dev
 
 ``sudo apt-get install zlib1g-dev``
+
+## Some nonsense linker error with a warning about a messed up rlib
+
+This issue happens on windows when you try to compile with a difference compiler than the one used to compile LLVM.
+
+Make sure you're using MSVC with Rust, and your MSVC version is the 2022 edition.
