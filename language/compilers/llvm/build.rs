@@ -620,6 +620,7 @@ fn build(llvm_path: PathBuf) {
     // We need to take note of what kind of libraries we linked to, so that
     // we can link to the same kind of system libraries
     let (kind, libs) = get_link_libraries(&llvm_config_path, &preferences);
+    panic!("{:?}", libs);
     for name in libs {
         println!("cargo:rustc-link-lib={}={}", kind.string(), name);
     }
