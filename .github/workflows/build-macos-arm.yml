@@ -30,7 +30,7 @@ jobs:
       - name: Add Nightly
         run: rustup toolchain install nightly
       - name: Test
-        run: cargo +nightly test --verbose --bin magpie
+        run: cargo +nightly test --verbose --bin magpie -- --nocapture
       - name: Build
         run: cargo +nightly build --verbose --release --bin magpie
       - name: Build Wrapper
