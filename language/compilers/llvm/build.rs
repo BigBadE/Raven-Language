@@ -612,6 +612,11 @@ fn build(llvm_path: PathBuf) {
 
     let preferences = LinkingPreferences::init();
 
+    
+    if target_os_is("macos") {
+        println!("cargo:rustc-link-search=native=/usr/local/include");
+    }
+
     // Link LLVM libraries
     println!("cargo:rustc-link-search=native={}", libdir);
     for link_search_dir in get_system_library_dirs() {
