@@ -613,8 +613,8 @@ fn build(llvm_path: PathBuf) {
     let preferences = LinkingPreferences::init();
 
     
-    if target_os_is("macos") {
-        println!("cargo:rustc-link-search=native=/opt/homebrew/Cellar/zstd/1.5.6/lib");
+    if let Ok(found) = env::var("ZSTD_LIB_DIR") {
+        println!("cargo:rustc-link-search=native={}", found);
     }
 
     // Link LLVM libraries

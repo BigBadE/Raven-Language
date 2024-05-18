@@ -16,11 +16,16 @@ Magpie can also be passed individual files, for example you can run this from th
 
 ## /usr/bin/ld: cannot find -lzstd: No such file or directory
 
-Install zstd-dev
+On Ubuntu: Install zstd-dev
 
 ``sudo apt-get install zstd-dev``
 
-(It could also be called libzstd, libzstd-dev, or other variations)
+On MacOS: For some reason, brew doesn't seem to set the link dir correctly.
+
+(If brew isn't installed, install it)
+Run ``brew install zstd``
+Run ``brew info zstd``
+Set the environmental variable ZSTD_LIB_DIR to the directory listed in the info command (plus /lib)
 
 ## /usr/bin/ld: cannot find -lz: No such file or directory
 
