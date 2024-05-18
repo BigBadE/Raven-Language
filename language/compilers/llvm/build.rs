@@ -614,7 +614,7 @@ fn build(llvm_path: PathBuf) {
 
     
     if target_os_is("macos") {
-        println!("cargo:rustc-link-search=native=/usr/local/include");
+        println!("cargo:rustc-link-search=native=/Users/local/include");
     }
 
     // Link LLVM libraries
