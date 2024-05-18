@@ -614,7 +614,7 @@ fn build(llvm_path: PathBuf) {
 
     
     if target_os_is("macos") {
-        println!("cargo:rustc-link-search=native=/Users/local/include");
+        println!("cargo:rustc-link-search=native=/opt/homebrew/Cellar/zstd/1.5.6/lib");
     }
 
     // Link LLVM libraries
