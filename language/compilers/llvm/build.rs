@@ -30,10 +30,7 @@ fn main() {
         },
         _ => panic!("Unsupported architecture: {}. Make sure to download LLVM yourself and follow llvm-sys's instructions or make an issue on the github", env::consts::ARCH)
     }
-    target = target.join("llvm");
-    if env::consts::OS != "windows" {
-        target = target.join("target")
-    }
+    target = target.join("llvm").join("target");
     build(target);
 }
 
@@ -584,26 +581,15 @@ fn build(llvm_path: PathBuf) {
     println!("cargo:rerun-if-env-changed={}", &*ENV_USE_DEBUG_MSVCRT);
     println!("cargo:rerun-if-env-changed={}", &*ENV_FORCE_FFI);
 
-    if cfg!(feature = "no-llvm-linking") && cfg!(feature = "disable-alltargets-init") {
-        // exit early as we don't need to do anything and llvm-config isn't needed at all
-        return;
-    }
-
     let llvm_config_path = match locate_llvm_config(&llvm_path) {
         None => {
             panic!("Failed to find LLVM at {}", llvm_path.to_str().unwrap());
-            return;
         }
         Some(llvm_config_path) => llvm_config_path,
     };
 
     std::env::set_var("CFLAGS", get_llvm_cflags(&llvm_config_path));
     cc::Build::new().file("wrappers/target.c").compile("targetwrappers");
-
-    if cfg!(feature = "no-llvm-linking") {
-        return;
-    }
-
     let libdir = llvm_config(&llvm_config_path, ["--libdir"]);
 
     // Export information to other crates
@@ -632,7 +618,7 @@ fn build(llvm_path: PathBuf) {
     // Link system libraries
     // We get the system libraries based on the kind of LLVM libraries we link to, but we link to
     // system libs based on the target environment.
-    let sys_lib_kind = if cfg!(target_feature = "crt-static") { LibraryKind::Static } else { LibraryKind::Dynamic };
+    let sys_lib_kind = LibraryKind::Dynamic;
     for name in get_system_libraries(&llvm_config_path, kind) {
         println!("cargo:rustc-link-lib={}={}", sys_lib_kind.string(), name);
     }
