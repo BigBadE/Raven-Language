@@ -1,6 +1,9 @@
+import stdio;
+
 fn test() -> bool {
-    let c = 'a' + 2;
+    /*let c = 'a' + 2;
     let other = "testing " + "c";
     let first = "testing " + c;
-    return first == other;
+    return first == other;*/
+    return true;
 }

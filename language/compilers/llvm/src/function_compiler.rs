@@ -1,5 +1,6 @@
 use std::mem::MaybeUninit;
 use std::ops::Deref;
+use std::os::raw;
 use std::sync::Arc;
 
 use inkwell::basic_block::BasicBlock;
@@ -10,6 +11,7 @@ use inkwell::AddressSpace;
 
 use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
 use syntax::program::function::{CodelessFinalizedFunction, FinalizedCodeBody};
+use syntax::program::r#struct;
 use syntax::program::types::FinalizedTypes;
 use syntax::{is_modifier, Attribute, Modifier};
 
@@ -298,19 +300,24 @@ pub fn compile_effect<'ctx>(
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
             //Compensate for type id
             let mut offset = 1;
-            for struct_field in &loading_from.types.get_nongeneric_return(type_getter).unwrap().inner_struct().fields {
+            let structure = loading_from.types.get_nongeneric_return(type_getter).unwrap();
+            let structure = structure.inner_struct();
+            for struct_field in &structure.fields {
                 if &struct_field.field.name != field {
                     offset += 1;
                 } else {
                     break;
                 }
             }
+            let mut fields = structure.fields.iter()
+            .map(|field| type_getter.get_type(&field.field.field_type)).collect::<Vec<_>>();
+            fields.insert(0, type_getter.compiler.context.i64_type().as_basic_type_enum());
 
             let gep = type_getter
                 .compiler
                 .builder
                 .build_struct_gep(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    type_getter.compiler.context.struct_type(fields.as_slice(), false),
                     from.into_pointer_value(),
                     offset,
                     &id.to_string(),
@@ -352,7 +359,12 @@ pub fn compile_effect<'ctx>(
                 )
                 .unwrap();
 
-            let mut offset = 1;
+            let mut fields = out_arguments.iter().map(|argument| unsafe { argument.assume_init() }.get_type()).collect::<Vec<_>>();
+            fields.insert(0, type_getter.compiler.context.i64_type().as_basic_type_enum());
+            let structure = type_getter.compiler.context.struct_type(
+                fields.as_slice(), false);
+
+                let mut offset = 1;
             for argument in out_arguments {
                 let value = unsafe { argument.assume_init() };
 
@@ -360,7 +372,7 @@ pub fn compile_effect<'ctx>(
                     .compiler
                     .builder
                     .build_struct_gep(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        structure,
                         pointer,
                         offset,
                         &id.to_string(),
@@ -394,21 +406,10 @@ pub fn compile_effect<'ctx>(
             let pointer_type = if output.get_type().is_pointer_type() {
                 return Some(output);
             } else {
-                output.get_type().ptr_type(AddressSpace::default())
+                output.get_type()
             };
 
-            let size = unsafe {
-                type_getter
-                    .compiler
-                    .builder
-                    .build_gep(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        pointer_type.const_zero(),
-                        &[type_getter.compiler.context.i64_type().const_int(1, false)],
-                        &id.to_string(),
-                    )
-                    .unwrap()
-            };
+            let size = pointer_type.size_of().unwrap();
 
             *id += 1;
 
@@ -421,16 +422,13 @@ pub fn compile_effect<'ctx>(
                         .module
                         .get_function("malloc")
                         .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
-                    &[BasicMetadataValueEnum::PointerValue(size)],
+                    &[BasicMetadataValueEnum::IntValue(size)],
                     &id.to_string(),
                 )
                 .unwrap()
                 .try_as_basic_value()
                 .unwrap_left()
                 .into_pointer_value();
-            *id += 1;
-
-            let malloc = type_getter.compiler.builder.build_pointer_cast(malloc, pointer_type, &id.to_string()).unwrap();
             *id += 1;
 
             if output.is_pointer_value() {
@@ -615,17 +613,17 @@ pub fn compile_effect<'ctx>(
                     .push(BasicMetadataValueEnum::from(compile_effect(type_getter, function, &args[i], id).unwrap()));
             }
             let mut struct_type = Vec::default();
+            let function_type = type_getter.get_function(method).get_type();
             for _ in 0..=*func_offset {
                 struct_type.push(
-                    type_getter.get_function(method).get_type().ptr_type(AddressSpace::default()).as_basic_type_enum(),
+                    function_type.ptr_type(AddressSpace::default()).as_basic_type_enum(),
                 );
             }
-
-            let table = type_getter
+            let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
+            let table_pointer = type_getter
                 .compiler
                 .builder
-                .build_bit_cast(
-                    table.into_pointer_value(),
+                .build_struct_gep(
                     type_getter
                         .compiler
                         .context
@@ -637,25 +635,12 @@ pub fn compile_effect<'ctx>(
                                     .i64_type()
                                     .ptr_type(AddressSpace::default())
                                     .as_basic_type_enum(),
-                                type_getter
-                                    .compiler
-                                    .context
-                                    .struct_type(struct_type.as_slice(), false)
+                                struct_type
                                     .ptr_type(AddressSpace::default())
                                     .as_basic_type_enum(),
                             ],
                             false,
-                        )
-                        .ptr_type(AddressSpace::default()),
-                    &id.to_string(),
-                )
-                .unwrap();
-            *id += 1;
-            let table_pointer = type_getter
-                .compiler
-                .builder
-                .build_struct_gep(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        ),
                     table.into_pointer_value(),
                     1,
                     &id.to_string(),
@@ -665,14 +650,14 @@ pub fn compile_effect<'ctx>(
             let vtable = type_getter
                 .compiler
                 .builder
-                .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), table_pointer, &id.to_string())
+                .build_load(struct_type.ptr_type(AddressSpace::default()), table_pointer, &id.to_string())
                 .unwrap();
             *id += 1;
             let function_pointer = type_getter
                 .compiler
                 .builder
                 .build_struct_gep(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    struct_type,
                     vtable.into_pointer_value(),
                     *func_offset as u32,
                     &id.to_string(),
@@ -689,12 +674,13 @@ pub fn compile_effect<'ctx>(
                 )
                 .unwrap()
                 .into_pointer_value();
-            *id += 2;
+            *id += 1;
             type_getter
                 .compiler
                 .builder
-                .build_call(
-                    unsafe { FunctionValue::new(offset.as_value_ref()).unwrap() },
+                .build_indirect_call(
+                    function_type,
+                    offset,
                     compiled_args.into_boxed_slice().deref(),
                     &(*id - 1).to_string(),
                 )
@@ -729,8 +715,7 @@ pub fn compile_effect<'ctx>(
                             type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
                         ],
                         false,
-                    )
-                    .ptr_type(AddressSpace::default());
+                    );
 
                 let malloc = malloc_type(type_getter, structure.ptr_type(AddressSpace::default()).const_zero(), id);
                 let struct_field = type_getter
@@ -745,7 +730,7 @@ pub fn compile_effect<'ctx>(
                     .compiler
                     .builder
                     .build_struct_gep(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        raw_structure,
                         malloc,
                         1,
                         &id.to_string(),
@@ -757,7 +742,7 @@ pub fn compile_effect<'ctx>(
                     type_getter
                         .compiler
                         .builder
-                        .build_bit_cast(malloc, raw_structure, &(*id - 1).to_string())
+                        .build_bit_cast(malloc, raw_structure.ptr_type(AddressSpace::default()), &(*id - 1).to_string())
                         .unwrap()
                         .as_basic_value_enum(),
                 )

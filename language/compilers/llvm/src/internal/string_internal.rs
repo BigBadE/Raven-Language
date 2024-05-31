@@ -28,13 +28,13 @@ pub fn string_internal<'ctx>(
             .build_int_add(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
