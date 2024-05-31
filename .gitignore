@@ -1,4 +1,4 @@
 /target
 .idea/
-.vscode/
+.vscode/settings.json
 Cargo.lock

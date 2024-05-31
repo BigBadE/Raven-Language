@@ -32,13 +32,13 @@ pub fn compile_internal<'ctx>(
             .build_right_shift(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -59,13 +59,13 @@ pub fn compile_internal<'ctx>(
             .build_right_shift(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -86,13 +86,13 @@ pub fn compile_internal<'ctx>(
             .build_left_shift(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -104,7 +104,7 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("array::Index") {
-        let offset = get_loaded(&compiler, params.get(1).unwrap()).into_int_value();
+        let offset = get_loaded(&compiler, compiler.context.i64_type(), params.get(1).unwrap()).into_int_value();
         let offset = compiler.builder.build_int_add(offset, compiler.context.i64_type().const_int(1, false), "3").unwrap();
 
         let gep;
@@ -210,11 +210,11 @@ pub fn malloc_type<'a>(
 }
 
 /// Loads the type if it's a pointer
-fn get_loaded<'ctx>(compiler: &CompilerImpl<'ctx>, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+fn get_loaded<'ctx, T: BasicType<'ctx>>(compiler: &CompilerImpl<'ctx>, pointer_type: T, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
     if value.is_pointer_value() {
         return compiler
             .builder
-            .build_load(compiler.context.ptr_type(AddressSpace::default()), value.into_pointer_value(), "0")
+            .build_load(pointer_type, value.into_pointer_value(), "0")
             .unwrap();
     }
     return *value;

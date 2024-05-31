@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::compiler::CompilerImpl;
 use crate::internal::instructions::malloc_type;
 use crate::type_getter::CompilerTypeGetter;
@@ -21,13 +23,13 @@ pub fn math_internal<'ctx>(
             .build_int_add(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -47,7 +49,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "2",
                     )
@@ -56,7 +58,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -76,7 +78,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "2",
                     )
@@ -85,7 +87,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -104,7 +106,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "2",
                     )
@@ -113,7 +115,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -126,7 +128,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "2",
                     )
@@ -135,7 +137,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -155,7 +157,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "2",
                     )
@@ -164,7 +166,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -177,7 +179,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "2",
                     )
@@ -186,7 +188,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -224,7 +226,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "1",
                     )
@@ -244,7 +246,7 @@ pub fn math_internal<'ctx>(
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.first().unwrap().into_pointer_value(),
                         "1",
                     )
@@ -264,13 +266,13 @@ pub fn math_internal<'ctx>(
             .build_xor(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -290,13 +292,13 @@ pub fn math_internal<'ctx>(
             .build_or(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -316,13 +318,13 @@ pub fn math_internal<'ctx>(
             .build_and(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -342,13 +344,13 @@ pub fn math_internal<'ctx>(
             .build_xor(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -372,13 +374,13 @@ pub fn math_internal<'ctx>(
             .build_and(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -402,13 +404,13 @@ pub fn math_internal<'ctx>(
             .build_xor(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -432,13 +434,13 @@ pub fn math_internal<'ctx>(
             .build_or(
                 compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), pointer_type, "2")
+                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
                     .unwrap()
                     .into_int_value(),
                 compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         params.get(1).unwrap().into_pointer_value(),
                         "3",
                     )
@@ -467,26 +469,19 @@ fn compile_relational_op(
         type_getter.compiler.context.bool_type().ptr_type(AddressSpace::default()).const_zero(),
         &mut 0,
     );
+
     let returning = compiler
         .builder
         .build_int_compare(
             op,
             compiler
                 .builder
-                .build_load(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    params.first().unwrap().into_pointer_value(),
-                    "2",
-                )
+                .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
                 .unwrap()
                 .into_int_value(),
             compiler
                 .builder
-                .build_load(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    params.get(1).unwrap().into_pointer_value(),
-                    "3",
-                )
+                .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
                 .unwrap()
                 .into_int_value(),
             "1",

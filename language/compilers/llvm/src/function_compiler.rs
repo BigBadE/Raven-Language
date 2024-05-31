@@ -194,7 +194,7 @@ pub fn compile_effect<'ctx>(
                     .compiler
                     .builder
                     .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        type_getter.compiler.context.i64_type(),
                         effect.into_pointer_value(),
                         &(*id - 1).to_string(),
                     )
