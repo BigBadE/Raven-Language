@@ -2,8 +2,10 @@ import stdio;
 
 fn test() -> bool {
     if(test_greater()/* && test_less() && test_greater_or_eq() && test_less_or_eq()*/){
+        printf("Hit!");
         return true;
     }
+    printf("Miss!");
     return false;
  }
 
@@ -18,6 +20,7 @@ fn test_greater() -> bool {
         return false;
     }
     if(x > 0){
+        printf("Got it!");
         return true;
     }
     printf("Three!");
