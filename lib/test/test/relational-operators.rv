@@ -1,29 +1,23 @@
 import stdio;
 
 fn test() -> bool {
-    if(test_greater()/* && test_less() && test_greater_or_eq() && test_less_or_eq()*/){
-        printf("Hit!");
+    if(test_greater() && test_less() && test_greater_or_eq() && test_less_or_eq()){
         return true;
     }
-    printf("Miss!");
     return false;
  }
 
 fn test_greater() -> bool {
     let x = 5;
     if(x > 5){
-        printf("One!");
         return false;
     }
     if(x > 10){
-        printf("Two!");
         return false;
     }
     if(x > 0){
-        printf("Got it!");
         return true;
     }
-    printf("Three!");
     return false;
 }
 
