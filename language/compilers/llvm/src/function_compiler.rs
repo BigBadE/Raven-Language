@@ -36,7 +36,7 @@ pub fn instance_function<'a, 'ctx>(
         value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
     } else if is_modifier(function.data.modifiers, Modifier::Internal) {
         value = create_function_value(&function, type_getter, None);
-        compile_internal(&type_getter, &type_getter.compiler, &function.data.name, value);
+        compile_internal(&type_getter, &type_getter.compiler, &function, value);
     } else if is_modifier(function.data.modifiers, Modifier::Extern) {
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {
@@ -474,18 +474,7 @@ pub fn compile_effect<'ctx>(
             let pointer_type =
                 if output.is_pointer_type() { output.into_pointer_type() } else { output.ptr_type(AddressSpace::default()) };
 
-            let size = unsafe {
-                type_getter
-                    .compiler
-                    .builder
-                    .build_gep(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        pointer_type.const_zero(),
-                        &[type_getter.compiler.context.i64_type().const_int(1, false)],
-                        &id.to_string(),
-                    )
-                    .unwrap()
-            };
+            let size = output.size_of().unwrap();
 
             *id += 1;
 
@@ -522,31 +511,23 @@ pub fn compile_effect<'ctx>(
             Some(malloc.as_basic_value_enum())
         }
         FinalizedEffectType::CreateArray(types, values) => {
-            let ptr_type = types
-                .as_ref()
-                .map(|inner| {
+            let ptr_type = match types.as_ref() {
+                Some(inner) => {
                     let inner = type_getter.get_type(inner);
-                    unsafe {
+                    let output = 
                         type_getter
                             .compiler
                             .builder
-                            .build_gep(
-                                type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                                if inner.is_pointer_type() {
-                                    inner.into_pointer_type()
-                                } else {
-                                    inner.ptr_type(AddressSpace::default())
-                                }
-                                .const_zero(),
-                                &[type_getter.compiler.context.i64_type().const_int(values.len() as u64 + 1, false)],
+                            .build_int_mul(
+                                inner.size_of().unwrap(),
+                                type_getter.compiler.context.i64_type().const_int(values.len() as u64 + 1, false),
                                 &id.to_string(),
-                            )
-                            .unwrap()
-                    }
-                })
-                .unwrap_or_else(|| {
-                    type_getter.compiler.context.struct_type(&[], false).ptr_type(AddressSpace::default()).const_zero()
-                });
+                            ).unwrap();
+                    *id += 1;
+                    output
+                },
+                None => type_getter.compiler.context.i64_type().const_zero()
+            };
             let malloc = malloc_type(type_getter, ptr_type, id);
 
             type_getter
@@ -555,30 +536,27 @@ pub fn compile_effect<'ctx>(
                 .build_store(malloc, type_getter.compiler.context.i64_type().const_int(values.len() as u64, false))
                 .unwrap();
 
+            let malloc_int = type_getter.compiler.builder.build_ptr_to_int(malloc, type_getter.compiler.context.i64_type(), &id.to_string()).unwrap();
+            *id += 1;
+
             let mut i = 1;
             for value in values {
-                let gep = unsafe {
+                let field_pointer = 
                     type_getter
                         .compiler
                         .builder
-                        .build_gep(
+                        .build_int_to_ptr(
+                            type_getter.compiler.builder.build_int_add(malloc_int, 
+                                type_getter.compiler.context.i64_type().const_int(i, false), &id.to_string()).unwrap(),
                             type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                            malloc,
-                            &[type_getter.compiler.context.i64_type().const_int(i, false)],
-                            &id.to_string(),
+                            &(*id + 1).to_string(),
                         )
-                        .unwrap()
-                };
+                        .unwrap();
                 i += 1;
-                *id += 1;
-                let gep = type_getter
-                    .compiler
-                    .builder
-                    .build_pointer_cast(gep, gep.get_type().ptr_type(AddressSpace::default()), &id.to_string())
-                    .unwrap();
-                *id += 1;
+                *id += 2;
                 let effect = compile_effect(type_getter, function, value, id).unwrap();
-                type_getter.compiler.builder.build_store(gep, effect).unwrap();
+                *id += 1;
+                type_getter.compiler.builder.build_store(field_pointer, effect).unwrap();
             }
 
             Some(malloc.as_basic_value_enum())
@@ -717,7 +695,7 @@ pub fn compile_effect<'ctx>(
                         false,
                     );
 
-                let malloc = malloc_type(type_getter, structure.ptr_type(AddressSpace::default()).const_zero(), id);
+                let malloc = malloc_type(type_getter, structure.size_of().unwrap(), id);
                 let struct_field = type_getter
                     .compiler
                     .builder

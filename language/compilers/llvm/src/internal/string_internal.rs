@@ -17,7 +17,7 @@ pub fn string_internal<'ctx>(
         type_getter.compiler.builder.build_return(Some(value.get_params().first().unwrap())).unwrap();
     } else if name.starts_with("string::Add<char + u64>_char::add") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
         let pointer_type = compiler
             .builder
             .build_bit_cast(pointer_type, compiler.context.ptr_type(AddressSpace::default()), "1")

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::compiler::CompilerImpl;
 use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::internal::math_internal::math_internal;
@@ -5,16 +7,19 @@ use crate::internal::string_internal::string_internal;
 use crate::type_getter::CompilerTypeGetter;
 use inkwell::builder::Builder;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue};
 use inkwell::AddressSpace;
+use syntax::program::function::CodelessFinalizedFunction;
 
 /// Compiles a method with the internal keyword
 pub fn compile_internal<'ctx>(
     type_getter: &CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
-    name: &String,
+    function: &Arc<CodelessFinalizedFunction>,
     value: FunctionValue<'ctx>,
 ) {
+    let name = &function.data.name;
+    
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
@@ -25,7 +30,7 @@ pub fn compile_internal<'ctx>(
         build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), compiler);
     } else if name.starts_with("math::RightShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
 
         let returning = compiler
             .builder
@@ -52,7 +57,7 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::LogicRightShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
 
         let returning = compiler
             .builder
@@ -79,7 +84,7 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::LeftShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, pointer_type.get_type().const_zero(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
 
         let returning = compiler
             .builder
@@ -159,30 +164,12 @@ pub fn compile_internal<'ctx>(
 /// Creates a malloc for the type
 pub fn malloc_type<'a>(
     type_getter: &CompilerTypeGetter<'a>,
-    pointer_type: PointerValue<'a>,
+    size: IntValue<'a>,
     id: &mut u64,
 ) -> PointerValue<'a> {
-    let size = unsafe {
-        type_getter
-            .compiler
-            .builder
-            .build_gep(
-                type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                pointer_type,
-                &[type_getter.compiler.context.i64_type().const_int(1, false)],
-                &id.to_string(),
-            )
-            .unwrap()
-    };
+    let size = type_getter.compiler.builder.build_int_to_ptr(size, 
+        type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string()).unwrap();
     *id += 1;
-    let size = type_getter
-        .compiler
-        .builder
-        .build_bit_cast(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
-        .unwrap()
-        .into_pointer_value();
-    *id += 1;
-
     let malloc = type_getter
         .compiler
         .builder
@@ -200,13 +187,7 @@ pub fn malloc_type<'a>(
         .unwrap_left()
         .into_pointer_value();
     *id += 1;
-    let malloc = type_getter
-        .compiler
-        .builder
-        .build_bit_cast(malloc.as_basic_value_enum(), pointer_type.as_basic_value_enum().get_type(), &id.to_string())
-        .unwrap();
-    *id += 1;
-    return malloc.into_pointer_value();
+    return malloc;
 }
 
 /// Loads the type if it's a pointer

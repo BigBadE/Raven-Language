@@ -1,7 +1,7 @@
 import stdio;
 
 fn test() -> bool {
-    if(test_greater()/* && test_less() && test_greater_or_eq() && test_less_or_eq()*/){
+    if(test_greater() && test_less() && test_greater_or_eq() && test_less_or_eq()){
         return true;
     }
     return false;
@@ -9,12 +9,12 @@ fn test() -> bool {
 
 fn test_greater() -> bool {
     let x = 5;
-    /*if(x > 5){
+    if(x > 5){
         return false;
     }
     if(x > 10){
         return false;
-    }*/
+    }
     if(x > 0){
         return true;
     }
