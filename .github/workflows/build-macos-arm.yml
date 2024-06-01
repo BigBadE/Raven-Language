@@ -1,12 +1,12 @@
 name: Raven-MacOS-ARM
 
-on:
-  schedule:
-    - cron: "0 0 * * *"
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+#on:
+#  schedule:
+#    - cron: "0 0 * * *"
+#  push:
+#    branches: [ "master" ]
+#  pull_request:
+#    branches: [ "master" ]
 
 # Cancel any other build tasks running right now to prevent stale uploads
 concurrency:
