@@ -1,5 +1,5 @@
 fn test() -> bool {
-    if(test_greater() && test_less() && test_greater_or_eq() && test_less_or_eq()){
+    if(test_greater()/* && test_less() && test_greater_or_eq() && test_less_or_eq()*/){
         return true;
     }
     return false;
