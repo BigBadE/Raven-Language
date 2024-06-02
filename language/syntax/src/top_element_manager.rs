@@ -117,7 +117,6 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
                         None => {}
                     }
                     if finished {
-                        eprintln!("Failed!");
                         Poll::Ready(Err(self.error.clone()))
                     } else {
                         self.syntax.lock().async_manager.impl_waiters.push(cx.waker().clone());
@@ -157,8 +156,8 @@ pub async fn find_trait_implementation(
         .await
         {
             let value = value.finalize(syntax.clone()).await;
-            if let Some(value) = Syntax::get_implementation_methods(&syntax, &return_type, &value).await {
-                for (types, functions) in &value {
+            if let Some(implementors) = Syntax::get_implementation_methods(&syntax, &return_type, &value).await {
+                for (types, functions) in &implementors {       
                     for temp in functions {
                         let mut current = vec![];
                         if &temp.name.split("::").last().unwrap() == method {

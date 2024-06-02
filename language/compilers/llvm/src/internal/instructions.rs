@@ -26,7 +26,17 @@ pub fn compile_internal<'ctx>(
     if string_internal(type_getter, compiler, name, &value) || math_internal(type_getter, compiler, name, &value) {
         return;
     }
-    if name.starts_with("numbers::Cast") {
+    if name.starts_with("types::pointer::Pointer<T>::get_ptr_data") {
+        let pointer_int = compiler.builder.build_ptr_to_int(params.get(0).unwrap().into_pointer_value(), 
+        compiler.context.i64_type(), "0").unwrap().as_basic_value_enum();
+        compiler.builder.build_return(Some(&pointer_int)).unwrap();
+    } else if name.starts_with("types::pointer::Pointer<T>::read") {
+        let pointer_val = compiler.builder.build_load(compiler.context.i64_type(), 
+        params[0].into_pointer_value(), "0").unwrap().into_int_value();
+        let read = compiler.builder.build_load(compiler.context.struct_type(&[], false), 
+        compiler.builder.build_int_to_ptr(pointer_val, compiler.context.ptr_type(AddressSpace::default()), "1").unwrap(), "2").unwrap();
+        compiler.builder.build_return(Some(&read)).unwrap();
+    } else if name.starts_with("numbers::Cast") {
         build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), compiler);
     } else if name.starts_with("math::RightShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();

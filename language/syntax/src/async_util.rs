@@ -45,21 +45,6 @@ pub struct AsyncDataGetter<T: TopElement> {
     pub getting: Arc<T>,
 }
 
-/// Asynchronously gets the implementation of a structure
-pub struct AsyncStructImplGetter {
-    /// The program
-    pub syntax: Arc<Mutex<Syntax>>,
-    /// Type to get
-    pub getting: FinalizedTypes,
-}
-
-impl AsyncStructImplGetter {
-    /// Creates a new async struct impl getter
-    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: FinalizedTypes) -> Self {
-        return Self { syntax, getting };
-    }
-}
-
 impl<T: TopElement> AsyncTypesGetter<T> {
     /// Helper method to try a get a type with the given prefix, and adding a waker if not.
     fn get_types(
@@ -214,22 +199,41 @@ where
     }
 }
 
+/// Asynchronously gets the implementation of a structure
+pub struct AsyncStructImplGetter {
+    /// The program
+    pub syntax: Arc<Mutex<Syntax>>,
+    /// Type to get
+    pub getting: FinalizedTypes,
+}
+
+impl AsyncStructImplGetter {
+    /// Creates a new async struct impl getter
+    pub fn new(syntax: Arc<Mutex<Syntax>>, getting: FinalizedTypes) -> Self {
+        return Self { syntax, getting };
+    }
+}
+
 impl Future for AsyncStructImplGetter {
     type Output = Vec<Arc<FinishedStructImplementor>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut locked = self.syntax.lock();
-
-        if let Some(found) = locked.struct_implementations.get(&self.getting) {
-            return Poll::Ready(found.clone());
+        if !locked.finished_impls() {
+            locked.async_manager.impl_waiters.push(cx.waker().clone());
+            return Poll::Pending
         }
 
-        return if locked.finished_impls() {
-            Poll::Ready(Vec::default())
-        } else {
-            locked.async_manager.impl_waiters.push(cx.waker().clone());
-            Poll::Pending
-        };
+        let mut output = vec!();
+        for (types, impls) in &locked.struct_implementations {
+            if self.getting.of_type_sync(&types, None).0 {
+                for found_impl in impls {
+                    output.push(found_impl.clone());
+                }
+            }
+        }
+        
+        return Poll::Ready(output);
     }
 }
 

@@ -114,6 +114,7 @@ pub async fn check_method_call(
 
         finalized_effects.insert(0, calling);
 
+        // Try to find the function with that name
         if let Ok(value) = Syntax::get_function(
             code_verifier.syntax.clone(),
             Span::default(),
@@ -125,6 +126,7 @@ pub async fn check_method_call(
         {
             value
         } else {
+            // Used to check if a function is valid
             let checker = async |implementor: Arc<FinishedTraitImplementor>,
                                  method: Arc<FunctionData>|
                    -> Result<FinalizedEffects, ParsingError> {
@@ -145,15 +147,49 @@ pub async fn check_method_call(
                 .await
             };
 
-            return TraitImplWaiter {
+            // Try and see if it's a trait method call
+            match (TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
                 resolver: code_verifier.resolver.boxed_clone(),
                 method: method.clone(),
                 return_type: return_type.clone(),
                 checker,
-                error: effect.span.make_error(ParsingMessage::NoImpl(return_type.clone(), method.clone())),
+                error: ParsingError::new(Span::default(), ParsingMessage::ShouldntSee("Check method call trait waiter")),
+            }.await) {
+                Ok(found) => return Ok(found),
+                _ => {}
             }
-            .await;
+
+            // If it's not a trait method call, try to find a self-impl method call
+            for implementor in Syntax::get_struct_impl(
+                code_verifier.syntax.clone(),
+                return_type.clone(),
+            )
+            .await
+            {
+                for function in &implementor.functions {
+                    if function.name.split("::").last().unwrap() == method {
+                        let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
+                        match check_method(
+                            method,
+                            finalized_effects.clone(),
+                            &code_verifier.syntax,
+                            variables,
+                            returning.clone(),
+                            &effect.span,
+                        )
+                        .await
+                        {
+                            Ok(result) => return Ok(result),
+                            Err(error) => eprintln!("Error: {}", error.message),
+                        }
+                    }
+                }
+            }
+            return Err(ParsingError::new(
+                effect.span.clone(),
+                ParsingMessage::NoImpl(return_type, method.clone()),
+            ));
         }
     } else {
         if method.contains("::") {

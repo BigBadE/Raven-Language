@@ -1,6 +1,8 @@
-using ptr;
+import types::pointer;
+import types::pointer::Pointer;
 
 fn test() -> bool {
-    //return read(ptr(123)) == 123;
-    return true;
+    let value = 123;
+    let pointer = Pointer::get_ptr(value);
+    return value == pointer.read();
 }

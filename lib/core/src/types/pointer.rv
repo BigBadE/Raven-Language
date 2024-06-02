@@ -1,0 +1,23 @@
+pub struct Pointer<T> {
+    pub data: u64;
+}
+
+impl<T> Pointer<T> {
+    pub fn get_ptr(reading: T) -> Pointer<T> {
+        return new Pointer {
+            data: Pointer::get_ptr_data(reading),
+        };
+    }
+
+    internal fn get_ptr_data(reading: T) -> u64 {
+        
+    }
+
+    pub fn read(self) -> T {
+        return Pointer::read_ptr_data(self.data);
+    }
+
+    internal fn read_ptr_data(pointer: u64) -> T {
+        
+    }
+}

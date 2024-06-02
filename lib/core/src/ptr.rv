@@ -1,7 +1,0 @@
-/*pub internal fn read<T>(pointer: *T) -> T {
-
-}
-
-pub internal fn ptr<T>(pointer: T) -> *T {
-
-}*/
