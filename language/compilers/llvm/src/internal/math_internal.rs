@@ -36,7 +36,6 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Subtract") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
         let returning = compiler
             .builder
@@ -57,7 +56,6 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Multiply") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
         let returning = compiler
             .builder
@@ -78,7 +76,6 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Divide") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_div(
@@ -113,7 +110,6 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Remainder") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_rem(
@@ -177,7 +173,6 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::BitInvert") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
         let returning = compiler
             .builder

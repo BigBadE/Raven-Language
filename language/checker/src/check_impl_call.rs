@@ -41,12 +41,14 @@ pub async fn check_impl_call(
 
     // Get the return type, or VOID if there is none
     let calling_type;
+    let done_calling: Option<Box<FinalizedEffects>>;
     if matches!(calling.types, EffectType::NOP) {
         calling_type = FinalizedTypes::Struct(VOID.clone());
+        done_calling = None;
     } else {
         let calling_effect = verify_effect(code_verifier, variables, *calling.clone()).await?;
         calling_type = get_return(&calling_effect.types, variables, &code_verifier.syntax).await.unwrap();
-        finalized_effects.insert(0, calling_effect);
+        done_calling = Some(Box::new(calling_effect));
     }
 
     // Get the trait
@@ -62,6 +64,7 @@ pub async fn check_impl_call(
         let trait_type = trait_type.finalize(code_verifier.syntax.clone()).await;
         // Simple container for all the data that needs to be stored
         let mut impl_checker = ImplCheckerData {
+            calling: done_calling,
             code_verifier,
             trait_type: &trait_type,
             explicit_generics: &explicit_generics,
@@ -98,6 +101,8 @@ pub async fn check_impl_call(
 
 /// All the data used by implementation checkers
 pub struct ImplCheckerData<'a> {
+    /// The effect being called
+    calling: Option<Box<FinalizedEffects>>,
     /// The code verified fields
     code_verifier: &'a CodeVerifier<'a>,
     /// Trait being checked
@@ -147,7 +152,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
 
             return Ok(Some(FinalizedEffects::new(
                 token.clone(),
-                FinalizedEffectType::VirtualCall(i, function, temp, returning),
+                FinalizedEffectType::VirtualCall(i, function, data.calling.clone().unwrap(), temp, returning),
             )));
         } else if found.name.split("::").last().unwrap() != data.method {
             i += 1;
@@ -196,7 +201,8 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
         let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
         let mut temp = vec![];
         mem::swap(&mut temp, data.finalized_effects);
-        return Ok(Some(FinalizedEffects::new(token.clone(), FinalizedEffectType::VirtualCall(i, output, temp, returning))));
+        return Ok(Some(FinalizedEffects::new(token.clone(), 
+        FinalizedEffectType::VirtualCall(i, output, data.calling.clone().unwrap(), temp, returning))));
     }
 
     if !data.method.is_empty() {
@@ -237,6 +243,7 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
             };
 
             match check_method(
+                data.calling.clone(),
                 method.clone(),
                 data.finalized_effects.clone(),
                 &data.code_verifier.syntax,

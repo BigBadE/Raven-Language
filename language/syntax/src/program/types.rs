@@ -218,6 +218,16 @@ impl FinalizedTypes {
         };
     }
 
+    /// Checks if a type is generic
+    pub fn is_generic(&self) -> bool {
+        return match self {
+            FinalizedTypes::Reference(inner) | FinalizedTypes::Array(inner) => inner.is_generic(),
+            FinalizedTypes::Generic(_, _) => true,
+            FinalizedTypes::Struct(_) => false,
+            FinalizedTypes::GenericType(base, bounds) => base.is_generic() || bounds.iter().any(|found| found.is_generic()),
+        };
+    }
+
     /// Checks if the type is of the other type, following Raven's type rules.
     /// May block until all implementations are finished parsing, must not be called from
     /// implementation parsing to prevent deadlocking.
@@ -553,10 +563,45 @@ impl Display for FinalizedTypes {
 
 impl PartialEq for FinalizedTypes {
     fn eq(&self, other: &Self) -> bool {
-        return self.name_safe().map_or(false, |inner| {
-            other
-                .name_safe()
-                .map_or(false, |other| inner.splitn(2, '$').next().unwrap() == other.splitn(2, '$').next().unwrap())
-        });
+        return recursive_eq(self, other);
+    }
+}
+
+fn recursive_eq(first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
+    if let FinalizedTypes::Reference(inner) = first {
+        return recursive_eq(inner, second);
+    }
+    if let FinalizedTypes::Reference(inner) = second {
+        return recursive_eq(first, inner);
+    }
+    return match first {
+        FinalizedTypes::Struct(first) => match second {
+            FinalizedTypes::Struct(second) => first.data.name.splitn(2, '$').next().unwrap() == 
+            second.data.name.splitn(2, '$').next().unwrap(),
+            _ => false,
+        },
+        FinalizedTypes::Array(first) => match second {
+            FinalizedTypes::Array(second) => recursive_eq(first, second),
+            _ => false,
+        },
+        FinalizedTypes::Generic(name, _) => match second {
+            FinalizedTypes::Generic(other_name, _) => name == other_name,
+            _ => false,
+        },
+        FinalizedTypes::GenericType(base, bounds) => match second {
+            FinalizedTypes::GenericType(second_base, second_bounds) => {
+                if base != second_base || bounds.len() != second_bounds.len() {
+                    return false;
+                }
+                for i in 0..bounds.len() {
+                    if bounds[i] != second_bounds[i] {
+                        return false;
+                    }
+                } 
+                return true;
+            },
+            _ => false
+        },
+        _ => unreachable!()
     }
 }

@@ -4,7 +4,7 @@ pub struct Pointer<T> {
 
 impl<T> Pointer<T> {
     pub fn get_ptr(reading: T) -> Pointer<T> {
-        return new Pointer {
+        return new Pointer<T> {
             data: Pointer::get_ptr_data(reading),
         };
     }

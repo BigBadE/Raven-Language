@@ -239,8 +239,8 @@ pub enum FinalizedEffectType {
     /// Creates a character
     Char(char),
     /// Calls a virtual method, usually a downcasted trait, with the given function index, function, and generic return type (if any)
-    /// and on the given arguments (first argument must be the downcased trait).
-    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>, Option<(FinalizedTypes, Span)>),
+    /// and with the given arguments on the given effect (the downcased trait).
+    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Box<FinalizedEffects>, Vec<FinalizedEffects>, Option<(FinalizedTypes, Span)>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on EffectType::ImplementationCall
     GenericVirtualCall(
         usize,
@@ -272,7 +272,7 @@ impl FinalizedEffectType {
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
             Self::MethodCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
-            | Self::VirtualCall(_, function, _, _)
+            | Self::VirtualCall(_, function, _, _, _)
             | Self::GenericVirtualCall(_, _, function, _, _) => {
                 function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
             }
@@ -292,7 +292,9 @@ impl FinalizedEffectType {
                 .find(|field| &field.field.name == name)
                 .map(|field| field.field.field_type.clone()),
             // Returns the program type.
-            Self::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
+            Self::CreateStruct(_, types, _) => {
+                Some(FinalizedTypes::Reference(Box::new(types.clone())))
+            },
             // Returns the internal constant type.
             Self::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             Self::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),

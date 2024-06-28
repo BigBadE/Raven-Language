@@ -33,10 +33,10 @@ pub async fn degeneric_effect(
 ) -> Result<(), ParsingError> {
     match effect {
         FinalizedEffectType::CreateVariable(name, value, types) => {
-            *types = get_return(&value.types, variables, syntax).await.unwrap();
-            variables.variables.insert(name.clone(), types.clone());
             degeneric_effect(&mut value.types, syntax, process_manager, variables, span).await?;
+            *types = get_return(&value.types, variables, syntax).await.unwrap();
             degeneric_type(types, process_manager.generics(), syntax).await;
+            variables.variables.insert(name.clone(), types.clone());
         }
         FinalizedEffectType::CompareJump(effect, _, _) => {
             degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?
@@ -44,7 +44,7 @@ pub async fn degeneric_effect(
         FinalizedEffectType::CodeBody(body) => degeneric_code_body(body, process_manager, variables, syntax).await?,
         FinalizedEffectType::MethodCall(calling, function, arguments, return_type) => {
             if let Some(found) = calling {
-                degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
+                arguments.insert(0, *found.clone());
             }
 
             let mut before_arguments = function.arguments.clone();
@@ -74,13 +74,18 @@ pub async fn degeneric_effect(
 
             *function = degeneric_function(
                 function.clone(),
-                process_manager.cloned(),
+                degenericing_process_manager.cloned(),
                 arguments,
                 syntax,
                 variables,
                 return_type.clone(),
             )
             .await?;
+
+            let mut output = Vec::new();
+            for arg in &*arguments {
+                output.push(arg.types.clone());
+            }
 
             for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
@@ -103,7 +108,6 @@ pub async fn degeneric_effect(
             let name = function.data.name.split("::").last().unwrap();
             let function =
                 implementation.iter().flat_map(|(_, inner)| inner).find(|inner| inner.name.ends_with(&name)).unwrap();
-
             arguments.insert(0, calling.clone());
             let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
             let function =
@@ -148,7 +152,8 @@ pub async fn degeneric_effect(
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
         }
-        FinalizedEffectType::VirtualCall(_, function, arguments, returning) => {
+        FinalizedEffectType::VirtualCall(_, function, calling, arguments, returning) => {
+            arguments.insert(0, *calling.clone());
             *function = degeneric_function(
                 function.clone(),
                 process_manager.cloned(),
@@ -180,7 +185,8 @@ pub async fn degeneric_effect(
             let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
             let mut temp = vec![];
             mem::swap(&mut temp, effects);
-            *effect = FinalizedEffectType::VirtualCall(*index, output, temp, returning.clone());
+            let calling = temp.remove(0);
+            *effect = FinalizedEffectType::VirtualCall(*index, output, Box::new(calling), temp, returning.clone());
             degeneric_effect(effect, syntax, process_manager, variables, span).await?;
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
@@ -295,6 +301,12 @@ pub async fn degeneric_function(
             .field_type
             .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.clone())
             .await?;
+    }
+
+    // Fixes any generics referencing other generics
+    let generics = manager.generics().clone();
+    for (_, generic) in manager.mut_generics() {
+        degeneric_type(generic, &generics, syntax).await;
     }
 
     // Now all the generic types have been resolved, it's time to replace them with
@@ -430,7 +442,12 @@ pub async fn degeneric_type(
     return match types {
         FinalizedTypes::Generic(name, _) => {
             if let Some(found) = generics.get(name) {
-                types.clone_from(found);
+                if found.is_generic() && types != found {
+                    types.clone_from(found);
+                    degeneric_type(types, generics, syntax).await;
+                } else {
+                    types.clone_from(found);
+                }
             }
         }
         FinalizedTypes::GenericType(base, bounds) => {
@@ -476,9 +493,16 @@ pub async fn degeneric_type(
                 let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), base.data.clone()).await.deref());
                 data.data.clone_from(&arc_other);
 
+                let mut struct_generics = HashMap::new();
+                let mut i = 0;
+                for (name, _types) in &base.generics {
+                    struct_generics.insert(name.clone(), bounds[i].clone());
+                    i += 1;
+                }
+
                 // Update the program's fields
                 for field in &mut data.fields {
-                    degeneric_type(&mut field.field.field_type, generics, syntax).await;
+                    degeneric_type(&mut field.field.field_type, &struct_generics, syntax).await;
                 }
 
                 let data = Arc::new(data);

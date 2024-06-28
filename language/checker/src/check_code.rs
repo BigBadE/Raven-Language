@@ -16,7 +16,6 @@ use syntax::SimpleVariableManager;
 use crate::check_impl_call::check_impl_call;
 use crate::check_method_call::check_method_call;
 use crate::check_operator::check_operator;
-use crate::degeneric::degeneric_type_fields;
 use crate::{get_return, CodeVerifier};
 
 /// Verifies a block of code, linking all method calls and types, and making sure the code is ready to compile.
@@ -205,7 +204,7 @@ async fn verify_create_struct(
     effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
-    let mut target = Syntax::parse_type(
+    let target = Syntax::parse_type(
         code_verifier.syntax.clone(),
         Span::default(),
         code_verifier.resolver.boxed_clone(),
@@ -242,7 +241,7 @@ async fn verify_create_struct(
         final_effects.push((i, final_effect));
     }
 
-    degeneric_type_fields(&mut target, &mut generics, &code_verifier.syntax).await;
+    //degeneric_type_fields(&mut target, &mut generics, &code_verifier.syntax).await;
     return Ok(FinalizedEffects::new(
         Span::default(),
         FinalizedEffectType::CreateStruct(

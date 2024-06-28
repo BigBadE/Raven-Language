@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
-use std::path::PathBuf;
 
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId};
 use lsp_types::notification::{DidChangeTextDocument, DidOpenTextDocument};
@@ -118,7 +117,7 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
                 match cast::<GotoDeclaration>(req) {
-                    Ok((id, params)) => {
+                    Ok((_id, params)) => {
                         syntax.get_syntax(params.text_document_position_params.text_document.uri.to_file_path().unwrap());
                         let mut position = params.text_document_position_params.position;
                         position.line += 1;
@@ -145,7 +144,6 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> Result<(), Bo
                                     .as_slice()
                             )
                         );
-                        continue;
                     }
                     Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
                     Err(ExtractError::MethodMismatch(req)) => req,

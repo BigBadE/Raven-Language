@@ -5,7 +5,6 @@ use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::internal::math_internal::math_internal;
 use crate::internal::string_internal::string_internal;
 use crate::type_getter::CompilerTypeGetter;
-use inkwell::builder::Builder;
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue};
 use inkwell::AddressSpace;
@@ -145,7 +144,7 @@ pub fn compile_internal<'ctx>(
                 .builder
                 .build_gep(
                     type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    value.get_type().get_return_type().unwrap().ptr_type(AddressSpace::default()).const_zero(),
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()).const_zero(),
                     &[type_getter.compiler.context.i64_type().const_int(1, false)],
                     "0",
                 )

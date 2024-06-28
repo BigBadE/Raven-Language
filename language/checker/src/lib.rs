@@ -70,7 +70,7 @@ pub async fn get_return(
     syntax: &Arc<Mutex<Syntax>>,
 ) -> Option<FinalizedTypes> {
     return match types {
-        FinalizedEffectType::MethodCall(_, function, args, return_type) => match function.return_type.as_ref().cloned() {
+        FinalizedEffectType::MethodCall(calling, function, _, return_type) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
                 if let Some((return_type, _)) = return_type {
                     let generics = function
@@ -79,7 +79,7 @@ pub async fn get_return(
                         .map(|(name, _)| (name.clone(), return_type.clone()))
                         .collect::<HashMap<_, _>>();
                     degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
-                } else if let Some(calling) = args.get(0) {
+                } else if let Some(calling) = calling {
                     let other = get_return(&calling.types, variables, syntax).await;
                     if let Some(found) = other {
                         let mut generics = HashMap::new();
@@ -98,7 +98,7 @@ pub async fn get_return(
             None => None,
         },
         FinalizedEffectType::GenericMethodCall(function, _, args)
-        | FinalizedEffectType::VirtualCall(_, function, args, _)
+        | FinalizedEffectType::VirtualCall(_, function, _, args, _)
         | FinalizedEffectType::GenericVirtualCall(_, _, function, args, _) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
                 if let Some(calling) = args.get(0) {

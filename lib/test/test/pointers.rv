@@ -3,6 +3,8 @@ import types::pointer::Pointer;
 
 fn test() -> bool {
     let value = 123;
+    // Is a Pointer<u64>
     let pointer = Pointer::get_ptr(value);
+    // Returns a T which is a u64
     return value == pointer.read();
 }

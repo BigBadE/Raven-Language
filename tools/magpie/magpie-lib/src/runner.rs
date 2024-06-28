@@ -10,7 +10,7 @@ use syntax::program::syntax::Syntax;
 use crate::build_project;
 use crate::project::RavenProject;
 
-pub fn build_file<T: RavenExtern + 'static>(
+pub fn _build_file<T: RavenExtern + 'static>(
     arguments: &mut Arguments,
     sources: &mut Vec<Box<dyn SourceSet>>,
     compile: bool,
@@ -22,7 +22,7 @@ pub fn build_file<T: RavenExtern + 'static>(
 
     let build_sources = arguments.runner_settings.compiler_arguments.temp_folder.parent().unwrap().join("build.rv");
     arguments.runner_settings.compiler_arguments.target = "build::project".to_string();
-    let project = build_project::<RavenProject>(arguments, &mut vec![Box::new(FileSourceSet { root: build_sources })], true)
+    let _project = build_project::<RavenProject>(arguments, &mut vec![Box::new(FileSourceSet { root: build_sources })], true)
         .unwrap()
         .1
         .unwrap();

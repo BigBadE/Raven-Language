@@ -230,7 +230,7 @@ fn is_compatible_llvm(llvm_version: &Version) -> bool {
         return false;
     }
 
-    let strict = env::var_os(&*ENV_STRICT_VERSIONING).is_some() || cfg!(feature = "strict-versioning");
+    let strict = env::var_os(&*ENV_STRICT_VERSIONING).is_some();
     if strict {
         llvm_version.major == CRATE_VERSION.major && llvm_version.minor == CRATE_VERSION.minor
     } else {
@@ -521,23 +521,7 @@ struct LinkingPreferences {
 
 impl LinkingPreferences {
     fn init() -> LinkingPreferences {
-        let prefer_static = cfg!(feature = "prefer-static");
-        let prefer_dynamic = cfg!(feature = "prefer-dynamic");
-        let force_static = cfg!(feature = "force-static");
-        let force_dynamic = cfg!(feature = "force-dynamic");
-
-        // more than one preference is an error
-        if [prefer_static, prefer_dynamic, force_static, force_dynamic].iter().filter(|&&x| x).count() > 1 {
-            panic!(
-                "Only one of the features `prefer-static`, `prefer-dynamic`, `force-static`, \
-                 `force-dynamic` can be enabled at once"
-            );
-        }
-
-        // if no preference is given, default to force static linking, matching previous behavior
-        let force_static = force_static || !(prefer_static || prefer_dynamic || force_dynamic);
-
-        LinkingPreferences { prefer_static: force_static || prefer_static, force: force_static || force_dynamic }
+        LinkingPreferences { prefer_static: true, force: false }
     }
 }
 
