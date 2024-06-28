@@ -14,7 +14,6 @@ trait Equal<T> {
     fn equal(self, other: T) -> bool;
 }
 
-
 #[priority(-10)]
 #[operation({}>{})]
 trait GreaterThan<T> {

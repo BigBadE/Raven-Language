@@ -456,61 +456,6 @@ pub async fn degeneric_type(
             for bound in &mut *bounds {
                 degeneric_type(bound, generics, syntax).await;
             }
-
-            let base = base.inner_struct();
-            if bounds.is_empty() {
-                *types = FinalizedTypes::Struct(base.clone());
-                // If there are no bounds, we're good.
-                return;
-            }
-            let name = format!("{}<{}>", base.data.name, display_parenless(&bounds, ", "));
-            // If this type has already been flattened with these args, return that.
-            if syntax.lock().structures.types.contains_key(&name) {
-                let data;
-                {
-                    let locked = syntax.lock();
-                    // skipcq: RS-W1070 Initialization of a value can't use clone_from
-                    data = locked.structures.types.get(&name).unwrap().clone();
-                }
-                let base = AsyncDataGetter::new(syntax.clone(), data).await;
-                *types = FinalizedTypes::Struct(base.clone());
-            } else {
-                // Clone the type and add the new type to the structures.
-                let mut other = StructData::clone(&base.data);
-                other.name.clone_from(&name);
-
-                // Update the program's functions
-                for function in &mut other.functions {
-                    let mut temp = FunctionData::clone(function);
-                    temp.name = format!("{}::{}", name, temp.name.split("::").last().unwrap());
-                    let temp = Arc::new(temp);
-                    *function = temp;
-                }
-
-                let arc_other = Arc::new(other);
-
-                // Get the FinalizedStruct and degeneric it.
-                let mut data = FinalizedStruct::clone(AsyncDataGetter::new(syntax.clone(), base.data.clone()).await.deref());
-                data.data.clone_from(&arc_other);
-
-                let mut struct_generics = HashMap::new();
-                let mut i = 0;
-                for (name, _types) in &base.generics {
-                    struct_generics.insert(name.clone(), bounds[i].clone());
-                    i += 1;
-                }
-
-                // Update the program's fields
-                for field in &mut data.fields {
-                    degeneric_type(&mut field.field.field_type, &struct_generics, syntax).await;
-                }
-
-                let data = Arc::new(data);
-                // Add the flattened type to the syntax
-                let mut locked = syntax.lock();
-                locked.structures.add_data(arc_other, data.clone());
-                *types = FinalizedTypes::Struct(data.clone());
-            }
         }
         FinalizedTypes::Reference(inner) => degeneric_type(inner, generics, syntax).await,
         FinalizedTypes::Array(inner) => degeneric_type(inner, generics, syntax).await,

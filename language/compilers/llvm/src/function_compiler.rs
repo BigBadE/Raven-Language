@@ -206,7 +206,7 @@ pub fn compile_effect<'ctx>(
         }
         FinalizedEffectType::CodeBody(body) => compile_block(body, function, type_getter, id),
         //Calling function, function arguments
-        FinalizedEffectType::MethodCall(calling_on, calling_function, arguments, _) => {
+        FinalizedEffectType::MethodCall(_calling_on, calling_function, arguments, _) => {
             let mut final_arguments = Vec::default();
 
             let calling = type_getter.get_function(calling_function);
@@ -265,9 +265,9 @@ pub fn compile_effect<'ctx>(
         //Loads variable/field pointer from program, or self if program is None
         FinalizedEffectType::Load(loading_from, field, _) => {
             let from = compile_effect(type_getter, function, loading_from, id).unwrap();
-            //Compensate for type id
-            let mut offset = 1;
-            let structure = loading_from.types.get_nongeneric_return(type_getter).unwrap();
+            let mut offset = 0;
+            let mut structure = loading_from.types.get_nongeneric_return(type_getter).unwrap();
+            type_getter.fix_generic_struct(&mut structure);
             let structure = structure.inner_struct();
             for struct_field in &structure.fields {
                 if &struct_field.field.name != field {
@@ -276,9 +276,8 @@ pub fn compile_effect<'ctx>(
                     break;
                 }
             }
-            let mut fields =
+            let fields =
                 structure.fields.iter().map(|field| type_getter.get_type(&field.field.field_type)).collect::<Vec<_>>();
-            fields.insert(0, type_getter.compiler.context.i64_type().as_basic_type_enum());
 
             let gep = type_getter
                 .compiler
@@ -311,27 +310,11 @@ pub fn compile_effect<'ctx>(
             let pointer = compile_effect(type_getter, function, effect.as_ref().unwrap(), id).unwrap().into_pointer_value();
             *id += 1;
 
-            let id_field = type_getter
-                .compiler
-                .builder
-                .build_bit_cast(pointer, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
-                .unwrap();
-
-            type_getter
-                .compiler
-                .builder
-                .build_store(
-                    id_field.into_pointer_value(), //Pointer to the id field
-                    type_getter.compiler.context.i64_type().const_int(structure.id(), false),
-                )
-                .unwrap();
-
-            let mut fields =
+            let fields =
                 out_arguments.iter().map(|argument| unsafe { argument.assume_init() }.get_type()).collect::<Vec<_>>();
-            fields.insert(0, type_getter.compiler.context.i64_type().as_basic_type_enum());
             let structure = type_getter.compiler.context.struct_type(fields.as_slice(), false);
 
-            let mut offset = 1;
+            let mut offset = 0;
             for argument in out_arguments {
                 let value = unsafe { argument.assume_init() };
 
