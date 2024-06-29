@@ -126,6 +126,6 @@ impl<'ctx> CompilerImpl<'ctx> {
                                        .to_str().unwrap()).unwrap().as_ptr());
         }*/
 
-        print_formatted(type_getter.compiler.module.to_string());
+        //print_formatted(type_getter.compiler.module.to_string());
     }
 }

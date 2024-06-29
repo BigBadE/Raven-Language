@@ -209,7 +209,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             TokenTypes::Operator => {
                 let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap();
                 // If there is a variable right next to a less than, it's probably a generic method call.
-                // Example: test<Value>()
+                // Example: test<Value>() or Structure<Value>::method()
                 parser_utils.index -= 1;
                 if (last.token_type == TokenTypes::Variable || last.token_type == TokenTypes::CallingType)
                     && is_generic(&parser_utils.tokens[parser_utils.index - 1], parser_utils)
@@ -471,6 +471,22 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
             None
         };
 
+    if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Colon
+        && parser_utils.tokens[parser_utils.index + 1].token_type == TokenTypes::Colon
+        && parser_utils.tokens[parser_utils.index + 2].token_type == TokenTypes::Variable
+    {
+        let calling = parser_utils.tokens[parser_utils.index + 2].to_string(parser_utils.buffer);
+        parser_utils.index += 4;
+        return Ok(Effects {
+            types: EffectType::MethodCall(
+                effect.map(|inner| Box::new(inner)),
+                format!("{}::{}", name.clone(), calling),
+                get_effects(parser_utils)?,
+                returning,
+            ),
+            span: Span::new(parser_utils.file, token),
+        });
+    }
     parser_utils.index += 1;
     return Ok(Effects {
         types: EffectType::MethodCall(
