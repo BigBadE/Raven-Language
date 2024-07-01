@@ -6,7 +6,7 @@ use std::mem;
 use syntax::async_util::UnparsedType;
 use syntax::errors::ParsingError;
 use syntax::errors::{ErrorSource, ParsingMessage};
-use syntax::program::code::{EffectType, Effects, Expression, ExpressionType};
+use syntax::program::code::{EffectType, Effects, Expression, ExpressionType, IntType};
 use syntax::program::function::CodeBody;
 
 /// Parsers a block of code into its return type (if all code paths lead to a single type, or else a line) and the code body.
@@ -61,7 +61,14 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
         if effect.is_some() {
             match token.token_type {
                 TokenTypes::Float
-                | TokenTypes::Integer
+                | TokenTypes::IntegerI8
+                | TokenTypes::IntegerI16
+                | TokenTypes::IntegerI32
+                | TokenTypes::IntegerI64
+                | TokenTypes::IntegerU8
+                | TokenTypes::IntegerU16
+                | TokenTypes::IntegerU32
+                | TokenTypes::IntegerU64
                 | TokenTypes::Char
                 | TokenTypes::True
                 | TokenTypes::False
@@ -284,13 +291,25 @@ fn parse_basic_line(
             ));
             ControlFlow::Skipping
         }
-        TokenTypes::Integer => {
+        TokenTypes::IntegerI8 | TokenTypes::IntegerI16 | TokenTypes::IntegerI32 | TokenTypes::IntegerI64 | 
+        TokenTypes::IntegerU8 | TokenTypes::IntegerU16 | TokenTypes::IntegerU32 | TokenTypes::IntegerU64 => {
             *effect = Some(Effects::new(
                 Span::new(parser_utils.file, parser_utils.index),
-                EffectType::Int(token.to_string(parser_utils.buffer).parse().unwrap()),
+                EffectType::Int(token.to_string(parser_utils.buffer).parse().unwrap(), match token.token_type {
+                    TokenTypes::IntegerI8 => IntType::I8,
+                    TokenTypes::IntegerI16 => IntType::I16,
+                    TokenTypes::IntegerI32 => IntType::I32,
+                    TokenTypes::IntegerI64 => IntType::I64,
+                    TokenTypes::IntegerU8 => IntType::U8,
+                    TokenTypes::IntegerU16 => IntType::U16,
+                    TokenTypes::IntegerU32 => IntType::U32,
+                    TokenTypes::IntegerU64 => IntType::U64,
+                    _ => panic!(),
+                
+                }),
             ));
             ControlFlow::Skipping
-        }
+        }        
         TokenTypes::Char => {
             *effect = Some(Effects::new(
                 Span::new(parser_utils.file, parser_utils.index),
