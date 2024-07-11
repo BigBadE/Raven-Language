@@ -352,7 +352,8 @@ impl Syntax {
 
     /// Adds the element to the syntax
     fn add<T: TopElement + 'static>(&mut self, adding: &mut Arc<T>) {
-        /*if T::get_manager(locked.deref_mut()).types.contains_key(adding.name()) {
+        /*TODO fix duplicate catching
+        if T::get_manager(locked.deref_mut()).types.contains_key(adding.name()) {
             locked.errors.push(adding.get_span().make_error("Duplicate type!"));
         }*/
 

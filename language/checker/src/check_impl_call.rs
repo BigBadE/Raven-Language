@@ -47,6 +47,15 @@ pub async fn check_impl_call(
         done_calling = None;
     } else {
         let calling_effect = verify_effect(code_verifier, variables, *calling.clone()).await?;
+        if get_return(&calling_effect.types, variables, &code_verifier.syntax).await.is_none() {
+            match &calling_effect.types {
+                FinalizedEffectType::Load(inner, name, _) => {
+                    //println!("{:?}", get_return(&inner.types, variables, &code_verifier.syntax).await
+                    //.unwrap().get_fields().iter().map(|field| field.field.name.clone()).collect::<Vec<_>>())                    
+                },
+                _ => {}
+            }
+        }
         calling_type = get_return(&calling_effect.types, variables, &code_verifier.syntax).await.unwrap();
         done_calling = Some(Box::new(calling_effect));
     }
@@ -201,8 +210,10 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
         let output = AsyncDataGetter::new(data.code_verifier.syntax.clone(), target.clone()).await;
         let mut temp = vec![];
         mem::swap(&mut temp, data.finalized_effects);
-        return Ok(Some(FinalizedEffects::new(token.clone(), 
-        FinalizedEffectType::VirtualCall(i, output, data.calling.clone().unwrap(), temp, returning))));
+        return Ok(Some(FinalizedEffects::new(
+            token.clone(),
+            FinalizedEffectType::VirtualCall(i, output, data.calling.clone().unwrap(), temp, returning),
+        )));
     }
 
     if !data.method.is_empty() {

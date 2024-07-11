@@ -26,7 +26,15 @@ impl<T> Pointer<T> {
         return Pointer::read_ptr_data(self.data);
     }
 
+    pub fn write(self, data: T) {
+        Pointer::write_ptr_data(self.data, data);
+    }
+
     internal fn read_ptr_data(pointer: u64) -> T {
+        
+    }
+    
+    internal fn write_ptr_data(pointer: u64, data: T) {
         
     }
 
@@ -37,6 +45,7 @@ impl<T> Pointer<T> {
 
 internal impl<T> Add<u64, Pointer<T>> for Pointer<T> {
     fn add(self, other: u64) -> Pointer<T> {
+        self.data += other;
         return self;
     }
 }

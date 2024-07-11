@@ -60,6 +60,7 @@ pub fn parse_structure(
                     member_modifiers.push(Modifier::Internal);
                 }
             }
+            // TODO remove this, not sure why it's here
             TokenTypes::FunctionStart => {
                 let file = parser_utils.file_name.clone();
                 if parser_utils.file_name.is_empty() {
@@ -191,7 +192,7 @@ pub fn parse_implementor(
                 member_attributes = Vec::default();
                 member_modifiers = Vec::default();
             }
-            TokenTypes::StructTopElement => {}
+            TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::StructEnd | TokenTypes::EOF => break,
             TokenTypes::InvalidCharacters => {
                 return (

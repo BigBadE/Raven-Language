@@ -1,15 +1,25 @@
-import types::Pointer;
+import types::pointer;
 
-/*pub struct Array<T> {
-    size: u64,
-    data: Pointer<T>
+pub struct Array<T> {
+    size: u64;
+    data: Pointer<T>;
 }
 
 impl<T> Array<T> {
-    /*pub fn new(size: u64) -> Array<T> {
+    pub fn new(size: u64) -> Array<T> {
         return new Array<T> {
             size: size,
-            pointer: Pointer<T>::alloc_empty(size * Pointer<T>::get_size()),
+            data: Pointer<T>::alloc_empty(size * Pointer<T>::get_size()),
         };
+    }
+
+    /*pub fn set(self, index: u64, data: T) {
+        let target = self.data + (index * Pointer<T>::get_size());
+        target.write(data);
+    }
+
+    pub fn get(self, index: u64) -> T {
+        let target = self.data + (index * Pointer<T>::get_size());
+        return target.get();
     }*/
-}*/
+}

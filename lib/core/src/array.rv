@@ -1,21 +1,3 @@
-import iter;
-
-trait Array<T> {
-    fn length(self) -> u64;
-
-    fn iter(self) -> Iter<T>;
-}
-
-internal impl<T> Array for [T] {
-    fn length(self) -> u64 {
-
-    }
-
-    fn iter(self) -> Iter<T> {
-
-    }
-}
-
 #[operation([{+}])]
 trait CreateArray<T> {
     fn instance(self) -> [T];
