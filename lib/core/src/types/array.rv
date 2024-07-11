@@ -1,0 +1,15 @@
+import types::Pointer;
+
+/*pub struct Array<T> {
+    size: u64,
+    data: Pointer<T>
+}
+
+impl<T> Array<T> {
+    /*pub fn new(size: u64) -> Array<T> {
+        return new Array<T> {
+            size: size,
+            pointer: Pointer<T>::alloc_empty(size * Pointer<T>::get_size()),
+        };
+    }*/
+}*/

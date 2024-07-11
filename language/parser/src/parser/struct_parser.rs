@@ -253,12 +253,12 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Unparse
                 let name = token.to_string(parser_utils.buffer);
                 current.push(UnparsedType::Basic(name));
             }
-            TokenTypes::GenericsEnd => {
+            TokenTypes::GenericsEnd | TokenTypes::GenericBoundEnd => {
                 break;
             }
             TokenTypes::GenericEnd => {}
             _ => {
-                panic!("Unexpected type!");
+                panic!("Unexpected type {:?}: {}", token.token_type, token.to_string(parser_utils.buffer));
             }
         }
     }
@@ -298,7 +298,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                 let unparsed = if let Some(inner) = parse_bounds(name.clone(), parser_utils) {
                     inner
                 } else {
-                    break;
+                    return;
                 };
                 unparsed_bounds.push(unparsed.clone());
                 bounds.push(Syntax::parse_type(
@@ -315,7 +315,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                     generics.insert(name.clone(), bounds);
                 }
 
-                break;
+                return;
             }
             _ => panic!(
                 "Unknown token type {:?} - {} ({:?})",
@@ -363,7 +363,9 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
                 }
             }
             TokenTypes::GenericEnd => {}
-            TokenTypes::GenericBoundEnd => break,
+            TokenTypes::GenericBoundEnd => {
+                break
+            },
             TokenTypes::GenericsEnd => {
                 parser_utils.index -= 1;
                 break;

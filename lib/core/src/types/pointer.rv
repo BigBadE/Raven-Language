@@ -1,8 +1,17 @@
+import mem;
+import math;
+
 pub struct Pointer<T> {
     pub data: u64;
 }
 
 impl<T> Pointer<T> {
+    pub fn alloc_empty(size: u64) -> Pointer<T> {
+        return new Pointer<T> { 
+            data: malloc(size),
+        };
+    }
+
     pub fn get_ptr(reading: T) -> Pointer<T> {
         return new Pointer<T> {
             data: Pointer::get_ptr_data(reading),
@@ -19,5 +28,15 @@ impl<T> Pointer<T> {
 
     internal fn read_ptr_data(pointer: u64) -> T {
         
+    }
+
+    internal fn get_size() -> u64 {
+
+    }
+}
+
+internal impl<T> Add<u64, Pointer<T>> for Pointer<T> {
+    fn add(self, other: u64) -> Pointer<T> {
+        return self;
     }
 }

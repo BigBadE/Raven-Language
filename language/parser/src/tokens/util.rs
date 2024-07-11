@@ -147,8 +147,8 @@ pub fn next_generic(tokenizer: &mut Tokenizer) -> Token {
         TokenTypes::GenericsStart | TokenTypes::GenericEnd => {
             parse_to_character(tokenizer, TokenTypes::Generic, &[b':', b',', b'>', b'<'])
         }
-        //              T       : Test       <             Other   <             Second  >               >               ,          E       : Yep
-        //GenericsStart Generic GenericBound GenericsStart Generic GenericsStart Generic GenericBoundEnd GenericBoundEnd GenericEnd Generic GenericBound
+        //<             T       : Test       <             Other   <             Second  >               >               ,          E       : Yep        >
+        //GenericsStart Generic GenericBound GenericsStart Generic GenericsStart Generic GenericBoundEnd GenericBoundEnd GenericEnd Generic GenericBound GenericsEnd
         TokenTypes::Generic | TokenTypes::GenericBound | TokenTypes::GenericBoundEnd => {
             if tokenizer.matches(":") || tokenizer.matches("+") {
                 parse_to_character(tokenizer, TokenTypes::GenericBound, &[b',', b'+', b'>', b'<'])
