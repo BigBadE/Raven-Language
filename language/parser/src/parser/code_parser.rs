@@ -323,7 +323,10 @@ fn parse_basic_line(
         TokenTypes::For => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_for(parser_utils)?)),
         TokenTypes::While => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_while(parser_utils)?)),
         TokenTypes::Do => ControlFlow::Returning(Expression::new(expression_type.clone(), parse_do_while(parser_utils)?)),
-        TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::ArgumentEnd => ControlFlow::Finish,
+        TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::ArgumentEnd => {
+            parser_utils.index -= 1;
+            ControlFlow::Finish
+        },
         TokenTypes::Comment => ControlFlow::Skipping,
         TokenTypes::ParenOpen => {
             let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
@@ -354,6 +357,7 @@ fn parse_basic_line(
                         ));
                         ControlFlow::Skipping
                     } else {
+                        // TODO figure out if this actually ever triggers
                         //effect = None;
                         panic!("Unknown code path - report this!");
                     }
@@ -576,7 +580,7 @@ fn parse_new(parser_utils: &mut ParserUtils, span: &Span) -> Result<Effects, Par
     return Ok(Effects::new(Span::new(parser_utils.file, type_token), EffectType::CreateStruct(types.unwrap(), values)));
 }
 
-/// Parses the arguments to a new program
+/// Parses the arguments to a new struct effect
 fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(String, Effects)>, ParsingError> {
     let mut values = Vec::default();
     let mut name = String::default();
@@ -601,12 +605,6 @@ fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(St
                 name = String::default();
             }
             TokenTypes::BlockEnd => break,
-            TokenTypes::LineEnd => {
-                if parser_utils.tokens.get(parser_utils.index - 2).unwrap().token_type == TokenTypes::BlockEnd {
-                    parser_utils.index -= 1;
-                    break;
-                }
-            }
             TokenTypes::InvalidCharacters => {}
             TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type),

@@ -305,7 +305,7 @@ pub async fn check_args(
         length += 1;
     }
     if function.arguments.len() != length {
-        return Err(span.make_error(ParsingMessage::MissingArgument()));
+        return Err(span.make_error(ParsingMessage::MissingArgument(function.arguments.len() as u64, length as u64)));
     }
 
     for i in 0..function.arguments.len() {

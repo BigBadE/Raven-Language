@@ -106,6 +106,8 @@ pub fn parse_operator(
         effects.push(found);
     }
 
+    //let span = effects.last().unwrap().span.clone();
+    //parser_utils.index = span.end;
     let mut last = parser_utils.tokens[parser_utils.index - 1].token_type.clone();
     while TokenTypes::BlockStart == last
         || TokenTypes::LineEnd == last

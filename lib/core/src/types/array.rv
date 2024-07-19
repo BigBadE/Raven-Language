@@ -6,12 +6,12 @@ pub struct Array<T> {
 }
 
 impl<T> Array<T> {
-    pub fn new(size: u64) -> Array<T> {
+    /*pub fn new(size: u64) -> Array<T> {
         return new Array<T> {
             size: size,
-            data: Pointer<T>::alloc_empty(size * Pointer<T>::get_size()),
+            data: Pointer<T>::alloc_empty(size * test()),
         };
-    }
+    }*/
 
     /*pub fn set(self, index: u64, data: T) {
         let target = self.data + (index * Pointer<T>::get_size());
@@ -22,4 +22,8 @@ impl<T> Array<T> {
         let target = self.data + (index * Pointer<T>::get_size());
         return target.get();
     }*/
+}
+
+pub fn test() -> u64 {
+    return 0;
 }

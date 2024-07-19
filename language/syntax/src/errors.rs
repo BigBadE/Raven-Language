@@ -35,7 +35,7 @@ pub enum ParsingMessage {
     MismatchedTypes(FinalizedTypes, FinalizedTypes),
     UnknownOperation(String),
     UnknownFunction(),
-    MissingArgument(),
+    MissingArgument(u64, u64),
     AmbiguousMethod(String),
     NoMethod(String, FinalizedTypes),
     NoImpl(FinalizedTypes, String),
@@ -77,7 +77,7 @@ impl Display for ParsingMessage {
             }
             ParsingMessage::UnknownOperation(operation) => write!(f, "Unknown operation '{}'", operation),
             ParsingMessage::UnknownFunction() => write!(f, "Unknown function!"),
-            ParsingMessage::MissingArgument() => write!(f, "Incorrect arguments length!"),
+            ParsingMessage::MissingArgument(expected, found) => write!(f, "Expected {} arguments but found {}!", expected, found),
             ParsingMessage::AmbiguousMethod(name) => write!(f, "Ambiguous method {}!", name),
             ParsingMessage::NoMethod(name, types) => write!(f, "No method {} for generic {}", name, fix_type(types)),
             ParsingMessage::NoImpl(base, method) => {
