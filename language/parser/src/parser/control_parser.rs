@@ -27,6 +27,10 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
     // Get the code inside the if statement
     let (mut returning, body) = parse_code(parser_utils)?;
+    
+    if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::BlockEnd {
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters()));
+    }
 
     let mut else_ifs = Vec::default();
     let mut else_body = None;
@@ -47,9 +51,15 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             }
 
             parser_utils.index += 1;
-
             // Get the body of the else if block
             let (other_returning, body) = parse_code(parser_utils)?;
+
+            if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::BlockEnd {
+                return Err(
+                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters())
+                );
+            }
+            
             // An if statement is only the return of the block if every code path returns, so if they differ
             // this can't be a return block.
             if other_returning != returning {
@@ -60,6 +70,13 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             parser_utils.index += 2;
             // Get the else body
             let (other_returning, body) = parse_code(parser_utils)?;
+
+            if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::BlockEnd {
+                return Err(
+                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters())
+                );
+            }
+
             // Check to make sure the else body returns if the other bodies do.
             if other_returning != returning {
                 returning = ExpressionType::Line;
@@ -82,6 +99,17 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
         returning,
         create_if(effect.unwrap().effect, body, else_ifs, else_body, parser_utils.imports.last_id - adding)?,
     ));
+}
+
+pub struct Test<K, V> {
+    first: K,
+    second: V
+}
+
+impl<K> Test<K, u64> {
+    pub fn new() -> Self {
+        todo!();
+    }
 }
 
 /// Parses a for statement into a single expression

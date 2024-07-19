@@ -113,7 +113,7 @@ pub async fn verify_function_code(
                 FinalizedEffects::new(Span::default(), FinalizedEffectType::NOP),
             ));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
-            return Err(codeless.data.span.make_error(ParsingMessage::UnexpectedVoid()));
+            return Err(codeless.data.span.make_error(ParsingMessage::NoReturn()));
         }
     }
 

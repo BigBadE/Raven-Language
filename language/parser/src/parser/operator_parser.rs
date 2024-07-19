@@ -11,14 +11,17 @@ pub fn parse_operator(
     parser_utils: &mut ParserUtils,
     state: &ParseState,
 ) -> Result<Effects, ParsingError> {
+    // In the operation syntax, {} is used to represent a value
     let mut operation = String::default();
     let mut effects = Vec::default();
 
+    // If there's an effect before it, it must start with something like {}+{} instead of an effect like !{}
     if let Some(effect) = last {
         operation += "{}";
         effects.push(effect);
     }
 
+    // Backtrack before the operator and add all of the operator to the operation string
     parser_utils.index -= 1;
     while let Some(token) = parser_utils.tokens.get(parser_utils.index) {
         if token.token_type == TokenTypes::Operator
@@ -32,6 +35,7 @@ pub fn parse_operator(
         parser_utils.index += 1;
     }
 
+    // Parse the right effect of the operator
     let mut first_element_token = Span::new(parser_utils.file, parser_utils.index);
     let (mut index, mut tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
     let mut right = match parse_line(
@@ -46,16 +50,15 @@ pub fn parse_operator(
     };
     first_element_token.extend_span(parser_utils.index);
 
+    // If it's a list effect, get all the elements
     if right.is_some() {
-        while parser_utils.tokens.get(parser_utils.index - 1).unwrap().token_type == TokenTypes::ArgumentEnd {
+        while parser_utils.tokens.get(parser_utils.index).unwrap().token_type == TokenTypes::ArgumentEnd {
             (index, tokens) = (parser_utils.index.clone(), parser_utils.tokens.len());
             let mut next_element_token = Span::new(parser_utils.file, parser_utils.index);
             let next = parse_line(parser_utils, ParseState::InOperator)?.map(|inner| inner.effect);
             next_element_token.extend_span(parser_utils.index);
             if let Some(next_element) = next {
-                if matches!(next_element.types, EffectType::NOP) {
-                    break;
-                }
+                parser_utils.index += 1;
                 right = match right.unwrap().types {
                     EffectType::CreateArray(mut inner) => {
                         inner.push(next_element);
@@ -74,17 +77,15 @@ pub fn parse_operator(
             }
         }
 
-        if let Some(inner) = &right {
-            if matches!(inner.types, EffectType::NOP) {
-                parser_utils.index = index;
-                parser_utils.tokens.truncate(tokens);
-                return Ok(Effects::new(
-                    Span::new(parser_utils.file, parser_utils.index),
-                    EffectType::Operation(operation, effects),
-                ));
-            } else {
-                operation += "{}";
-            }
+        if right.is_none() {
+            parser_utils.index = index;
+            parser_utils.tokens.truncate(tokens);
+            return Ok(Effects::new(
+                Span::new(parser_utils.file, parser_utils.index),
+                EffectType::Operation(operation, effects),
+            ));
+        } else {
+            operation += "{}";
         }
     } else {
         parser_utils.index = index;
@@ -104,19 +105,6 @@ pub fn parse_operator(
 
     if let Some(found) = right {
         effects.push(found);
-    }
-
-    //let span = effects.last().unwrap().span.clone();
-    //parser_utils.index = span.end;
-    let mut last = parser_utils.tokens[parser_utils.index - 1].token_type.clone();
-    while TokenTypes::BlockStart == last
-        || TokenTypes::LineEnd == last
-        || TokenTypes::BlockEnd == last
-        || TokenTypes::ArgumentEnd == last
-        || TokenTypes::ParenClose == last
-    {
-        parser_utils.index -= 1;
-        last.clone_from(&parser_utils.tokens[parser_utils.index - 1].token_type);
     }
 
     return Ok(Effects {

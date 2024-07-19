@@ -192,7 +192,7 @@ pub fn parse_implementor(
                 member_attributes = Vec::default();
                 member_modifiers = Vec::default();
             }
-            TokenTypes::StructTopElement | TokenTypes::Comment => {}
+            TokenTypes::StructTopElement | TokenTypes::Comment => {},
             TokenTypes::StructEnd | TokenTypes::EOF => break,
             TokenTypes::InvalidCharacters => {
                 return (

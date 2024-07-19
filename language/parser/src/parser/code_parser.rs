@@ -18,6 +18,9 @@ pub fn parse_code(parser_utils: &mut ParserUtils) -> Result<(ExpressionType, Cod
             types.clone_from(&expression.expression_type);
         }
         lines.push(expression);
+        if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::LineEnd {
+            parser_utils.index += 1;
+        }
     }
     parser_utils.imports.last_id += 1;
     return Ok((types, CodeBody::new(lines, (parser_utils.imports.last_id - 1).to_string())));
@@ -115,6 +118,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     if effect.is_some() {
                         return Err(span.make_error(ParsingMessage::UnexpectedValue()));
                     }
+
                     effect = Some(Effects::new(
                         Span::new(parser_utils.file, parser_utils.index),
                         EffectType::LoadVariable(token.to_string(parser_utils.buffer)),
@@ -247,10 +251,11 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
         }
     }
 
-    return Ok(Some(Expression::new(
-        expression_type,
-        effect.unwrap_or_else(|| Effects::new(Span::default(), EffectType::NOP)),
-    )));
+    if effect.is_none() {
+        return Ok(None);
+    }
+
+    return Ok(Some(Expression::new(expression_type, effect.unwrap())));
 }
 
 /// Tells the function what to do after the line is parsed
@@ -326,7 +331,7 @@ fn parse_basic_line(
         TokenTypes::LineEnd | TokenTypes::ParenClose | TokenTypes::ArgumentEnd => {
             parser_utils.index -= 1;
             ControlFlow::Finish
-        },
+        }
         TokenTypes::Comment => ControlFlow::Skipping,
         TokenTypes::ParenOpen => {
             let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
@@ -355,6 +360,7 @@ fn parse_basic_line(
                             Span::new(parser_utils.file, parser_utils.index),
                             EffectType::Paren(Box::new(expression.effect)),
                         ));
+                        parser_utils.index += 1;
                         ControlFlow::Skipping
                     } else {
                         // TODO figure out if this actually ever triggers
@@ -474,14 +480,12 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
         } else {
             None
         };
-
     if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Colon
         && parser_utils.tokens[parser_utils.index + 1].token_type == TokenTypes::Colon
-        && parser_utils.tokens[parser_utils.index + 2].token_type == TokenTypes::Variable
-    {
+        && parser_utils.tokens[parser_utils.index + 2].token_type == TokenTypes::Variable {
         let calling = parser_utils.tokens[parser_utils.index + 2].to_string(parser_utils.buffer);
         parser_utils.index += 4;
-        return Ok(Effects {
+        let out = Effects {
             types: EffectType::MethodCall(
                 effect.map(|inner| Box::new(inner)),
                 format!("{}::{}", name.clone(), calling),
@@ -489,7 +493,8 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
                 returning,
             ),
             span: Span::new(parser_utils.file, token),
-        });
+        };
+        return Ok(out);
     }
     parser_utils.index += 1;
     return Ok(Effects {
@@ -512,13 +517,13 @@ fn get_effects(parser_utils: &mut ParserUtils) -> Result<Vec<Effects>, ParsingEr
         while let Some(mut expression) = parse_line(parser_utils, ParseState::None)? {
             expression.effect.span.extend_span_backwards(start);
             effects.push(expression.effect);
-            if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::ArgumentEnd {
+            if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::ArgumentEnd {
                 break;
             }
+            parser_utils.index += 1;
         }
-    } else {
-        parser_utils.index += 1;
     }
+    parser_utils.index += 1;
     return Ok(effects);
 }
 
@@ -603,8 +608,11 @@ fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(St
                 };
                 values.push((name, effect));
                 name = String::default();
+                if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::ArgumentEnd {
+                    parser_utils.index += 1;
+                }
             }
-            TokenTypes::BlockEnd => break,
+            TokenTypes::BlockEnd | TokenTypes::ParenClose => break,
             TokenTypes::InvalidCharacters => {}
             TokenTypes::Comment => {}
             _ => panic!("How'd you get here? {:?}", token.token_type),

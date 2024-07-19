@@ -271,6 +271,7 @@ pub async fn check_method(
         match method.return_type.as_ref() {
             Some(method_return) => {
                 if !method_return.of_type(generic_returning, syntax.clone()).await {
+                    eprintln!("Failed for {} and {}", method_return, generic_returning);
                     return Err(
                         span.make_error(ParsingMessage::MismatchedTypes(generic_returning.clone(), method_return.clone()))
                     );

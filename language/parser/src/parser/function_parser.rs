@@ -32,6 +32,7 @@ pub fn parse_function(
     let mut last_arg_type = String::default();
 
     let token = parser_utils.index;
+    let start = parser_utils.index;
 
     while !parser_utils.tokens.is_empty() {
         let token = &parser_utils.tokens[parser_utils.index];
@@ -79,7 +80,8 @@ pub fn parse_function(
                 return_type = Some(parser_utils.get_struct(&Span::new(parser_utils.file, parser_utils.index - 1), ret_name))
             }
             TokenTypes::CodeStart => {
-                code = Some(parse_code(parser_utils)?.1);
+                let temp = parse_code(parser_utils)?.1;
+                code = Some(temp);
                 break;
             }
             TokenTypes::CodeEnd => break,

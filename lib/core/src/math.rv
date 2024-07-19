@@ -372,7 +372,7 @@ pub internal impl<T: Number, E: Number> LessThan<E> for T {
 
 pub impl<T: GreaterThan<Number>, E: Number> LessOrEqual<E> for T {
     fn less_or_equal(self, other: E) -> bool {
-        return !(self.greater_than(other));
+        return !self.greater_than(other);
    }
 }
 

@@ -9,6 +9,7 @@ use colored::Colorize;
 pub enum ParsingMessage {
     ShouldntSee(&'static str),
     StringAttribute(),
+    NoReturn(),
     UnexpectedValue(),
     UnexpectedLet(),
     UnexpectedIf(),
@@ -47,6 +48,7 @@ impl Display for ParsingMessage {
         return match self {
             ParsingMessage::ShouldntSee(message) => write!(f, "You shouldn't see this - {}", message),
             ParsingMessage::StringAttribute() => write!(f, "The operator attribute should have a string value"),
+            ParsingMessage::NoReturn() => write!(f, "No value was returned!"),
             ParsingMessage::UnexpectedValue() => write!(f, "Unexpected value! Did you forget a semicolon?"),
             ParsingMessage::UnexpectedLet() => write!(f, "Unexpected let! Did you forget a semicolon?"),
             ParsingMessage::UnexpectedIf() => write!(f, "Unexpected if! Did you forget a semicolon?"),
