@@ -82,7 +82,7 @@ impl ProcessManager for TypesChecker {
 
     async fn degeneric_code(&self, function: Arc<CodelessFinalizedFunction>, syntax: &Arc<Mutex<Syntax>>) {
         let variables = SimpleVariableManager::for_function(&function);
-        let _ = match degeneric_function(function, Box::new(self.clone()), &vec![], syntax, &variables, None).await {
+        let _ = match degeneric_function(function, Box::new(self.clone()), &vec![], syntax, &variables, vec!()).await {
             Ok(result) => result,
             Err(error) => panic!("{:?}", error),
         };

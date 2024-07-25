@@ -32,7 +32,6 @@ pub fn parse_function(
     let mut last_arg_type = String::default();
 
     let token = parser_utils.index;
-    let start = parser_utils.index;
 
     while !parser_utils.tokens.is_empty() {
         let token = &parser_utils.tokens[parser_utils.index];

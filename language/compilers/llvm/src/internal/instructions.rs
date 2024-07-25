@@ -29,6 +29,8 @@ pub fn compile_internal<'ctx>(
         let pointer_int = compiler.builder.build_ptr_to_int(params.get(0).unwrap().into_pointer_value(), 
         compiler.context.i64_type(), "0").unwrap().as_basic_value_enum();
         compiler.builder.build_return(Some(&pointer_int)).unwrap();
+    } else if name.starts_with("types::pointer::Pointer<T>::get_size$") {
+        panic!("{:?}", function.generics);
     } else if name.starts_with("types::pointer::Pointer<T>::read") {
         let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
         let pointer_val = compiler.builder.build_load(compiler.context.i64_type(), 

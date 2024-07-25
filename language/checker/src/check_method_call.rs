@@ -35,30 +35,29 @@ pub async fn check_method_call(
         unreachable!()
     }
 
-    let returning = match returning {
-        Some((inner, span)) => Some((
-            Syntax::parse_type(
-                code_verifier.syntax.clone(),
-                span.clone(),
-                code_verifier.resolver.boxed_clone(),
-                inner,
-                vec![],
-            )
-            .await?
-            .finalize(code_verifier.syntax.clone())
-            .await,
-            span,
-        )),
+    let calling = match calling {
+        Some(inner) => Some(verify_effect(code_verifier, variables, *inner).await?),
         None => None,
     };
 
-    let calling = match calling {
-        Some(inner) => Some(verify_effect(code_verifier, variables, *inner).await?),
-        None => None
-    };
+    let mut final_returning = vec![];
+    for (value, span) in returning {
+        final_returning.push((
+            Syntax::parse_type(code_verifier.syntax.clone(), span.clone(), code_verifier.resolver.boxed_clone(), 
+            value, vec![])
+                .await?
+                .finalize(code_verifier.syntax.clone())
+                .await,
+            span.clone(),
+        ));
+    }
     // Finds methods based off the calling type.
     let method = if let Some(calling) = calling.clone() {
         let return_type: FinalizedTypes = get_return(&calling.types, variables, &code_verifier.syntax).await.unwrap();
+        // TODO fix up the errors here
+        if final_returning.len() > 0 {
+            panic!("Generic bounds added to non-generic type!");
+        }
 
         // If it's generic, check its trait bounds for the method
         if return_type.inner_struct_safe().is_none() {
@@ -111,7 +110,7 @@ pub async fn check_method_call(
             let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
             return Ok(FinalizedEffects::new(
                 effect.span.clone(),
-                FinalizedEffectType::VirtualCall(index, method, calling.unwrap(), finalized_effects, returning),
+                FinalizedEffectType::VirtualCall(index, method, calling.unwrap(), finalized_effects),
             ));
         }
 
@@ -145,7 +144,7 @@ pub async fn check_method_call(
                     finalized_effects.clone(),
                     &code_verifier.syntax,
                     variables,
-                    returning.clone(),
+                    final_returning.clone(),
                     &effect.span,
                 )
                 .await
@@ -159,18 +158,15 @@ pub async fn check_method_call(
                 return_type: return_type.clone(),
                 checker,
                 error: ParsingError::new(Span::default(), ParsingMessage::ShouldntSee("Check method call trait waiter")),
-            }.await) {
+            }
+            .await)
+            {
                 Ok(found) => return Ok(found),
                 _ => {}
             }
 
             // If it's not a trait method call, try to find a self-impl method call
-            for implementor in Syntax::get_struct_impl(
-                code_verifier.syntax.clone(),
-                return_type.clone(),
-            )
-            .await
-            {
+            for implementor in Syntax::get_struct_impl(code_verifier.syntax.clone(), return_type.clone()).await {
                 for function in &implementor.functions {
                     if function.name.split("::").last().unwrap() == method {
                         let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
@@ -180,7 +176,7 @@ pub async fn check_method_call(
                             finalized_effects.clone(),
                             &code_verifier.syntax,
                             variables,
-                            returning.clone(),
+                            final_returning.clone(),
                             &effect.span,
                         )
                         .await
@@ -191,10 +187,7 @@ pub async fn check_method_call(
                     }
                 }
             }
-            return Err(ParsingError::new(
-                effect.span.clone(),
-                ParsingMessage::NoImpl(return_type, method.clone()),
-            ));
+            return Err(ParsingError::new(effect.span.clone(), ParsingMessage::NoImpl(return_type, method.clone())));
         }
     } else {
         if method.contains("::") {
@@ -225,7 +218,7 @@ pub async fn check_method_call(
                                 finalized_effects.clone(),
                                 &code_verifier.syntax,
                                 variables,
-                                returning.clone(),
+                                final_returning.clone(),
                                 &effect.span,
                             )
                             .await
@@ -250,8 +243,16 @@ pub async fn check_method_call(
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
-    return check_method(calling.map(|inner| Box::new(inner)), method, 
-    finalized_effects, &code_verifier.syntax, variables, returning, &effect.span).await;
+    return check_method(
+        calling.map(|inner| Box::new(inner)),
+        method,
+        finalized_effects,
+        &code_verifier.syntax,
+        variables,
+        final_returning,
+        &effect.span,
+    )
+    .await;
 }
 
 /// Checks if a method call is valid
@@ -262,34 +263,15 @@ pub async fn check_method(
     effects: Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    generic_returning: Option<(FinalizedTypes, Span)>,
+    generic_returning: Vec<(FinalizedTypes, Span)>,
     span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
     check_args(&method, &calling, &effects, syntax, variables, span).await?;
 
-    if let Some((generic_returning, span)) = generic_returning.as_ref() {
-        match method.return_type.as_ref() {
-            Some(method_return) => {
-                if !method_return.of_type(generic_returning, syntax.clone()).await {
-                    eprintln!("Failed for {} and {}", method_return, generic_returning);
-                    return Err(
-                        span.make_error(ParsingMessage::MismatchedTypes(generic_returning.clone(), method_return.clone()))
-                    );
-                }
-            }
-            None => return Err(span.make_error(ParsingMessage::UnexpectedVoid())),
-        }
-    }
-
     return Ok(FinalizedEffects::new(
-            span.clone(),
-            FinalizedEffectType::MethodCall(
-                calling,
-                method,
-                effects,
-                generic_returning,
-            ),
-        ));
+        span.clone(),
+        FinalizedEffectType::MethodCall(calling, method, effects, generic_returning),
+    ));
 }
 
 /// Checks to see if arguments are valid
@@ -314,7 +296,7 @@ pub async fn check_args(
             if i == 0 {
                 calling.as_ref().unwrap()
             } else {
-                &args[i-1]
+                &args[i - 1]
             }
         } else {
             &args[i]

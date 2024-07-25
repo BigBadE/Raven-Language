@@ -58,7 +58,7 @@ pub async fn check_operator(
         variables,
         Effects::new(
             effect.span.clone(),
-            EffectType::ImplementationCall(calling, operation.name.clone(), String::default(), values, None),
+            EffectType::ImplementationCall(calling, operation.name.clone(), String::default(), values),
         ),
     )
     .await;

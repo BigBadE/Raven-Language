@@ -101,17 +101,6 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     ));
 }
 
-pub struct Test<K, V> {
-    first: K,
-    second: V
-}
-
-impl<K> Test<K, u64> {
-    pub fn new() -> Self {
-        todo!();
-    }
-}
-
 /// Parses a for statement into a single expression
 pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let name = &parser_utils.tokens[parser_utils.index];
@@ -348,8 +337,7 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
                             Box::new(Effects::new(Span::default(), EffectType::LoadVariable(variable.clone()))),
                             "iter::Iter".to_string(),
                             "next".to_string(),
-                            vec![],
-                            None,
+                            vec![]
                         ),
                     )),
                 ),
@@ -373,8 +361,7 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
                             Box::new(Effects::new(Span::default(), EffectType::LoadVariable(variable.clone()))),
                             "iter::Iter".to_string(),
                             "has_next".to_string(),
-                            vec![],
-                            None,
+                            vec![]
                         ),
                     )),
                     body.label.clone(),

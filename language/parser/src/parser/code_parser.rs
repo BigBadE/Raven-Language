@@ -347,7 +347,7 @@ fn parse_basic_line(
                             temp.map(|inner| Box::new(inner)),
                             name.clone(),
                             get_effects(parser_utils)?,
-                            None,
+                            vec!(),
                         ),
                         span,
                     });
@@ -468,17 +468,17 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     let name = parser_utils.tokens[parser_utils.index - 2].to_string(parser_utils.buffer);
     let token = parser_utils.index - 2;
     // Get the type being expressed. Should only be one type.
-    let returning: Option<(UnparsedType, Span)> =
+    let returning: Vec<(UnparsedType, Span)> =
         if let UnparsedType::Generic(_, bounds) = parse_generics(String::default(), parser_utils).0 {
             /*
             TODO figure out how to check for ungotten generics with generic method calls
             if bounds.len() != 1 {
                 Span::new(parser_utils.file, parser_utils.index - 1).make_error("Expected one generic argument!");
             }*/
-            let types: &UnparsedType = bounds.first().unwrap();
-            Some((types.clone(), Span::new(parser_utils.file, parser_utils.index - 1)))
+            // TODO make the span correct here, dunno how it'd be done tbh
+            bounds.into_iter().map(|bound| (bound, Span::new(parser_utils.file, parser_utils.index - 1))).collect()
         } else {
-            None
+            vec!()
         };
     if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Colon
         && parser_utils.tokens[parser_utils.index + 1].token_type == TokenTypes::Colon

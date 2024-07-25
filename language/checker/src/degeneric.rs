@@ -42,7 +42,7 @@ pub async fn degeneric_effect(
             degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?
         }
         FinalizedEffectType::CodeBody(body) => degeneric_code_body(body, process_manager, variables, syntax).await?,
-        FinalizedEffectType::MethodCall(calling, function, arguments, return_type) => {
+        FinalizedEffectType::MethodCall(calling, function, arguments, explicit_generic) => {
             if let Some(found) = calling {
                 arguments.insert(0, *found.clone());
             }
@@ -78,7 +78,7 @@ pub async fn degeneric_effect(
                 arguments,
                 syntax,
                 variables,
-                return_type.clone(),
+                explicit_generic.clone(),
             )
             .await?;
 
@@ -111,12 +111,12 @@ pub async fn degeneric_effect(
             arguments.insert(0, calling.clone());
             let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
             let function =
-                degeneric_function(function.clone(), process_manager.cloned(), &arguments, syntax, variables, None).await?;
+                degeneric_function(function.clone(), process_manager.cloned(), &arguments, syntax, variables, vec!()).await?;
             for argument in &mut *arguments {
                 degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
             }
             degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
-            *effect = FinalizedEffectType::MethodCall(None, function, arguments.clone(), None);
+            *effect = FinalizedEffectType::MethodCall(None, function, arguments.clone(), vec!());
         }
         FinalizedEffectType::Set(base, value) => {
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
@@ -152,7 +152,7 @@ pub async fn degeneric_effect(
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
         }
-        FinalizedEffectType::VirtualCall(_, function, calling, arguments, returning) => {
+        FinalizedEffectType::VirtualCall(_, function, calling, arguments) => {
             arguments.insert(0, *calling.clone());
             *function = degeneric_function(
                 function.clone(),
@@ -160,7 +160,7 @@ pub async fn degeneric_effect(
                 arguments,
                 syntax,
                 variables,
-                returning.clone(),
+                vec![],
             )
             .await?;
             for effect in &mut *arguments {
@@ -168,7 +168,7 @@ pub async fn degeneric_effect(
             }
             degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
         }
-        FinalizedEffectType::GenericVirtualCall(index, target, found, effects, returning) => {
+        FinalizedEffectType::GenericVirtualCall(index, target, found, effects) => {
             syntax.lock().process_manager.handle().lock().spawn(
                 target.name.clone(),
                 degeneric_header(
@@ -186,7 +186,7 @@ pub async fn degeneric_effect(
             let mut temp = vec![];
             mem::swap(&mut temp, effects);
             let calling = temp.remove(0);
-            *effect = FinalizedEffectType::VirtualCall(*index, output, Box::new(calling), temp, returning.clone());
+            *effect = FinalizedEffectType::VirtualCall(*index, output, Box::new(calling), temp);
             degeneric_effect(effect, syntax, process_manager, variables, span).await?;
         }
         FinalizedEffectType::Downcast(base, target, functions) => {
@@ -207,7 +207,7 @@ pub async fn degeneric_effect(
 
             for function in &impl_functions[0].1 {
                 let function = AsyncDataGetter::new(syntax.clone(), function.clone()).await;
-                let function = degeneric_function(function, manager.cloned(), &vec![], syntax, variables, None).await?;
+                let function = degeneric_function(function, manager.cloned(), &vec![], syntax, variables, vec!()).await?;
                 functions.push(function)
             }
 
@@ -271,7 +271,7 @@ pub async fn degeneric_function(
     arguments: &Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    returning: Option<(FinalizedTypes, Span)>,
+    returning: Vec<(FinalizedTypes, Span)>,
 ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
     /*
     TODO properly merge generics? needs more research
@@ -282,25 +282,30 @@ pub async fn degeneric_function(
     .map(|(name, types)| (name.clone(), FinalizedTypes::Generic(name, types)))
     .collect::<HashMap<_, _>>();*/
     // Degenerics the return type if there is one and returning is some.
-    if let Some(inner) = method.return_type.clone() {
-        if let Some((returning, span)) = returning {
-            inner.resolve_generic(&returning, syntax, manager.mut_generics(), span).await?;
+
+    if !returning.is_empty() {
+        *manager.mut_generics() = method
+            .generics
+            .iter()
+            .zip(returning)
+            //TODO bounds check
+            .map(|((generic, _bounds), explicit_generic)| (generic.clone(), explicit_generic.0))
+            .collect::<HashMap<_, _>>();
+    } else {
+        //Degenerics the arguments to the method
+        for i in 0..method.arguments.len() {
+            if method.arguments.len() != 0 && arguments.len() == 0 {
+                break;
+            }
+
+            let argument_type = get_return(&arguments[i].types, variables, syntax).await.unwrap();
+
+            method.arguments[i]
+                .field
+                .field_type
+                .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.clone())
+                .await?;
         }
-    }
-
-    //Degenerics the arguments to the method
-    for i in 0..method.arguments.len() {
-        if method.arguments.len() != 0 && arguments.len() == 0 {
-            break;
-        }
-
-        let argument_type = get_return(&arguments[i].types, variables, syntax).await.unwrap();
-
-        method.arguments[i]
-            .field
-            .field_type
-            .resolve_generic(&argument_type, syntax, manager.mut_generics(), arguments[i].span.clone())
-            .await?;
     }
 
     // Fixes any generics referencing other generics

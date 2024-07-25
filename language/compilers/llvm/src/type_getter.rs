@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 use std::sync::Arc;
-use syntax::async_util::AsyncDataGetter;
 use syntax::program::r#struct::{FinalizedStruct, StructData};
 
 use crate::compiler::CompilerImpl;
@@ -159,7 +158,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
 
                     // Update the program's fields
                     for field in &mut data.fields {
-                        simple_degeneric(&mut field.field.field_type, &struct_generics);
+                        self.simple_degeneric(&mut field.field.field_type, &struct_generics);
                     }
 
                     let data = Arc::new(data);
@@ -174,18 +173,18 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             _ => {}
         }
     }
-}
 
-pub fn simple_degeneric(degenericing: &mut FinalizedTypes, generics: &HashMap<String, FinalizedTypes>) {
-    match degenericing {
-        FinalizedTypes::Generic(name, _bounds) => {
-            *degenericing = generics.get(name).unwrap().clone();
+    pub fn simple_degeneric(&self, degenericing: &mut FinalizedTypes, generics: &HashMap<String, FinalizedTypes>) {
+        match degenericing {
+            FinalizedTypes::Generic(name, _bounds) => {
+                *degenericing = generics.get(name).unwrap().clone();
+            }
+            FinalizedTypes::Struct(_) => {}
+            FinalizedTypes::Array(inner) | FinalizedTypes::Reference(inner) => {
+                self.simple_degeneric(inner, generics);
+            },
+            FinalizedTypes::GenericType(_, _) => self.fix_generic_struct(degenericing)
         }
-        FinalizedTypes::Struct(_) => {}
-        FinalizedTypes::Array(inner) | FinalizedTypes::Reference(inner) => {
-            simple_degeneric(inner, generics);
-        }
-        _ => unreachable!(),
     }
 }
 

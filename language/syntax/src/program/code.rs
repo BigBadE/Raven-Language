@@ -149,11 +149,11 @@ pub enum EffectType {
     /// A block of code inside the block of code.
     CodeBody(CodeBody),
     /// Finds the implementation of the given trait for the given calling type, and calls the given method.
-    /// Calling, trait to call, function name, args, and return type (if explicitly required)
-    ImplementationCall(Box<Effects>, String, String, Vec<Effects>, Option<UnparsedType>),
+    /// Calling, trait to call, function name, and args
+    ImplementationCall(Box<Effects>, String, String, Vec<Effects>),
     /// Finds the method with the name and calls it with those arguments.
     /// Calling, calling function, function arguments, and return type (if explicitly required)
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Option<(UnparsedType, Span)>),
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Vec<(UnparsedType, Span)>),
     /// Sets the variable to a value.
     Set(Box<Effects>, Box<Effects>),
     /// Loads variable with the given name.
@@ -214,7 +214,7 @@ pub enum FinalizedEffectType {
         Option<Box<FinalizedEffects>>,
         Arc<CodelessFinalizedFunction>,
         Vec<FinalizedEffects>,
-        Option<(FinalizedTypes, Span)>,
+        Vec<(FinalizedTypes, Span)>,
     ),
     /// Calls the trait's function with the given arguments.
     GenericMethodCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
@@ -240,15 +240,9 @@ pub enum FinalizedEffectType {
     Char(char),
     /// Calls a virtual method, usually a downcasted trait, with the given function index, function, and generic return type (if any)
     /// and with the given arguments on the given effect (the downcased trait).
-    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Box<FinalizedEffects>, Vec<FinalizedEffects>, Option<(FinalizedTypes, Span)>),
+    VirtualCall(usize, Arc<CodelessFinalizedFunction>, Box<FinalizedEffects>, Vec<FinalizedEffects>),
     /// Calls a virtual method on a generic type. Same as above, but must degeneric like check_code on EffectType::ImplementationCall
-    GenericVirtualCall(
-        usize,
-        Arc<FunctionData>,
-        Arc<CodelessFinalizedFunction>,
-        Vec<FinalizedEffects>,
-        Option<(FinalizedTypes, Span)>,
-    ),
+    GenericVirtualCall(usize, Arc<FunctionData>, Arc<CodelessFinalizedFunction>, Vec<FinalizedEffects>),
     /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
     /// The functions are empty until after degenericing
     Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<CodelessFinalizedFunction>>),
@@ -272,8 +266,8 @@ impl FinalizedEffectType {
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
             Self::MethodCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
-            | Self::VirtualCall(_, function, _, _, _)
-            | Self::GenericVirtualCall(_, _, function, _, _) => {
+            | Self::VirtualCall(_, function, _, _)
+            | Self::GenericVirtualCall(_, _, function, _) => {
                 function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
             }
             Self::LoadVariable(name) => {
@@ -292,9 +286,7 @@ impl FinalizedEffectType {
                 .find(|field| &field.field.name == name)
                 .map(|field| field.field.field_type.clone()),
             // Returns the program type.
-            Self::CreateStruct(_, types, _) => {
-                Some(FinalizedTypes::Reference(Box::new(types.clone())))
-            },
+            Self::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
             // Returns the internal constant type.
             Self::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             Self::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
