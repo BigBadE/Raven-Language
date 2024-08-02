@@ -68,6 +68,7 @@ impl ProcessManager for TypesChecker {
         resolver: Box<dyn NameResolver>,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedFunction {
+        let name = function.data.name.clone();
         return verify_function_code(self, resolver, code, function, syntax).await.unwrap_or_else(|error| {
             syntax.lock().errors.push(error.clone());
             FinalizedFunction {
@@ -75,7 +76,7 @@ impl ProcessManager for TypesChecker {
                 fields: vec![],
                 code: FinalizedCodeBody::default(),
                 return_type: None,
-                data: Arc::new(FunctionData::new(Vec::default(), 0, String::default(), Span::default())),
+                data: Arc::new(FunctionData::poisoned(name, error)),
             }
         });
     }

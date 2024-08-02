@@ -139,7 +139,7 @@ impl<'a> ParserUtils<'a> {
         if let Some(base) = implementor.implementor {
             let base = base.await?;
             let base = base.finalize(syntax.clone()).await;
-
+            
             let chalk_type = Arc::new(Syntax::make_impldatum(&generics, &target, &base));
 
             let output = FinishedTraitImplementor {
