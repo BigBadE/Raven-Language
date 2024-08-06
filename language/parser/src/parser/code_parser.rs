@@ -347,7 +347,7 @@ fn parse_basic_line(
                             temp.map(|inner| Box::new(inner)),
                             name.clone(),
                             get_effects(parser_utils)?,
-                            vec!(),
+                            vec![],
                         ),
                         span,
                     });
@@ -467,22 +467,19 @@ fn parse_string(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError>
 fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let name = parser_utils.tokens[parser_utils.index - 2].to_string(parser_utils.buffer);
     let token = parser_utils.index - 2;
-    // Get the type being expressed. Should only be one type.
-    let returning: Vec<(UnparsedType, Span)> =
-        if let UnparsedType::Generic(_, bounds) = parse_generics(String::default(), parser_utils).0 {
-            /*
-            TODO figure out how to check for ungotten generics with generic method calls
-            if bounds.len() != 1 {
-                Span::new(parser_utils.file, parser_utils.index - 1).make_error("Expected one generic argument!");
-            }*/
-            // TODO make the span correct here, dunno how it'd be done tbh
-            bounds.into_iter().map(|bound| (bound, Span::new(parser_utils.file, parser_utils.index - 1))).collect()
-        } else {
-            vec!()
-        };
+    // Get the explicit generics
+    let explicit_generics: Vec<UnparsedType> = if let UnparsedType::Generic(_, bounds) =
+        parse_generics(UnparsedType::Basic(Span::default(), String::default()), parser_utils)
+    {
+        //TODO figure out how to check for ungotten generics with generic method calls
+        bounds
+    } else {
+        vec![]
+    };
     if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Colon
         && parser_utils.tokens[parser_utils.index + 1].token_type == TokenTypes::Colon
-        && parser_utils.tokens[parser_utils.index + 2].token_type == TokenTypes::Variable {
+        && parser_utils.tokens[parser_utils.index + 2].token_type == TokenTypes::Variable
+    {
         let calling = parser_utils.tokens[parser_utils.index + 2].to_string(parser_utils.buffer);
         parser_utils.index += 4;
         let out = Effects {
@@ -490,7 +487,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
                 effect.map(|inner| Box::new(inner)),
                 format!("{}::{}", name.clone(), calling),
                 get_effects(parser_utils)?,
-                returning,
+                explicit_generics,
             ),
             span: Span::new(parser_utils.file, token),
         };
@@ -502,7 +499,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
             effect.map(|inner| Box::new(inner)),
             name.clone(),
             get_effects(parser_utils)?,
-            returning,
+            explicit_generics,
         ),
         span: Span::new(parser_utils.file, token),
     });
@@ -568,10 +565,15 @@ fn parse_new(parser_utils: &mut ParserUtils, span: &Span) -> Result<Effects, Par
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Variable => types = Some(UnparsedType::Basic(token.to_string(parser_utils.buffer))),
+            TokenTypes::Variable => {
+                types = Some(UnparsedType::Basic(
+                    Span::new(parser_utils.file, parser_utils.index - 1),
+                    token.to_string(parser_utils.buffer),
+                ))
+            }
             //Handle making new structs with generics.
             TokenTypes::Operator => {
-                types = Some(parse_generics(types.unwrap().to_string(), parser_utils).0);
+                types = Some(parse_generics(types.unwrap(), parser_utils));
             }
             TokenTypes::BlockStart => {
                 values = parse_new_args(parser_utils, span)?;

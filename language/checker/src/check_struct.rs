@@ -1,6 +1,7 @@
 use crate::finalize_generics;
 use crate::output::TypesChecker;
 use parking_lot::Mutex;
+use syntax::async_util::NameResolver;
 use std::sync::Arc;
 use syntax::errors::ParsingError;
 use syntax::program::code::{FinalizedField, FinalizedMemberField};
@@ -12,6 +13,7 @@ use syntax::program::types::FinalizedTypes;
 pub async fn verify_struct(
     _process_manager: &TypesChecker,
     structure: UnfinalizedStruct,
+    resolver: &Box<dyn NameResolver>,
     syntax: &Arc<Mutex<Syntax>>,
     include_refs: bool,
 ) -> Result<FinalizedStruct, ParsingError> {
@@ -30,7 +32,7 @@ pub async fn verify_struct(
     }
 
     let output = FinalizedStruct {
-        generics: finalize_generics(syntax, structure.generics).await?,
+        generics: finalize_generics(syntax, resolver, &structure.generics).await?,
         fields: finalized_fields,
         data: structure.data,
     };

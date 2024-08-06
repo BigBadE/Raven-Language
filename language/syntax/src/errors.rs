@@ -41,6 +41,7 @@ pub enum ParsingMessage {
     NoMethod(String, FinalizedTypes),
     NoImpl(FinalizedTypes, String),
     NoTraitImpl(FinalizedTypes, FinalizedTypes),
+    RecursiveGeneric(String)
 }
 
 impl Display for ParsingMessage {
@@ -87,7 +88,8 @@ impl Display for ParsingMessage {
             }
             ParsingMessage::NoTraitImpl(base, traits) => {
                 write!(f, "No implementation of {} for {}", fix_type(traits), fix_type(base))
-            }
+            },
+            ParsingMessage::RecursiveGeneric(name) => write!(f, "Recursive generic {}", name)
         };
     }
 }

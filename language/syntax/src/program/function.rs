@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use async_trait::async_trait;
 use data::tokens::Span;
 
-use crate::async_util::{HandleWrapper, NameResolver};
+use crate::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use crate::program::code::{Expression, FinalizedExpression, FinalizedMemberField, MemberField};
 use crate::program::types::FinalizedTypes;
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 pub struct FunctionData {
     /// The function's attributes
     pub attributes: Vec<Attribute>,
-    /// The function's modifiers
+    /// The function's modifiers in a bit representation, see Modifier
     pub modifiers: u8,
     /// The function's name
     pub name: String,
@@ -93,7 +93,7 @@ impl TopElement for FunctionData {
         let name = current.data.name.clone();
 
         // Get the codeless finalized function and the code from the function.
-        let (codeless_function, code) = process_manager.verify_func(current, &syntax).await;
+        let (codeless_function, code) = process_manager.verify_func(current, &resolver, &syntax).await;
 
         // Finalize the code and combine it with the codeless finalized function.
         let finalized_function = process_manager.verify_code(codeless_function.clone(), code, resolver, &syntax).await;
@@ -117,7 +117,7 @@ impl TopElement for FunctionData {
 /// Code is finalizied separately and combined with this to make a FinalizedFunction.
 pub struct UnfinalizedFunction {
     /// The ordered generics of the function
-    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    pub generics: IndexMap<String, Vec<UnparsedType>>,
     /// The function's fields
     pub fields: Vec<ParsingFuture<MemberField>>,
     /// The function's code
@@ -144,7 +144,7 @@ impl DataType<FunctionData> for UnfinalizedFunction {
 #[derive(Clone, Debug)]
 pub struct CodelessFinalizedFunction {
     /// The function's generics
-    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub generics: IndexMap<String, FinalizedTypes>,
     /// The function's arguments
     pub arguments: Vec<FinalizedMemberField>,
     /// The function's return type
@@ -172,7 +172,7 @@ impl CodelessFinalizedFunction {
 #[derive(Clone, Debug)]
 pub struct FinalizedFunction {
     /// The function's generics
-    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub generics: IndexMap<String, FinalizedTypes>,
     /// The function's fields
     pub fields: Vec<FinalizedMemberField>,
     /// The function's code

@@ -23,14 +23,14 @@ pub async fn check_method_call(
     let mut finalized_effects = Vec::default();
     let calling;
     let method;
-    let returning;
-    if let EffectType::MethodCall(new_calling, new_method, effects, new_return_type) = effect.types {
+    let explicit_generics;
+    if let EffectType::MethodCall(new_calling, new_method, effects, new_explicit_generics) = effect.types {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
         }
         calling = new_calling;
         method = new_method;
-        returning = new_return_type;
+        explicit_generics = new_explicit_generics;
     } else {
         unreachable!()
     }
@@ -41,14 +41,14 @@ pub async fn check_method_call(
     };
 
     let mut final_returning = vec![];
-    for (value, span) in returning {
+    for value in explicit_generics {
+        let span = value.get_span();
         final_returning.push((
-            Syntax::parse_type(code_verifier.syntax.clone(), span.clone(), code_verifier.resolver.boxed_clone(), 
-            value, vec![])
+            Syntax::parse_type(code_verifier.syntax.clone(), code_verifier.resolver.boxed_clone(), value, vec![])
                 .await?
                 .finalize(code_verifier.syntax.clone())
                 .await,
-            span.clone(),
+            span,
         ));
     }
     // Finds methods based off the calling type.

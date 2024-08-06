@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use indexmap::IndexMap;
-
 use data::tokens::{Span, Token, TokenTypes};
 use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
@@ -29,7 +27,6 @@ pub fn parse_structure(
     let start = Span::new(parser_utils.file, parser_utils.index);
     let mut name = String::default();
     let mut fields = Vec::default();
-    let mut generics = IndexMap::default();
     let mut functions = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
         let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
@@ -38,13 +35,19 @@ pub fn parse_structure(
         match token.token_type {
             TokenTypes::Identifier => {
                 name = token.to_string(parser_utils.buffer);
-                parser_utils.imports.parent = Some(UnparsedType::Basic(name.clone()));
+                parser_utils.imports.parent =
+                    Some(UnparsedType::Basic(Span::new(parser_utils.file, parser_utils.index - 1), name.clone()));
             }
             TokenTypes::GenericsStart => {
-                parse_generics(parser_utils, &mut generics);
+                parse_generics(parser_utils); 
                 parser_utils.imports.parent = Some(UnparsedType::Generic(
                     Box::new(parser_utils.imports.parent.clone().unwrap()),
-                    generics.keys().map(|key| UnparsedType::Basic(key.clone())).collect(),
+                    parser_utils
+                        .imports
+                        .generics
+                        .keys()
+                        .map(|inner| UnparsedType::Basic(Span::default(), inner.clone()))
+                        .collect::<Vec<_>>(),
                 ));
             }
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
@@ -95,6 +98,7 @@ pub fn parse_structure(
         }
     }
 
+    let generics = parser_utils.imports.generics.clone();
     parser_utils.imports.generics.clear();
 
     let data = if is_modifier(modifiers, Modifier::Internal) && !is_modifier(modifiers, Modifier::Trait) {
@@ -120,14 +124,11 @@ pub fn parse_implementor(
     modifiers: Vec<Modifier>,
 ) -> (Result<TraitImplementor, ParsingError>, String, String) {
     let mut base = None;
-    let mut base_span = None;
     let mut implementor = None;
-    let mut implementor_span = None;
 
     let mut member_attributes = Vec::default();
     let mut member_modifiers = Vec::default();
     let mut functions = Vec::default();
-    let mut generics = IndexMap::default();
 
     let mut state = 0;
     while parser_utils.tokens.len() != parser_utils.index {
@@ -136,20 +137,18 @@ pub fn parse_implementor(
         match token.token_type {
             TokenTypes::Identifier => {
                 let name = token.to_string(parser_utils.buffer);
-                let temp = Some(UnparsedType::Basic(name.clone()));
+                let temp = Some(UnparsedType::Basic(Span::new(parser_utils.file, parser_utils.index - 1), name.clone()));
                 if state == 0 {
                     base = temp;
-                    base_span = Some(Span::new(parser_utils.file, parser_utils.index - 1));
                     state = 1;
                 } else {
                     parser_utils.imports.parent = temp.clone();
                     implementor = temp;
-                    implementor_span = Some(Span::new(parser_utils.file, parser_utils.index - 1));
                 }
             }
             TokenTypes::GenericsStart => {
                 if state == 0 {
-                    parse_generics(parser_utils, &mut generics);
+                    parse_generics(parser_utils);
                 } else {
                     let type_generics = match parse_type_generics(parser_utils) {
                         Ok(generics) => generics,
@@ -158,12 +157,10 @@ pub fn parse_implementor(
                     if state == 1 {
                         let found = UnparsedType::Generic(Box::new(base.unwrap()), type_generics);
                         base = Some(found);
-                        base_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     } else {
                         let found = Some(UnparsedType::Generic(Box::new(implementor.unwrap()), type_generics));
                         parser_utils.imports.parent = found.clone();
                         implementor = found;
-                        implementor_span.as_mut().unwrap().extend_span(parser_utils.index - 1);
                     }
                 }
             }
@@ -216,24 +213,18 @@ pub fn parse_implementor(
 
     let base_future = Box::pin(Syntax::parse_type(
         parser_utils.syntax.clone(),
-        base_span.unwrap(),
         parser_utils.imports.boxed_clone(),
         base.clone().unwrap(),
         vec![],
     ));
 
     let implementor_future = if let Some(implementor) = implementor.clone() {
-        Some(Syntax::parse_type(
-            parser_utils.syntax.clone(),
-            implementor_span.unwrap(),
-            parser_utils.imports.boxed_clone(),
-            implementor,
-            vec![],
-        ))
+        Some(Syntax::parse_type(parser_utils.syntax.clone(), parser_utils.imports.boxed_clone(), implementor, vec![]))
     } else {
         None
     };
 
+    let generics = parser_utils.imports.generics.clone();
     parser_utils.imports.generics.clear();
 
     return (
@@ -256,7 +247,7 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Unparse
             }
             TokenTypes::Generic => {
                 let name = token.to_string(parser_utils.buffer);
-                current.push(UnparsedType::Basic(name));
+                current.push(UnparsedType::Basic(Span::new(parser_utils.file, parser_utils.index - 1), name));
             }
             TokenTypes::GenericsEnd | TokenTypes::GenericBoundEnd => {
                 break;
@@ -272,11 +263,9 @@ pub fn parse_type_generics(parser_utils: &mut ParserUtils) -> Result<Vec<Unparse
 }
 
 /// Parses the generics and adds them to the generics map
-pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<String, Vec<ParsingFuture<Types>>>) {
+pub fn parse_generics(parser_utils: &mut ParserUtils) {
     let mut name = String::default();
-    let mut bounds: Vec<ParsingFuture<Types>> = Vec::default();
     let mut unparsed_bounds: Vec<UnparsedType> = Vec::default();
-    let mut added = Vec::new();
     while parser_utils.tokens.len() != parser_utils.index {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
@@ -287,12 +276,12 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                     name = name[1..].to_string();
                 }
                 name = name.trim().to_string();
-                added.push(name.clone());
             }
             TokenTypes::GenericEnd => {
-                parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
-                generics.insert(name.clone(), bounds);
-                bounds = Vec::default();
+                parser_utils.imports.generics.insert(
+                    name.clone(),
+                    unparsed_bounds,
+                );
                 unparsed_bounds = Vec::default();
             }
             TokenTypes::GenericBound => {
@@ -302,7 +291,10 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
                     name = name[1..].to_string();
                 }
                 let name = name.trim().to_string();
-                let unparsed = if let Some(inner) = parse_bounds(name.clone(), parser_utils) {
+                let unparsed = if let Some(inner) = parse_bounds(
+                    UnparsedType::Basic(Span::new(parser_utils.file, parser_utils.index - 1), name.clone()),
+                    parser_utils,
+                ) {
                     inner
                 } else {
                     break;
@@ -311,8 +303,10 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             }
             TokenTypes::GenericsEnd => {
                 if !name.is_empty() {
-                    parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
-                    generics.insert(name.clone(), bounds);
+                    parser_utils.imports.generics.insert(
+                        name.clone(),
+                        unparsed_bounds,
+                    );
                 }
 
                 break;
@@ -328,28 +322,14 @@ pub fn parse_generics(parser_utils: &mut ParserUtils, generics: &mut IndexMap<St
             ),
         }
     }
-
-    for generic in added {
-        let mut bounds = Vec::new();
-        for unparsed in parser_utils.imports.generics.get(&generic).unwrap() {
-            bounds.push(Syntax::parse_type(
-                parser_utils.syntax.clone(),
-                Span::new(parser_utils.file, parser_utils.index - 1),
-                parser_utils.imports.boxed_clone(),
-                unparsed.clone(),
-                vec![],
-            ));
-        }
-        generics.insert(name.clone(), bounds);
-    }
 }
 
 /// Parses the bounds of a generic
-pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
+pub fn parse_bounds(name: UnparsedType, parser_utils: &mut ParserUtils) -> Option<UnparsedType> {
     if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::GenericsStart {
         parser_utils.index += 1;
     } else {
-        return Some(UnparsedType::Basic(name));
+        return Some(name);
     }
     let mut unparsed_bounds: Vec<UnparsedType> = Vec::default();
     while parser_utils.tokens.len() != parser_utils.index {
@@ -362,7 +342,10 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
                     name = name[1..].to_string();
                 }
                 name = name.trim().to_string();
-                let unparsed = if let Some(inner) = parse_bounds(name.clone(), parser_utils) {
+                let unparsed = if let Some(inner) = parse_bounds(
+                    UnparsedType::Basic(Span::new(parser_utils.file, parser_utils.index - 1), name.clone()),
+                    parser_utils,
+                ) {
                     inner
                 } else {
                     break;
@@ -370,7 +353,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
                 unparsed_bounds.push(unparsed);
             }
             TokenTypes::GenericsStart => {
-                if let Some(inner) = parse_bounds(String::default(), parser_utils) {
+                if let Some(inner) = parse_bounds(UnparsedType::Basic(Span::default(), String::default()), parser_utils) {
                     unparsed_bounds.push(inner);
                 } else {
                     return None;
@@ -389,11 +372,7 @@ pub fn parse_bounds(name: String, parser_utils: &mut ParserUtils) -> Option<Unpa
         }
     }
 
-    let unparsed = if unparsed_bounds.is_empty() {
-        UnparsedType::Basic(name)
-    } else {
-        UnparsedType::Generic(Box::new(UnparsedType::Basic(name)), unparsed_bounds)
-    };
+    let unparsed = if unparsed_bounds.is_empty() { name } else { UnparsedType::Generic(Box::new(name), unparsed_bounds) };
 
     return Some(unparsed);
 }

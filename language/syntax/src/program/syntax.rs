@@ -196,7 +196,7 @@ impl Syntax {
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used
     /// in the solve method, which calls on the Chalk library.
     pub fn make_impldatum(
-        generics: &IndexMap<String, Vec<FinalizedTypes>>,
+        generics: &IndexMap<String, FinalizedTypes>,
         first: &FinalizedTypes,
         second: &FinalizedTypes,
     ) -> ImplDatum<ChalkIr> {
@@ -429,25 +429,15 @@ impl Syntax {
         }
 
         // Checks if the type is a generic type
-        if let Some(found) = name_resolver.generic(&getting) {
-            let mut bounds = Vec::default();
-            // Get all the generic's bounds.
-            if !resolved_generics.contains(&getting) {
-                resolved_generics.push(getting.clone());
-                for bound in found {
-                    bounds.push(
-                        Self::parse_type(
-                            syntax.clone(),
-                            error.clone(),
-                            name_resolver.boxed_clone(),
-                            bound,
-                            resolved_generics.clone(),
-                        )
-                        .await?,
-                    );
-                }
+        if let Some(generic_bounds) = name_resolver.generic(&getting) {
+            if resolved_generics.contains(&getting) {
+                return Err(ParsingError::new(error, ParsingMessage::RecursiveGeneric(getting)));
             }
-
+            let mut bounds = vec![];
+            for bound in generic_bounds {
+                bounds.push(Self::parse_type(syntax.clone(), name_resolver.boxed_clone(), bound, resolved_generics.clone()).await?);
+            }
+            resolved_generics.push(getting.clone());
             return Ok(Types::Generic(getting, bounds));
         }
 
@@ -526,20 +516,18 @@ impl Syntax {
     #[async_recursion]
     pub async fn parse_type(
         syntax: Arc<Mutex<Syntax>>,
-        error: Span,
         resolver: Box<dyn NameResolver>,
         types: UnparsedType,
         resolved_generics: Vec<String>,
     ) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
-            UnparsedType::Basic(name) => Syntax::get_struct(syntax, error, name, resolver, resolved_generics).await,
+            UnparsedType::Basic(span, name) => Syntax::get_struct(syntax, span, name, resolver, resolved_generics).await,
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::default();
                 for arg in args {
                     generics.push(
                         Self::parse_type(
                             syntax.clone(),
-                            error.clone(),
                             resolver.boxed_clone(),
                             arg,
                             resolved_generics.clone(),
@@ -548,11 +536,8 @@ impl Syntax {
                     );
                 }
 
-                if generics.is_empty() {
-                    eprintln!("Found with no generics!");
-                }
                 Ok(Types::GenericType(
-                    Box::new(Self::parse_type(syntax, error, resolver, *name, resolved_generics).await?),
+                    Box::new(Self::parse_type(syntax, resolver, *name, resolved_generics).await?),
                     generics,
                 ))
             }

@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -238,18 +239,31 @@ impl Future for AsyncStructImplGetter {
 }
 
 /// A type that hasn't been parsed yet, used for types that need to be clonable before they're finalized.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub enum UnparsedType {
     /// Basic types are just a string
-    Basic(String),
+    Basic(Span, String),
     /// A generic-bound type, with a base type and bounds
     Generic(Box<UnparsedType>, Vec<UnparsedType>),
+}
+
+impl UnparsedType {
+    pub fn get_span(&self) -> Span {
+        return match self {
+            UnparsedType::Basic(span, _) => span.clone(),
+            UnparsedType::Generic(base, bounds) => {
+                let mut output = base.get_span().clone();
+                output.extend_span(bounds.last().as_ref().unwrap().get_span().end+1);
+                output
+            }
+        }
+    }
 }
 
 impl Display for UnparsedType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         return match self {
-            UnparsedType::Basic(name) => write!(f, "{}", name),
+            UnparsedType::Basic(_, name) => write!(f, "{}", name),
             UnparsedType::Generic(base, bounds) => {
                 write!(f, "{}<{}>", base, display_parenless(bounds, " + "))
             }
@@ -266,7 +280,10 @@ pub trait NameResolver: Send + Sync {
     fn generic(&self, name: &String) -> Option<Vec<UnparsedType>>;
 
     /// All of this function's generics
-    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>>;
+    fn generics(&self) -> &IndexMap<String, Vec<UnparsedType>>;
+
+    /// All of this function's generics, mutably
+    fn generics_mut(&mut self) -> &mut IndexMap<String, Vec<UnparsedType>>;
 
     /// Clones the name resolver in a box, because it's a trait it can't be directly cloned.
     fn boxed_clone(&self) -> Box<dyn NameResolver>;
@@ -287,7 +304,12 @@ impl NameResolver for EmptyNameResolver {
         panic!("Should not be called after finalizing!")
     }
 
-    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>> {
+    fn generics(&self) -> &IndexMap<String, Vec<UnparsedType>> {
+        panic!("Should not be called after finalizing!")
+    }
+
+    
+    fn generics_mut(&mut self) -> &mut IndexMap<String, Vec<UnparsedType>> {
         panic!("Should not be called after finalizing!")
     }
 

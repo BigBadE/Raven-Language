@@ -327,10 +327,10 @@ pub async fn degeneric_function(
             panic!("Failed to find generic {} in call to function {}", key, function.data.name);
         }
     }
-    
+
     // Replace the generics with the real value
     new_method.generics =
-        new_method.generics.iter().map(|(key, _)| (key.clone(), vec![manager.generics()[key].clone()])).collect();
+        new_method.generics.iter().map(|(key, _)| (key.clone(), manager.generics()[key].clone())).collect();
 
     let mut method_data = FunctionData::clone(&function.data);
     method_data.name.clone_from(&name);
@@ -360,7 +360,9 @@ pub async fn degeneric_function(
 
     // Spawn a thread to asynchronously degeneric the code inside the function.
     let handle = manager.handle().clone();
-    handle.lock().spawn(new_function.data.name.clone(), degeneric_code(syntax.clone(), original, new_function.clone(), manager));
+    handle
+        .lock()
+        .spawn(new_function.data.name.clone(), degeneric_code(syntax.clone(), original, new_function.clone(), manager));
 
     return Ok(new_function);
 }
@@ -561,7 +563,10 @@ pub async fn degeneric_header(
     let mut iterator = function.generics.iter();
     for generic in generics {
         let (name, bounds) = iterator.next().unwrap();
-        for bound in bounds {
+        for bound in match bounds {
+            FinalizedTypes::Generic(_, bounds) => bounds,
+            _ => panic!("Bad generics in func generics"),
+        } {
             if !generic.of_type(bound, syntax.clone()).await {
                 // TODO see if this is needed
                 return Err(span.make_error(ParsingMessage::ShouldntSee("Bounds sanity check!")));

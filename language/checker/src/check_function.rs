@@ -19,6 +19,7 @@ use syntax::{is_modifier, Modifier, ProcessManager, SimpleVariableManager};
 /// Verifies a function and returns its code, which is verified seperate to prevent deadlocks
 pub async fn verify_function(
     mut function: UnfinalizedFunction,
+    resolver: &Box<dyn NameResolver>,
     syntax: &Arc<Mutex<Syntax>>,
     include_refs: bool,
 ) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
@@ -50,7 +51,7 @@ pub async fn verify_function(
 
     // Return the codeless finalized function
     let codeless = CodelessFinalizedFunction {
-        generics: finalize_generics(syntax, function.generics).await?,
+        generics: finalize_generics(syntax, resolver, &function.generics).await?,
         arguments: fields,
         return_type,
         data: function.data.clone(),
@@ -83,17 +84,9 @@ pub async fn verify_function_code(
 
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
     let mut process_manager = process_manager.clone();
-    for (name, bounds) in resolver.generics() {
-        let mut output = vec![];
-        for bound in bounds {
-            output.push(
-                Syntax::parse_type(syntax.clone(), Span::default(), resolver.boxed_clone(), bound.clone(), vec![])
-                    .await?
-                    .finalize(syntax.clone())
-                    .await,
-            )
-        }
-        process_manager.mut_generics().insert(name.clone(), FinalizedTypes::Generic(name.clone(), output));
+
+    for (name, bounds) in finalize_generics(syntax, &resolver, resolver.generics()).await? {
+        process_manager.mut_generics().insert(name.clone(), bounds);
     }
 
     let mut code_verifier = CodeVerifier {

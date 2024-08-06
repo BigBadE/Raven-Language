@@ -152,8 +152,8 @@ pub enum EffectType {
     /// Calling, trait to call, function name, and args
     ImplementationCall(Box<Effects>, String, String, Vec<Effects>),
     /// Finds the method with the name and calls it with those arguments.
-    /// Calling, calling function, function arguments, and return type (if explicitly required)
-    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Vec<(UnparsedType, Span)>),
+    /// Calling, calling function, function arguments, and explicit generics
+    MethodCall(Option<Box<Effects>>, String, Vec<Effects>, Vec<UnparsedType>),
     /// Sets the variable to a value.
     Set(Box<Effects>, Box<Effects>),
     /// Loads variable with the given name.

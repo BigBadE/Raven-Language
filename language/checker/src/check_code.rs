@@ -206,7 +206,6 @@ async fn verify_create_struct(
 ) -> Result<FinalizedEffects, ParsingError> {
     let target = Syntax::parse_type(
         code_verifier.syntax.clone(),
-        Span::default(),
         code_verifier.resolver.boxed_clone(),
         target,
         vec![],

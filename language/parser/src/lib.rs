@@ -2,9 +2,9 @@
 #![feature(let_chains)]
 extern crate core;
 
+use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -49,7 +49,7 @@ pub struct ImportNameResolver {
     /// The current file imports
     pub imports: Vec<String>,
     /// The current generics
-    pub generics: HashMap<String, Vec<UnparsedType>>,
+    pub generics: IndexMap<String, Vec<UnparsedType>>,
     /// The parent type
     pub parent: Option<UnparsedType>,
     /// Last ID used on a code block label
@@ -59,7 +59,7 @@ pub struct ImportNameResolver {
 impl ImportNameResolver {
     /// Creates a new name resolver
     pub fn new(base: String) -> Self {
-        return Self { imports: vec![base], generics: HashMap::default(), parent: None, last_id: 0 };
+        return Self { imports: vec![base], generics: IndexMap::default(), parent: None, last_id: 0 };
     }
 }
 
@@ -72,8 +72,12 @@ impl NameResolver for ImportNameResolver {
         return self.generics.get(name).cloned();
     }
 
-    fn generics(&self) -> &HashMap<String, Vec<UnparsedType>> {
+    fn generics(&self) -> &IndexMap<String, Vec<UnparsedType>> {
         return &self.generics;
+    }
+    
+    fn generics_mut(&mut self) -> &mut IndexMap<String, Vec<UnparsedType>> {
+        return &mut self.generics;
     }
 
     fn boxed_clone(&self) -> Box<dyn NameResolver> {

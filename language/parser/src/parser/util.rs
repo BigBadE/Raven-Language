@@ -116,16 +116,23 @@ impl<'a> ParserUtils<'a> {
         handle: Arc<Mutex<HandleWrapper>>,
         syntax: Arc<Mutex<Syntax>>,
         implementor: TraitImplementor,
-        resolver: Box<dyn NameResolver>,
+        mut resolver: Box<dyn NameResolver>,
         process_manager: Box<dyn ProcessManager>,
     ) -> Result<(), ParsingError> {
         let mut generics = IndexMap::default();
         for (generic, bounds) in implementor.generics {
-            let mut final_bounds = Vec::default();
+            resolver.generics_mut().insert(generic.clone(), bounds.clone());
+
+            let mut output_bounds = vec![];
             for bound in bounds {
-                final_bounds.push(bound.await?.finalize(syntax.clone()).await);
+                output_bounds.push(
+                    Syntax::parse_type(syntax.clone(), resolver.boxed_clone(), bound, vec![])
+                        .await?
+                        .finalize(syntax.clone())
+                        .await,
+                );
             }
-            generics.insert(generic, final_bounds);
+            generics.insert(generic.clone(), FinalizedTypes::Generic(generic, output_bounds));
         }
 
         let target = implementor.base.await?;
@@ -139,7 +146,7 @@ impl<'a> ParserUtils<'a> {
         if let Some(base) = implementor.implementor {
             let base = base.await?;
             let base = base.finalize(syntax.clone()).await;
-            
+
             let chalk_type = Arc::new(Syntax::make_impldatum(&generics, &target, &base));
 
             let output = FinishedTraitImplementor {
@@ -224,39 +231,33 @@ impl<'a> ParserUtils<'a> {
     }
 }
 
-/// Parses generics, returning both its unparsed form (for copying) and a future (for actually getting the generics)
-pub fn parse_generics(input: String, parser_utils: &mut ParserUtils) -> (UnparsedType, ParsingFuture<Types>) {
-    let mut generics: Vec<ParsingFuture<Types>> = Vec::default();
+/// Parses generics, returning both its unparsed form
+pub fn parse_generics(input: UnparsedType, parser_utils: &mut ParserUtils) -> UnparsedType {
     let mut unparsed_generics = Vec::default();
-    let mut last: Option<(UnparsedType, ParsingFuture<Types>)> = None;
+    let mut last: Option<UnparsedType> = None;
     loop {
         let token = parser_utils.tokens.get(parser_utils.index).unwrap();
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => {
-                last = Some((
-                    UnparsedType::Basic(token.to_string(parser_utils.buffer)),
-                    Box::pin(Syntax::get_struct(
-                        parser_utils.syntax.clone(),
-                        Span::default(),
+                if let Some(unparsed) = last {
+                    unparsed_generics.push(unparsed);
+                }
+                last = Some(
+                    UnparsedType::Basic(
+                        Span::new(parser_utils.file, parser_utils.index - 1),
                         token.to_string(parser_utils.buffer),
-                        Box::new(parser_utils.imports.clone()),
-                        vec![],
-                    )),
-                ))
+                    ))
             }
             TokenTypes::Operator => {
-                if let Some((unparsed, types)) = last {
-                    let (unparsed, types) = inner_generic(unparsed, types, parser_utils);
-                    generics.push(Box::pin(types));
-                    unparsed_generics.push(unparsed);
+                if let Some(unparsed) = last {
+                    unparsed_generics.push(parse_generics(unparsed, parser_utils));
                     last = None;
                 }
             }
             TokenTypes::ArgumentEnd => {
-                if let Some((unparsed, types)) = last {
+                if let Some(unparsed) = last {
                     unparsed_generics.push(unparsed);
-                    generics.push(types);
                     last = None;
                 }
             }
@@ -267,83 +268,5 @@ pub fn parse_generics(input: String, parser_utils: &mut ParserUtils) -> (Unparse
         }
     }
 
-    return (
-        UnparsedType::Generic(Box::new(UnparsedType::Basic(input.clone())), unparsed_generics),
-        Box::pin(to_generic(input, generics)),
-    );
-}
-
-/// Gets the generic type from its name and bounds
-async fn to_generic(name: String, bounds: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
-    let mut output = Vec::default();
-    for bound in bounds {
-        output.push(bound.await?.clone());
-    }
-
-    return Ok(Types::Generic(name, output));
-}
-
-/// Inner generic parser, for nested generic types
-fn inner_generic(
-    unparsed: UnparsedType,
-    outer: ParsingFuture<Types>,
-    parser_utils: &mut ParserUtils,
-) -> (UnparsedType, ParsingFuture<Types>) {
-    let mut values: Vec<ParsingFuture<Types>> = Vec::default();
-    let mut unparsed_values = Vec::default();
-    let mut last: Option<(UnparsedType, ParsingFuture<Types>)> = None;
-    loop {
-        let token = parser_utils.tokens.get(parser_utils.index).unwrap();
-        parser_utils.index += 1;
-        match token.token_type {
-            TokenTypes::Variable => {
-                if let Some((unparsed, found)) = last {
-                    unparsed_values.push(unparsed);
-                    values.push(Box::pin(found));
-                }
-                last = Some((
-                    UnparsedType::Basic(token.to_string(parser_utils.buffer)),
-                    Box::pin(Syntax::get_struct(
-                        parser_utils.syntax.clone(),
-                        Span::default(),
-                        token.to_string(parser_utils.buffer),
-                        Box::new(parser_utils.imports.clone()),
-                        vec![],
-                    )),
-                ));
-            }
-            TokenTypes::Operator => {
-                if let Some((unparsed, types)) = last {
-                    let (unparsed, types) = inner_generic(unparsed, types, parser_utils);
-                    unparsed_values.push(unparsed);
-                    values.push(types);
-                    last = None;
-                }
-            }
-            TokenTypes::ArgumentEnd => {
-                if let Some((unparsed, types)) = last {
-                    unparsed_values.push(unparsed);
-                    values.push(types);
-                    last = None;
-                }
-            }
-            _ => {
-                parser_utils.index -= 1;
-                break;
-            }
-        }
-    }
-
-    let types =
-        if unparsed_values.is_empty() { unparsed } else { UnparsedType::Generic(Box::new(unparsed), unparsed_values) };
-    return (types, Box::pin(async_to_generic(outer, values)));
-}
-
-/// Asynchronously gets a generic type from its base and bounds
-async fn async_to_generic(outer: ParsingFuture<Types>, bounds: Vec<ParsingFuture<Types>>) -> Result<Types, ParsingError> {
-    let mut new_bounds = Vec::default();
-    for bound in bounds {
-        new_bounds.push(bound.await?);
-    }
-    return Ok(Types::GenericType(Box::new(outer.await?), new_bounds));
+    return UnparsedType::Generic(Box::new(input.clone()), unparsed_generics);
 }

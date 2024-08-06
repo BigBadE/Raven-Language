@@ -3,7 +3,6 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use data::tokens::{Span, TokenTypes};
-use syntax::async_util::NameResolver;
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
 use syntax::program::code::MemberField;
 use syntax::program::function::{CodeBody, FunctionData, UnfinalizedFunction};
@@ -23,7 +22,7 @@ pub fn parse_function(
     modifiers: Vec<Modifier>,
 ) -> Result<UnfinalizedFunction, ParsingError> {
     let mut name = String::default();
-    let mut generics = IndexMap::default();
+    let mut span = Span::default();
     let mut fields: Vec<ParsingFuture<MemberField>> = Vec::default();
     let mut code = None;
     let mut return_type = None;
@@ -31,14 +30,15 @@ pub fn parse_function(
     let mut last_arg = String::default();
     let mut last_arg_type = String::default();
 
-    let token = parser_utils.index;
-
     while !parser_utils.tokens.is_empty() {
         let token = &parser_utils.tokens[parser_utils.index];
         parser_utils.index += 1;
         match token.token_type {
-            TokenTypes::Identifier => name = parser_utils.file_name.clone() + "::" + &*token.to_string(parser_utils.buffer),
-            TokenTypes::GenericsStart => parse_generics(parser_utils, &mut generics),
+            TokenTypes::Identifier => {
+                name = parser_utils.file_name.clone() + "::" + &*token.to_string(parser_utils.buffer);
+                span = Span::new(parser_utils.file, parser_utils.index - 1);
+            }
+            TokenTypes::GenericsStart => parse_generics(parser_utils),
             TokenTypes::ArgumentsStart | TokenTypes::ArgumentSeparator | TokenTypes::ArgumentTypeSeparator => {}
             TokenTypes::ArgumentName => last_arg = token.to_string(parser_utils.buffer),
             TokenTypes::ArgumentType => last_arg_type = token.to_string(parser_utils.buffer),
@@ -53,7 +53,6 @@ pub fn parse_function(
                     fields.push(Box::pin(to_field(
                         Syntax::parse_type(
                             parser_utils.syntax.clone(),
-                            Span::default(),
                             Box::new(parser_utils.imports.clone()),
                             parser_utils.imports.parent.clone().unwrap(),
                             vec![],
@@ -98,29 +97,14 @@ pub fn parse_function(
         modifiers += Modifier::Trait as u8;
     }
 
-    for (key, generic) in &parser_utils.imports.generics {
-        let mut bounds = Vec::default();
-        for bound in generic {
-            bounds.push(Syntax::parse_type(
-                parser_utils.syntax.clone(),
-                Span::default(),
-                parser_utils.imports.boxed_clone(),
-                bound.clone(),
-                vec![],
-            ));
-        }
-        generics.insert(key.clone(), bounds);
-    }
-
-    let span = Span::new(parser_utils.file, token);
     return Ok(UnfinalizedFunction {
-        generics,
+        generics: parser_utils.imports.generics.clone(),
         fields,
         code: code.unwrap_or_else(|| CodeBody::new(Vec::default(), "empty".to_string())),
         return_type,
         data: Arc::new(FunctionData::new(attributes, modifiers, name, span.clone())),
         parent: parser_utils.imports.parent.clone().map(|types| {
-            Syntax::parse_type(parser_utils.syntax.clone(), span, Box::new(parser_utils.imports.clone()), types, vec![])
+            Syntax::parse_type(parser_utils.syntax.clone(), Box::new(parser_utils.imports.clone()), types, vec![])
         }),
     });
 }

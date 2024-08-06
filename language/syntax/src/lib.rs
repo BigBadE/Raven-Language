@@ -11,6 +11,7 @@ use crate::program::syntax::Syntax;
 use crate::program::types::{FinalizedTypes, Types};
 use crate::top_element_manager::TopElementManager;
 use async_trait::async_trait;
+use async_util::UnparsedType;
 use chalk_solve::rust_ir::ImplDatum;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -178,6 +179,7 @@ pub trait ProcessManager: Send + Sync {
     async fn verify_func(
         &self,
         function: UnfinalizedFunction,
+        resolver: &Box<dyn NameResolver>,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody);
 
@@ -197,7 +199,7 @@ pub trait ProcessManager: Send + Sync {
     async fn verify_struct(
         &self,
         structure: UnfinalizedStruct,
-        resolver: Box<dyn NameResolver>,
+        resolver: &Box<dyn NameResolver>,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedStruct;
 
@@ -314,7 +316,7 @@ pub struct TraitImplementor {
     /// Type being implemented
     pub implementor: Option<ParsingFuture<Types>>,
     /// The implementor's generics
-    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    pub generics: IndexMap<String, Vec<UnparsedType>>,
     /// The implementor's attributes
     pub attributes: Vec<Attribute>,
     /// The implementor's functions
@@ -332,7 +334,7 @@ pub struct FinishedTraitImplementor {
     /// The implementation as a chalk type
     pub chalk_type: Arc<ImplDatum<ChalkIr>>,
     /// The generics declared by this implementor
-    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub generics: IndexMap<String, FinalizedTypes>,
     /// The attributes on this implementor
     pub attributes: Vec<Attribute>,
     /// All ths functions in this implementor
@@ -346,7 +348,7 @@ pub struct FinishedStructImplementor {
     /// Would be Iter<T>
     pub target: FinalizedTypes,
     /// The generics declared by this implementor
-    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub generics: IndexMap<String, FinalizedTypes>,
     /// The attributes on this implementor
     pub attributes: Vec<Attribute>,
     /// All ths functions in this implementor

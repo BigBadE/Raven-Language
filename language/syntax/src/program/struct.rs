@@ -12,11 +12,11 @@ use lazy_static::lazy_static;
 use async_trait::async_trait;
 use data::tokens::Span;
 
-use crate::async_util::{HandleWrapper, NameResolver};
+use crate::async_util::{HandleWrapper, NameResolver, UnparsedType};
 use crate::chalk_interner::ChalkIr;
 use crate::program::code::{FinalizedMemberField, MemberField};
 use crate::program::function::{FunctionData, UnfinalizedFunction};
-use crate::program::types::{FinalizedTypes, Types};
+use crate::program::types::FinalizedTypes;
 use crate::top_element_manager::TopElementManager;
 use crate::{is_modifier, DataType, Modifier, ParsingFuture, ProcessManager, Syntax, TopElement};
 use crate::{Attribute, ParsingError};
@@ -123,7 +123,7 @@ pub struct StructData {
 /// An unfinalized struct
 pub struct UnfinalizedStruct {
     /// The program's generics
-    pub generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
+    pub generics: IndexMap<String, Vec<UnparsedType>>,
     /// The program's fields
     pub fields: Vec<ParsingFuture<MemberField>>,
     /// The program's functions
@@ -142,7 +142,7 @@ impl DataType<StructData> for UnfinalizedStruct {
 #[derive(Clone, Debug)]
 pub struct FinalizedStruct {
     /// The program's generics
-    pub generics: IndexMap<String, Vec<FinalizedTypes>>,
+    pub generics: IndexMap<String, FinalizedTypes>,
     /// The program's fields
     pub fields: Vec<FinalizedMemberField>,
     /// The program's data
@@ -320,7 +320,7 @@ impl TopElement for StructData {
         let data = current.data.clone();
         let functions = current.functions;
         current.functions = Vec::default();
-        let structure = Arc::new(process_manager.verify_struct(current, resolver.boxed_clone(), &syntax).await);
+        let structure = Arc::new(process_manager.verify_struct(current, &resolver, &syntax).await);
         {
             let mut locked = syntax.lock();
             locked.structures.add_data(data.clone(), structure.clone());

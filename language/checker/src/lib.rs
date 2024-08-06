@@ -11,12 +11,12 @@ use data::tokens::Span;
 use indexmap::IndexMap;
 
 use crate::degeneric::degeneric_type_no_generic_types;
-use syntax::async_util::NameResolver;
+use syntax::async_util::{NameResolver, UnparsedType};
 use syntax::errors::ParsingError;
 use syntax::program::code::FinalizedEffectType;
 use syntax::program::syntax::Syntax;
-use syntax::program::types::{FinalizedTypes, Types};
-use syntax::{ParsingFuture, SimpleVariableManager};
+use syntax::program::types::FinalizedTypes;
+use syntax::SimpleVariableManager;
 
 use crate::output::TypesChecker;
 
@@ -40,15 +40,18 @@ pub mod output;
 /// Finalizes an IndexMap of generics into FinalizedEffectType
 pub async fn finalize_generics(
     syntax: &Arc<Mutex<Syntax>>,
-    generics: IndexMap<String, Vec<ParsingFuture<Types>>>,
-) -> Result<IndexMap<String, Vec<FinalizedTypes>>, ParsingError> {
+    resolver: &Box<dyn NameResolver>,
+    generics: &IndexMap<String, Vec<UnparsedType>>,
+) -> Result<IndexMap<String, FinalizedTypes>, ParsingError> {
     let mut output = IndexMap::default();
-    for (generic, value) in generics {
-        let mut values = Vec::default();
-        for found in value {
-            values.push(found.await?.finalize(syntax.clone()).await);
+    for (generic, bounds) in generics {
+        let mut output_bounds = vec![];
+        for bound in bounds {
+            output_bounds.push(Syntax::parse_type(syntax.clone(), resolver.boxed_clone(), bound.clone(), vec![]).await?
+            .finalize(syntax.clone())
+            .await);
         }
-        output.insert(generic, values);
+        output.insert(generic.clone(), FinalizedTypes::Generic(generic.clone(), output_bounds));
     }
     return Ok(output);
 }
