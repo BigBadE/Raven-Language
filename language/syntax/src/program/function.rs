@@ -91,7 +91,6 @@ impl TopElement for FunctionData {
         process_manager: Box<dyn ProcessManager>,
     ) -> Result<(), ParsingError> {
         let name = current.data.name.clone();
-
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &resolver, &syntax).await;
 
@@ -99,9 +98,6 @@ impl TopElement for FunctionData {
         let finalized_function = process_manager.verify_code(codeless_function.clone(), code, resolver, &syntax).await;
         let finalized_function = Arc::new(finalized_function);
 
-        if finalized_function.data.name.is_empty() {
-            eprintln!("{}, {}, {}", name, codeless_function.data.name, finalized_function.data.name);
-        }
         // Add the finalized code to the compiling list.
         Syntax::add_compiling(process_manager, finalized_function.clone(), &syntax, true).await;
         handle.lock().finish_task(&name);

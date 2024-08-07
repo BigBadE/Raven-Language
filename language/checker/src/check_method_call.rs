@@ -102,15 +102,15 @@ pub async fn check_method_call(
                 false,
             )
             .await?;
-            let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
+            let function = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
             let calling = Some(Box::new(calling));
-            check_args(&method, &calling, &finalized_effects, &code_verifier.syntax, variables, &effect.span).await?;
+            check_args(&function, &calling, &finalized_effects, &code_verifier.syntax, variables, &effect.span).await?;
 
-            let index = return_type.inner_struct().data.functions.iter().position(|found| *found == method.data).unwrap();
+            let index = return_type.inner_struct().data.functions.iter().position(|found| *found == function.data).unwrap();
             return Ok(FinalizedEffects::new(
                 effect.span.clone(),
-                FinalizedEffectType::VirtualCall(index, method, calling.unwrap(), finalized_effects),
+                FinalizedEffectType::VirtualCall(index, function, calling.unwrap(), finalized_effects),
             ));
         }
 
@@ -138,7 +138,7 @@ pub async fn check_method_call(
                     .base
                     .resolve_generic(&return_type, &code_verifier.syntax, &mut process_manager.generics, Span::default())
                     .await?;
-                check_method(
+                check_function(
                     calling.clone(),
                     method,
                     finalized_effects.clone(),
@@ -170,7 +170,7 @@ pub async fn check_method_call(
                 for function in &implementor.functions {
                     if function.name.split("::").last().unwrap() == method {
                         let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
-                        match check_method(
+                        match check_function(
                             calling.clone(),
                             method,
                             finalized_effects.clone(),
@@ -212,7 +212,7 @@ pub async fn check_method_call(
                     for function in &implementor.functions {
                         if function.name.split("::").last().unwrap() == possible[possible.len() - 1] {
                             let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
-                            match check_method(
+                            match check_function(
                                 None,
                                 method,
                                 finalized_effects.clone(),
@@ -243,7 +243,7 @@ pub async fn check_method_call(
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
-    return check_method(
+    return check_function(
         calling.map(|inner| Box::new(inner)),
         method,
         finalized_effects,
@@ -255,22 +255,22 @@ pub async fn check_method_call(
     .await;
 }
 
-/// Checks if a method call is valid
-/// The CheckerVariableManager here is used for the effects calling the method
-pub async fn check_method(
+/// Checks if a function call is valid
+/// The CheckerVariableManager here is used for the effects calling the function
+pub async fn check_function(
     calling: Option<Box<FinalizedEffects>>,
-    method: Arc<CodelessFinalizedFunction>,
+    function: Arc<CodelessFinalizedFunction>,
     effects: Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    generic_returning: Vec<(FinalizedTypes, Span)>,
+    explicit_generics: Vec<(FinalizedTypes, Span)>,
     span: &Span,
 ) -> Result<FinalizedEffects, ParsingError> {
-    check_args(&method, &calling, &effects, syntax, variables, span).await?;
+    check_args(&function, &calling, &effects, syntax, variables, span).await?;
 
     return Ok(FinalizedEffects::new(
         span.clone(),
-        FinalizedEffectType::MethodCall(calling, method, effects, generic_returning),
+        FinalizedEffectType::MethodCall(calling, function, effects, explicit_generics),
     ));
 }
 

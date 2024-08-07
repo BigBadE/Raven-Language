@@ -41,7 +41,6 @@ pub enum ParsingMessage {
     NoMethod(String, FinalizedTypes),
     NoImpl(FinalizedTypes, String),
     NoTraitImpl(FinalizedTypes, FinalizedTypes),
-    RecursiveGeneric(String)
 }
 
 impl Display for ParsingMessage {
@@ -80,7 +79,9 @@ impl Display for ParsingMessage {
             }
             ParsingMessage::UnknownOperation(operation) => write!(f, "Unknown operation '{}'", operation),
             ParsingMessage::UnknownFunction() => write!(f, "Unknown function!"),
-            ParsingMessage::MissingArgument(expected, found) => write!(f, "Expected {} arguments but found {}!", expected, found),
+            ParsingMessage::MissingArgument(expected, found) => {
+                write!(f, "Expected {} arguments but found {}!", expected, found)
+            }
             ParsingMessage::AmbiguousMethod(name) => write!(f, "Ambiguous method {}!", name),
             ParsingMessage::NoMethod(name, types) => write!(f, "No method {} for generic {}", name, fix_type(types)),
             ParsingMessage::NoImpl(base, method) => {
@@ -88,8 +89,7 @@ impl Display for ParsingMessage {
             }
             ParsingMessage::NoTraitImpl(base, traits) => {
                 write!(f, "No implementation of {} for {}", fix_type(traits), fix_type(base))
-            },
-            ParsingMessage::RecursiveGeneric(name) => write!(f, "Recursive generic {}", name)
+            }
         };
     }
 }

@@ -39,7 +39,7 @@ pub fn parse_structure(
                     Some(UnparsedType::Basic(Span::new(parser_utils.file, parser_utils.index - 1), name.clone()));
             }
             TokenTypes::GenericsStart => {
-                parse_generics(parser_utils); 
+                parse_generics(parser_utils);
                 parser_utils.imports.parent = Some(UnparsedType::Generic(
                     Box::new(parser_utils.imports.parent.clone().unwrap()),
                     parser_utils
@@ -278,10 +278,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils) {
                 name = name.trim().to_string();
             }
             TokenTypes::GenericEnd => {
-                parser_utils.imports.generics.insert(
-                    name.clone(),
-                    unparsed_bounds,
-                );
+                parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
                 unparsed_bounds = Vec::default();
             }
             TokenTypes::GenericBound => {
@@ -303,10 +300,7 @@ pub fn parse_generics(parser_utils: &mut ParserUtils) {
             }
             TokenTypes::GenericsEnd => {
                 if !name.is_empty() {
-                    parser_utils.imports.generics.insert(
-                        name.clone(),
-                        unparsed_bounds,
-                    );
+                    parser_utils.imports.generics.insert(name.clone(), unparsed_bounds);
                 }
 
                 break;

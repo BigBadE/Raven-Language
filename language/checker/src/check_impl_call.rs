@@ -11,7 +11,7 @@ use syntax::top_element_manager::ImplWaiter;
 use syntax::SimpleVariableManager;
 
 use crate::check_code::verify_effect;
-use crate::check_method_call::check_method;
+use crate::check_method_call::check_function;
 use crate::degeneric::degeneric_header;
 use crate::{get_return, CodeVerifier};
 
@@ -158,7 +158,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
                     i,
                     target,
                     AsyncDataGetter::new(data.code_verifier.syntax.clone(), found.clone()).await,
-                    temp
+                    temp,
                 ),
             )));
         }
@@ -205,7 +205,7 @@ async fn try_get_impl(data: &ImplCheckerData<'_>, span: &Span) -> Result<Option<
         if temp.name.split("::").last().unwrap() == data.method || data.method.is_empty() {
             let method = AsyncDataGetter::new(data.code_verifier.syntax.clone(), temp.clone()).await;
 
-            match check_method(
+            match check_function(
                 data.calling.clone(),
                 method.clone(),
                 data.finalized_effects.clone(),

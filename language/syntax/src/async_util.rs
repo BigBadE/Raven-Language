@@ -222,10 +222,10 @@ impl Future for AsyncStructImplGetter {
         let mut locked = self.syntax.lock();
         if !locked.finished_impls() {
             locked.async_manager.impl_waiters.push(cx.waker().clone());
-            return Poll::Pending
+            return Poll::Pending;
         }
 
-        let mut output = vec!();
+        let mut output = vec![];
         for (types, impls) in &locked.struct_implementations {
             if self.getting.of_type_sync(&types, None).0 {
                 for found_impl in impls {
@@ -233,7 +233,7 @@ impl Future for AsyncStructImplGetter {
                 }
             }
         }
-        
+
         return Poll::Ready(output);
     }
 }
@@ -253,10 +253,12 @@ impl UnparsedType {
             UnparsedType::Basic(span, _) => span.clone(),
             UnparsedType::Generic(base, bounds) => {
                 let mut output = base.get_span().clone();
-                output.extend_span(bounds.last().as_ref().unwrap().get_span().end+1);
+                if !bounds.is_empty() {
+                    output.extend_span(bounds.last().as_ref().unwrap().get_span().end + 1);
+                }
                 output
             }
-        }
+        };
     }
 }
 
@@ -308,7 +310,6 @@ impl NameResolver for EmptyNameResolver {
         panic!("Should not be called after finalizing!")
     }
 
-    
     fn generics_mut(&mut self) -> &mut IndexMap<String, Vec<UnparsedType>> {
         panic!("Should not be called after finalizing!")
     }

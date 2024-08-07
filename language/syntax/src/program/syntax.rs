@@ -126,7 +126,13 @@ impl Syntax {
                 }
 
                 if generic {
-                    locked.generics.insert(function.data.name.clone(), function);
+                    locked.generics.insert(function.data.name.clone(), function.clone());
+
+                    // TODO figure out generic traits
+                    // If the function is in a trait, it can't be generic, so it gets automatically compiled
+                    if is_modifier(function.data.modifiers, Modifier::Trait) {
+                        locked.compiling.insert(function.data.name.clone(), function);
+                    }
                 } else {
                     locked.compiling.insert(function.data.name.clone(), function);
                 }
@@ -431,13 +437,16 @@ impl Syntax {
         // Checks if the type is a generic type
         if let Some(generic_bounds) = name_resolver.generic(&getting) {
             if resolved_generics.contains(&getting) {
-                return Err(ParsingError::new(error, ParsingMessage::RecursiveGeneric(getting)));
-            }
-            let mut bounds = vec![];
-            for bound in generic_bounds {
-                bounds.push(Self::parse_type(syntax.clone(), name_resolver.boxed_clone(), bound, resolved_generics.clone()).await?);
+                // If the generic is recursive, for example "T: Add<E, T>", then ignore the bounds since they're irrelevant in the second recursive case
+                return Ok(Types::Generic(getting, vec![]));
             }
             resolved_generics.push(getting.clone());
+            let mut bounds = vec![];
+            for bound in generic_bounds {
+                bounds.push(
+                    Self::parse_type(syntax.clone(), name_resolver.boxed_clone(), bound, resolved_generics.clone()).await?,
+                );
+            }
             return Ok(Types::Generic(getting, bounds));
         }
 
@@ -526,13 +535,7 @@ impl Syntax {
                 let mut generics = Vec::default();
                 for arg in args {
                     generics.push(
-                        Self::parse_type(
-                            syntax.clone(),
-                            resolver.boxed_clone(),
-                            arg,
-                            resolved_generics.clone(),
-                        )
-                        .await?,
+                        Self::parse_type(syntax.clone(), resolver.boxed_clone(), arg, resolved_generics.clone()).await?,
                     );
                 }
 

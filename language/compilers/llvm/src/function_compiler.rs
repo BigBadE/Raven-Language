@@ -34,7 +34,7 @@ pub fn instance_function<'a, 'ctx>(
         value = compile_llvm_intrinsics(function.data.name.split("::").last().unwrap(), type_getter);
     } else if is_modifier(function.data.modifiers, Modifier::Internal) {
         value = create_function_value(&function, type_getter, None);
-        compile_internal(&type_getter, &type_getter.compiler, &function, value);
+        compile_internal(type_getter, &function, value);
     } else if is_modifier(function.data.modifiers, Modifier::Extern) {
         value = create_function_value(&function, type_getter, Some(Linkage::External))
     } else {

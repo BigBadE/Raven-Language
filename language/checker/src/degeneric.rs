@@ -1,4 +1,3 @@
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::future::Future;
 use std::mem;
@@ -8,6 +7,8 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use async_recursion::async_recursion;
+use parking_lot::Mutex;
+
 use data::tokens::Span;
 use syntax::async_util::AsyncDataGetter;
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
@@ -42,13 +43,22 @@ pub async fn degeneric_effect(
             degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?
         }
         FinalizedEffectType::CodeBody(body) => degeneric_code_body(body, process_manager, variables, syntax).await?,
-        FinalizedEffectType::MethodCall(calling, function, arguments, explicit_generic) => {
+        FinalizedEffectType::MethodCall(calling, function, arguments, explicit_generics) => {
             if let Some(found) = calling {
                 arguments.insert(0, *found.clone());
+            }
+            for argument in &mut *arguments {
+                degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
+            }
+
+            for (generic, _) in &mut *explicit_generics {
+                // Degeneric explicit generics using the parent function's generics.
+                degeneric_type(generic, process_manager.generics(), syntax).await;
             }
 
             let mut before_arguments = function.arguments.clone();
             let mut degenericing_process_manager = process_manager.cloned();
+            degenericing_process_manager.mut_generics().clear();
 
             for i in 0..before_arguments.len() {
                 before_arguments[i]
@@ -78,7 +88,7 @@ pub async fn degeneric_effect(
                 arguments,
                 syntax,
                 variables,
-                explicit_generic.clone(),
+                explicit_generics.clone(),
             )
             .await?;
 
@@ -87,9 +97,6 @@ pub async fn degeneric_effect(
                 output.push(arg.types.clone());
             }
 
-            for argument in &mut *arguments {
-                degeneric_effect(&mut argument.types, syntax, process_manager, variables, span).await?;
-            }
             degeneric_arguments(&before_arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericMethodCall(function, types, arguments) => {
@@ -155,14 +162,16 @@ pub async fn degeneric_effect(
         }
         FinalizedEffectType::VirtualCall(_, function, calling, arguments) => {
             arguments.insert(0, *calling.clone());
-            *function =
-                degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, vec![]).await?;
+            // TODO figure out generic virtual functions
+            //*function =
+            //    degeneric_function(function.clone(), process_manager.cloned(), arguments, syntax, variables, vec![]).await?;
             for effect in &mut *arguments {
                 degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
             }
             degeneric_arguments(&function.arguments, arguments, syntax, variables, process_manager).await?;
         }
         FinalizedEffectType::GenericVirtualCall(index, target, found, effects) => {
+            // TODO figure this out as well
             syntax.lock().process_manager.handle().lock().spawn(
                 target.name.clone(),
                 degeneric_header(
@@ -265,14 +274,9 @@ pub async fn degeneric_function(
     arguments: &Vec<FinalizedEffects>,
     syntax: &Arc<Mutex<Syntax>>,
     variables: &SimpleVariableManager,
-    mut explicit_generics: Vec<(FinalizedTypes, Span)>,
+    explicit_generics: Vec<(FinalizedTypes, Span)>,
 ) -> Result<Arc<CodelessFinalizedFunction>, ParsingError> {
     if !explicit_generics.is_empty() {
-        // Degeneric explicit generics using the parent function's generics.
-        for (explicit_generic, _) in &mut explicit_generics {
-            degeneric_type(explicit_generic, manager.generics(), syntax).await;
-        }
-
         // Replace each generic with its explicitly given value
         *manager.mut_generics() = function
             .generics
@@ -281,8 +285,9 @@ pub async fn degeneric_function(
             //TODO safety checks
             .map(|((generic, _bounds), explicit_generic)| (generic.clone(), explicit_generic.0))
             .collect::<HashMap<_, _>>();
-    } else {
+    } else if function.arguments.len() != 0 && arguments.len() != 0 {
         // Figure out what each generic actually is by comparing the input arguments to the function's arguments.
+        // Downcasting ignores arguments to try and only half-degeneric, so if the arguments are empty then skip this.
         for i in 0..function.arguments.len() {
             let argument_type = get_return(&arguments[i].types, variables, syntax).await.unwrap();
 
@@ -320,34 +325,39 @@ pub async fn degeneric_function(
     }
 
     // Copy the method and degeneric every type inside of it.
-    let mut new_method = CodelessFinalizedFunction::clone(&function);
+    let mut new_function = CodelessFinalizedFunction::clone(&function);
 
-    for (key, _) in &new_method.generics {
+    for (key, _) in &new_function.generics {
         if !manager.generics().contains_key(key) {
-            panic!("Failed to find generic {} in call to function {}", key, function.data.name);
+            panic!(
+                "Failed to find generic {} in call to function {} with {:?}",
+                key,
+                function.data.name,
+                manager.generics().keys().collect::<Vec<_>>()
+            );
         }
     }
 
     // Replace the generics with the real value
-    new_method.generics =
-        new_method.generics.iter().map(|(key, _)| (key.clone(), manager.generics()[key].clone())).collect();
+    new_function.generics =
+        new_function.generics.iter().map(|(key, _)| (key.clone(), manager.generics()[key].clone())).collect();
 
     let mut method_data = FunctionData::clone(&function.data);
     method_data.name.clone_from(&name);
-    new_method.data = Arc::new(method_data);
+    new_function.data = Arc::new(method_data);
     // Degeneric the arguments.
-    for argument in &mut new_method.arguments {
+    for argument in &mut new_function.arguments {
         degeneric_type(&mut argument.field.field_type, &manager.generics(), syntax).await;
     }
 
     // Degeneric the return type if there is one.
-    if let Some(method_returning) = &mut new_method.return_type {
+    if let Some(method_returning) = &mut new_function.return_type {
         degeneric_type(method_returning, &manager.generics(), syntax).await;
     }
 
     // Add the new degenericed static data to the locked function.
     let original = function;
-    let new_function = Arc::new(new_method);
+    let new_function = Arc::new(new_function);
     let mut locked = syntax.lock();
     // Since Syntax can't be locked this whole time, sometimes someone else can beat this method to the punch.
     // It's super rare to happen, but if it does just give up

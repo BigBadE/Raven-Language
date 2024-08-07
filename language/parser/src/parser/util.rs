@@ -120,9 +120,11 @@ impl<'a> ParserUtils<'a> {
         process_manager: Box<dyn ProcessManager>,
     ) -> Result<(), ParsingError> {
         let mut generics = IndexMap::default();
-        for (generic, bounds) in implementor.generics {
+        for (generic, bounds) in &implementor.generics {
             resolver.generics_mut().insert(generic.clone(), bounds.clone());
+        }
 
+        for (generic, bounds) in implementor.generics {
             let mut output_bounds = vec![];
             for bound in bounds {
                 output_bounds.push(
@@ -243,11 +245,10 @@ pub fn parse_generics(input: UnparsedType, parser_utils: &mut ParserUtils) -> Un
                 if let Some(unparsed) = last {
                     unparsed_generics.push(unparsed);
                 }
-                last = Some(
-                    UnparsedType::Basic(
-                        Span::new(parser_utils.file, parser_utils.index - 1),
-                        token.to_string(parser_utils.buffer),
-                    ))
+                last = Some(UnparsedType::Basic(
+                    Span::new(parser_utils.file, parser_utils.index - 1),
+                    token.to_string(parser_utils.buffer),
+                ))
             }
             TokenTypes::Operator => {
                 if let Some(unparsed) = last {
@@ -268,5 +269,9 @@ pub fn parse_generics(input: UnparsedType, parser_utils: &mut ParserUtils) -> Un
         }
     }
 
-    return UnparsedType::Generic(Box::new(input.clone()), unparsed_generics);
+    return if unparsed_generics.is_empty() {
+        input.clone()
+    } else {
+        UnparsedType::Generic(Box::new(input.clone()), unparsed_generics)
+    };
 }

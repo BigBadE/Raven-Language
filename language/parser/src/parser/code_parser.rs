@@ -471,7 +471,7 @@ fn parse_generic_method(effect: Option<Effects>, parser_utils: &mut ParserUtils)
     let explicit_generics: Vec<UnparsedType> = if let UnparsedType::Generic(_, bounds) =
         parse_generics(UnparsedType::Basic(Span::default(), String::default()), parser_utils)
     {
-        //TODO figure out how to check for ungotten generics with generic method calls
+        //TODO figure out how to check for un-resolved generics with generic method calls
         bounds
     } else {
         vec![]

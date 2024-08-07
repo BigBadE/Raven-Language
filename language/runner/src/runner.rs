@@ -105,7 +105,10 @@ pub async fn run<T: Send + 'static>(
     build(syntax.clone(), settings).await?;
 
     go_sender.send(()).await.unwrap();
-    return Ok(receiver.recv().await.unwrap());
+    return match receiver.recv().await {
+        Some(value) => Ok(value),
+        None => Err(vec![]),
+    };
 }
 
 /// Runs the compiler, waiting for the receiver before running the main function then sending the result on the sender.

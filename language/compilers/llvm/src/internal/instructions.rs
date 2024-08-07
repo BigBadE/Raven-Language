@@ -12,33 +12,67 @@ use syntax::program::function::CodelessFinalizedFunction;
 
 /// Compiles a method with the internal keyword
 pub fn compile_internal<'ctx>(
-    type_getter: &CompilerTypeGetter<'ctx>,
-    compiler: &CompilerImpl<'ctx>,
+    type_getter: &mut CompilerTypeGetter<'ctx>,
     function: &Arc<CodelessFinalizedFunction>,
     value: FunctionValue<'ctx>,
 ) {
+    let compiler = type_getter.compiler.clone();
     let name = &function.data.name;
-    
+
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
-    if string_internal(type_getter, compiler, name, &value) || math_internal(type_getter, compiler, name, &value) {
+    if string_internal(type_getter, &compiler, name, &value) || math_internal(type_getter, &compiler, name, &value) {
         return;
     }
     if name.starts_with("types::pointer::Pointer<T>::get_ptr_data") {
-        let pointer_int = compiler.builder.build_ptr_to_int(params.get(0).unwrap().into_pointer_value(), 
-        compiler.context.i64_type(), "0").unwrap().as_basic_value_enum();
+        let pointer_int = compiler
+            .builder
+            .build_ptr_to_int(params.get(0).unwrap().into_pointer_value(), compiler.context.i64_type(), "0")
+            .unwrap()
+            .as_basic_value_enum();
         compiler.builder.build_return(Some(&pointer_int)).unwrap();
+    } else if name.starts_with("types::pointer::Pointer<T>::write_ptr_data$") {
+        let pointer = compiler
+            .builder
+            .build_load(compiler.context.i64_type(), params.get(0).unwrap().into_pointer_value(), "0")
+            .unwrap();
+        let pointer = compiler
+            .builder
+            .build_int_to_ptr(pointer.into_int_value(), compiler.context.ptr_type(AddressSpace::default()), "1")
+            .unwrap();
+        let data = compiler
+            .builder
+            .build_load(compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "2")
+            .unwrap();
+        compiler.builder.build_store(pointer, data).unwrap();
+        compiler.builder.build_return(None).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::get_size$") {
-        panic!("{:?}: {}", function.generics, name);
+        let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
+        let target_type = type_getter.get_type(function.generics.iter().next().unwrap().1);
+        compiler.builder.build_store(storing, target_type.size_of().unwrap().as_basic_value_enum()).unwrap();
+        compiler.builder.build_return(Some(&storing)).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::read") {
         let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
-        let pointer_val = compiler.builder.build_load(compiler.context.i64_type(), 
-        params[0].into_pointer_value(), "1").unwrap().into_int_value();
-        type_getter.compiler.builder.build_store(storing, compiler.builder.build_int_to_ptr(pointer_val, compiler.context.ptr_type(AddressSpace::default()), "2").unwrap()).unwrap();
+        let pointer_val = compiler
+            .builder
+            .build_load(compiler.context.i64_type(), params[0].into_pointer_value(), "1")
+            .unwrap()
+            .into_int_value();
+        type_getter
+            .compiler
+            .builder
+            .build_store(
+                storing,
+                compiler
+                    .builder
+                    .build_int_to_ptr(pointer_val, compiler.context.ptr_type(AddressSpace::default()), "2")
+                    .unwrap(),
+            )
+            .unwrap();
         compiler.builder.build_return(Some(&storing)).unwrap();
     } else if name.starts_with("numbers::Cast") {
-        build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), compiler);
+        build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), &compiler);
     } else if name.starts_with("math::RightShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
         let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
@@ -53,11 +87,7 @@ pub fn compile_internal<'ctx>(
                     .into_int_value(),
                 compiler
                     .builder
-                    .build_load(
-                        type_getter.compiler.context.i64_type(),
-                        params.get(1).unwrap().into_pointer_value(),
-                        "3",
-                    )
+                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
                     .unwrap()
                     .into_int_value(),
                 true,
@@ -80,11 +110,7 @@ pub fn compile_internal<'ctx>(
                     .into_int_value(),
                 compiler
                     .builder
-                    .build_load(
-                        type_getter.compiler.context.i64_type(),
-                        params.get(1).unwrap().into_pointer_value(),
-                        "3",
-                    )
+                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
                     .unwrap()
                     .into_int_value(),
                 false,
@@ -107,11 +133,7 @@ pub fn compile_internal<'ctx>(
                     .into_int_value(),
                 compiler
                     .builder
-                    .build_load(
-                        type_getter.compiler.context.i64_type(),
-                        params.get(1).unwrap().into_pointer_value(),
-                        "3",
-                    )
+                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
                     .unwrap()
                     .into_int_value(),
                 "1",
@@ -173,13 +195,12 @@ pub fn compile_internal<'ctx>(
 }
 
 /// Creates a malloc for the type
-pub fn malloc_type<'a>(
-    type_getter: &CompilerTypeGetter<'a>,
-    size: IntValue<'a>,
-    id: &mut u64,
-) -> PointerValue<'a> {
-    let size = type_getter.compiler.builder.build_int_to_ptr(size, 
-        type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string()).unwrap();
+pub fn malloc_type<'a>(type_getter: &CompilerTypeGetter<'a>, size: IntValue<'a>, id: &mut u64) -> PointerValue<'a> {
+    let size = type_getter
+        .compiler
+        .builder
+        .build_int_to_ptr(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
+        .unwrap();
     *id += 1;
     let malloc = type_getter
         .compiler
@@ -202,12 +223,13 @@ pub fn malloc_type<'a>(
 }
 
 /// Loads the type if it's a pointer
-fn get_loaded<'ctx, T: BasicType<'ctx>>(compiler: &CompilerImpl<'ctx>, pointer_type: T, value: &BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+fn get_loaded<'ctx, T: BasicType<'ctx>>(
+    compiler: &CompilerImpl<'ctx>,
+    pointer_type: T,
+    value: &BasicValueEnum<'ctx>,
+) -> BasicValueEnum<'ctx> {
     if value.is_pointer_value() {
-        return compiler
-            .builder
-            .build_load(pointer_type, value.into_pointer_value(), "0")
-            .unwrap();
+        return compiler.builder.build_load(pointer_type, value.into_pointer_value(), "0").unwrap();
     }
     return *value;
 }
