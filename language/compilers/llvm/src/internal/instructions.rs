@@ -32,6 +32,12 @@ pub fn compile_internal<'ctx>(
             .unwrap()
             .as_basic_value_enum();
         compiler.builder.build_return(Some(&pointer_int)).unwrap();
+    } else if name.starts_with("types::pointer::Pointer<T>::malloc_size") {
+        let size = compiler
+            .builder
+            .build_load(compiler.context.i64_type(), params.get(0).unwrap().into_pointer_value(), "0")
+            .unwrap();
+        compiler.builder.build_return(Some(&malloc_type(type_getter, size.into_int_value(), &mut 1))).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::write_ptr_data$") {
         let pointer = compiler
             .builder
@@ -52,25 +58,8 @@ pub fn compile_internal<'ctx>(
         let target_type = type_getter.get_type(function.generics.iter().next().unwrap().1);
         compiler.builder.build_store(storing, target_type.size_of().unwrap().as_basic_value_enum()).unwrap();
         compiler.builder.build_return(Some(&storing)).unwrap();
-    } else if name.starts_with("types::pointer::Pointer<T>::read") {
-        let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
-        let pointer_val = compiler
-            .builder
-            .build_load(compiler.context.i64_type(), params[0].into_pointer_value(), "1")
-            .unwrap()
-            .into_int_value();
-        type_getter
-            .compiler
-            .builder
-            .build_store(
-                storing,
-                compiler
-                    .builder
-                    .build_int_to_ptr(pointer_val, compiler.context.ptr_type(AddressSpace::default()), "2")
-                    .unwrap(),
-            )
-            .unwrap();
-        compiler.builder.build_return(Some(&storing)).unwrap();
+    } else if name.starts_with("types::pointer::Pointer<T>::read_ptr_data$") {
+        compiler.builder.build_return(Some(&params[0].into_pointer_value())).unwrap();
     } else if name.starts_with("numbers::Cast") {
         build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), &compiler);
     } else if name.starts_with("math::RightShift") {

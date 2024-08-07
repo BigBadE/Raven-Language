@@ -8,7 +8,7 @@ pub struct Pointer<T> {
 impl<T> Pointer<T> {
     pub fn alloc_empty(size: u64) -> Pointer<T> {
         return new Pointer<T> { 
-            data: malloc(size),
+            data: Pointer<T>::malloc_size(size),
         };
     }
 
@@ -16,6 +16,10 @@ impl<T> Pointer<T> {
         return new Pointer<T> {
             data: Pointer::get_ptr_data(reading),
         };
+    }
+
+    internal fn malloc_size(size: u64) -> u64 {
+
     }
 
     internal fn get_ptr_data(reading: T) -> u64 {

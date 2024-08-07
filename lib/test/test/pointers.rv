@@ -6,5 +6,6 @@ fn test() -> bool {
     let value = 2;
     // Is a Pointer<u64>
     let pointer = Pointer::get_ptr(value);
+    pointer.write(123);
     return value == pointer.read();
 }

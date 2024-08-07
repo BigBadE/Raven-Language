@@ -9,5 +9,6 @@ fn test() -> bool {
 
     let pointer = Pointer<u64>::alloc_empty(64);
     pointer.write(123);
+    //return pointer.read() == 123;
     return true;
 }
