@@ -91,7 +91,6 @@ pub async fn verify_function_code(
 
     let mut code_verifier = CodeVerifier {
         process_manager: &process_manager,
-        function_name: codeless.data.name.clone(),
         resolver,
         return_type: codeless.return_type.clone(),
         syntax: syntax.clone(),

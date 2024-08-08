@@ -3,6 +3,7 @@
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
 #![feature(async_fn_traits)]
+#![feature(async_closure)]
 
 use crate::async_util::{HandleWrapper, NameResolver};
 use crate::program::function::{CodeBody, CodelessFinalizedFunction, FinalizedFunction, FunctionData, UnfinalizedFunction};
