@@ -1,4 +1,3 @@
-use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -8,6 +7,7 @@ use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::OptimizationLevel;
+use parking_lot::Mutex;
 use tokio::time;
 
 use data::tokens::Span;
@@ -20,7 +20,6 @@ use syntax::program::syntax::Syntax;
 use crate::function_compiler::{compile_block, instance_function};
 use crate::main_future::MainFuture;
 use crate::type_getter::CompilerTypeGetter;
-use crate::util::print_formatted;
 
 /// A compiler implementation which must wrap the context
 pub struct CompilerImpl<'ctx> {
@@ -126,6 +125,6 @@ impl<'ctx> CompilerImpl<'ctx> {
                                        .to_str().unwrap()).unwrap().as_ptr());
         }*/
 
-        print_formatted(type_getter.compiler.module.to_string());
+        //print_formatted(type_getter.compiler.module.to_string());
     }
 }

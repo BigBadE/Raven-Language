@@ -79,7 +79,7 @@ pub struct TraitImplWaiter<F> {
     /// Name resolver and its imports
     pub resolver: Box<dyn NameResolver>,
     /// Name of the method
-    pub method: String,
+    pub function: String,
     /// The type being checked
     pub return_type: FinalizedTypes,
     /// A future that checks if the function is valid
@@ -94,9 +94,9 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
     type Output = Result<FinalizedEffects, ParsingError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let finished = self.syntax.lock().finished_impls();
-        let value =
-            pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.method, &self.return_type)).poll(cx).clone();
+        let value = pin!(find_trait_implementation(&self.syntax, &*self.resolver, &self.function, &self.return_type))
+            .poll(cx)
+            .clone();
         return match value {
             Poll::Ready(inner) => match inner {
                 Ok(inner) => {
@@ -116,10 +116,11 @@ impl<F: AsyncFnMut(Arc<FinishedTraitImplementor>, Arc<FunctionData>) -> Result<F
                         }
                         None => {}
                     }
-                    if finished {
+                    let mut syntax = self.syntax.lock();
+                    if syntax.finished_impls() {
                         Poll::Ready(Err(self.error.clone()))
                     } else {
-                        self.syntax.lock().async_manager.impl_waiters.push(cx.waker().clone());
+                        syntax.async_manager.impl_waiters.push(cx.waker().clone());
                         Poll::Pending
                     }
                 }
@@ -157,7 +158,7 @@ pub async fn find_trait_implementation(
         {
             let value = value.finalize(syntax.clone()).await;
             if let Some(implementors) = Syntax::get_implementation_methods(&syntax, &return_type, &value).await {
-                for (types, functions) in &implementors {       
+                for (types, functions) in &implementors {
                     for temp in functions {
                         let mut current = vec![];
                         if &temp.name.split("::").last().unwrap() == method {

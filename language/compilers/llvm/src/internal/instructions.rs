@@ -39,19 +39,11 @@ pub fn compile_internal<'ctx>(
             .unwrap();
         compiler.builder.build_return(Some(&malloc_type(type_getter, size.into_int_value(), &mut 1))).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::write_ptr_data$") {
-        let pointer = compiler
-            .builder
-            .build_load(compiler.context.i64_type(), params.get(0).unwrap().into_pointer_value(), "0")
-            .unwrap();
-        let pointer = compiler
-            .builder
-            .build_int_to_ptr(pointer.into_int_value(), compiler.context.ptr_type(AddressSpace::default()), "1")
-            .unwrap();
         let data = compiler
             .builder
             .build_load(compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "2")
             .unwrap();
-        compiler.builder.build_store(pointer, data).unwrap();
+        compiler.builder.build_store(params.get(0).unwrap().into_pointer_value(), data).unwrap();
         compiler.builder.build_return(None).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::get_size$") {
         let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);

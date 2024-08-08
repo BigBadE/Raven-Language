@@ -204,15 +204,10 @@ async fn verify_create_struct(
     effects: Vec<(String, Effects)>,
     variables: &mut SimpleVariableManager,
 ) -> Result<FinalizedEffects, ParsingError> {
-    let target = Syntax::parse_type(
-        code_verifier.syntax.clone(),
-        code_verifier.resolver.boxed_clone(),
-        target,
-        vec![],
-    )
-    .await?
-    .finalize(code_verifier.syntax.clone())
-    .await;
+    let target = Syntax::parse_type(code_verifier.syntax.clone(), code_verifier.resolver.boxed_clone(), target, vec![])
+        .await?
+        .finalize(code_verifier.syntax.clone())
+        .await;
 
     let mut generics = code_verifier.process_manager.generics.clone();
     let mut final_effects = vec![];

@@ -47,9 +47,12 @@ pub async fn finalize_generics(
     for (generic, bounds) in generics {
         let mut output_bounds = vec![];
         for bound in bounds {
-            output_bounds.push(Syntax::parse_type(syntax.clone(), resolver.boxed_clone(), bound.clone(), vec![]).await?
-            .finalize(syntax.clone())
-            .await);
+            output_bounds.push(
+                Syntax::parse_type(syntax.clone(), resolver.boxed_clone(), bound.clone(), vec![])
+                    .await?
+                    .finalize(syntax.clone())
+                    .await,
+            );
         }
         output.insert(generic.clone(), FinalizedTypes::Generic(generic.clone(), output_bounds));
     }
@@ -59,6 +62,7 @@ pub async fn finalize_generics(
 /// Simple wrapper program for the types used in code verification
 pub struct CodeVerifier<'a> {
     process_manager: &'a TypesChecker,
+    function_name: String,
     resolver: Box<dyn NameResolver>,
     return_type: Option<FinalizedTypes>,
     syntax: Arc<Mutex<Syntax>>,

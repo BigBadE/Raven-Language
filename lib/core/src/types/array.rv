@@ -14,8 +14,8 @@ impl<T> Array<T> {
     }
 
     pub fn set(self, index: u64, data: T) {
-        let target = self.data + (index * Pointer<T>::get_size());
-        target.write(data);
+        //let target = self.data + (index * Pointer<T>::get_size());
+        self.data.write(data);
     }
 
     pub fn get(self, index: u64) -> T {

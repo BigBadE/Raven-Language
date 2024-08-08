@@ -22,14 +22,14 @@ pub async fn check_method_call(
 ) -> Result<FinalizedEffects, ParsingError> {
     let mut finalized_effects = Vec::default();
     let calling;
-    let method;
+    let function;
     let explicit_generics;
     if let EffectType::MethodCall(new_calling, new_method, effects, new_explicit_generics) = effect.types {
         for effect in effects {
             finalized_effects.push(verify_effect(code_verifier, variables, effect).await?)
         }
         calling = new_calling;
-        method = new_method;
+        function = new_method;
         explicit_generics = new_explicit_generics;
     } else {
         unreachable!()
@@ -51,6 +51,7 @@ pub async fn check_method_call(
             span,
         ));
     }
+
     // Finds methods based off the calling type.
     let method = if let Some(calling) = calling.clone() {
         let return_type: FinalizedTypes = get_return(&calling.types, variables, &code_verifier.syntax).await.unwrap();
@@ -62,7 +63,7 @@ pub async fn check_method_call(
         // If it's generic, check its trait bounds for the method
         if return_type.inner_struct_safe().is_none() {
             // Looking for the method
-            if let Some(mut found) = return_type.find_method(&method) {
+            if let Some(mut found) = return_type.find_method(&function) {
                 let span = calling.span.clone();
                 finalized_effects.insert(0, calling);
                 let mut output = vec![];
@@ -78,9 +79,9 @@ pub async fn check_method_call(
                 }
 
                 if output.len() > 1 {
-                    return Err(span.make_error(ParsingMessage::AmbiguousMethod(method)));
+                    return Err(span.make_error(ParsingMessage::AmbiguousMethod(function)));
                 } else if output.is_empty() {
-                    return Err(span.make_error(ParsingMessage::NoMethod(method, return_type)));
+                    return Err(span.make_error(ParsingMessage::NoMethod(function, return_type)));
                 }
 
                 let (found_trait, found) = output.pop().unwrap();
@@ -97,7 +98,7 @@ pub async fn check_method_call(
             let method = Syntax::get_function(
                 code_verifier.syntax.clone(),
                 effect.span.clone(),
-                format!("{}::{}", return_type.inner_struct().data.name, method),
+                format!("{}::{}", return_type.inner_struct().data.name, function),
                 code_verifier.resolver.boxed_clone(),
                 false,
             )
@@ -115,12 +116,11 @@ pub async fn check_method_call(
         }
 
         let calling = Some(Box::new(calling));
-
         // Try to find the function with that name
         if let Ok(value) = Syntax::get_function(
             code_verifier.syntax.clone(),
             Span::default(),
-            method.clone(),
+            function.clone(),
             code_verifier.resolver.boxed_clone(),
             true,
         )
@@ -154,7 +154,7 @@ pub async fn check_method_call(
             match (TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
                 resolver: code_verifier.resolver.boxed_clone(),
-                method: method.clone(),
+                function: function.clone(),
                 return_type: return_type.clone(),
                 checker,
                 error: ParsingError::new(Span::default(), ParsingMessage::ShouldntSee("Check method call trait waiter")),
@@ -167,9 +167,9 @@ pub async fn check_method_call(
 
             // If it's not a trait method call, try to find a self-impl method call
             for implementor in Syntax::get_struct_impl(code_verifier.syntax.clone(), return_type.clone()).await {
-                for function in &implementor.functions {
-                    if function.name.split("::").last().unwrap() == method {
-                        let method = AsyncDataGetter::new(code_verifier.syntax.clone(), function.clone()).await;
+                for impl_function in &implementor.functions {
+                    if impl_function.name.split("::").last().unwrap() == function {
+                        let method = AsyncDataGetter::new(code_verifier.syntax.clone(), impl_function.clone()).await;
                         match check_function(
                             calling.clone(),
                             method,
@@ -187,11 +187,11 @@ pub async fn check_method_call(
                     }
                 }
             }
-            return Err(ParsingError::new(effect.span.clone(), ParsingMessage::NoImpl(return_type, method.clone())));
+            return Err(ParsingError::new(effect.span.clone(), ParsingMessage::NoImpl(return_type, function.clone())));
         }
     } else {
-        if method.contains("::") {
-            let possible = method.split("::").collect::<Vec<_>>();
+        if function.contains("::") {
+            let possible = function.split("::").collect::<Vec<_>>();
             let structure = possible[possible.len() - 2];
 
             if let Ok(structure) = Syntax::get_struct(
@@ -235,7 +235,7 @@ pub async fn check_method_call(
         Syntax::get_function(
             code_verifier.syntax.clone(),
             effect.span.clone(),
-            method,
+            function,
             code_verifier.resolver.boxed_clone(),
             true,
         )

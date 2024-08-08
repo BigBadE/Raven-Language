@@ -3,12 +3,7 @@ import types::array;
 import types::pointer;
 
 fn test() -> bool {
-    //let testing = Array<u64>::test(1);
-    //testing.set(0, 123);
-    //return testing.get(0) == 123;
-
-    let pointer = Pointer<u64>::alloc_empty(64);
-    pointer.write(123);
-    //return pointer.read() == 123;
-    return true;
+    let testing = Array<u64>::test(1);
+    testing.set(0, 123);
+    return testing.get(0) == 123;
 }

@@ -93,7 +93,6 @@ impl TopElement for FunctionData {
         let name = current.data.name.clone();
         // Get the codeless finalized function and the code from the function.
         let (codeless_function, code) = process_manager.verify_func(current, &resolver, &syntax).await;
-
         // Finalize the code and combine it with the codeless finalized function.
         let finalized_function = process_manager.verify_code(codeless_function.clone(), code, resolver, &syntax).await;
         let finalized_function = Arc::new(finalized_function);
