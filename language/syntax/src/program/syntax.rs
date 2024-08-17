@@ -267,7 +267,7 @@ impl Syntax {
             FinalizedTypes::Array(inner) => {
                 let mut checking = checking;
                 // Unwrap references because references don't matter for type checking.
-                if let FinalizedTypes::Reference(inner_type) = checking {
+                if let FinalizedTypes::Reference(inner_type, _) = checking {
                     checking = inner_type;
                 }
                 if let FinalizedTypes::Array(other) = checking {
@@ -277,7 +277,7 @@ impl Syntax {
                     Some(false)
                 }
             }
-            FinalizedTypes::Reference(inner) => {
+            FinalizedTypes::Reference(inner, _) => {
                 // References are unwrapped and the inner is checked.
                 self.solve_nonstruct_types(inner, checking)
             }

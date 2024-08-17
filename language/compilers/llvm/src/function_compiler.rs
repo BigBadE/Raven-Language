@@ -47,7 +47,7 @@ pub fn instance_function<'a, 'ctx>(
 /// Instances a type from its FinalizedTypes
 pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTypeGetter<'ctx>) -> BasicTypeEnum<'ctx> {
     return match types {
-        FinalizedTypes::Reference(inner) => type_getter.get_type(inner),
+        FinalizedTypes::Reference(inner, _) => type_getter.get_type(inner),
         FinalizedTypes::Array(inner) => type_getter.get_type(inner),
         _ => {
             if is_modifier(types.inner_struct().data.modifiers, Modifier::Trait) {

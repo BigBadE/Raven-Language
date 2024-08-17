@@ -18,7 +18,7 @@ use crate::{get_compiler, JoinWaiter};
 
 pub fn create_syntax(settings: &Arguments) -> Arc<Mutex<Syntax>> {
     let handle = Arc::new(Mutex::new(HandleWrapper::new(settings.cpu_runtime.handle().clone())));
-    let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
+    let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone())));
     syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
     return Arc::new(Mutex::new(syntax));
 }

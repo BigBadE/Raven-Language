@@ -94,7 +94,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         .as_basic_type_enum();
         return match types {
             FinalizedTypes::Struct(_) | FinalizedTypes::Array(_) => found,
-            FinalizedTypes::Reference(_) => self.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+            FinalizedTypes::Reference(_, _) => self.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
             _ => panic!("Can't compile a generic! {:?}", found),
         };
     }
@@ -111,7 +111,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
 
     pub fn fix_generic_struct(&self, types: &mut FinalizedTypes) {
         match types {
-            FinalizedTypes::Reference(inner) | FinalizedTypes::Array(inner) => self.fix_generic_struct(inner),
+            FinalizedTypes::Reference(inner, _) | FinalizedTypes::Array(inner) => self.fix_generic_struct(inner),
             FinalizedTypes::GenericType(base, bounds) => {
                 let base = base.inner_struct();
                 if bounds.is_empty() {
@@ -180,10 +180,10 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 *degenericing = generics.get(name).unwrap().clone();
             }
             FinalizedTypes::Struct(_) => {}
-            FinalizedTypes::Array(inner) | FinalizedTypes::Reference(inner) => {
+            FinalizedTypes::Array(inner) | FinalizedTypes::Reference(inner, _) => {
                 self.simple_degeneric(inner, generics);
-            },
-            FinalizedTypes::GenericType(_, _) => self.fix_generic_struct(degenericing)
+            }
+            FinalizedTypes::GenericType(_, _) => self.fix_generic_struct(degenericing),
         }
     }
 }

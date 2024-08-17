@@ -1,13 +1,12 @@
 use crate::finalize_generics;
 use crate::output::TypesChecker;
 use parking_lot::Mutex;
-use syntax::async_util::NameResolver;
 use std::sync::Arc;
+use syntax::async_util::NameResolver;
 use syntax::errors::ParsingError;
 use syntax::program::code::{FinalizedField, FinalizedMemberField};
 use syntax::program::r#struct::{FinalizedStruct, UnfinalizedStruct};
 use syntax::program::syntax::Syntax;
-use syntax::program::types::FinalizedTypes;
 
 /// Verifies if a struct is valid
 pub async fn verify_struct(
@@ -15,15 +14,11 @@ pub async fn verify_struct(
     structure: UnfinalizedStruct,
     resolver: &Box<dyn NameResolver>,
     syntax: &Arc<Mutex<Syntax>>,
-    include_refs: bool,
 ) -> Result<FinalizedStruct, ParsingError> {
     let mut finalized_fields = Vec::default();
     for field in structure.fields {
         let field = field.await?;
-        let mut field_type = field.field.field_type.finalize(syntax.clone()).await;
-        if include_refs {
-            field_type = FinalizedTypes::Reference(Box::new(field_type));
-        }
+        let field_type = field.field.field_type.finalize(syntax.clone()).await;
         finalized_fields.push(FinalizedMemberField {
             modifiers: field.modifiers,
             attributes: field.attributes,

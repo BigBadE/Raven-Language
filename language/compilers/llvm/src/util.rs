@@ -46,10 +46,10 @@ pub fn create_function_value<'ctx>(
     let llvm_function = match &function.return_type {
         Some(returning) => {
             let mut returning = returning;
-            if let FinalizedTypes::Reference(inner) = returning {
+            if let FinalizedTypes::Reference(inner, _) = returning {
                 returning = inner.deref();
             }
-            let types = type_getter.get_type(&FinalizedTypes::Reference(Box::new(returning.clone())));
+            let types = type_getter.get_type(&returning.clone());
             //Structs deallocate their memory when the function ends, so instead the parent function passes a pointer to it.
             //TODO not used for now cause malloc is used, but for future speed ups will be needed
             /*if types.is_struct_type() {
