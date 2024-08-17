@@ -265,9 +265,7 @@ impl FinalizedEffectType {
             Self::FunctionCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
             | Self::VirtualCall(_, function, _, _)
-            | Self::GenericVirtualCall(_, _, function, _) => {
-                function.return_type.as_ref().map(|inner| FinalizedTypes::Reference(Box::new(inner.clone())))
-            }
+            | Self::GenericVirtualCall(_, _, function, _) => function.return_type.clone(),
             Self::LoadVariable(name) => {
                 let variable = variables.get_variable(name);
                 if variable.is_some() {
@@ -284,7 +282,7 @@ impl FinalizedEffectType {
                 .find(|field| &field.field.name == name)
                 .map(|field| field.field.field_type.clone()),
             // Returns the program type.
-            Self::CreateStruct(_, types, _) => Some(FinalizedTypes::Reference(Box::new(types.clone()))),
+            Self::CreateStruct(_, types, _) => Some(types.clone()),
             // Returns the internal constant type.
             Self::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             Self::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
@@ -297,7 +295,7 @@ impl FinalizedEffectType {
             }
             // References return their inner type as well.
             Self::ReferenceLoad(inner) => match inner.types.get_nongeneric_return(variables).unwrap() {
-                FinalizedTypes::Reference(inner) => Some(*inner),
+                FinalizedTypes::Reference(inner, _) => Some(*inner),
                 _ => panic!("Tried to load non-reference!"),
             },
             // Heap allocations shouldn't get return type checked, even though they have a type.

@@ -461,7 +461,7 @@ pub async fn degeneric_type(
                 degeneric_type(bound, generics, syntax).await;
             }
         }
-        FinalizedTypes::Reference(inner) => degeneric_type(inner, generics, syntax).await,
+        FinalizedTypes::Reference(inner, _) => degeneric_type(inner, generics, syntax).await,
         FinalizedTypes::Struct(inner) => {
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {
@@ -493,7 +493,7 @@ pub async fn degeneric_type_no_generic_types(
                 degeneric_type_no_generic_types(bound, generics, syntax).await;
             }
         }
-        FinalizedTypes::Reference(inner) => degeneric_type_no_generic_types(inner, generics, syntax).await,
+        FinalizedTypes::Reference(inner, _) => degeneric_type_no_generic_types(inner, generics, syntax).await,
         FinalizedTypes::Struct(inner) => {
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {
@@ -532,7 +532,7 @@ pub async fn degeneric_type_fields(
                 degeneric_type_fields(bound, generics, syntax).await;
             }
         }
-        FinalizedTypes::Reference(inner) => degeneric_type_fields(inner, generics, syntax).await,
+        FinalizedTypes::Reference(inner, _) => degeneric_type_fields(inner, generics, syntax).await,
         FinalizedTypes::Struct(inner) => {
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {
