@@ -1,8 +1,15 @@
 # !!! DO NOT DOWNLOAD RAVEN ANYWHERE WITH A SPACE IN THE PATH. EX: "C:/Program Files/Raven". IT WILL NOT WORK. I CANNOT FIX IT !!!
 
-This project requires the latest Rust download. Download it using Rustup from https://www.rust-lang.org/tools/install
-
 # Building
+
+# Requirements
+
+- Rust's latest nightly: https://www.rust-lang.org/tools/install
+    - Make sure to install the nightly toolchain with `rustup toolchain install nightly`
+
+- MSVC 2022: Download at https://visualstudio.microsoft.com/downloads/
+    - Install the Windows 10 SDK and the C++ build tools
+    - Uninstall any older versions if you're having issues
 
 Run this in the lib/test folder (or whatever Raven project in the repository you want to run)
 ```cargo run --bin magpie```
@@ -33,8 +40,16 @@ Install zlib1g-dev
 
 ``sudo apt-get install zlib1g-dev``
 
-## Some nonsense linker error with a warning about a messed up rlib
+# Rust error when compiling
+
+Run ``rustup update`` to update your nightly version
+
+## LINK error (unresolved external symbol)
 
 This issue happens on windows when you try to compile with a difference compiler than the one used to compile LLVM.
 
 Make sure you're using MSVC with Rust, and your MSVC version is the 2022 edition.
+
+## LINK error (link: missing operand after ' ■')
+
+Make sure Windows 10 SDK is installed with your MSVC installation.

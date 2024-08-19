@@ -1,6 +1,6 @@
 # Memory management
 
-Raven plans to have a dual system, using borrow checking with linear types and generational references.
+Raven plans to have a dual system, using borrow checking and generational references.
 
 The idea is that the compiler can seamlessly switch between the two systems, depending on the needs of the program.
 This is instituted through a few core ideas:
@@ -13,22 +13,84 @@ For example:
 
 ```rust
 struct Owner {
-    owned_value: str
+    owned_value: String
 }
 ```
 
-This has a bunch of advantages:
+This applies to functions as well:
 
-- It's easy to reason when the type gets dropped, allowed zero-overhead memory management
-- Custom drop logic can be implemented, such as requiring a function call before dropping
+```rust
+fn first() {
+    let owner = new
+    Owner {
+        owned_value: "Hello, world!"
+    };
+    second(owner);
+    // Errors, because owner is owned by second now!
+    println!(owner.owned_value);
+}
 
-Some structs can require ownership, such as a future that needs to be awaited.
-In most cases, however, struct ownership is not required. It's instead automatically determined by the compiler to
-reduce
-memory
-management overhead.
-A majority of variables are simply owned and dropped when they go out of scope, however there needs to be some form of
-"backup" when the compiler can't reason when the variable should be dropped.
+fn second(owner: Owner) {
+    // Doesn't matter
+}
+```
+
+This is called a "linear type", it's created once and used once. Loans are one way to get around this restriction, which
+are denoted with the & symbol:
+
+```rust
+fn first() {
+    let owner = new
+    Owner {
+        owned_value: "Hello, world!"
+    };
+    second(&owner);
+    // No error, because owner is owned by first still, second just got a loan for it!
+    println!(owner.owned_value);
+}
+
+// The Owner object is loaned
+fn second(owner: &Owner) {
+    // Doesn't matter
+}
+```
+
+Now, this does come with two caveats:
+
+- A loan can not exist after the original object is dropped (objects drop when their parents drop)
+- Two mutable loans can not be made to the same piece of data
+
+Now, if you use Rust, you may notice that a loan is to specific fields instead of to the entire object, like a borrow.
+This is a unique difference between Rust and Raven, allowing for code like this:
+
+```rust
+struct MyStruct {
+    objects: Vec<String>,
+    other_data: u64
+}
+
+impl MyStruct {
+    fn requires_mut(& { mut other_data } self ) {}
+}
+
+fn example(my_struct: MyStruct) {
+    for element in &my_struct.objects {
+        // Allowed, as long as requires_mut doesn't require a loan on my_struct.objects
+        my_struct.requires_mut();
+    }
+}
+```
+
+This also works inside structs:
+
+```rust
+struct ExampleMap {
+    data: Vec<String>,
+    map: HashMap<String, &{ data } String>
+}
+```
+
+This would require anything adding a value to map be a reference to the data field.
 
 # Generational References
 
@@ -40,20 +102,16 @@ and the data they point to has a generation number at the start. If they don't m
 Of course, there's a chance it just happens to match, but it's a 1 / 2^64 chance, which is low enough to be
 statistically impossible.
 
-This is denoted with the & symbol:
+This is denoted with the * symbol:
 
 ```rust
 struct LinkedListNode {
-    next: &LinkedListNode,
+    next: Option<* LinkedListNode>,
     data: u64
 }
-```
 
-These are technically owned, allowing them to have custom drop requirements. For example:
-
-```rust
 struct LinkedList {
-    head: Option<&LinkedListNode>
+    head: Option<* LinkedListNode>
 }
 
 impl Drop for LinkedList {
@@ -66,41 +124,3 @@ impl Drop for LinkedList {
     }
 }
 ```
-
-Of course, false can be passed to not drop the base value. This can allow memory leaks, but those don't violate memory
-safety.
-
-The issue with these references is twofold:
-
-- There's overhead to check the generation number
-- Methods need to be rewritten to take references
-
-There's a few ways to fix these issues, which all stem from "pure" functions which have no side effects.
-
-For example:
-
-```rust
-fn print_list(list: &Vec<Foo>) {
-    for item in list {
-        // Generation check
-        printf(item);
-    }
-}
-```
-
-Since the function doesn't ever modify the list, it can be rewritten as:
-
-```rust
-fn print_list(list: Vec<Foor>) {
-    for item in list {
-        // No generation check
-        printf(item);
-    }
-}
-```
-
-Then it can be called with a generational reference or a normal reference, as long as the generational reference checks
-if
-the value is still alive before calling. This is inspired by Vale's "pure" functions, but it doesn't require the
-keyword.
-
