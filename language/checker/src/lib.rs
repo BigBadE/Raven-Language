@@ -40,7 +40,7 @@ pub mod output;
 /// Finalizes an IndexMap of generics into FinalizedEffectType
 pub async fn finalize_generics(
     syntax: &Arc<Mutex<Syntax>>,
-    resolver: &Box<dyn NameResolver>,
+    resolver: &dyn NameResolver,
     generics: &IndexMap<String, Vec<UnparsedType>>,
 ) -> Result<IndexMap<String, FinalizedTypes>, ParsingError> {
     let mut output = IndexMap::default();

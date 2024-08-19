@@ -102,7 +102,7 @@ pub async fn check_method_call(
                 code_verifier.resolver.boxed_clone(),
                 false,
             )
-            .await?;
+                .await?;
             let function = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
 
             let calling = Some(Box::new(calling));
@@ -124,14 +124,14 @@ pub async fn check_method_call(
             code_verifier.resolver.boxed_clone(),
             true,
         )
-        .await
+            .await
         {
             value
         } else {
             // Used to check if a function is valid
             let checker = async |implementor: Arc<FinishedTraitImplementor>,
                                  method: Arc<FunctionData>|
-                   -> Result<FinalizedEffects, ParsingError> {
+                                 -> Result<FinalizedEffects, ParsingError> {
                 let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
                 let mut process_manager = code_verifier.process_manager.clone();
                 implementor
@@ -147,11 +147,11 @@ pub async fn check_method_call(
                     final_returning.clone(),
                     &effect.span,
                 )
-                .await
+                    .await
             };
 
             // Try and see if it's a trait method call
-            match (TraitImplWaiter {
+            if let Ok(found) = (TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
                 resolver: code_verifier.resolver.boxed_clone(),
                 function: function.clone(),
@@ -159,10 +159,9 @@ pub async fn check_method_call(
                 checker,
                 error: ParsingError::new(Span::default(), ParsingMessage::ShouldntSee("Check method call trait waiter")),
             }
-            .await)
+                .await)
             {
-                Ok(found) => return Ok(found),
-                _ => {}
+                return Ok(found);
             }
 
             // If it's not a trait method call, try to find a self-impl method call
@@ -179,7 +178,7 @@ pub async fn check_method_call(
                             final_returning.clone(),
                             &effect.span,
                         )
-                        .await
+                            .await
                         {
                             Ok(result) => return Ok(result),
                             Err(error) => eprintln!("Error: {}", error.message),
@@ -201,13 +200,13 @@ pub async fn check_method_call(
                 code_verifier.resolver.boxed_clone(),
                 vec![],
             )
-            .await
+                .await
             {
                 for implementor in Syntax::get_struct_impl(
                     code_verifier.syntax.clone(),
                     structure.finalize(code_verifier.syntax.clone()).await,
                 )
-                .await
+                    .await
                 {
                     for function in &implementor.functions {
                         if function.name.split("::").last().unwrap() == possible[possible.len() - 1] {
@@ -221,7 +220,7 @@ pub async fn check_method_call(
                                 final_returning.clone(),
                                 &effect.span,
                             )
-                            .await
+                                .await
                             {
                                 Ok(result) => return Ok(result),
                                 Err(error) => eprintln!("Error: {}", error.message),
@@ -239,7 +238,7 @@ pub async fn check_method_call(
             code_verifier.resolver.boxed_clone(),
             true,
         )
-        .await?
+            .await?
     };
 
     let method = AsyncDataGetter::new(code_verifier.syntax.clone(), method).await;
@@ -252,7 +251,7 @@ pub async fn check_method_call(
         final_returning,
         &effect.span,
     )
-    .await;
+        .await;
 }
 
 /// Checks if a function call is valid
@@ -303,7 +302,7 @@ pub async fn check_args(
         };
         let mut arg_return_type = get_return(&types.types, variables, syntax).await;
         if !arg_return_type.is_some() {
-            return Err(span.make_error(ParsingMessage::UnexpectedVoid()));
+            return Err(span.make_error(ParsingMessage::UnexpectedVoid));
         }
         let arg_return_type = arg_return_type.as_mut().unwrap();
         let base_field_type = &function.arguments[i].field.field_type;

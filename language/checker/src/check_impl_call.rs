@@ -144,7 +144,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
         if target.len() > 1 {
             return Err(token.make_error(ParsingMessage::AmbiguousMethod(data.method.clone())));
         } else if target.is_empty() {
-            return Err(token.make_error(ParsingMessage::UnknownFunction()));
+            return Err(token.make_error(ParsingMessage::UnknownFunction));
         }
         let (_, target) = target.pop().unwrap();
 
@@ -186,7 +186,7 @@ async fn check_virtual_type(data: &mut ImplCheckerData<'_>, token: &Span) -> Res
     }
 
     if !data.method.is_empty() {
-        return Err(token.make_error(ParsingMessage::UnknownFunction()));
+        return Err(token.make_error(ParsingMessage::UnknownFunction));
     }
     return Ok(None);
 }

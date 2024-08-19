@@ -53,7 +53,7 @@ pub fn parse_structure(
             TokenTypes::StructTopElement | TokenTypes::Comment => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().add_poison(Arc::new(StructData::new_poisoned(
                 format!("{}", parser_utils.file_name),
-                Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedTopElement()),
+                Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedTopElement),
             ))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut member_attributes),
@@ -142,7 +142,7 @@ pub fn parse_implementor(
                     base = temp;
                     state = 1;
                 } else {
-                    parser_utils.imports.parent = temp.clone();
+                    parser_utils.imports.parent.clone_from(&temp);
                     implementor = temp;
                 }
             }
@@ -159,7 +159,7 @@ pub fn parse_implementor(
                         base = Some(found);
                     } else {
                         let found = Some(UnparsedType::Generic(Box::new(implementor.unwrap()), type_generics));
-                        parser_utils.imports.parent = found.clone();
+                        parser_utils.imports.parent.clone_from(&found);
                         implementor = found;
                     }
                 }
@@ -196,7 +196,7 @@ pub fn parse_implementor(
             TokenTypes::InvalidCharacters => {
                 return (
                     Err(Span::new(parser_utils.file, parser_utils.index - 1)
-                        .make_error(ParsingMessage::UnexpectedCharacters())),
+                        .make_error(ParsingMessage::UnexpectedCharacters)),
                     "error".to_string(),
                     "error".to_string(),
                 )
@@ -230,7 +230,7 @@ pub fn parse_implementor(
     return (
         Ok(TraitImplementor { base: base_future, generics, implementor: implementor_future, functions, attributes }),
         base.unwrap().to_string(),
-        implementor.map(|inner| inner.to_string()).unwrap_or("none".to_string()),
+        implementor.map_or_else(|| "none".to_string(), |inner| inner.to_string()),
     );
 }
 

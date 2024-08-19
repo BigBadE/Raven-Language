@@ -3,6 +3,7 @@ use crate::output::TypesChecker;
 use crate::{finalize_generics, CodeVerifier};
 use data::tokens::Span;
 use parking_lot::Mutex;
+use std::ops::Deref;
 use std::sync::Arc;
 use syntax::async_util::NameResolver;
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
@@ -19,7 +20,7 @@ use syntax::{is_modifier, Modifier, ProcessManager, SimpleVariableManager};
 /// Verifies a function and returns its code, which is verified seperate to prevent deadlocks
 pub async fn verify_function(
     mut function: UnfinalizedFunction,
-    resolver: &Box<dyn NameResolver>,
+    resolver: &dyn NameResolver,
     syntax: &Arc<Mutex<Syntax>>,
     include_refs: bool,
 ) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
@@ -85,7 +86,7 @@ pub async fn verify_function_code(
     let mut variable_manager = SimpleVariableManager::for_function(&codeless);
     let mut process_manager = process_manager.clone();
 
-    for (name, bounds) in finalize_generics(syntax, &resolver, resolver.generics()).await? {
+    for (name, bounds) in finalize_generics(syntax, resolver.deref(), resolver.generics()).await? {
         process_manager.mut_generics().insert(name.clone(), bounds);
     }
 
@@ -106,7 +107,7 @@ pub async fn verify_function_code(
                 FinalizedEffects::new(Span::default(), FinalizedEffectType::NOP),
             ));
         } else if !is_modifier(codeless.data.modifiers, Modifier::Trait) {
-            return Err(codeless.data.span.make_error(ParsingMessage::NoReturn()));
+            return Err(codeless.data.span.make_error(ParsingMessage::NoReturn));
         }
     }
 

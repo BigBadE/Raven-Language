@@ -76,7 +76,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                 | TokenTypes::For
                 | TokenTypes::While
                 | TokenTypes::Do => {
-                    return Err(span.make_error(ParsingMessage::UnexpectedValue()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedValue));
                 }
                 _ => {}
             }
@@ -116,7 +116,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     }
                 } else {
                     if effect.is_some() {
-                        return Err(span.make_error(ParsingMessage::UnexpectedValue()));
+                        return Err(span.make_error(ParsingMessage::UnexpectedValue));
                     }
 
                     effect = Some(Effects::new(
@@ -128,7 +128,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             TokenTypes::Return => expression_type = ExpressionType::Return(Span::new(parser_utils.file, parser_utils.index)),
             TokenTypes::New => {
                 if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedValue()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedValue));
                 }
                 effect = Some(parse_new(parser_utils, &span)?);
             }
@@ -138,7 +138,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     break;
                 } else {
                     if effect.is_some() {
-                        return Err(span.make_error(ParsingMessage::UnexpectedValue()));
+                        return Err(span.make_error(ParsingMessage::UnexpectedValue));
                     }
 
                     // Get the code in the next block.
@@ -153,12 +153,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
             TokenTypes::Let => {
                 if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedLet()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedLet));
                 }
             }
             TokenTypes::If => {
                 if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedIf()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedIf));
                 }
 
                 let expression = parse_if(parser_utils)?;
@@ -170,19 +170,19 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
             TokenTypes::For => {
                 if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedFor()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedFor));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)));
             }
             TokenTypes::While => {
                 if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedFor()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedFor));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)));
             }
             TokenTypes::Do => {
                 if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedFor()));
+                    return Err(span.make_error(ParsingMessage::UnexpectedFor));
                 }
                 return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)));
             }
@@ -197,7 +197,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                             EffectType::Set(Box::new(effect.unwrap()), Box::new(value.effect)),
                         ));
                     } else {
-                        return Err(span.make_error(ParsingMessage::UnexpectedVoid()));
+                        return Err(span.make_error(ParsingMessage::UnexpectedVoid));
                     }
                     break;
                 } else {
@@ -238,7 +238,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     // Ignored, ParenOpen or Operator handles this
                 } else {
                     if effect.is_none() {
-                        return Err(span.make_error(ParsingMessage::ExtraSymbol()));
+                        return Err(span.make_error(ParsingMessage::ExtraSymbol));
                     }
                     effect = Some(Effects::new(
                         Span::new(parser_utils.file, parser_utils.index),
@@ -246,7 +246,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     ))
                 }
             }
-            TokenTypes::Else => return Err(span.make_error(ParsingMessage::UnexpectedElse())),
+            TokenTypes::Else => return Err(span.make_error(ParsingMessage::UnexpectedElse)),
             _ => panic!("How'd you get here? {:?}", token.token_type),
         }
     }
@@ -533,11 +533,11 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
         if TokenTypes::Variable == next.token_type {
             name = next.to_string(parser_utils.buffer);
         } else {
-            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedToken()));
+            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedToken));
         }
 
         if TokenTypes::Equals != parser_utils.tokens.get(parser_utils.index + 1).unwrap().token_type {
-            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedSymbol()));
+            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedSymbol));
         }
         parser_utils.index += 2;
         error_token = Span::new(parser_utils.file, parser_utils.index);
@@ -549,7 +549,7 @@ fn parse_let(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
             error_token.extend_span(parser_utils.index - 2);
             Ok(Effects::new(error_token, EffectType::CreateVariable(name, Box::new(line.effect))))
         }
-        None => Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid())),
+        None => Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid)),
     };
 }
 
@@ -600,7 +600,7 @@ fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(St
                 let effect = if TokenTypes::Colon == token.token_type {
                     match parse_line(parser_utils, ParseState::New)? {
                         Some(inner) => inner.effect,
-                        None => return Err(span.make_error(ParsingMessage::ExpectedEffect())),
+                        None => return Err(span.make_error(ParsingMessage::ExpectedEffect)),
                     }
                 } else {
                     Effects::new(

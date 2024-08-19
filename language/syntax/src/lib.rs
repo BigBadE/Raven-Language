@@ -180,7 +180,7 @@ pub trait ProcessManager: Send + Sync {
     async fn verify_func(
         &self,
         function: UnfinalizedFunction,
-        resolver: &Box<dyn NameResolver>,
+        resolver: &dyn NameResolver,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody);
 
@@ -200,7 +200,7 @@ pub trait ProcessManager: Send + Sync {
     async fn verify_struct(
         &self,
         structure: UnfinalizedStruct,
-        resolver: &Box<dyn NameResolver>,
+        resolver: &dyn NameResolver,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedStruct;
 

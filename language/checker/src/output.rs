@@ -44,7 +44,7 @@ impl ProcessManager for TypesChecker {
     async fn verify_func(
         &self,
         function: UnfinalizedFunction,
-        resolver: &Box<dyn NameResolver>,
+        resolver: &dyn NameResolver,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody) {
         return verify_function(function, resolver, syntax, self.include_refs).await.unwrap_or_else(|error| {
@@ -93,7 +93,7 @@ impl ProcessManager for TypesChecker {
     async fn verify_struct(
         &self,
         structure: UnfinalizedStruct,
-        resolver: &Box<dyn NameResolver>,
+        resolver: &dyn NameResolver,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedStruct {
         match verify_struct(self, structure, resolver, &syntax, self.include_refs).await {

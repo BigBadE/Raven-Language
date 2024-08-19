@@ -107,7 +107,7 @@ impl Syntax {
         syntax: &Arc<Mutex<Syntax>>,
         generic: bool,
     ) {
-        let waker;
+        let mut waker: Option<Waker> = None;
         {
             let mut locked = syntax.lock();
             if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
@@ -148,7 +148,7 @@ impl Syntax {
             } else {
                 locked.compiling.insert(function.data.name.clone(), function.clone());
             }
-            waker = locked.async_manager.target_waker.clone();
+            waker.clone_from(&locked.async_manager.target_waker);
         }
         if generic {
             process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
@@ -336,13 +336,13 @@ impl Syntax {
                 if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
                     name.replace("{+}", "{}").clone()
                 } else {
-                    locked.errors.push(ParsingError::new(Span::default(), ParsingMessage::StringAttribute()));
+                    locked.errors.push(ParsingError::new(Span::default(), ParsingMessage::StringAttribute));
                     return;
                 };
 
             // Checks if there is a duplicate of that operation.
             if locked.operations.contains_key(&name) {
-                locked.errors.push(adding.get_span().make_error(ParsingMessage::DuplicateStructure()));
+                locked.errors.push(adding.get_span().make_error(ParsingMessage::DuplicateStructure));
             }
 
             locked.operations.insert(name.clone(), adding.clone());

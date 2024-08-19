@@ -250,9 +250,9 @@ pub enum UnparsedType {
 impl UnparsedType {
     pub fn get_span(&self) -> Span {
         return match self {
-            UnparsedType::Basic(span, _) => span.clone(),
+            UnparsedType::Basic(span, _) => *span,
             UnparsedType::Generic(base, bounds) => {
-                let mut output = base.get_span().clone();
+                let mut output = base.get_span();
                 if !bounds.is_empty() {
                     output.extend_span(bounds.last().as_ref().unwrap().get_span().end + 1);
                 }

@@ -145,6 +145,7 @@ impl FinalizedTypes {
     pub fn to_chalk_trait(&self, binders: &Vec<&String>) -> TraitDatum<ChalkIr> {
         if let FinalizedTypes::Struct(inner) = self {
             if let ChalkData::Trait(_, _, traits) = &inner.data.chalk_data {
+                // skipcq: RS-W1110 Incorrectly assumes this is copy-able
                 return traits.clone();
             } else {
                 panic!("Expected trait, found struct!");
@@ -249,7 +250,7 @@ impl FinalizedTypes {
         &self,
         other: &FinalizedTypes,
         syntax: Option<Arc<Mutex<Syntax>>>,
-    ) -> (bool, Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) {
+    ) -> (bool, Option<Pin<Box<dyn Future<Output=bool> + Send + Sync>>>) {
         return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
@@ -357,7 +358,7 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(referencing) => referencing.of_type_sync(other, syntax),
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
-                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>> = Vec::default();
+                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>> = Vec::default();
                     // For two generics to be the same, each bound must match at least one other bound.
                     'outer: for bound in bounds {
                         let mut fails = Vec::default();
@@ -408,12 +409,12 @@ impl FinalizedTypes {
             trait_type,
             error: Span::default().make_error(ParsingMessage::ShouldntSee("get_has_impl")),
         }
-        .await
-        .is_ok();
+            .await
+            .is_ok();
     }
 
     /// Joins a vec of futures, waiting for all to finish and returning true if they all returned true
-    pub async fn join(joining: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) -> bool {
+    pub async fn join(joining: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>>) -> bool {
         for temp in joining {
             if !temp.await {
                 return false;
@@ -474,7 +475,7 @@ impl FinalizedTypes {
 
                 if let FinalizedTypes::GenericType(other_base, other_bounds) = other {
                     if other_bounds.len() != bounds.len() {
-                        return Err(bounds_error.make_error(ParsingMessage::IncorrectBoundsLength()));
+                        return Err(bounds_error.make_error(ParsingMessage::IncorrectBoundsLength));
                     }
                     base.resolve_generic(other_base, syntax, generics, bounds_error.clone()).await?;
 
@@ -576,8 +577,10 @@ fn recursive_eq(first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
     }
     return match first {
         FinalizedTypes::Struct(first) => match second {
-            FinalizedTypes::Struct(second) => first.data.name.splitn(2, '$').next().unwrap() == 
-            second.data.name.splitn(2, '$').next().unwrap(),
+            FinalizedTypes::Struct(second) => {
+                first.data.name.split_once('$').unwrap_or((&first.data.name, &"")).0
+                    == second.data.name.split_once('$').unwrap_or((&second.data.name, &"")).0
+            }
             _ => false,
         },
         FinalizedTypes::Array(first) => match second {
@@ -597,11 +600,11 @@ fn recursive_eq(first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
                     if bounds[i] != second_bounds[i] {
                         return false;
                     }
-                } 
+                }
                 return true;
-            },
-            _ => false
+            }
+            _ => false,
         },
-        _ => unreachable!()
-    }
+        _ => unreachable!(),
+    };
 }

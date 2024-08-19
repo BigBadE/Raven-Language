@@ -46,7 +46,7 @@ pub fn parse_function(
                 if last_arg_type.is_empty() {
                     if !parser_utils.imports.parent.is_some() {
                         return Err(
-                            Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::SelfInStatic())
+                            Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::SelfInStatic)
                         );
                     }
 

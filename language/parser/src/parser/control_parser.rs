@@ -15,21 +15,21 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
     // This gets value == 2
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
 
     // Make sure the if statement ended with a bracket
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
 
     parser_utils.index += 1;
 
     // Get the code inside the if statement
     let (mut returning, body) = parse_code(parser_utils)?;
-    
+
     if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::BlockEnd {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters));
     }
 
     let mut else_ifs = Vec::default();
@@ -43,11 +43,11 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
             let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
             if effect.is_none() {
-                return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+                return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
             }
 
             if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-                return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+                return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
             }
 
             parser_utils.index += 1;
@@ -56,10 +56,10 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
             if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::BlockEnd {
                 return Err(
-                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters())
+                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters)
                 );
             }
-            
+
             // An if statement is only the return of the block if every code path returns, so if they differ
             // this can't be a return block.
             if other_returning != returning {
@@ -73,7 +73,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
 
             if parser_utils.tokens[parser_utils.index - 1].token_type != TokenTypes::BlockEnd {
                 return Err(
-                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters())
+                    Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedCharacters)
                 );
             }
 
@@ -84,7 +84,7 @@ pub fn parse_if(parser_utils: &mut ParserUtils) -> Result<Expression, ParsingErr
             else_body = Some(body);
             break;
         } else {
-            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedCodeBlock()));
+            return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedCodeBlock));
         }
     }
 
@@ -107,12 +107,12 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     parser_utils.index += 1;
     // Gets the name of the for loop variable
     if name.token_type != TokenTypes::Variable {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedVariableName()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedVariableName));
     }
 
     // Checks for the "in" keyword
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::In {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedIn()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedIn));
     }
     parser_utils.index += 1;
 
@@ -122,13 +122,13 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
     let mut error_token = Span::new(parser_utils.file, parser_utils.index);
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
     error_token.extend_span(parser_utils.index);
 
     // Checks for the code start
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::ExpectedCodeBlock()));
+        return Err(Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::ExpectedCodeBlock));
     }
     parser_utils.index += 1;
 
@@ -144,11 +144,11 @@ pub fn parse_for(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError
 pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
 
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
 
     parser_utils.index += 1;
@@ -161,7 +161,7 @@ pub fn parse_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingErr
 /// Parses a do while into a single expression
 pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, ParsingError> {
     if parser_utils.tokens.get(parser_utils.index).unwrap().token_type != TokenTypes::BlockStart {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
 
     parser_utils.index += 1;
@@ -169,14 +169,14 @@ pub fn parse_do_while(parser_utils: &mut ParserUtils) -> Result<Effects, Parsing
     let (_returning, body) = parse_code(parser_utils)?;
 
     if parser_utils.tokens[parser_utils.index].token_type != TokenTypes::While {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedWhile()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::ExpectedWhile));
     }
 
     parser_utils.index += 1;
 
     let effect = parse_line(parser_utils, ParseState::ControlVariable)?;
     if effect.is_none() {
-        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid()));
+        return Err(Span::new(parser_utils.file, parser_utils.index).make_error(ParsingMessage::UnexpectedVoid));
     }
 
     parser_utils.imports.last_id += 1;
@@ -337,7 +337,7 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
                             Box::new(Effects::new(Span::default(), EffectType::LoadVariable(variable.clone()))),
                             "iter::Iter".to_string(),
                             "next".to_string(),
-                            vec![]
+                            vec![],
                         ),
                     )),
                 ),
@@ -361,7 +361,7 @@ fn create_for(name: String, effect: Effects, mut body: CodeBody, id: u32) -> Res
                             Box::new(Effects::new(Span::default(), EffectType::LoadVariable(variable.clone()))),
                             "iter::Iter".to_string(),
                             "has_next".to_string(),
-                            vec![]
+                            vec![],
                         ),
                     )),
                     body.label.clone(),

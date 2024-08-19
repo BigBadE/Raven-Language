@@ -125,8 +125,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                     let base;
                     {
                         let locked = self.syntax.lock();
-                        // skipcq: RS-W1070 Initialization of a value can't use clone_from
                         let data = locked.structures.types.get(&name).unwrap().clone();
+                        // skipcq: RS-W1070 Initialization of a value can't use clone_from
                         base = locked.structures.data.get(&data).unwrap().clone();
                     }
                     *types = FinalizedTypes::Struct(base);
@@ -177,13 +177,14 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn simple_degeneric(&self, degenericing: &mut FinalizedTypes, generics: &HashMap<String, FinalizedTypes>) {
         match degenericing {
             FinalizedTypes::Generic(name, _bounds) => {
+                // skipcq: RS-W1070 Can't use clone_from due to borrow checking
                 *degenericing = generics.get(name).unwrap().clone();
             }
             FinalizedTypes::Struct(_) => {}
             FinalizedTypes::Array(inner) | FinalizedTypes::Reference(inner) => {
                 self.simple_degeneric(inner, generics);
-            },
-            FinalizedTypes::GenericType(_, _) => self.fix_generic_struct(degenericing)
+            }
+            FinalizedTypes::GenericType(_, _) => self.fix_generic_struct(degenericing),
         }
     }
 }

@@ -148,7 +148,7 @@ pub async fn verify_effect(
             if let Some(temp_found) = get_return(&effect.types, variables, &code_verifier.syntax).await {
                 found = temp_found;
             } else {
-                return Err(effect.span.make_error(ParsingMessage::UnexpectedVoid()));
+                return Err(effect.span.make_error(ParsingMessage::UnexpectedVoid));
             };
 
             variables.variables.insert(name.clone(), found.clone());

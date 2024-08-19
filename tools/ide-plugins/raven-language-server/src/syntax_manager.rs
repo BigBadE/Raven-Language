@@ -34,6 +34,8 @@ impl SyntaxManager {
         let mut directory = Self::get_project(&mut arguments, &file);
 
         self.parents.insert(file.clone(), build_project::<()>(&mut arguments, &mut directory, false).unwrap().0);
+
+        // skipcq: RS-W1110 Incorrectly assumes this is copy-able
         return self.parents.get(&file).unwrap().clone();
     }
 

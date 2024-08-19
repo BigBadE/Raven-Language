@@ -22,7 +22,7 @@ pub fn parse_top(parser_utils: &mut ParserUtils) {
             TokenTypes::Start | TokenTypes::AttributeEnd => {}
             TokenTypes::InvalidCharacters => parser_utils.syntax.lock().add_poison(Arc::new(StructData::new_poisoned(
                 format!("${}", parser_utils.file),
-                Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedTopElement()),
+                Span::new(parser_utils.file, parser_utils.index - 1).make_error(ParsingMessage::UnexpectedTopElement),
             ))),
             TokenTypes::ImportStart => parse_import(parser_utils),
             TokenTypes::AttributesStart => parse_attribute(parser_utils, &mut attributes),
