@@ -51,17 +51,16 @@ fn main() {
 ```
 
 - A syntax object is created in runner/runner
-- The compiler is started on another thread, waiting for code to be ready to compile (line 35). It's important to note
+- The compiler is started on another thread, waiting for code to be ready to compile. It's important to note
   that the compiler only runs on one thread (LLVM is not multithreaded), but it still runs on another thread.
-- The parsing job is created on a new thread in runner/runner (line 46)
+- The parsing job is created on a new thread in runner/runner
     - parser/tokens/top_tokenizer finds the import and the main function with no modifiers or arguments, and makes it
       into a UnfinalizedFunction
     - parser/tokens/code_tokenizer finds the method printf and turns it into a line with a single Effect: MethodCall
       with the argument "Two"
 - Tokenizer returns, and the list of tokens is passed to the parser and a ParserUtils object is created to keep track of
   the parsing progress (parser/lib)
-    - parser/parser/top_parser finds the import, and adds it to the ParserUtil's import list (parser/parser/top_parser
-      line 85)
+    - parser/parser/top_parser finds the import, and adds it to the ParserUtil's import list
     - parser/parser/top_parser finds the function, and passes it to parser/parser/function_parser
     - parser/parser/function_parser finds no attributes or generics, finds a code body, and passes it to
       parser/parser/code_parser
@@ -69,9 +68,9 @@ fn main() {
       returned. This code is NOT linked, the method call doesn't actually know anything about what method it calls. This
       allows recursive functions to work
 - Parser returns, and passes the single function to ParserUtils::add_function which passes it to Syntax::add
-    - The function is added to syntax.types so it can be found when linking
+    - The function is added to syntax.types so it can be found when internally linking
     - Anything waiting for that function wakes up (nothing calls main, so nothing does)
-- A verifying job is created on a new thread in parser/parser/top_parser (line 29) to verify the function
+- A verifying job is created on a new thread in parser/parser/top_parser to verify the function
     - The code is split into a CodelessFinalizedFunction and a CodeBody as the function itself is finalized
     - The code is finalized, the method effect which is the only line gets turned into a FinalizedEffect
         - checker/check_code adds a waiter for the printf function to finish if it isn't finished yet.
@@ -79,9 +78,9 @@ fn main() {
           previously found imports (see syntax/async_util/AsyncTypesGetter to see how functions are found)
 - The finalized function (with the code) is put into compiling list, which the compiler thread can find.
     - The compiler finds the main function, and starts compiling it
-    - The compiler finds the method call to printf (compilers/llvm/function_compiler line 177), adds a call to the
+    - The compiler finds the method call to printf, adds a call to the
       function, and adds it to the compiling list
-    - The compiler compiles every function in the compiling list (compilers/llvm/type_getter line 105), compiling each
+    - The compiler compiles every function in the compiling list, compiling each
       function, which may add more to the compiling list
 - After the compiler has an empty compiling list it calls the main function and sends the result back to the runner (
   which is empty).
