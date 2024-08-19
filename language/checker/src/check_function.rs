@@ -1,8 +1,9 @@
-use std::sync::Arc;
-
-use parking_lot::Mutex;
-
+use crate::check_code::verify_code;
+use crate::output::TypesChecker;
+use crate::{finalize_generics, CodeVerifier};
 use data::tokens::Span;
+use parking_lot::Mutex;
+use std::sync::Arc;
 use syntax::async_util::NameResolver;
 use syntax::errors::{ErrorSource, ParsingError, ParsingMessage};
 use syntax::program::code::{
@@ -12,23 +13,21 @@ use syntax::program::function::{
     CodeBody, CodelessFinalizedFunction, FinalizedCodeBody, FinalizedFunction, UnfinalizedFunction,
 };
 use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
 use syntax::{is_modifier, Modifier, ProcessManager, SimpleVariableManager};
-
-use crate::check_code::verify_code;
-use crate::output::TypesChecker;
-use crate::{finalize_generics, CodeVerifier};
 
 /// Verifies a function and returns its code, which is verified seperate to prevent deadlocks
 pub async fn verify_function(
     mut function: UnfinalizedFunction,
     resolver: &Box<dyn NameResolver>,
     syntax: &Arc<Mutex<Syntax>>,
+    include_refs: bool,
 ) -> Result<(CodelessFinalizedFunction, CodeBody), ParsingError> {
     let mut fields = Vec::default();
     // Verify arguments
     for argument in &mut function.fields {
         let field = argument.await?;
-        let field = FinalizedMemberField {
+        let mut field = FinalizedMemberField {
             modifiers: field.modifiers,
             attributes: field.attributes,
             field: FinalizedField {
@@ -36,6 +35,9 @@ pub async fn verify_function(
                 name: field.field.name,
             },
         };
+        if include_refs {
+            field.field.field_type = FinalizedTypes::Reference(Box::new(field.field.field_type));
+        }
 
         fields.push(field);
     }

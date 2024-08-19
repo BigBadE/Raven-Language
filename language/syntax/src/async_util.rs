@@ -256,7 +256,6 @@ impl UnparsedType {
                 if !bounds.is_empty() {
                     output.extend_span(bounds.last().as_ref().unwrap().get_span().end + 1);
                 }
-                
                 output
             }
         };

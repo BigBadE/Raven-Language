@@ -101,7 +101,7 @@ pub async fn get_return(
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
-                Some(inner)
+                Some(FinalizedTypes::Reference(Box::new(inner)))
             }
             None => None,
         },
@@ -123,7 +123,7 @@ pub async fn get_return(
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
-                Some(inner)
+                Some(FinalizedTypes::Reference(Box::new(inner)))
             }
             None => None,
         },
@@ -133,7 +133,7 @@ pub async fn get_return(
         | FinalizedEffectType::Set(_, inner) => get_return(&inner.types, variables, syntax).await,
         // References return their inner type as well.
         FinalizedEffectType::ReferenceLoad(inner) => match get_return(&inner.types, variables, syntax).await.unwrap() {
-            FinalizedTypes::Reference(inner, _) => Some(*inner),
+            FinalizedTypes::Reference(inner) => Some(*inner),
             _ => panic!("Tried to load non-reference!"),
         },
         // Gets the type of the field in the program with that name.
