@@ -53,7 +53,7 @@ impl<'ctx> CompilerImpl<'ctx> {
             Box::new(EmptyNameResolver {}),
             false,
         )
-            .await
+        .await
         {
             Ok(_) => {}
             Err(_) => return None,

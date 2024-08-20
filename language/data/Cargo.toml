@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.36.0", features = ["rt-multi-thread", "sync", "time"] }
-parking_lot = "0.12.1"
-anyhow = "1.0.80"
+tokio = { version = "1.39.3", features = ["rt-multi-thread", "sync", "time"] }
+parking_lot = "0.12.3"
+anyhow = "1.0.86"
