@@ -69,6 +69,8 @@ pub fn compile_block<'ctx>(
     code: &FinalizedCodeBody,
     type_getter: &mut CompilerTypeGetter<'ctx>,
 ) -> Option<BasicValueEnum<'ctx>> {
+    // If the block already exists, go to it. If not, create it
+    // Helps for weird control flow caused by certain blocks.
     let block = if let Some(block) = type_getter.blocks.get(&code.label) {
         type_getter.compiler.builder.position_at_end(block.clone());
         block.clone()
@@ -84,25 +86,11 @@ pub fn compile_block<'ctx>(
     for line in &code.expressions {
         match line.expression_type {
             ExpressionType::Return(_) => {
-                if let FinalizedEffectType::CodeBody(body) = &line.effect.types {
-                    if !broke {
-                        let destination = get_block_or_create(&body.label, type_getter);
-                        type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
-                    }
-                    compile_effect(type_getter, &line.effect);
-                    broke = true;
-                }
-
                 if matches!(&line.effect.types, FinalizedEffectType::NOP) {
-                    if !broke {
-                        type_getter.compiler.builder.build_return(None).unwrap();
-                    }
+                    type_getter.compiler.builder.build_return(None).unwrap();
                 } else {
                     let returned = compile_effect(type_getter, &line.effect).unwrap();
-
-                    if !broke {
-                        type_getter.compiler.builder.build_return(Some(&returned)).unwrap();
-                    }
+                    type_getter.compiler.builder.build_return(Some(&returned)).unwrap();
                 }
                 broke = true;
             }
@@ -145,6 +133,11 @@ pub fn compile_block<'ctx>(
             }
             ExpressionType::Break => return compile_effect(type_getter, &line.effect),
         }
+    }
+
+    // Should never happen, but better than unsound code.
+    if !broke {
+        panic!("No break in code body!");
     }
 
     return None;
