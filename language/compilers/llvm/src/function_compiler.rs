@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
-use inkwell::types::{BasicType, BasicTypeEnum};
+use inkwell::types::{BasicType, BasicTypeEnum, StructType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
 
@@ -51,17 +51,7 @@ pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTy
         FinalizedTypes::Array(inner) => type_getter.get_type(inner),
         _ => {
             if is_modifier(types.inner_struct().data.modifiers, Modifier::Trait) {
-                type_getter
-                    .compiler
-                    .context
-                    .struct_type(
-                        &[
-                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                        ],
-                        false,
-                    )
-                    .as_basic_type_enum()
+                reference_struct(type_getter).as_basic_type_enum()
             } else {
                 let mut fields = vec![type_getter.compiler.context.i64_type().as_basic_type_enum()];
                 for field in &types.inner_struct().fields {
@@ -77,15 +67,13 @@ pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTy
 /// Compiles a FinalizedCodeBody
 pub fn compile_block<'ctx>(
     code: &FinalizedCodeBody,
-    function: FunctionValue<'ctx>,
     type_getter: &mut CompilerTypeGetter<'ctx>,
-    id: &mut u64,
 ) -> Option<BasicValueEnum<'ctx>> {
     let block = if let Some(block) = type_getter.blocks.get(&code.label) {
         type_getter.compiler.builder.position_at_end(block.clone());
         block.clone()
     } else {
-        let temp = type_getter.compiler.context.append_basic_block(function, &code.label);
+        let temp = type_getter.compiler.context.append_basic_block(type_getter.function.unwrap(), &code.label);
         type_getter.blocks.insert(code.label.clone(), temp);
         temp
     };
@@ -98,10 +86,10 @@ pub fn compile_block<'ctx>(
             ExpressionType::Return(_) => {
                 if let FinalizedEffectType::CodeBody(body) = &line.effect.types {
                     if !broke {
-                        let destination = get_block_or_create(&body.label, function, type_getter);
+                        let destination = get_block_or_create(&body.label, type_getter);
                         type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
                     }
-                    compile_effect(type_getter, function, &line.effect, id);
+                    compile_effect(type_getter, &line.effect);
                     broke = true;
                 }
 
@@ -110,7 +98,7 @@ pub fn compile_block<'ctx>(
                         type_getter.compiler.builder.build_return(None).unwrap();
                     }
                 } else {
-                    let returned = compile_effect(type_getter, function, &line.effect, id).unwrap();
+                    let returned = compile_effect(type_getter, &line.effect).unwrap();
 
                     if !broke {
                         type_getter.compiler.builder.build_return(Some(&returned)).unwrap();
@@ -121,15 +109,15 @@ pub fn compile_block<'ctx>(
             ExpressionType::Line => {
                 if broke {
                     if matches!(&line.effect.types, FinalizedEffectType::CodeBody(_)) {
-                        compile_effect(type_getter, function, &line.effect, id);
+                        compile_effect(type_getter, &line.effect);
                     }
                 } else {
                     match &line.effect.types {
                         FinalizedEffectType::CodeBody(body) => {
-                            let destination = get_block_or_create(&body.label, function, type_getter);
+                            let destination = get_block_or_create(&body.label, type_getter);
                             type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
 
-                            compile_effect(type_getter, function, &line.effect, id);
+                            compile_effect(type_getter, &line.effect);
 
                             if !body.returns {
                                 let label = body.label.clone() + "end";
@@ -137,7 +125,7 @@ pub fn compile_block<'ctx>(
                                     type_getter.compiler.builder.position_at_end(block.clone());
                                     block.clone()
                                 } else {
-                                    type_getter.compiler.context.append_basic_block(function, &label)
+                                    type_getter.compiler.context.append_basic_block(type_getter.function.unwrap(), &label)
                                 };
 
                                 type_getter.blocks.insert(label, temp);
@@ -147,15 +135,15 @@ pub fn compile_block<'ctx>(
                         }
                         FinalizedEffectType::Jump(_) | FinalizedEffectType::CompareJump(_, _, _) => {
                             broke = true;
-                            compile_effect(type_getter, function, &line.effect, id);
+                            compile_effect(type_getter, &line.effect);
                         }
                         _ => {
-                            compile_effect(type_getter, function, &line.effect, id);
+                            compile_effect(type_getter, &line.effect);
                         }
                     }
                 }
             }
-            ExpressionType::Break => return compile_effect(type_getter, function, &line.effect, id),
+            ExpressionType::Break => return compile_effect(type_getter, &line.effect),
         }
     }
 
@@ -166,68 +154,58 @@ pub fn compile_block<'ctx>(
 // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub fn compile_effect<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
-    function: FunctionValue<'ctx>,
     effect: &FinalizedEffects,
-    id: &mut u64,
 ) -> Option<BasicValueEnum<'ctx>> {
     return match &effect.types {
         FinalizedEffectType::NOP => {
-            panic!("Tried to compile a NOP! For {}", function.get_name().to_str().unwrap())
+            panic!("Tried to compile a NOP! For {}", type_getter.function.unwrap().get_name().to_str().unwrap())
         }
         FinalizedEffectType::CreateVariable(name, inner, types) => {
-            let compiled = compile_effect(type_getter, function, inner, id).unwrap();
+            let compiled = compile_effect(type_getter, inner).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));
             Some(compiled.as_basic_value_enum())
         }
-        //Label of jumping to body
         FinalizedEffectType::Jump(label) => {
-            let destination = get_block_or_create(label, function, type_getter);
+            let destination = get_block_or_create(label, type_getter);
             type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
             None
         }
-        //Comparison effect, and label to jump to the first if true, second if false
         FinalizedEffectType::CompareJump(effect, then_body, else_body) => {
-            let effect = compile_effect(type_getter, function, effect, id).unwrap();
-            let effect = if effect.is_pointer_value() {
-                *id += 1;
-                type_getter
-                    .compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), effect.into_pointer_value(), &(*id - 1).to_string())
-                    .unwrap()
-                    .into_int_value()
-            } else {
-                effect.into_int_value()
-            };
-            let then = get_block_or_create(then_body, function, type_getter);
-            let else_block = get_block_or_create(else_body, function, type_getter);
+            let effect = compile_effect(type_getter, effect).unwrap();
+            let effect = load_if_pointer(type_getter, type_getter.compiler.context.i64_type(), effect).into_int_value();
+            let then = get_block_or_create(then_body, type_getter);
+            let else_block = get_block_or_create(else_body, type_getter);
             type_getter.compiler.builder.build_conditional_branch(effect, then, else_block).unwrap();
             None
         }
-        FinalizedEffectType::CodeBody(body) => compile_block(body, function, type_getter, id),
-        //Calling function, function arguments
+        FinalizedEffectType::CodeBody(body) => compile_block(body, type_getter),
         FinalizedEffectType::MethodCall(_calling_on, calling_function, arguments, _) => {
             let mut final_arguments = Vec::default();
 
             let calling = type_getter.get_function(calling_function);
             type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
 
-            add_args(&mut final_arguments, type_getter, function, arguments, false, id);
+            for i in 0..arguments.len() {
+                let argument = arguments.get(i).unwrap();
+                let value = compile_effect(type_getter, argument).unwrap();
+
+                final_arguments.push(From::from(value));
+            }
 
             let call = type_getter
                 .compiler
                 .builder
-                .build_call(calling, final_arguments.as_slice(), &id.to_string())
+                .build_call(calling, final_arguments.as_slice(), &type_getter.id.to_string())
                 .unwrap()
                 .try_as_basic_value()
                 .left();
-            *id += 1;
+            type_getter.id += 1;
             return match call {
                 Some(inner) => {
                     if inner.is_pointer_value() {
                         Some(inner)
                     } else {
-                        let pointer = malloc_type(type_getter, inner.get_type().size_of().unwrap(), id);
+                        let pointer = malloc_type(type_getter, inner.get_type().size_of().unwrap());
                         type_getter.compiler.builder.build_store(pointer, inner).unwrap();
                         Some(pointer.as_basic_value_enum())
                     }
@@ -237,25 +215,10 @@ pub fn compile_effect<'ctx>(
         }
         //Sets pointer to value
         FinalizedEffectType::Set(setting, value) => {
-            let output = compile_effect(type_getter, function, setting, id).unwrap();
-            let mut storing = compile_effect(type_getter, function, value, id).unwrap();
-            if storing.is_pointer_value() {
-                storing = type_getter
-                    .compiler
-                    .builder
-                    .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        storing.into_pointer_value(),
-                        &id.to_string(),
-                    )
-                    .unwrap();
-                *id += 1;
-            }
-            let output = type_getter
-                .compiler
-                .builder
-                .build_bit_cast(output, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
-                .unwrap();
+            let output = compile_effect(type_getter, setting).unwrap();
+            let value = compile_effect(type_getter, value).unwrap();
+            let storing =
+                load_if_pointer(type_getter, type_getter.compiler.context.ptr_type(AddressSpace::default()), value);
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing).unwrap();
             Some(output)
         }
@@ -264,18 +227,12 @@ pub fn compile_effect<'ctx>(
         }
         //Loads variable/field pointer from program, or self if program is None
         FinalizedEffectType::Load(loading_from, field, _) => {
-            let from = compile_effect(type_getter, function, loading_from, id).unwrap();
-            let mut offset = 0;
+            let from = compile_effect(type_getter, loading_from).unwrap();
             let mut structure = loading_from.types.get_nongeneric_return(type_getter).unwrap();
             type_getter.fix_generic_struct(&mut structure);
             let structure = structure.inner_struct();
-            for struct_field in &structure.fields {
-                if &struct_field.field.name != field {
-                    offset += 1;
-                } else {
-                    break;
-                }
-            }
+            let offset = structure.fields.iter().position(|struct_field| &struct_field.field.name == field).unwrap();
+
             let fields =
                 structure.fields.iter().map(|field| type_getter.get_type(&field.field.field_type)).collect::<Vec<_>>();
 
@@ -285,16 +242,20 @@ pub fn compile_effect<'ctx>(
                 .build_struct_gep(
                     type_getter.compiler.context.struct_type(fields.as_slice(), false),
                     from.into_pointer_value(),
-                    offset,
-                    &id.to_string(),
+                    offset as u32,
+                    &type_getter.id.to_string(),
                 )
                 .unwrap();
-            *id += 2;
+            type_getter.id += 2;
             Some(
                 type_getter
                     .compiler
                     .builder
-                    .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), gep, &(*id - 1).to_string())
+                    .build_load(
+                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                        gep,
+                        &(type_getter.id - 1).to_string(),
+                    )
                     .unwrap(),
             )
         }
@@ -303,12 +264,12 @@ pub fn compile_effect<'ctx>(
             let mut out_arguments = vec![MaybeUninit::uninit(); arguments.len()];
 
             for (index, effect) in arguments {
-                let returned = compile_effect(type_getter, function, effect, id).unwrap();
+                let returned = compile_effect(type_getter, effect).unwrap();
                 *out_arguments.get_mut(*index).unwrap() = MaybeUninit::new(returned);
             }
 
-            let pointer = compile_effect(type_getter, function, effect.as_ref().unwrap(), id).unwrap().into_pointer_value();
-            *id += 1;
+            let pointer = compile_effect(type_getter, effect.as_ref().unwrap()).unwrap().into_pointer_value();
+            type_getter.id += 1;
 
             let fields =
                 out_arguments.iter().map(|argument| unsafe { argument.assume_init() }.get_type()).collect::<Vec<_>>();
@@ -318,9 +279,12 @@ pub fn compile_effect<'ctx>(
             for argument in out_arguments {
                 let value = unsafe { argument.assume_init() };
 
-                let pointer =
-                    type_getter.compiler.builder.build_struct_gep(structure, pointer, offset, &id.to_string()).unwrap();
-                *id += 1;
+                let pointer = type_getter
+                    .compiler
+                    .builder
+                    .build_struct_gep(structure, pointer, offset, &type_getter.id.to_string())
+                    .unwrap();
+                type_getter.id += 1;
                 type_getter.compiler.builder.build_store(pointer, value).unwrap();
                 offset += 1;
             }
@@ -343,7 +307,7 @@ pub fn compile_effect<'ctx>(
             Some(type_getter.compiler.context.i8_type().const_int(*char as u64, false).as_basic_value_enum())
         }
         FinalizedEffectType::HeapStore(inner) => {
-            let mut output = compile_effect(type_getter, function, inner, id).unwrap();
+            let output = compile_effect(type_getter, inner).unwrap();
 
             let pointer_type = if output.get_type().is_pointer_type() {
                 return Some(output);
@@ -351,107 +315,37 @@ pub fn compile_effect<'ctx>(
                 output.get_type()
             };
 
-            let size = pointer_type.size_of().unwrap();
-
-            *id += 1;
-
-            let malloc = type_getter
-                .compiler
-                .builder
-                .build_call(
-                    type_getter
-                        .compiler
-                        .module
-                        .get_function("malloc")
-                        .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
-                    &[BasicMetadataValueEnum::IntValue(size)],
-                    &id.to_string(),
-                )
-                .unwrap()
-                .try_as_basic_value()
-                .unwrap_left()
-                .into_pointer_value();
-            *id += 1;
-
-            if output.is_pointer_value() {
-                output = type_getter
-                    .compiler
-                    .builder
-                    .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        output.into_pointer_value(),
-                        &id.to_string(),
-                    )
-                    .unwrap();
-                *id += 1;
-            }
+            let malloc = malloc_type(type_getter, pointer_type.size_of().unwrap());
+            let output =
+                load_if_pointer(type_getter, type_getter.compiler.context.ptr_type(AddressSpace::default()), output);
             type_getter.compiler.builder.build_store(malloc, output).unwrap();
             Some(malloc.as_basic_value_enum())
         }
         FinalizedEffectType::StackStore(inner) => {
-            let output = compile_effect(type_getter, function, inner, id).unwrap();
+            let output = compile_effect(type_getter, inner).unwrap();
             if !output.is_pointer_value() {
-                store_and_load(type_getter, output.get_type(), output, id)
+                store_and_load(type_getter, output.get_type(), output)
             } else {
                 Some(output)
             }
         }
         FinalizedEffectType::ReferenceLoad(inner) => {
-            let inner = compile_effect(type_getter, function, inner, id).unwrap();
+            let inner = compile_effect(type_getter, inner).unwrap();
             let output = type_getter
                 .compiler
                 .builder
                 .build_load(
                     type_getter.compiler.context.ptr_type(AddressSpace::default()),
                     inner.into_pointer_value(),
-                    &id.to_string(),
+                    &type_getter.id.to_string(),
                 )
                 .unwrap();
-            *id += 1;
+            type_getter.id += 1;
             Some(output)
         }
         FinalizedEffectType::HeapAllocate(types) => {
             let output = type_getter.get_type(types);
-
-            let pointer_type = if output.is_pointer_type() {
-                output.into_pointer_type()
-            } else {
-                type_getter.compiler.context.ptr_type(AddressSpace::default())
-            };
-
-            let size = output.size_of().unwrap();
-
-            *id += 1;
-
-            let size = type_getter
-                .compiler
-                .builder
-                .build_bit_cast(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
-                .unwrap()
-                .into_pointer_value();
-
-            *id += 1;
-
-            let malloc = type_getter
-                .compiler
-                .builder
-                .build_call(
-                    type_getter
-                        .compiler
-                        .module
-                        .get_function("malloc")
-                        .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
-                    &[BasicMetadataValueEnum::PointerValue(size)],
-                    &id.to_string(),
-                )
-                .unwrap()
-                .try_as_basic_value()
-                .unwrap_left()
-                .into_pointer_value();
-            *id += 1;
-
-            let malloc = type_getter.compiler.builder.build_pointer_cast(malloc, pointer_type, &id.to_string()).unwrap();
-            *id += 1;
+            let malloc = malloc_type(type_getter, output.size_of().unwrap());
 
             Some(malloc.as_basic_value_enum())
         }
@@ -465,15 +359,15 @@ pub fn compile_effect<'ctx>(
                         .build_int_mul(
                             inner.size_of().unwrap(),
                             type_getter.compiler.context.i64_type().const_int(values.len() as u64 + 1, false),
-                            &id.to_string(),
+                            &type_getter.id.to_string(),
                         )
                         .unwrap();
-                    *id += 1;
+                    type_getter.id += 1;
                     output
                 }
                 None => type_getter.compiler.context.i64_type().const_zero(),
             };
-            let malloc = malloc_type(type_getter, ptr_type, id);
+            let malloc = malloc_type(type_getter, ptr_type);
 
             type_getter
                 .compiler
@@ -484,9 +378,9 @@ pub fn compile_effect<'ctx>(
             let malloc_int = type_getter
                 .compiler
                 .builder
-                .build_ptr_to_int(malloc, type_getter.compiler.context.i64_type(), &id.to_string())
+                .build_ptr_to_int(malloc, type_getter.compiler.context.i64_type(), &type_getter.id.to_string())
                 .unwrap();
-            *id += 1;
+            type_getter.id += 1;
 
             let mut i = 1;
             for value in values {
@@ -500,48 +394,47 @@ pub fn compile_effect<'ctx>(
                             .build_int_add(
                                 malloc_int,
                                 type_getter.compiler.context.i64_type().const_int(i, false),
-                                &id.to_string(),
+                                &type_getter.id.to_string(),
                             )
                             .unwrap(),
                         type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        &(*id + 1).to_string(),
+                        &(type_getter.id + 1).to_string(),
                     )
                     .unwrap();
                 i += 1;
-                *id += 2;
-                let effect = compile_effect(type_getter, function, value, id).unwrap();
-                *id += 1;
+                type_getter.id += 2;
+                let effect = compile_effect(type_getter, value).unwrap();
+                type_getter.id += 1;
                 type_getter.compiler.builder.build_store(field_pointer, effect).unwrap();
             }
 
             Some(malloc.as_basic_value_enum())
         }
         FinalizedEffectType::VirtualCall(func_offset, method, _, args) => {
-            let table = compile_effect(type_getter, function, &args[0], id).unwrap();
+            let table = compile_effect(type_getter, &args[0]).unwrap();
 
             let mut compiled_args = Vec::default();
-            let calling = compile_effect(type_getter, function, &args[0], id).unwrap();
+            let calling = compile_effect(type_getter, &args[0]).unwrap();
             let target_type = type_getter.compiler.context.ptr_type(AddressSpace::default());
             let calling = type_getter
                 .compiler
                 .builder
-                .build_bit_cast(calling.into_pointer_value(), target_type, &id.to_string())
+                .build_bit_cast(calling.into_pointer_value(), target_type, &type_getter.id.to_string())
                 .unwrap();
-            *id += 1;
+            type_getter.id += 1;
             let calling = type_getter
                 .compiler
                 .builder
                 .build_load(
                     type_getter.compiler.context.ptr_type(AddressSpace::default()),
                     calling.into_pointer_value(),
-                    &id.to_string(),
+                    &type_getter.id.to_string(),
                 )
                 .unwrap();
             compiled_args.push(BasicMetadataValueEnum::from(calling));
-            *id += 1;
+            type_getter.id += 1;
             for i in 1..args.len() {
-                compiled_args
-                    .push(BasicMetadataValueEnum::from(compile_effect(type_getter, function, &args[i], id).unwrap()));
+                compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, &args[i]).unwrap()));
             }
             let mut struct_type = Vec::default();
             let function_type = type_getter.get_function(method).get_type();
@@ -549,107 +442,54 @@ pub fn compile_effect<'ctx>(
                 struct_type.push(type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum());
             }
             let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
+            let reference_struct = reference_struct(type_getter);
             let table_pointer = type_getter
                 .compiler
                 .builder
-                .build_struct_gep(
-                    type_getter.compiler.context.struct_type(
-                        &[
-                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                        ],
-                        false,
-                    ),
-                    table.into_pointer_value(),
-                    1,
-                    &id.to_string(),
-                )
+                .build_struct_gep(reference_struct, table.into_pointer_value(), 1, &type_getter.id.to_string())
                 .unwrap();
-            *id += 1;
+            type_getter.id += 1;
             let vtable = type_getter
                 .compiler
                 .builder
-                .build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), table_pointer, &id.to_string())
+                .build_load(
+                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                    table_pointer,
+                    &type_getter.id.to_string(),
+                )
                 .unwrap();
-            *id += 1;
+            type_getter.id += 1;
             let function_pointer = type_getter
                 .compiler
                 .builder
-                .build_struct_gep(struct_type, vtable.into_pointer_value(), *func_offset as u32, &id.to_string())
+                .build_struct_gep(struct_type, vtable.into_pointer_value(), *func_offset as u32, &type_getter.id.to_string())
                 .unwrap();
-            *id += 1;
+            type_getter.id += 1;
             let offset = type_getter
                 .compiler
                 .builder
                 .build_load(
                     type_getter.compiler.context.ptr_type(AddressSpace::default()),
                     function_pointer,
-                    &id.to_string(),
+                    &type_getter.id.to_string(),
                 )
                 .unwrap()
                 .into_pointer_value();
-            *id += 1;
+            type_getter.id += 1;
             type_getter
                 .compiler
                 .builder
-                .build_indirect_call(function_type, offset, compiled_args.into_boxed_slice().deref(), &(*id - 1).to_string())
+                .build_indirect_call(
+                    function_type,
+                    offset,
+                    compiled_args.into_boxed_slice().deref(),
+                    &(type_getter.id - 1).to_string(),
+                )
                 .unwrap()
                 .try_as_basic_value()
                 .left()
         }
-        FinalizedEffectType::Downcast(base, target, functions) => {
-            let base_return_types = base.types.get_nongeneric_return(type_getter).unwrap();
-            if is_modifier(base_return_types.inner_struct().data.modifiers, Modifier::Trait) {
-                if !target.eq(&base_return_types) {
-                    panic!("Downcasting to a trait that doesn't match! Not implemented yet!")
-                } else {
-                    compile_effect(type_getter, function, base, id)
-                }
-            } else {
-                let table = type_getter.vtable.clone();
-                let base = compile_effect(type_getter, function, base, id).unwrap();
-                let table = table.borrow_mut().get_vtable(type_getter, target, &base_return_types, functions);
-                *id += 1;
-
-                let structure = type_getter
-                    .compiler
-                    .context
-                    .struct_type(&[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
-                let raw_structure = type_getter.compiler.context.struct_type(
-                    &[
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
-                    ],
-                    false,
-                );
-
-                let malloc = malloc_type(type_getter, structure.size_of().unwrap(), id);
-                let struct_field = type_getter
-                    .compiler
-                    .builder
-                    .build_bit_cast(malloc, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
-                    .unwrap();
-                *id += 1;
-                type_getter.compiler.builder.build_store(struct_field.into_pointer_value(), base).unwrap();
-
-                let offset =
-                    type_getter.compiler.builder.build_struct_gep(raw_structure, malloc, 1, &id.to_string()).unwrap();
-                *id += 2;
-                type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum()).unwrap();
-                Some(
-                    type_getter
-                        .compiler
-                        .builder
-                        .build_bit_cast(
-                            malloc,
-                            type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                            &(*id - 1).to_string(),
-                        )
-                        .unwrap()
-                        .as_basic_value_enum(),
-                )
-            }
-        }
+        FinalizedEffectType::Downcast(base, target, functions) => compile_downcast(type_getter, base, target, functions),
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
@@ -659,46 +499,87 @@ pub fn compile_effect<'ctx>(
     };
 }
 
+fn reference_struct<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
+    return type_getter.compiler.context.struct_type(
+        &[
+            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+            type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+        ],
+        false,
+    );
+}
+
+fn compile_downcast<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    base: &Box<FinalizedEffects>,
+    target: &FinalizedTypes,
+    functions: &Vec<Arc<CodelessFinalizedFunction>>,
+) -> Option<BasicValueEnum<'ctx>> {
+    let base_return_types = base.types.get_nongeneric_return(type_getter).unwrap();
+    if is_modifier(base_return_types.inner_struct().data.modifiers, Modifier::Trait) {
+        if !target.eq(&base_return_types) {
+            panic!("Downcasting to a trait that doesn't match! Not implemented yet!")
+        } else {
+            return compile_effect(type_getter, base);
+        }
+    } else {
+        let table = type_getter.vtable.clone();
+        let base = compile_effect(type_getter, base).unwrap();
+        let table = table.borrow_mut().get_vtable(type_getter, target, &base_return_types, functions);
+        type_getter.id += 1;
+
+        let structure = type_getter
+            .compiler
+            .context
+            .struct_type(&[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
+
+        let malloc = malloc_type(type_getter, structure.size_of().unwrap());
+        type_getter.compiler.builder.build_store(malloc, base).unwrap();
+
+        let reference_struct = reference_struct(type_getter);
+        let offset =
+            type_getter.compiler.builder.build_struct_gep(reference_struct, malloc, 1, &type_getter.id.to_string()).unwrap();
+        type_getter.id += 1;
+        type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum()).unwrap();
+        return Some(malloc.as_basic_value_enum());
+    }
+}
+
+fn load_if_pointer<'ctx, T: BasicType<'ctx>>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    types: T,
+    storing: BasicValueEnum<'ctx>,
+) -> BasicValueEnum<'ctx> {
+    if storing.is_pointer_value() {
+        let loaded = type_getter
+            .compiler
+            .builder
+            .build_load(types, storing.into_pointer_value(), &type_getter.id.to_string())
+            .unwrap();
+        type_getter.id += 1;
+        return loaded;
+    }
+    return storing;
+}
+
 /// Stores a value and then loads it
 fn store_and_load<'ctx, T: BasicType<'ctx>>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     types: T,
-    inputer: BasicValueEnum<'ctx>,
-    id: &mut u64,
+    storing: BasicValueEnum<'ctx>,
 ) -> Option<BasicValueEnum<'ctx>> {
-    let pointer = type_getter.compiler.builder.build_alloca(types, &id.to_string()).unwrap();
-    *id += 1;
-    type_getter.compiler.builder.build_store(pointer, inputer).unwrap();
+    let pointer = type_getter.compiler.builder.build_alloca(types, &type_getter.id.to_string()).unwrap();
+    type_getter.id += 1;
+    type_getter.compiler.builder.build_store(pointer, storing).unwrap();
     return Some(pointer.as_basic_value_enum());
 }
 
-/// Adds the arguments to final_arguments
-fn add_args<'ctx, 'a>(
-    final_arguments: &'a mut Vec<BasicMetadataValueEnum<'ctx>>,
-    type_getter: &mut CompilerTypeGetter<'ctx>,
-    function: FunctionValue<'ctx>,
-    arguments: &'a Vec<FinalizedEffects>,
-    offset: bool,
-    id: &mut u64,
-) {
-    for i in offset as usize..arguments.len() {
-        let argument = arguments.get(i).unwrap();
-        let value = compile_effect(type_getter, function, argument, id).unwrap();
-
-        final_arguments.push(From::from(value));
-    }
-}
-
 /// Gets a block with the given name, and if it's not found, create it
-fn get_block_or_create<'ctx>(
-    name: &String,
-    function: FunctionValue<'ctx>,
-    type_getter: &mut CompilerTypeGetter<'ctx>,
-) -> BasicBlock<'ctx> {
+fn get_block_or_create<'ctx>(name: &String, type_getter: &mut CompilerTypeGetter<'ctx>) -> BasicBlock<'ctx> {
     return if let Some(output) = type_getter.blocks.get(name) {
         output.clone()
     } else {
-        let temp = type_getter.compiler.context.append_basic_block(function, name);
+        let temp = type_getter.compiler.context.append_basic_block(type_getter.function.unwrap(), name);
         type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
         type_getter.blocks.insert(name.clone(), temp);
         temp

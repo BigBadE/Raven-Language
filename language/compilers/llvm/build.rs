@@ -195,7 +195,7 @@ fn llvm_config_binary_names() -> impl Iterator<Item = String> {
 /// Check whether the given version of LLVM is blocklisted,
 /// returning `Some(reason)` if it is.
 fn is_blocklisted_llvm(llvm_version: &Version) -> Option<&'static str> {
-    static BLOCKLIST: &[(u64, u64, u64, &'static str)] = &[];
+    static BLOCKLIST: &[(u64, u64, u64, &str)] = &[];
 
     if let Some(x) = env::var_os(&*ENV_IGNORE_BLOCKLIST) {
         if &x == "YES" {

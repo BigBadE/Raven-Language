@@ -289,7 +289,7 @@ impl TopElement for StructData {
             chalk_data: Self::get_chalk_data(id, 0),
             id,
             name: "empty".to_string(),
-            span: Default::default(),
+            span: Span::default(),
             attributes: vec![],
             functions: vec![],
             poisoned: vec![],

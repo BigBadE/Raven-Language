@@ -36,6 +36,10 @@ pub struct CompilerTypeGetter<'ctx> {
     pub current_block: Option<BasicBlock<'ctx>>,
     /// Current function's variables
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
+    /// Current ID
+    pub id: u64,
+    /// Current function, None if a function isn't currently being compiled
+    pub function: Option<FunctionValue<'ctx>>,
 }
 
 impl<'ctx> CompilerTypeGetter<'ctx> {
@@ -49,6 +53,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             blocks: HashMap::default(),
             current_block: None,
             variables: HashMap::default(),
+            id: 0,
+            function: None,
         };
     }
 
@@ -68,6 +74,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             blocks: self.blocks.clone(),
             current_block: self.current_block.clone(),
             variables,
+            id: 0,
+            function: Some(llvm_function),
         };
     }
 

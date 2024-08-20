@@ -37,7 +37,7 @@ pub fn compile_internal<'ctx>(
             .builder
             .build_load(compiler.context.i64_type(), params.get(0).unwrap().into_pointer_value(), "0")
             .unwrap();
-        compiler.builder.build_return(Some(&malloc_type(type_getter, size.into_int_value(), &mut 1))).unwrap();
+        compiler.builder.build_return(Some(&malloc_type(type_getter, size.into_int_value()))).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::write_ptr_data$") {
         let data = compiler
             .builder
@@ -46,7 +46,7 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_store(params.get(0).unwrap().into_pointer_value(), data).unwrap();
         compiler.builder.build_return(None).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::get_size$") {
-        let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
+        let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
         let target_type = type_getter.get_type(function.generics.iter().next().unwrap().1);
         compiler.builder.build_store(storing, target_type.size_of().unwrap().as_basic_value_enum()).unwrap();
         compiler.builder.build_return(Some(&storing)).unwrap();
@@ -56,7 +56,7 @@ pub fn compile_internal<'ctx>(
         build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), &compiler);
     } else if name.starts_with("math::RightShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -79,7 +79,7 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::LogicRightShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -102,7 +102,7 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::LeftShift") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -176,13 +176,13 @@ pub fn compile_internal<'ctx>(
 }
 
 /// Creates a malloc for the type
-pub fn malloc_type<'a>(type_getter: &CompilerTypeGetter<'a>, size: IntValue<'a>, id: &mut u64) -> PointerValue<'a> {
+pub fn malloc_type<'a>(type_getter: &mut CompilerTypeGetter<'a>, size: IntValue<'a>) -> PointerValue<'a> {
     let size = type_getter
         .compiler
         .builder
-        .build_int_to_ptr(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &id.to_string())
+        .build_int_to_ptr(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &type_getter.id.to_string())
         .unwrap();
-    *id += 1;
+    type_getter.id += 1;
     let malloc = type_getter
         .compiler
         .builder
@@ -193,13 +193,13 @@ pub fn malloc_type<'a>(type_getter: &CompilerTypeGetter<'a>, size: IntValue<'a>,
                 .get_function("malloc")
                 .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
             &[BasicMetadataValueEnum::PointerValue(size)],
-            &id.to_string(),
+            &type_getter.id.to_string(),
         )
         .unwrap()
         .try_as_basic_value()
         .unwrap_left()
         .into_pointer_value();
-    *id += 1;
+    type_getter.id += 1;
     return malloc;
 }
 

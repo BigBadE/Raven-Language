@@ -17,6 +17,7 @@ pub struct SyntaxManager {
 impl SyntaxManager {
     pub fn get_syntax(&mut self, file: PathBuf) -> Arc<Mutex<Syntax>> {
         if let Some(found) = self.parents.get(&file) {
+            // skipcq: RS-W1110 Incorrectly assumes this is copy-able
             return found.clone();
         }
         return self.update_syntax(file);

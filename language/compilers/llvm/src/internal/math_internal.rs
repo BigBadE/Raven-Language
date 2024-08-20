@@ -1,4 +1,3 @@
-
 use crate::compiler::CompilerImpl;
 use crate::internal::instructions::malloc_type;
 use crate::type_getter::CompilerTypeGetter;
@@ -7,7 +6,7 @@ use inkwell::IntPredicate;
 
 /// Compiles internal math functions
 pub fn math_internal<'ctx>(
-    type_getter: &CompilerTypeGetter<'ctx>,
+    type_getter: &mut CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
     name: &String,
     value: &FunctionValue<'ctx>,
@@ -15,7 +14,7 @@ pub fn math_internal<'ctx>(
     let params = value.get_params();
     if name.starts_with("math::Add") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -36,7 +35,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Subtract") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
         let returning = compiler
             .builder
             .build_int_sub(
@@ -56,7 +55,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Multiply") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
         let returning = compiler
             .builder
             .build_int_mul(
@@ -76,7 +75,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Divide") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_div(
                 compiler
@@ -110,7 +109,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Remainder") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
         let returning = if name.ends_with("u64") {
             compiler.builder.build_int_unsigned_rem(
                 compiler
@@ -158,7 +157,7 @@ pub fn math_internal<'ctx>(
             compile_relational_op(IntPredicate::SLT, compiler, &params, type_getter)
         };
     } else if name.starts_with("math::Not") {
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
         let returning = compiler
             .builder
             .build_not(
@@ -173,7 +172,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_store(malloc, returning).unwrap();
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::BitInvert") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
         let returning = compiler
             .builder
             .build_not(
@@ -189,7 +188,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::BitXOR") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -211,7 +210,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::BitOr") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -233,7 +232,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::BitAnd") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -255,7 +254,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::BitXOR") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
 
         let returning = compiler
             .builder
@@ -277,7 +276,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::And") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
 
         let returning = compiler
             .builder
@@ -299,7 +298,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::XOR") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
 
         let returning = compiler
             .builder
@@ -321,7 +320,7 @@ pub fn math_internal<'ctx>(
         compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Or") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
 
         let returning = compiler
             .builder
@@ -352,9 +351,9 @@ fn compile_relational_op(
     op: IntPredicate,
     compiler: &CompilerImpl,
     params: &Vec<BasicValueEnum>,
-    type_getter: &CompilerTypeGetter,
+    type_getter: &mut CompilerTypeGetter,
 ) {
-    let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of(), &mut 0);
+    let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
 
     let returning = compiler
         .builder

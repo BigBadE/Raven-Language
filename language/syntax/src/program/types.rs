@@ -250,7 +250,7 @@ impl FinalizedTypes {
         &self,
         other: &FinalizedTypes,
         syntax: Option<Arc<Mutex<Syntax>>>,
-    ) -> (bool, Option<Pin<Box<dyn Future<Output=bool> + Send + Sync>>>) {
+    ) -> (bool, Option<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) {
         return match self {
             FinalizedTypes::Struct(found) => match other {
                 FinalizedTypes::Struct(other_struct) => {
@@ -358,7 +358,7 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(referencing) => referencing.of_type_sync(other, syntax),
             FinalizedTypes::Generic(_, bounds) => match other {
                 FinalizedTypes::Generic(_, other_bounds) => {
-                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>> = Vec::default();
+                    let mut outer_fails: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>> = Vec::default();
                     // For two generics to be the same, each bound must match at least one other bound.
                     'outer: for bound in bounds {
                         let mut fails = Vec::default();
@@ -409,12 +409,12 @@ impl FinalizedTypes {
             trait_type,
             error: Span::default().make_error(ParsingMessage::ShouldntSee("get_has_impl")),
         }
-            .await
-            .is_ok();
+        .await
+        .is_ok();
     }
 
     /// Joins a vec of futures, waiting for all to finish and returning true if they all returned true
-    pub async fn join(joining: Vec<Pin<Box<dyn Future<Output=bool> + Send + Sync>>>) -> bool {
+    pub async fn join(joining: Vec<Pin<Box<dyn Future<Output = bool> + Send + Sync>>>) -> bool {
         for temp in joining {
             if !temp.await {
                 return false;

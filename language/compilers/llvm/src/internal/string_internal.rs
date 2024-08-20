@@ -7,7 +7,7 @@ use inkwell::AddressSpace;
 
 /// Compiles internal string methods
 pub fn string_internal<'ctx>(
-    type_getter: &CompilerTypeGetter<'ctx>,
+    type_getter: &mut CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
     name: &String,
     value: &FunctionValue<'ctx>,
@@ -17,7 +17,7 @@ pub fn string_internal<'ctx>(
         type_getter.compiler.builder.build_return(Some(value.get_params().first().unwrap())).unwrap();
     } else if name.starts_with("string::Add<char + u64>_char::add") {
         let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of(), &mut 0);
+        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
         let pointer_type = compiler
             .builder
             .build_bit_cast(pointer_type, compiler.context.ptr_type(AddressSpace::default()), "1")
@@ -33,11 +33,7 @@ pub fn string_internal<'ctx>(
                     .into_int_value(),
                 compiler
                     .builder
-                    .build_load(
-                        type_getter.compiler.context.i64_type(),
-                        params.get(1).unwrap().into_pointer_value(),
-                        "3",
-                    )
+                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
                     .unwrap()
                     .into_int_value(),
                 "1",
