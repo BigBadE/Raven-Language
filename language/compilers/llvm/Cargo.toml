@@ -14,7 +14,7 @@ async-trait = "0.1.81"
 tokio = { version = "1.39.3", features = ["rt", "sync", "time"] }
 parking_lot = "0.12.3"
 
-llvm-sys = { version = "180.0.0", features = ["no-llvm-linking"] }
+llvm-sys = { version = "181.1.1", features = ["no-llvm-linking"] }
 inkwell = { git = "https://github.com/BigBadE/inkwell", features = ["llvm18-0-no-llvm-linking"] }
 
 dashmap = "6.0.1"
