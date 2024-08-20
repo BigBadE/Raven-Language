@@ -17,7 +17,7 @@ parking_lot = "0.12.1"
 llvm-sys = { version = "180.0.0", features = ["no-llvm-linking"] }
 inkwell = { git = "https://github.com/BigBadE/inkwell", features = ["llvm18-0-no-llvm-linking"] }
 
-dashmap = "5.5.3"
+dashmap = "6.0.1"
 
 [build-dependencies]
 anyhow = "1.0.83"
