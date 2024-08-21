@@ -131,34 +131,42 @@ pub fn compile_line<'ctx>(line: &FinalizedExpression, type_getter: &mut Compiler
             }
             *broke = true;
         }
-        ExpressionType::Line => {
-            if *broke {
-                // If the function already broke, ignore anything other than code bodies.
-                if matches!(&line.effect.types, FinalizedEffectType::CodeBody(_)) {
-                    compile_effect(type_getter, &line.effect);
-                }
-            } else {
-                match &line.effect.types {
-                    FinalizedEffectType::CodeBody(body) => {
-                        let destination = get_block_or_create(&body.label, type_getter);
-                        type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
-
-                        compile_effect(type_getter, &line.effect);
-                    }
-                    FinalizedEffectType::Jump(_) | FinalizedEffectType::CompareJump(_, _, _) => {
-                        *broke = true;
-                        compile_effect(type_getter, &line.effect);
-                    }
-                    _ => {
-                        compile_effect(type_getter, &line.effect);
-                    }
-                }
-            }
-        }
+        ExpressionType::Line => compile_nonreturning_line(line, type_getter, broke),
         // TODO implement breaks
         ExpressionType::Break => {
             compile_effect(type_getter, &line.effect);
             *broke = true;
+        }
+    }
+}
+
+/// Compiles a line that isn't a return or break.
+fn compile_nonreturning_line<'ctx>(
+    line: &FinalizedExpression,
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    broke: &mut bool,
+) {
+    if *broke {
+        // If the function already broke, ignore anything other than code bodies.
+        if matches!(&line.effect.types, FinalizedEffectType::CodeBody(_)) {
+            compile_effect(type_getter, &line.effect);
+        }
+    } else {
+        match &line.effect.types {
+            FinalizedEffectType::CodeBody(body) => {
+                // Make sure the code goes to the code body
+                let destination = get_block_or_create(&body.label, type_getter);
+                type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
+
+                compile_effect(type_getter, &line.effect);
+            }
+            FinalizedEffectType::Jump(_) | FinalizedEffectType::CompareJump(_, _, _) => {
+                *broke = true;
+                compile_effect(type_getter, &line.effect);
+            }
+            _ => {
+                compile_effect(type_getter, &line.effect);
+            }
         }
     }
 }
@@ -208,71 +216,9 @@ pub fn compile_effect<'ctx>(
             return Some(type_getter.variables.get(name).unwrap().1);
         }
         //Loads variable/field pointer from program, or self if program is None
-        FinalizedEffectType::Load(loading_from, field, _) => {
-            let from = compile_effect(type_getter, loading_from).unwrap();
-            let mut structure = loading_from.types.get_nongeneric_return(type_getter).unwrap();
-            type_getter.fix_generic_struct(&mut structure);
-            let structure = structure.inner_struct();
-            let offset = structure.fields.iter().position(|struct_field| &struct_field.field.name == field).unwrap();
-
-            let fields =
-                structure.fields.iter().map(|field| type_getter.get_type(&field.field.field_type)).collect::<Vec<_>>();
-
-            let gep = type_getter
-                .compiler
-                .builder
-                .build_struct_gep(
-                    type_getter.compiler.context.struct_type(fields.as_slice(), false),
-                    from.into_pointer_value(),
-                    offset as u32,
-                    &type_getter.id.to_string(),
-                )
-                .unwrap();
-            type_getter.id += 2;
-            Some(
-                type_getter
-                    .compiler
-                    .builder
-                    .build_load(
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        gep,
-                        &(type_getter.id - 1).to_string(),
-                    )
-                    .unwrap(),
-            )
-        }
+        FinalizedEffectType::Load(loading_from, field, _) => compile_load(type_getter, loading_from, field),
         //Struct to create and a tuple of the index of the argument and the argument
-        FinalizedEffectType::CreateStruct(effect, _structure, arguments) => {
-            let mut out_arguments = vec![MaybeUninit::uninit(); arguments.len()];
-
-            for (index, effect) in arguments {
-                let returned = compile_effect(type_getter, effect).unwrap();
-                *out_arguments.get_mut(*index).unwrap() = MaybeUninit::new(returned);
-            }
-
-            let pointer = compile_effect(type_getter, effect.as_ref().unwrap()).unwrap().into_pointer_value();
-            type_getter.id += 1;
-
-            let fields =
-                out_arguments.iter().map(|argument| unsafe { argument.assume_init() }.get_type()).collect::<Vec<_>>();
-            let structure = type_getter.compiler.context.struct_type(fields.as_slice(), false);
-
-            let mut offset = 0;
-            for argument in out_arguments {
-                let value = unsafe { argument.assume_init() };
-
-                let pointer = type_getter
-                    .compiler
-                    .builder
-                    .build_struct_gep(structure, pointer, offset, &type_getter.id.to_string())
-                    .unwrap();
-                type_getter.id += 1;
-                type_getter.compiler.builder.build_store(pointer, value).unwrap();
-                offset += 1;
-            }
-
-            Some(pointer.as_basic_value_enum())
-        }
+        FinalizedEffectType::CreateStruct(effect, _, arguments) => compile_create_struct(type_getter, effect, arguments),
         FinalizedEffectType::Float(float) => {
             Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum())
         }
@@ -344,6 +290,75 @@ pub fn compile_effect<'ctx>(
     };
 }
 
+fn compile_create_struct<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    effect: &Option<Box<FinalizedEffects>>,
+    arguments: &Vec<(usize, FinalizedEffects)>,
+) -> Option<BasicValueEnum<'ctx>> {
+    let mut out_arguments = vec![MaybeUninit::uninit(); arguments.len()];
+
+    for (index, effect) in arguments {
+        let returned = compile_effect(type_getter, effect).unwrap();
+        *out_arguments.get_mut(*index).unwrap() = MaybeUninit::new(returned);
+    }
+
+    let pointer = compile_effect(type_getter, effect.as_ref().unwrap()).unwrap().into_pointer_value();
+    type_getter.id += 1;
+
+    let fields = out_arguments.iter().map(|argument| unsafe { argument.assume_init() }.get_type()).collect::<Vec<_>>();
+    let structure = type_getter.compiler.context.struct_type(fields.as_slice(), false);
+
+    let mut offset = 0;
+    for argument in out_arguments {
+        let value = unsafe { argument.assume_init() };
+
+        let pointer =
+            type_getter.compiler.builder.build_struct_gep(structure, pointer, offset, &type_getter.id.to_string()).unwrap();
+        type_getter.id += 1;
+        type_getter.compiler.builder.build_store(pointer, value).unwrap();
+        offset += 1;
+    }
+
+    return Some(pointer.as_basic_value_enum());
+}
+
+/// Compiles a load effect
+fn compile_load<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    loading_from: &FinalizedEffects,
+    field: &String,
+) -> Option<BasicValueEnum<'ctx>> {
+    let from = compile_effect(type_getter, loading_from).unwrap();
+    let mut structure = loading_from.types.get_nongeneric_return(type_getter).unwrap();
+    type_getter.fix_generic_struct(&mut structure);
+    let structure = structure.inner_struct();
+    let offset = structure.fields.iter().position(|struct_field| &struct_field.field.name == field).unwrap();
+
+    let fields = structure.fields.iter().map(|field| type_getter.get_type(&field.field.field_type)).collect::<Vec<_>>();
+
+    let gep = type_getter
+        .compiler
+        .builder
+        .build_struct_gep(
+            type_getter.compiler.context.struct_type(fields.as_slice(), false),
+            from.into_pointer_value(),
+            offset as u32,
+            &type_getter.id.to_string(),
+        )
+        .unwrap();
+    type_getter.id += 2;
+    return Some(
+        type_getter
+            .compiler
+            .builder
+            .build_load(
+                type_getter.compiler.context.ptr_type(AddressSpace::default()),
+                gep,
+                &(type_getter.id - 1).to_string(),
+            )
+            .unwrap(),
+    );
+}
 fn compile_virtual_call<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     func_offset: &usize,
@@ -354,13 +369,6 @@ fn compile_virtual_call<'ctx>(
 
     let mut compiled_args = Vec::default();
     let calling = compile_effect(type_getter, &args[0]).unwrap();
-    let target_type = type_getter.compiler.context.ptr_type(AddressSpace::default());
-    let calling = type_getter
-        .compiler
-        .builder
-        .build_bit_cast(calling.into_pointer_value(), target_type, &type_getter.id.to_string())
-        .unwrap();
-    type_getter.id += 1;
     let calling = type_getter
         .compiler
         .builder
