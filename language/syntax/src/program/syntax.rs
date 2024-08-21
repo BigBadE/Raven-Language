@@ -110,14 +110,10 @@ impl Syntax {
         let mut waker: Option<Waker> = None;
         {
             let mut locked = syntax.lock();
-            if let Some(found) = locked.compiling_wakers.get(&function.data.name) {
-                for waker in found {
-                    waker.wake_by_ref();
-                }
-            }
-            locked.compiling_wakers.remove(&function.data.name);
+            locked.compiling_wakers.remove(&function.data.name).into_iter().flatten().for_each(Waker::wake);
 
             if function.data.name != locked.async_manager.target {
+                // Prevent duplicates from empty trait methods
                 if function.code.expressions.len() == 0
                     && ((locked.compiling.contains_key(&function.data.name) && !generic)
                     || (locked.generics.contains_key(&function.data.name) && generic))
@@ -125,15 +121,15 @@ impl Syntax {
                     return;
                 }
 
-                if generic {
-                    locked.generics.insert(function.data.name.clone(), function.clone());
+                if !generic {
+                    locked.compiling.insert(function.data.name.clone(), function);
+                    return;
+                }
+                locked.generics.insert(function.data.name.clone(), function.clone());
 
-                    // TODO figure out generic traits
-                    // If the function is in a trait, it can't be generic, so it gets automatically compiled
-                    if is_modifier(function.data.modifiers, Modifier::Trait) {
-                        locked.compiling.insert(function.data.name.clone(), function);
-                    }
-                } else {
+                // TODO figure out generic traits
+                // If the function is in a trait, it can't be generic, so it gets automatically compiled
+                if is_modifier(function.data.modifiers, Modifier::Trait) {
                     locked.compiling.insert(function.data.name.clone(), function);
                 }
                 return;
@@ -150,6 +146,7 @@ impl Syntax {
             }
             waker.clone_from(&locked.async_manager.target_waker);
         }
+
         if generic {
             process_manager.degeneric_code(Arc::new(function.to_codeless()), syntax).await;
         }
