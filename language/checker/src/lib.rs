@@ -76,7 +76,7 @@ pub async fn get_return(
     syntax: &Arc<Mutex<Syntax>>,
 ) -> Option<FinalizedTypes> {
     return match types {
-        FinalizedEffectType::MethodCall(calling, function, _, returning) => match function.return_type.as_ref().cloned() {
+        FinalizedEffectType::FunctionCall(calling, function, _, returning) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
                 if !returning.is_empty() {
                     let generics = function

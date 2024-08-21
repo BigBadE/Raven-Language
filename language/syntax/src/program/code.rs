@@ -210,7 +210,7 @@ pub enum FinalizedEffectType {
     /// Nested code body.
     CodeBody(FinalizedCodeBody),
     /// Calls the function on the given value (if any) with the given arguments and the given return type (if generic). The first arg is the output location
-    MethodCall(
+    FunctionCall(
         Option<Box<FinalizedEffects>>,
         Arc<CodelessFinalizedFunction>,
         Vec<FinalizedEffects>,
@@ -262,7 +262,7 @@ impl FinalizedEffectType {
             Self::NOP | Self::Jump(_) | Self::CompareJump(_, _, _) | Self::CodeBody(_) => None,
             // Downcasts simply return the downcasting target.
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
-            Self::MethodCall(_, function, _, _)
+            Self::FunctionCall(_, function, _, _)
             | Self::GenericMethodCall(function, _, _)
             | Self::VirtualCall(_, function, _, _)
             | Self::GenericVirtualCall(_, _, function, _) => {

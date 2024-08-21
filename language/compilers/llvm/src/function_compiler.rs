@@ -8,7 +8,7 @@ use inkwell::types::{BasicType, BasicTypeEnum, StructType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
 
-use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects};
+use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
 use syntax::program::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::program::types::FinalizedTypes;
 use syntax::{is_modifier, Attribute, Modifier};
@@ -79,59 +79,19 @@ pub fn compile_block<'ctx>(
         temp
     };
 
+    // Go to the end of the block to add code
     type_getter.current_block = Some(block);
     type_getter.compiler.builder.position_at_end(block);
+
+    // Every block must break in some way, this checks that while compiling each line
     let mut broke = false;
     for line in &code.expressions {
-        match line.expression_type {
-            ExpressionType::Return(_) => {
-                if matches!(&line.effect.types, FinalizedEffectType::NOP) {
-                    type_getter.compiler.builder.build_return(None).unwrap();
-                } else {
-                    let returned = compile_effect(type_getter, &line.effect).unwrap();
-                    type_getter.compiler.builder.build_return(Some(&returned)).unwrap();
-                }
-                broke = true;
-            }
-            ExpressionType::Line => {
-                if broke {
-                    if matches!(&line.effect.types, FinalizedEffectType::CodeBody(_)) {
-                        compile_effect(type_getter, &line.effect);
-                    }
-                } else {
-                    match &line.effect.types {
-                        FinalizedEffectType::CodeBody(body) => {
-                            let destination = get_block_or_create(&body.label, type_getter);
-                            type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
+        compile_line(line, type_getter, &mut broke);
+    }
 
-                            compile_effect(type_getter, &line.effect);
-
-                            if !body.returns {
-                                let label = body.label.clone() + "end";
-                                let temp = if let Some(block) = type_getter.blocks.get(&label) {
-                                    type_getter.compiler.builder.position_at_end(block.clone());
-                                    block.clone()
-                                } else {
-                                    type_getter.compiler.context.append_basic_block(type_getter.function.unwrap(), &label)
-                                };
-
-                                type_getter.blocks.insert(label, temp);
-                                type_getter.current_block = Some(temp);
-                                type_getter.compiler.builder.position_at_end(temp);
-                            }
-                        }
-                        FinalizedEffectType::Jump(_) | FinalizedEffectType::CompareJump(_, _, _) => {
-                            broke = true;
-                            compile_effect(type_getter, &line.effect);
-                        }
-                        _ => {
-                            compile_effect(type_getter, &line.effect);
-                        }
-                    }
-                }
-            }
-            ExpressionType::Break => return compile_effect(type_getter, &line.effect),
-        }
+    // If this code block doesn't return, create an end block to jump to.
+    if !code.returns {
+        create_block_end(code, type_getter);
     }
 
     // Should never happen, but better than unsound code.
@@ -140,6 +100,67 @@ pub fn compile_block<'ctx>(
     }
 
     return None;
+}
+
+/// This is used by control flow altering blocks like for loops for convenience.
+/// TODO rewrite this to be more sane. Probably smart.
+pub fn create_block_end<'ctx>(code: &FinalizedCodeBody, type_getter: &mut CompilerTypeGetter<'ctx>) {
+    let label = code.label.clone() + "end";
+    let temp = if let Some(block) = type_getter.blocks.get(&label) {
+        type_getter.compiler.builder.position_at_end(block.clone());
+        block.clone()
+    } else {
+        type_getter.compiler.context.append_basic_block(type_getter.function.unwrap(), &label)
+    };
+
+    type_getter.blocks.insert(label, temp);
+    type_getter.current_block = Some(temp);
+    type_getter.compiler.builder.position_at_end(temp);
+}
+
+/// Compile a line of code, handling breaking
+pub fn compile_line<'ctx>(line: &FinalizedExpression, type_getter: &mut CompilerTypeGetter<'ctx>, broke: &mut bool) {
+    match line.expression_type {
+        // If there's a return, return None for NOPs, else return the value
+        ExpressionType::Return(_) => {
+            if matches!(&line.effect.types, FinalizedEffectType::NOP) {
+                type_getter.compiler.builder.build_return(None).unwrap();
+            } else {
+                let returned = compile_effect(type_getter, &line.effect).unwrap();
+                type_getter.compiler.builder.build_return(Some(&returned)).unwrap();
+            }
+            *broke = true;
+        }
+        ExpressionType::Line => {
+            if *broke {
+                // If the function already broke, ignore anything other than code bodies.
+                if matches!(&line.effect.types, FinalizedEffectType::CodeBody(_)) {
+                    compile_effect(type_getter, &line.effect);
+                }
+            } else {
+                match &line.effect.types {
+                    FinalizedEffectType::CodeBody(body) => {
+                        let destination = get_block_or_create(&body.label, type_getter);
+                        type_getter.compiler.builder.build_unconditional_branch(destination).unwrap();
+
+                        compile_effect(type_getter, &line.effect);
+                    }
+                    FinalizedEffectType::Jump(_) | FinalizedEffectType::CompareJump(_, _, _) => {
+                        *broke = true;
+                        compile_effect(type_getter, &line.effect);
+                    }
+                    _ => {
+                        compile_effect(type_getter, &line.effect);
+                    }
+                }
+            }
+        }
+        // TODO implement breaks
+        ExpressionType::Break => {
+            compile_effect(type_getter, &line.effect);
+            *broke = true;
+        }
+    }
 }
 
 /// Compiles a single effect
@@ -171,39 +192,8 @@ pub fn compile_effect<'ctx>(
             None
         }
         FinalizedEffectType::CodeBody(body) => compile_block(body, type_getter),
-        FinalizedEffectType::MethodCall(_calling_on, calling_function, arguments, _) => {
-            let mut final_arguments = Vec::default();
-
-            let calling = type_getter.get_function(calling_function);
-            type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
-
-            for i in 0..arguments.len() {
-                let argument = arguments.get(i).unwrap();
-                let value = compile_effect(type_getter, argument).unwrap();
-
-                final_arguments.push(From::from(value));
-            }
-
-            let call = type_getter
-                .compiler
-                .builder
-                .build_call(calling, final_arguments.as_slice(), &type_getter.id.to_string())
-                .unwrap()
-                .try_as_basic_value()
-                .left();
-            type_getter.id += 1;
-            return match call {
-                Some(inner) => {
-                    if inner.is_pointer_value() {
-                        Some(inner)
-                    } else {
-                        let pointer = malloc_type(type_getter, inner.get_type().size_of().unwrap());
-                        type_getter.compiler.builder.build_store(pointer, inner).unwrap();
-                        Some(pointer.as_basic_value_enum())
-                    }
-                }
-                None => None,
-            };
+        FinalizedEffectType::FunctionCall(_, calling_function, arguments, _) => {
+            compile_function_call(type_getter, calling_function, arguments)
         }
         //Sets pointer to value
         FinalizedEffectType::Set(setting, value) => {
@@ -341,84 +331,8 @@ pub fn compile_effect<'ctx>(
 
             Some(malloc.as_basic_value_enum())
         }
-        FinalizedEffectType::VirtualCall(func_offset, method, _, args) => {
-            let table = compile_effect(type_getter, &args[0]).unwrap();
-
-            let mut compiled_args = Vec::default();
-            let calling = compile_effect(type_getter, &args[0]).unwrap();
-            let target_type = type_getter.compiler.context.ptr_type(AddressSpace::default());
-            let calling = type_getter
-                .compiler
-                .builder
-                .build_bit_cast(calling.into_pointer_value(), target_type, &type_getter.id.to_string())
-                .unwrap();
-            type_getter.id += 1;
-            let calling = type_getter
-                .compiler
-                .builder
-                .build_load(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    calling.into_pointer_value(),
-                    &type_getter.id.to_string(),
-                )
-                .unwrap();
-            compiled_args.push(BasicMetadataValueEnum::from(calling));
-            type_getter.id += 1;
-            for i in 1..args.len() {
-                compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, &args[i]).unwrap()));
-            }
-            let mut struct_type = Vec::default();
-            let function_type = type_getter.get_function(method).get_type();
-            for _ in 0..=*func_offset {
-                struct_type.push(type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum());
-            }
-            let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
-            let reference_struct = reference_struct(type_getter);
-            let table_pointer = type_getter
-                .compiler
-                .builder
-                .build_struct_gep(reference_struct, table.into_pointer_value(), 1, &type_getter.id.to_string())
-                .unwrap();
-            type_getter.id += 1;
-            let vtable = type_getter
-                .compiler
-                .builder
-                .build_load(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    table_pointer,
-                    &type_getter.id.to_string(),
-                )
-                .unwrap();
-            type_getter.id += 1;
-            let function_pointer = type_getter
-                .compiler
-                .builder
-                .build_struct_gep(struct_type, vtable.into_pointer_value(), *func_offset as u32, &type_getter.id.to_string())
-                .unwrap();
-            type_getter.id += 1;
-            let offset = type_getter
-                .compiler
-                .builder
-                .build_load(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    function_pointer,
-                    &type_getter.id.to_string(),
-                )
-                .unwrap()
-                .into_pointer_value();
-            type_getter.id += 1;
-            type_getter
-                .compiler
-                .builder
-                .build_indirect_call(
-                    function_type,
-                    offset,
-                    compiled_args.into_boxed_slice().deref(),
-                    &(type_getter.id - 1).to_string(),
-                )
-                .unwrap()
-                .try_as_basic_value()
-                .left()
+        FinalizedEffectType::VirtualCall(func_offset, function, _, args) => {
+            compile_virtual_call(type_getter, func_offset, function, args)
         }
         FinalizedEffectType::Downcast(base, target, functions) => compile_downcast(type_getter, base, target, functions),
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {
@@ -427,6 +341,131 @@ pub fn compile_effect<'ctx>(
         FinalizedEffectType::GenericVirtualCall(_, _, _, _) => {
             panic!("Generic virtual call not degeneric'd!")
         }
+    };
+}
+
+fn compile_virtual_call<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    func_offset: &usize,
+    function: &Arc<CodelessFinalizedFunction>,
+    args: &Vec<FinalizedEffects>,
+) -> Option<BasicValueEnum<'ctx>> {
+    let table = compile_effect(type_getter, &args[0]).unwrap();
+
+    let mut compiled_args = Vec::default();
+    let calling = compile_effect(type_getter, &args[0]).unwrap();
+    let target_type = type_getter.compiler.context.ptr_type(AddressSpace::default());
+    let calling = type_getter
+        .compiler
+        .builder
+        .build_bit_cast(calling.into_pointer_value(), target_type, &type_getter.id.to_string())
+        .unwrap();
+    type_getter.id += 1;
+    let calling = type_getter
+        .compiler
+        .builder
+        .build_load(
+            type_getter.compiler.context.ptr_type(AddressSpace::default()),
+            calling.into_pointer_value(),
+            &type_getter.id.to_string(),
+        )
+        .unwrap();
+    compiled_args.push(BasicMetadataValueEnum::from(calling));
+    type_getter.id += 1;
+    for i in 1..args.len() {
+        compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, &args[i]).unwrap()));
+    }
+    let mut struct_type = Vec::default();
+    let function_type = type_getter.get_function(function).get_type();
+    for _ in 0..=*func_offset {
+        struct_type.push(type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum());
+    }
+    let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
+    let reference_struct = reference_struct(type_getter);
+    let table_pointer = type_getter
+        .compiler
+        .builder
+        .build_struct_gep(reference_struct, table.into_pointer_value(), 1, &type_getter.id.to_string())
+        .unwrap();
+    type_getter.id += 1;
+    let vtable = type_getter
+        .compiler
+        .builder
+        .build_load(
+            type_getter.compiler.context.ptr_type(AddressSpace::default()),
+            table_pointer,
+            &type_getter.id.to_string(),
+        )
+        .unwrap();
+    type_getter.id += 1;
+    let function_pointer = type_getter
+        .compiler
+        .builder
+        .build_struct_gep(struct_type, vtable.into_pointer_value(), *func_offset as u32, &type_getter.id.to_string())
+        .unwrap();
+    type_getter.id += 1;
+    let offset = type_getter
+        .compiler
+        .builder
+        .build_load(
+            type_getter.compiler.context.ptr_type(AddressSpace::default()),
+            function_pointer,
+            &type_getter.id.to_string(),
+        )
+        .unwrap()
+        .into_pointer_value();
+    type_getter.id += 1;
+    return type_getter
+        .compiler
+        .builder
+        .build_indirect_call(
+            function_type,
+            offset,
+            compiled_args.into_boxed_slice().deref(),
+            &(type_getter.id - 1).to_string(),
+        )
+        .unwrap()
+        .try_as_basic_value()
+        .left();
+}
+
+/// Compiles a call to a function
+fn compile_function_call<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    calling_function: &Arc<CodelessFinalizedFunction>,
+    arguments: &Vec<FinalizedEffects>,
+) -> Option<BasicValueEnum<'ctx>> {
+    let mut final_arguments = Vec::default();
+
+    let calling = type_getter.get_function(calling_function);
+    type_getter.compiler.builder.position_at_end(type_getter.current_block.unwrap());
+
+    for i in 0..arguments.len() {
+        let argument = arguments.get(i).unwrap();
+        let value = compile_effect(type_getter, argument).unwrap();
+
+        final_arguments.push(From::from(value));
+    }
+
+    let call = type_getter
+        .compiler
+        .builder
+        .build_call(calling, final_arguments.as_slice(), &type_getter.id.to_string())
+        .unwrap()
+        .try_as_basic_value()
+        .left();
+    type_getter.id += 1;
+    return match call {
+        Some(inner) => {
+            if inner.is_pointer_value() {
+                Some(inner)
+            } else {
+                let pointer = malloc_type(type_getter, inner.get_type().size_of().unwrap());
+                type_getter.compiler.builder.build_store(pointer, inner).unwrap();
+                Some(pointer.as_basic_value_enum())
+            }
+        }
+        None => None,
     };
 }
 
