@@ -39,13 +39,13 @@ pub enum ParseState {
     /// When inside the arguments of a function.
     /// Ex:
     /// printf("String");
-    /// "String" would be parsed as a argument.
+    /// "String" would be parsed as an argument.
     Argument,
     /// When inside of an operator, such as 1 + 2
     InOperator,
     /// When inside both an operator and control variable.
     ControlOperator,
-    /// When inside a new expression.
+    /// When inside a new struct expression.
     New,
 }
 
@@ -140,6 +140,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                     ))
                 }
             }
+            TokenTypes::ParenOpen => parse_paren_open(parser_utils, &mut effect, &span)?,
             TokenTypes::Return => expression_type = ExpressionType::Return(Span::new(parser_utils.file, parser_utils.index)),
             TokenTypes::New => {
                 effect = Some(parse_new(parser_utils, &span)?);
@@ -326,43 +327,6 @@ fn parse_basic_line(line_info: &mut LineParseInfo) -> Result<ControlFlow, Parsin
             ControlFlow::Finish
         }
         TokenTypes::Comment => ControlFlow::Skipping,
-        TokenTypes::ParenOpen => {
-            let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
-            match last.token_type {
-                TokenTypes::Variable | TokenTypes::CallingType => {
-                    // Name of the method = the last token
-                    let name = last.to_string(parser_utils.buffer);
-                    let mut temp = None;
-                    mem::swap(&mut temp, effect);
-                    // The calling effect must be boxed if it exists.
-                    *effect = Some(Effects {
-                        types: EffectType::MethodCall(
-                            temp.map(|inner| Box::new(inner)),
-                            name.clone(),
-                            get_effects(parser_utils)?,
-                            vec![],
-                        ),
-                        span: *span,
-                    });
-                    ControlFlow::Skipping
-                }
-                // If it's not a method call, it's a parenthesized effect.
-                _ => {
-                    if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
-                        *effect = Some(Effects::new(
-                            Span::new(parser_utils.file, parser_utils.index),
-                            EffectType::Paren(Box::new(expression.effect)),
-                        ));
-                        parser_utils.index += 1;
-                        ControlFlow::Skipping
-                    } else {
-                        // TODO figure out if this actually ever triggers
-                        //effect = None;
-                        panic!("Unknown code path - report this!");
-                    }
-                }
-            }
-        }
         TokenTypes::Period => {
             if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::Period {
                 let mut temp = None;
@@ -380,6 +344,44 @@ fn parse_basic_line(line_info: &mut LineParseInfo) -> Result<ControlFlow, Parsin
         }
         _ => ControlFlow::NotFound,
     });
+}
+
+/// Parses a parenthesis open
+fn parse_paren_open(parser_utils: &mut ParserUtils, effect: &mut Option<Effects>, span: &Span) -> Result<(), ParsingError> {
+    let last = parser_utils.tokens.get(parser_utils.index - 2).unwrap().clone();
+    match last.token_type {
+        TokenTypes::Variable | TokenTypes::CallingType => {
+            // Name of the method = the last token
+            let name = last.to_string(parser_utils.buffer);
+            let mut temp = None;
+            mem::swap(&mut temp, effect);
+            // The calling effect must be boxed if it exists.
+            *effect = Some(Effects {
+                types: EffectType::MethodCall(
+                    temp.map(|inner| Box::new(inner)),
+                    name.clone(),
+                    get_effects(parser_utils)?,
+                    vec![],
+                ),
+                span: *span,
+            });
+        }
+        // If it's not a method call, it's a parenthesized effect.
+        _ => {
+            if let Some(expression) = parse_line(parser_utils, ParseState::None)? {
+                *effect = Some(Effects::new(
+                    Span::new(parser_utils.file, parser_utils.index),
+                    EffectType::Paren(Box::new(expression.effect)),
+                ));
+                parser_utils.index += 1;
+            } else {
+                // TODO figure out if this actually ever triggers
+                //effect = None;
+                panic!("Unknown code path - report this!");
+            }
+        }
+    }
+    return Ok(());
 }
 
 /// Parses tokens from the Raven code into a string
@@ -585,27 +587,14 @@ fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(St
     let mut values = Vec::default();
     let mut name = String::default();
     loop {
-        let token: &Token = parser_utils.tokens.get(parser_utils.index).unwrap();
+        let token: &Token = &parser_utils.tokens[parser_utils.index];
         parser_utils.index += 1;
         match token.token_type {
             TokenTypes::Variable => name = token.to_string(parser_utils.buffer),
             TokenTypes::Colon | TokenTypes::ArgumentEnd => {
-                let effect = if TokenTypes::Colon == token.token_type {
-                    match parse_line(parser_utils, ParseState::New)? {
-                        Some(inner) => inner.effect,
-                        None => return Err(span.make_error(ParsingMessage::ExpectedEffect)),
-                    }
-                } else {
-                    Effects::new(
-                        Span::new(parser_utils.file, parser_utils.index - 1),
-                        EffectType::LoadVariable(name.clone()),
-                    )
-                };
+                let effect = parse_new_arg_statement(parser_utils, span, &name)?;
                 values.push((name, effect));
                 name = String::default();
-                if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::ArgumentEnd {
-                    parser_utils.index += 1;
-                }
             }
             TokenTypes::BlockEnd | TokenTypes::ParenClose => break,
             TokenTypes::InvalidCharacters => {}
@@ -615,6 +604,21 @@ fn parse_new_args(parser_utils: &mut ParserUtils, span: &Span) -> Result<Vec<(St
     }
 
     return Ok(values);
+}
+
+fn parse_new_arg_statement(parser_utils: &mut ParserUtils, span: &Span, name: &String) -> Result<Effects, ParsingError> {
+    let output = Ok(if TokenTypes::Colon == parser_utils.tokens[parser_utils.index - 1].token_type {
+        match parse_line(parser_utils, ParseState::New)? {
+            Some(inner) => inner.effect,
+            None => return Err(span.make_error(ParsingMessage::ExpectedEffect)),
+        }
+    } else {
+        Effects::new(Span::new(parser_utils.file, parser_utils.index - 1), EffectType::LoadVariable(name.clone()))
+    });
+    if parser_utils.tokens[parser_utils.index].token_type == TokenTypes::ArgumentEnd {
+        parser_utils.index += 1;
+    }
+    return output;
 }
 
 /// Checks if a type is generic or if it's just followed by an operator
