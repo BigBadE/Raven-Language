@@ -113,15 +113,14 @@ impl<T: TopElement> AsyncTypesGetter<T> {
     /// Creates a new types getter
     pub fn new(
         syntax: Arc<Mutex<Syntax>>,
-        error: Span,
-        getting: String,
+        getting: (String, Span),
         name_resolver: Box<dyn NameResolver>,
         not_trait: bool,
     ) -> Self {
         return Self {
             syntax,
-            error: error.make_error(ParsingMessage::FailedToFind(getting.clone())),
-            getting,
+            error: getting.1.make_error(ParsingMessage::FailedToFind(getting.0.clone())),
+            getting: getting.0,
             name_resolver,
             finished: None,
             not_trait,

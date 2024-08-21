@@ -79,7 +79,7 @@ fn compile_two_arg_func<'ctx>(
             .into_int_value(),
         "1",
     )
-        .unwrap();
+    .unwrap();
     compiler.builder.build_store(malloc, returning).unwrap();
     compiler.builder.build_return(Some(&malloc)).unwrap();
 }
@@ -99,7 +99,7 @@ fn compile_one_arg_func<'ctx>(
         compiler.builder.build_load(type_getter.compiler.context.i64_type(), pointer_type, "2").unwrap().into_int_value(),
         "1",
     )
-        .unwrap();
+    .unwrap();
     compiler.builder.build_store(malloc, returning).unwrap();
     compiler.builder.build_return(Some(&malloc)).unwrap();
 }

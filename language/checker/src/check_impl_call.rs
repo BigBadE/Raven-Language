@@ -52,8 +52,7 @@ pub async fn check_impl_call(
     // Get the trait
     if let Ok(trait_type) = Syntax::get_struct(
         code_verifier.syntax.clone(),
-        Span::default(),
-        traits.clone(),
+        (traits.clone(), Span::default()),
         code_verifier.resolver.boxed_clone(),
         vec![],
     )

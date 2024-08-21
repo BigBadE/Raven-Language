@@ -149,8 +149,7 @@ pub async fn find_trait_implementation(
     for import in resolver.imports() {
         if let Ok(value) = Syntax::get_struct(
             syntax.clone(),
-            Span::default(),
-            import.split("::").last().unwrap().to_string(),
+            (import.split("::").last().unwrap().to_string(), Span::default()),
             resolver.boxed_clone(),
             vec![],
         )

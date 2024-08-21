@@ -48,12 +48,11 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) -> Option<Arc<CodelessFinalizedFunction>> {
         match Syntax::get_function(
             syntax.clone(),
-            Span::default(),
-            arguments.target.clone(),
+            (arguments.target.clone(), Span::default()),
             Box::new(EmptyNameResolver {}),
             false,
         )
-        .await
+            .await
         {
             Ok(_) => {}
             Err(_) => return None,

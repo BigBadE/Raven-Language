@@ -120,7 +120,7 @@ impl Syntax {
             if function.data.name != locked.async_manager.target {
                 if function.code.expressions.len() == 0
                     && ((locked.compiling.contains_key(&function.data.name) && !generic)
-                        || (locked.generics.contains_key(&function.data.name) && generic))
+                    || (locked.generics.contains_key(&function.data.name) && generic))
                 {
                     return;
                 }
@@ -170,33 +170,17 @@ impl Syntax {
         }
         self.async_manager.finished = true;
 
-        let mut keys = Vec::default();
-        self.structures.wakers.keys().for_each(|inner| keys.push(inner.clone()));
-        for key in &keys {
-            for waker in self.structures.wakers.remove(key).unwrap() {
-                waker.wake_by_ref();
-            }
-        }
+        self.structures.wakers.values().flatten().for_each(Waker::wake_by_ref);
+        self.structures.wakers.clear();
 
-        keys.clear();
-        self.functions.wakers.keys().for_each(|inner| keys.push(inner.clone()));
-        for key in &keys {
-            for waker in self.functions.wakers.remove(key).unwrap() {
-                waker.wake_by_ref();
-            }
-        }
+        self.functions.wakers.values().flatten().for_each(Waker::wake_by_ref);
+        self.functions.wakers.clear();
 
-        keys.clear();
-        self.operation_wakers.keys().for_each(|inner| keys.push(inner.clone()));
-        for key in &keys {
-            for waker in self.operation_wakers.remove(key).unwrap() {
-                waker.wake_by_ref();
-            }
-        }
+        self.operation_wakers.values().flatten().for_each(Waker::wake_by_ref);
+        self.operation_wakers.clear();
 
-        while let Some(found) = self.async_manager.impl_waiters.pop() {
-            found.wake();
-        }
+        self.async_manager.impl_waiters.iter().for_each(Waker::wake_by_ref);
+        self.async_manager.impl_waiters.clear();
     }
 
     /// Converts an implementation into a Chalk ImplDatum. This allows implementations to be used
@@ -317,29 +301,31 @@ impl Syntax {
     pub fn add_struct(syntax: &Arc<Mutex<Syntax>>, adding: &mut Arc<StructData>) {
         let mut locked = syntax.lock();
         locked.add(adding);
-        if adding.is_operator() {
-            // Gets the name of the operation, or errors if there isn't one.
-            let name =
-                if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
-                    name.replace("{+}", "{}").clone()
-                } else {
-                    locked.errors.push(ParsingError::new(Span::default(), ParsingMessage::StringAttribute));
-                    return;
-                };
+        if !adding.is_operator() {
+            return;
+        }
+        // Gets the name of the operation, or errors if there isn't one.
+        let name = if let Attribute::String(_, name) = Attribute::find_attribute("operation", &adding.attributes).unwrap() {
+            name.replace("{+}", "{}").clone()
+        } else {
+            locked.errors.push(ParsingError::new(Span::default(), ParsingMessage::StringAttribute));
+            return;
+        };
 
-            // Checks if there is a duplicate of that operation.
-            if locked.operations.contains_key(&name) {
-                locked.errors.push(adding.get_span().make_error(ParsingMessage::DuplicateStructure));
-            }
+        // Checks if there is a duplicate of that operation.
+        if locked.operations.contains_key(&name) {
+            locked.errors.push(adding.get_span().make_error(ParsingMessage::DuplicateStructure));
+        }
 
-            locked.operations.insert(name.clone(), adding.clone());
+        locked.operations.insert(name.clone(), adding.clone());
 
-            // Wakes every waker waiting for that operation.
-            if let Some(wakers) = locked.operation_wakers.get(&name) {
-                for waker in wakers {
-                    waker.wake_by_ref();
-                }
-            }
+        // Wakes every waker waiting for that operation.
+        let Some(wakers) = locked.operation_wakers.get(&name) else {
+            return;
+        };
+
+        for waker in wakers {
+            waker.wake_by_ref();
         }
     }
 
@@ -388,12 +374,11 @@ impl Syntax {
     /// Asynchronously gets a function, or returns the error if that function isn't found.
     pub async fn get_function(
         syntax: Arc<Mutex<Syntax>>,
-        error: Span,
-        getting: String,
+        getting: (String, Span),
         name_resolver: Box<dyn NameResolver>,
         not_trait: bool,
     ) -> Result<Arc<FunctionData>, ParsingError> {
-        return AsyncTypesGetter::new(syntax, error, getting, name_resolver, not_trait).await;
+        return AsyncTypesGetter::new(syntax, getting, name_resolver, not_trait).await;
     }
 
     /// Gets the implementation of a structure
@@ -408,31 +393,31 @@ impl Syntax {
     #[async_recursion]
     pub async fn get_struct(
         syntax: Arc<Mutex<Syntax>>,
-        error: Span,
-        getting: String,
+        getting: (String, Span),
         name_resolver: Box<dyn NameResolver>,
         mut resolved_generics: Vec<String>,
     ) -> Result<Types, ParsingError> {
+        let (name, span) = getting;
         // Checks if the type is a generic type
-        if let Some(generic_bounds) = name_resolver.generic(&getting) {
-            if resolved_generics.contains(&getting) {
+        if let Some(generic_bounds) = name_resolver.generic(&name) {
+            if resolved_generics.contains(&name) {
                 // If the generic is recursive, for example "T: Add<E, T>", then ignore the bounds since they're irrelevant in the second recursive case
-                return Ok(Types::Generic(getting, vec![]));
+                return Ok(Types::Generic(name, vec![]));
             }
-            resolved_generics.push(getting.clone());
+            resolved_generics.push(name.clone());
             let mut bounds = vec![];
             for bound in generic_bounds {
                 bounds.push(
                     Self::parse_type(syntax.clone(), name_resolver.boxed_clone(), bound, resolved_generics.clone()).await?,
                 );
             }
-            return Ok(Types::Generic(getting, bounds));
+            return Ok(Types::Generic(name, bounds));
         }
 
-        if getting.contains('<') {
-            return Ok(Self::parse_bounds(getting.as_bytes(), &syntax, &error, &*name_resolver).await?.remove(0));
+        if name.contains('<') {
+            return Ok(Self::parse_bounds(name.as_bytes(), &syntax, &span, &*name_resolver).await?.remove(0));
         }
-        return Ok(Types::Struct(AsyncTypesGetter::new(syntax, error, getting, name_resolver, false).await?));
+        return Ok(Types::Struct(AsyncTypesGetter::new(syntax, (name, span), name_resolver, false).await?));
     }
 
     /// Parses generic bounds on a type, returning the length parsed and the types found.
@@ -454,12 +439,11 @@ impl Syntax {
                     let bounds = Self::parse_bounds(&input[i + 1..], syntax, error, name_resolver).await?;
                     let first = Self::get_struct(
                         syntax.clone(),
-                        error.clone(),
-                        first.to_string(),
+                        (first.to_string(), error.clone()),
                         name_resolver.boxed_clone(),
                         vec![],
                     )
-                    .await?;
+                        .await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
                     return Ok(found);
                 }
@@ -468,12 +452,11 @@ impl Syntax {
                     found.push(
                         Self::get_struct(
                             syntax.clone(),
-                            error.clone(),
-                            getting.to_string(),
+                            (getting.to_string(), error.clone()),
                             name_resolver.boxed_clone(),
                             vec![],
                         )
-                        .await?,
+                            .await?,
                     );
                     last = i + 1;
                 }
@@ -482,12 +465,11 @@ impl Syntax {
                     found.push(
                         Self::get_struct(
                             syntax.clone(),
-                            error.clone(),
-                            first.to_string(),
+                            (first.to_string(), error.clone()),
                             name_resolver.boxed_clone(),
                             vec![],
                         )
-                        .await?,
+                            .await?,
                     );
                     return Ok(found);
                 }
@@ -509,7 +491,7 @@ impl Syntax {
         resolved_generics: Vec<String>,
     ) -> Result<Types, ParsingError> {
         let temp = match types.clone() {
-            UnparsedType::Basic(span, name) => Syntax::get_struct(syntax, span, name, resolver, resolved_generics).await,
+            UnparsedType::Basic(span, name) => Syntax::get_struct(syntax, (name, span), resolver, resolved_generics).await,
             UnparsedType::Generic(name, args) => {
                 let mut generics = Vec::default();
                 for arg in args {

@@ -97,8 +97,7 @@ pub async fn check_method_call(
         if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
             let method = Syntax::get_function(
                 code_verifier.syntax.clone(),
-                effect.span.clone(),
-                format!("{}::{}", return_type.inner_struct().data.name, function),
+                (format!("{}::{}", return_type.inner_struct().data.name, function), effect.span.clone()),
                 code_verifier.resolver.boxed_clone(),
                 false,
             )
@@ -119,8 +118,7 @@ pub async fn check_method_call(
         // Try to find the function with that name
         if let Ok(value) = Syntax::get_function(
             code_verifier.syntax.clone(),
-            Span::default(),
-            function.clone(),
+            (function.clone(), Span::default()),
             code_verifier.resolver.boxed_clone(),
             true,
         )
@@ -195,8 +193,7 @@ pub async fn check_method_call(
 
             if let Ok(structure) = Syntax::get_struct(
                 code_verifier.syntax.clone(),
-                Span::default(),
-                structure.to_string(),
+                (structure.to_string(), Span::default()),
                 code_verifier.resolver.boxed_clone(),
                 vec![],
             )
@@ -233,8 +230,7 @@ pub async fn check_method_call(
 
         Syntax::get_function(
             code_verifier.syntax.clone(),
-            effect.span.clone(),
-            function,
+            (function, effect.span.clone()),
             code_verifier.resolver.boxed_clone(),
             true,
         )
