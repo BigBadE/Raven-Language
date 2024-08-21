@@ -49,6 +49,16 @@ pub enum ParseState {
     New,
 }
 
+/// Line parsing information struct
+struct LineParseInfo<'a, 'b> {
+    parser_utils: &'a mut ParserUtils<'b>,
+    expression_type: &'a mut ExpressionType,
+    token: &'a Token,
+    state: &'a ParseState,
+    span: &'a Span,
+    effect: &'a mut Option<Effects>,
+}
+
 /// Parses a single line of code
 // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
 pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<Option<Expression>, ParsingError> {
@@ -71,6 +81,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                 | TokenTypes::StringStart
                 | TokenTypes::CodeEnd
                 | TokenTypes::BlockEnd
+                | TokenTypes::New
                 | TokenTypes::Let
                 | TokenTypes::If
                 | TokenTypes::For
@@ -82,18 +93,22 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
         }
 
-        match parse_basic_line(
-            parser_utils,
-            &mut expression_type,
-            &token,
-            &state,
-            Span::new(parser_utils.file, parser_utils.index - 1),
-            &mut effect,
-        )? {
-            ControlFlow::Returning(returning) => return Ok(Some(returning)),
-            ControlFlow::Skipping => continue,
-            ControlFlow::Finish => break,
-            ControlFlow::NotFound => {}
+        {
+            let mut line_parser = LineParseInfo {
+                parser_utils,
+                expression_type: &mut expression_type,
+                token: &token,
+                state: &state,
+                span: &span,
+                effect: &mut effect,
+            };
+
+            match parse_basic_line(&mut line_parser)? {
+                ControlFlow::Returning(returning) => return Ok(Some(returning)),
+                ControlFlow::Skipping => continue,
+                ControlFlow::Finish => break,
+                ControlFlow::NotFound => {}
+            }
         }
 
         match token.token_type {
@@ -127,9 +142,6 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
             }
             TokenTypes::Return => expression_type = ExpressionType::Return(Span::new(parser_utils.file, parser_utils.index)),
             TokenTypes::New => {
-                if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedValue));
-                }
                 effect = Some(parse_new(parser_utils, &span)?);
             }
             TokenTypes::BlockStart => {
@@ -151,16 +163,7 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                         Some(Effects::new(Span::new(parser_utils.file, parser_utils.index), EffectType::CodeBody(body)));
                 }
             }
-            TokenTypes::Let => {
-                if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedLet));
-                }
-            }
             TokenTypes::If => {
-                if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedIf));
-                }
-
                 let expression = parse_if(parser_utils)?;
                 // If the if returns/breaks, the outer block should too
                 if matches!(expression_type, ExpressionType::Line) {
@@ -169,21 +172,12 @@ pub fn parse_line(parser_utils: &mut ParserUtils, state: ParseState) -> Result<O
                 return Ok(Some(Expression::new(expression_type, expression.effect)));
             }
             TokenTypes::For => {
-                if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedFor));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_for(parser_utils)?)));
             }
             TokenTypes::While => {
-                if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedFor));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_while(parser_utils)?)));
             }
             TokenTypes::Do => {
-                if effect.is_some() {
-                    return Err(span.make_error(ParsingMessage::UnexpectedFor));
-                }
                 return Ok(Some(Expression::new(expression_type, parse_do_while(parser_utils)?)));
             }
             TokenTypes::Equals => {
@@ -268,18 +262,17 @@ enum ControlFlow {
 
 /// Handles some basic cases separately to reduce the complexity of the main function
 // skipcq: RS-R1000 Match statements have complexity calculated incorrectly
-fn parse_basic_line(
-    parser_utils: &mut ParserUtils,
-    expression_type: &mut ExpressionType,
-    token: &Token,
-    state: &ParseState,
-    span: Span,
-    effect: &mut Option<Effects>,
-) -> Result<ControlFlow, ParsingError> {
-    return Ok(match token.token_type {
-        TokenTypes::BlockEnd if *state == ParseState::New => ControlFlow::Finish,
+fn parse_basic_line(line_info: &mut LineParseInfo) -> Result<ControlFlow, ParsingError> {
+    // Unwrap and cast the variables first for my sanity.
+    let parser_utils: &mut ParserUtils = &mut line_info.parser_utils;
+    let expression_type: &mut ExpressionType = &mut line_info.expression_type;
+    let effect: &mut Option<Effects> = &mut line_info.effect;
+    let (span, token, state) = (line_info.span, line_info.token, line_info.state);
+
+    return Ok(match line_info.token.token_type {
+        TokenTypes::BlockEnd if *line_info.state == ParseState::New => ControlFlow::Finish,
         TokenTypes::Return => {
-            *expression_type = ExpressionType::Return(span);
+            *expression_type = ExpressionType::Return(*span);
             ControlFlow::Skipping
         }
         TokenTypes::Float => {
@@ -349,7 +342,7 @@ fn parse_basic_line(
                             get_effects(parser_utils)?,
                             vec![],
                         ),
-                        span,
+                        span: *span,
                     });
                     ControlFlow::Skipping
                 }

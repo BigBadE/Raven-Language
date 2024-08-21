@@ -5,7 +5,7 @@ use std::sync::Arc;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage;
 use inkwell::types::{BasicType, BasicTypeEnum, StructType};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::AddressSpace;
 
 use syntax::program::code::{ExpressionType, FinalizedEffectType, FinalizedEffects, FinalizedExpression};
@@ -177,10 +177,11 @@ pub fn compile_effect<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     effect: &FinalizedEffects,
 ) -> Option<BasicValueEnum<'ctx>> {
+    if let Some(inner) = compile_simple_effects(type_getter, effect) {
+        return inner;
+    }
+
     return match &effect.types {
-        FinalizedEffectType::NOP => {
-            panic!("Tried to compile a NOP! For {}", type_getter.function.unwrap().get_name().to_str().unwrap())
-        }
         FinalizedEffectType::CreateVariable(name, inner, types) => {
             let compiled = compile_effect(type_getter, inner).unwrap();
             type_getter.variables.insert(name.clone(), (types.clone(), compiled.as_basic_value_enum()));
@@ -199,10 +200,6 @@ pub fn compile_effect<'ctx>(
             type_getter.compiler.builder.build_conditional_branch(effect, then, else_block).unwrap();
             None
         }
-        FinalizedEffectType::CodeBody(body) => compile_block(body, type_getter),
-        FinalizedEffectType::FunctionCall(_, calling_function, arguments, _) => {
-            compile_function_call(type_getter, calling_function, arguments)
-        }
         //Sets pointer to value
         FinalizedEffectType::Set(setting, value) => {
             let output = compile_effect(type_getter, setting).unwrap();
@@ -211,28 +208,6 @@ pub fn compile_effect<'ctx>(
                 load_if_pointer(type_getter, type_getter.compiler.context.ptr_type(AddressSpace::default()), value);
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing).unwrap();
             Some(output)
-        }
-        FinalizedEffectType::LoadVariable(name) => {
-            return Some(type_getter.variables.get(name).unwrap().1);
-        }
-        //Loads variable/field pointer from program, or self if program is None
-        FinalizedEffectType::Load(loading_from, field, _) => compile_load(type_getter, loading_from, field),
-        //Struct to create and a tuple of the index of the argument and the argument
-        FinalizedEffectType::CreateStruct(effect, _, arguments) => compile_create_struct(type_getter, effect, arguments),
-        FinalizedEffectType::Float(float) => {
-            Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum())
-        }
-        FinalizedEffectType::UInt(int) => {
-            Some(type_getter.compiler.context.i64_type().const_int(*int, false).as_basic_value_enum())
-        }
-        FinalizedEffectType::Bool(bool) => {
-            Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum())
-        }
-        FinalizedEffectType::String(string) => {
-            Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum())
-        }
-        FinalizedEffectType::Char(char) => {
-            Some(type_getter.compiler.context.i8_type().const_int(*char as u64, false).as_basic_value_enum())
         }
         FinalizedEffectType::HeapStore(inner) => {
             let output = compile_effect(type_getter, inner).unwrap();
@@ -277,19 +252,56 @@ pub fn compile_effect<'ctx>(
 
             Some(malloc.as_basic_value_enum())
         }
-        FinalizedEffectType::VirtualCall(func_offset, function, _, args) => {
-            compile_virtual_call(type_getter, func_offset, function, args)
+        _ => unreachable!(),
+    };
+}
+
+/// Compiles a few effects handled entirely by seperate methods or simple one-liners
+fn compile_simple_effects<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    effect: &FinalizedEffects,
+) -> Option<Option<BasicValueEnum<'ctx>>> {
+    return Some(match &effect.types {
+        FinalizedEffectType::NOP => {
+            panic!("Tried to compile a NOP! For {}", type_getter.function.unwrap().get_name().to_str().unwrap())
         }
-        FinalizedEffectType::Downcast(base, target, functions) => compile_downcast(type_getter, base, target, functions),
         FinalizedEffectType::GenericMethodCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
         FinalizedEffectType::GenericVirtualCall(_, _, _, _) => {
             panic!("Generic virtual call not degeneric'd!")
         }
-    };
+        FinalizedEffectType::CodeBody(body) => compile_block(body, type_getter),
+        FinalizedEffectType::FunctionCall(_, calling_function, arguments, _) => {
+            compile_function_call(type_getter, calling_function, arguments)
+        }
+        FinalizedEffectType::VirtualCall(func_offset, function, _, args) => {
+            compile_virtual_call(type_getter, func_offset, function, args)
+        }
+        FinalizedEffectType::Downcast(base, target, functions) => compile_downcast(type_getter, base, target, functions),
+        //Loads variable/field pointer from program, or self if program is None
+        FinalizedEffectType::Load(loading_from, field, _) => compile_load(type_getter, loading_from, field),
+        //Struct to create and a tuple of the index of the argument and the argument
+        FinalizedEffectType::CreateStruct(effect, _, arguments) => compile_create_struct(type_getter, effect, arguments),
+        FinalizedEffectType::Float(float) => {
+            Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum())
+        }
+        FinalizedEffectType::UInt(int) => {
+            Some(type_getter.compiler.context.i64_type().const_int(*int, false).as_basic_value_enum())
+        }
+        FinalizedEffectType::Bool(bool) => {
+            Some(type_getter.compiler.context.bool_type().const_int(*bool as u64, false).as_basic_value_enum())
+        }
+        FinalizedEffectType::String(string) => {
+            Some(type_getter.compiler.context.const_string(string.as_bytes(), false).as_basic_value_enum())
+        }
+        FinalizedEffectType::Char(char) => {
+            Some(type_getter.compiler.context.i8_type().const_int(*char as u64, false).as_basic_value_enum())
+        }
+        FinalizedEffectType::LoadVariable(name) => Some(type_getter.variables.get(name).unwrap().1),
+        _ => return None,
+    });
 }
-
 fn compile_create_struct<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
     effect: &Option<Box<FinalizedEffects>>,
@@ -368,27 +380,20 @@ fn compile_virtual_call<'ctx>(
     let table = compile_effect(type_getter, &args[0]).unwrap();
 
     let mut compiled_args = Vec::default();
-    let calling = compile_effect(type_getter, &args[0]).unwrap();
     let calling = type_getter
         .compiler
         .builder
         .build_load(
             type_getter.compiler.context.ptr_type(AddressSpace::default()),
-            calling.into_pointer_value(),
+            table.into_pointer_value(),
             &type_getter.id.to_string(),
         )
         .unwrap();
     compiled_args.push(BasicMetadataValueEnum::from(calling));
     type_getter.id += 1;
-    for i in 1..args.len() {
+    for i in 0..args.len() {
         compiled_args.push(BasicMetadataValueEnum::from(compile_effect(type_getter, &args[i]).unwrap()));
     }
-    let mut struct_type = Vec::default();
-    let function_type = type_getter.get_function(function).get_type();
-    for _ in 0..=*func_offset {
-        struct_type.push(type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum());
-    }
-    let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
     let reference_struct = reference_struct(type_getter);
     let table_pointer = type_getter
         .compiler
@@ -406,13 +411,41 @@ fn compile_virtual_call<'ctx>(
         )
         .unwrap();
     type_getter.id += 1;
+    let function_type = type_getter.get_function(function).get_type();
+    return type_getter
+        .compiler
+        .builder
+        .build_indirect_call(
+            function_type,
+            get_func_from_vtable(type_getter, vtable.into_pointer_value(), *func_offset),
+            compiled_args.into_boxed_slice().deref(),
+            &(type_getter.id - 1).to_string(),
+        )
+        .unwrap()
+        .try_as_basic_value()
+        .left();
+}
+
+///Gets a function from a vtable
+fn get_func_from_vtable<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    vtable: PointerValue<'ctx>,
+    func_offset: usize,
+) -> PointerValue<'ctx> {
+    let mut struct_type = Vec::default();
+    for _ in 0..=*func_offset {
+        struct_type.push(type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum());
+    }
+    let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
+
     let function_pointer = type_getter
         .compiler
         .builder
-        .build_struct_gep(struct_type, vtable.into_pointer_value(), *func_offset as u32, &type_getter.id.to_string())
+        .build_struct_gep(struct_type, vtable, *func_offset as u32, &type_getter.id.to_string())
         .unwrap();
     type_getter.id += 1;
-    let offset = type_getter
+
+    let function_pointer = type_getter
         .compiler
         .builder
         .build_load(
@@ -423,18 +456,7 @@ fn compile_virtual_call<'ctx>(
         .unwrap()
         .into_pointer_value();
     type_getter.id += 1;
-    return type_getter
-        .compiler
-        .builder
-        .build_indirect_call(
-            function_type,
-            offset,
-            compiled_args.into_boxed_slice().deref(),
-            &(type_getter.id - 1).to_string(),
-        )
-        .unwrap()
-        .try_as_basic_value()
-        .left();
+    return function_pointer;
 }
 
 /// Compiles a call to a function

@@ -99,7 +99,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                 get_internal_struct(self.compiler.context, &types.name()).unwrap_or_else(|| instance_types(&types, self))
             }
         }
-            .as_basic_type_enum();
+        .as_basic_type_enum();
         return match types {
             FinalizedTypes::Struct(_) => found,
             FinalizedTypes::Reference(_) => self.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
