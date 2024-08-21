@@ -1,4 +1,4 @@
-#[operation([{+}])]
+/*#[operation([{+}])]
 trait CreateArray<T> {
     fn instance(self) -> [T];
 }
@@ -9,16 +9,12 @@ pub impl<T> CreateArray<T> for [T] {
     }
 }
 
-pub internal fn empty<T>() -> [T] {
-
-}
+pub internal impl<T> Index<T> for [T] {
+    fn index(self, index: u64) -> T {}
+}*/
 
 #[priority(1000)]
 #[operation({}[{}])]
 trait Index<T> {
     fn index(self, index: u64) -> T;
-}
-
-pub internal impl<T> Index<T> for [T] {
-    fn index(self, index: u64) -> T {}
 }

@@ -48,7 +48,6 @@ pub fn instance_function<'a, 'ctx>(
 pub fn instance_types<'ctx>(types: &FinalizedTypes, type_getter: &mut CompilerTypeGetter<'ctx>) -> BasicTypeEnum<'ctx> {
     return match types {
         FinalizedTypes::Reference(inner) => type_getter.get_type(inner),
-        FinalizedTypes::Array(inner) => type_getter.get_type(inner),
         _ => {
             if is_modifier(types.inner_struct().data.modifiers, Modifier::Trait) {
                 reference_struct(type_getter).as_basic_type_enum()
@@ -339,67 +338,6 @@ pub fn compile_effect<'ctx>(
         FinalizedEffectType::HeapAllocate(types) => {
             let output = type_getter.get_type(types);
             let malloc = malloc_type(type_getter, output.size_of().unwrap());
-
-            Some(malloc.as_basic_value_enum())
-        }
-        FinalizedEffectType::CreateArray(types, values) => {
-            let ptr_type = match types.as_ref() {
-                Some(inner) => {
-                    let inner = type_getter.get_type(inner);
-                    let output = type_getter
-                        .compiler
-                        .builder
-                        .build_int_mul(
-                            inner.size_of().unwrap(),
-                            type_getter.compiler.context.i64_type().const_int(values.len() as u64 + 1, false),
-                            &type_getter.id.to_string(),
-                        )
-                        .unwrap();
-                    type_getter.id += 1;
-                    output
-                }
-                None => type_getter.compiler.context.i64_type().const_zero(),
-            };
-            let malloc = malloc_type(type_getter, ptr_type);
-
-            type_getter
-                .compiler
-                .builder
-                .build_store(malloc, type_getter.compiler.context.i64_type().const_int(values.len() as u64, false))
-                .unwrap();
-
-            let malloc_int = type_getter
-                .compiler
-                .builder
-                .build_ptr_to_int(malloc, type_getter.compiler.context.i64_type(), &type_getter.id.to_string())
-                .unwrap();
-            type_getter.id += 1;
-
-            let mut i = 1;
-            for value in values {
-                let field_pointer = type_getter
-                    .compiler
-                    .builder
-                    .build_int_to_ptr(
-                        type_getter
-                            .compiler
-                            .builder
-                            .build_int_add(
-                                malloc_int,
-                                type_getter.compiler.context.i64_type().const_int(i, false),
-                                &type_getter.id.to_string(),
-                            )
-                            .unwrap(),
-                        type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                        &(type_getter.id + 1).to_string(),
-                    )
-                    .unwrap();
-                i += 1;
-                type_getter.id += 2;
-                let effect = compile_effect(type_getter, value).unwrap();
-                type_getter.id += 1;
-                type_getter.compiler.builder.build_store(field_pointer, effect).unwrap();
-            }
 
             Some(malloc.as_basic_value_enum())
         }

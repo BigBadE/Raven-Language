@@ -35,8 +35,6 @@ pub enum Types {
     Reference(Box<Types>),
     /// A generic with bounds
     Generic(String, Vec<Types>),
-    /// An array
-    Array(Box<Types>),
 }
 
 ///A type with a reference to the finalized program instead of the data.
@@ -50,8 +48,6 @@ pub enum FinalizedTypes {
     Reference(Box<FinalizedTypes>),
     /// A generic with bounds
     Generic(String, Vec<FinalizedTypes>),
-    /// An array
-    Array(Box<FinalizedTypes>),
 }
 
 impl Types {
@@ -60,7 +56,6 @@ impl Types {
         return match self {
             Types::Struct(structs) => structs.name.clone(),
             Types::Reference(structs) => structs.name(),
-            Types::Array(types) => format!("[{}]", types.name()),
             Types::Generic(_, _) => panic!("Generics should never be named"),
             Types::GenericType(_, _) => panic!("Generics should never be named"),
         };
@@ -72,7 +67,6 @@ impl Types {
         return match self {
             Types::Struct(structs) => FinalizedTypes::Struct(AsyncDataGetter::new(syntax, structs.clone()).await),
             Types::Reference(structs) => FinalizedTypes::Reference(Box::new(structs.finalize(syntax).await)),
-            Types::Array(inner) => FinalizedTypes::Array(Box::new(inner.finalize(syntax).await)),
             Types::Generic(name, bounds) => FinalizedTypes::Generic(name.clone(), Self::finalize_all(syntax, bounds).await),
             Types::GenericType(base, bounds) => FinalizedTypes::GenericType(
                 Box::new(base.finalize(syntax.clone()).await),
@@ -137,7 +131,6 @@ impl FinalizedTypes {
                     Some(output)
                 }
             }
-            FinalizedTypes::Array(_) => None,
         };
     }
 
@@ -170,7 +163,6 @@ impl FinalizedTypes {
                 }
             }
             FinalizedTypes::Reference(inner) => inner.to_chalk_type(binders),
-            FinalizedTypes::Array(inner) => TyKind::Slice(inner.to_chalk_type(binders)).intern(ChalkIr),
             FinalizedTypes::Generic(name, _bounds) => {
                 let index = binders.iter().position(|found| *found == name).unwrap();
                 TyKind::BoundVar(BoundVar { debruijn: DebruijnIndex::INNERMOST, index }).intern(ChalkIr)
@@ -222,7 +214,7 @@ impl FinalizedTypes {
     /// Checks if a type is generic
     pub fn is_generic(&self) -> bool {
         return match self {
-            FinalizedTypes::Reference(inner) | FinalizedTypes::Array(inner) => inner.is_generic(),
+            FinalizedTypes::Reference(inner) => inner.is_generic(),
             FinalizedTypes::Generic(_, _) => true,
             FinalizedTypes::Struct(_) => false,
             FinalizedTypes::GenericType(base, bounds) => base.is_generic() || bounds.iter().any(|found| found.is_generic()),
@@ -294,15 +286,6 @@ impl FinalizedTypes {
                 FinalizedTypes::GenericType(base, _) => self.of_type_sync(base, syntax),
                 // References are ignored for type checking.
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
-                FinalizedTypes::Array(_) => (false, None),
-            },
-            FinalizedTypes::Array(inner) => match other {
-                // Check the inner type.
-                FinalizedTypes::Array(other) => inner.of_type_sync(other, syntax),
-                // References are ignored for type checking.
-                FinalizedTypes::Reference(other) => self.of_type_sync(other, syntax),
-                // Only arrays can equal arrays
-                _ => (false, None),
             },
             FinalizedTypes::GenericType(base, generics) => match other {
                 FinalizedTypes::GenericType(other_base, other_generics) => {
@@ -352,7 +335,6 @@ impl FinalizedTypes {
                 FinalizedTypes::Struct(_) => base.of_type_sync(other, syntax),
                 // References are ignored for type checking.
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
-                FinalizedTypes::Array(_) => (false, None),
             },
             // References are ignored for type checking.
             FinalizedTypes::Reference(referencing) => referencing.of_type_sync(other, syntax),
@@ -383,7 +365,7 @@ impl FinalizedTypes {
                     (true, None)
                 }
                 FinalizedTypes::Reference(inner) => self.of_type_sync(inner, syntax),
-                FinalizedTypes::Struct(_) | FinalizedTypes::GenericType(_, _) | FinalizedTypes::Array(_) => {
+                FinalizedTypes::Struct(_) | FinalizedTypes::GenericType(_, _) => {
                     if bounds.is_empty() {
                         return (true, None);
                     }
@@ -488,19 +470,6 @@ impl FinalizedTypes {
             FinalizedTypes::Reference(inner) => {
                 return inner.resolve_generic(other, syntax, generics, bounds_error).await;
             }
-            FinalizedTypes::Array(inner) => {
-                let mut other = other;
-                // Ignore references.
-                while let FinalizedTypes::Reference(inner) = other {
-                    other = inner;
-                }
-                // Check on the inner type.
-                if let FinalizedTypes::Array(other) = other {
-                    return inner.resolve_generic(other, syntax, generics, bounds_error).await;
-                }
-
-                return Err(bounds_error.make_error(ParsingMessage::MismatchedTypes(other.clone(), *inner.clone())));
-            }
             _ => {}
         }
         return Ok(());
@@ -511,7 +480,6 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structs) => structs.data.name.clone(),
             FinalizedTypes::Reference(structs) => structs.name(),
-            FinalizedTypes::Array(inner) => format!("[{}]", inner.name()),
             FinalizedTypes::Generic(name, _) => {
                 panic!("Generics should never be named, tried to get {}", name)
             }
@@ -525,7 +493,6 @@ impl FinalizedTypes {
         return match self {
             FinalizedTypes::Struct(structs) => Some(structs.data.name.clone()),
             FinalizedTypes::Reference(structs) => structs.name_safe(),
-            FinalizedTypes::Array(inner) => inner.name_safe().map(|inner| format!("[{}]", inner)),
             FinalizedTypes::Generic(_, _) => None,
             FinalizedTypes::GenericType(_, _) => None,
         };
@@ -537,7 +504,6 @@ impl Display for Types {
         match self {
             Types::Struct(structure) => write!(f, "{}", structure.name),
             Types::Reference(structure) => write!(f, "{}", structure),
-            Types::Array(inner) => write!(f, "[{}]", inner),
             Types::Generic(name, bounds) => write!(f, "{}: {}", name, display(bounds, " + ")),
             Types::GenericType(types, generics) => {
                 write!(f, "{}<{}>", types, display_parenless(generics, ", "))
@@ -551,7 +517,6 @@ impl Display for FinalizedTypes {
         match self {
             FinalizedTypes::Struct(structure) => write!(f, "{}", structure.data.name),
             FinalizedTypes::Reference(structure) => write!(f, "{}", structure),
-            FinalizedTypes::Array(inner) => write!(f, "[{}]", inner),
             FinalizedTypes::Generic(name, bounds) => {
                 write!(f, "{}: {}", name, display(bounds, " + "))
             }
@@ -581,10 +546,6 @@ fn recursive_eq(first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
                 first.data.name.split_once('$').unwrap_or((&first.data.name, &"")).0
                     == second.data.name.split_once('$').unwrap_or((&second.data.name, &"")).0
             }
-            _ => false,
-        },
-        FinalizedTypes::Array(first) => match second {
-            FinalizedTypes::Array(second) => recursive_eq(first, second),
             _ => false,
         },
         FinalizedTypes::Generic(name, _) => match second {

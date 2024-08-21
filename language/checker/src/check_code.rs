@@ -170,7 +170,9 @@ pub async fn verify_effect(
 
             check_type(&types, &output, variables, code_verifier, &effect.span).await?;
 
-            FinalizedEffects::new(effect.span.clone(), store(FinalizedEffectType::CreateArray(types, output)))
+            // TODO add this
+            panic!("Array creation through operators not finished yet!");
+            //FinalizedEffects::new(effect.span.clone(), store(FinalizedEffectType::CreateArray(types, output)))
         }
         _ => unreachable!(),
     };

@@ -226,8 +226,6 @@ pub enum FinalizedEffectType {
     Load(Box<FinalizedEffects>, String, FinalizedTypes),
     /// Creates a struct at the given reference, of the given type with a tuple of the index of the argument and the argument.
     CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
-    /// Create an array with the type and values
-    CreateArray(Option<FinalizedTypes>, Vec<FinalizedEffects>),
     /// Creates a float
     Float(f64),
     /// Creates an unsigned int
@@ -304,99 +302,6 @@ impl FinalizedEffectType {
             },
             // Heap allocations shouldn't get return type checked, even though they have a type.
             Self::HeapAllocate(_) => panic!("Tried to get a type from a heap alloc!"),
-            // Returns the target type as an array type.
-            Self::CreateArray(types, _) => types.clone().map(|inner| FinalizedTypes::Array(Box::new(inner))),
         };
     }
-
-    /* TODO verify that this all is moved to the new function in degeneric
-    #[async_recursion(Sync)]
-    pub async fn degeneric(
-        &mut self,
-        process_manager: &dyn ProcessManager,
-        variables: &mut SimpleVariableManager,
-        syntax: &Arc<Mutex<Syntax>>,
-        span: &Span,
-    ) -> Result<(), ParsingError> {
-        match self {
-            Self::CompareJump(effect, _, _)
-            | Self::HeapStore(effect)
-            | Self::ReferenceLoad(effect)
-            | Self::StackStore(effect) => effect.types.degeneric(process_manager, variables, syntax, span).await?,
-            Self::CodeBody(body) => {
-                for statement in &mut body.expressions {
-                    statement.effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-            }
-            Self::MethodCall(calling, method, effects, return_type) => {
-                if let Some(found) = return_type {
-                    found.degeneric(process_manager.generics(), syntax).await;
-                }
-                let manager: Box<dyn ProcessManager> = process_manager.cloned();
-                if let Some(inner) = calling {
-                    inner.types.degeneric(&*manager, variables, syntax, span).await?;
-                }
-                for effect in &mut *effects {
-                    effect.types.degeneric(&*manager, variables, syntax, span).await?;
-                }
-                // Calls the degeneric method on the method.
-                *method = degeneric_function(method.clone(), manager, effects, syntax, variables, None).await?;
-            }
-            Self::GenericMethodCall(function, found_trait, effects) => {
-            }
-            // Virtual calls can't be generic because virtual calls aren't direct calls which can be degenericed.
-            Self::VirtualCall(_, _, effects) => {
-                for effect in &mut *effects {
-                    effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-            }
-            Self::Set(setting, value) => {
-                setting.types.degeneric(process_manager, variables, syntax, span).await?;
-                value.types.degeneric(process_manager, variables, syntax, span).await?;
-            }
-            Self::CreateStruct(target, types, effects) => {
-                if let Some(found) = target {
-                    found.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-                types.degeneric(process_manager.generics(), syntax).await;
-                for (_, effect) in effects {
-                    effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-            }
-            Self::CreateArray(other, effects) => {
-                if let Some(inner) = other {
-                    inner.degeneric(process_manager.generics(), syntax).await;
-                }
-                for effect in effects {
-                    effect.types.degeneric(process_manager, variables, syntax, span).await?;
-                }
-            }
-            Self::HeapAllocate(target) | Self::Downcast(_, target, _) => {
-                target.degeneric(process_manager.generics(), syntax).await
-            }
-            Self::GenericVirtualCall(index, target, found, effects) => {
-                syntax.lock().process_manager.handle().lock().spawn(
-                    target.name.clone(),
-                    degeneric_header(
-                        target.clone(),
-                        found.data.clone(),
-                        syntax.clone(),
-                        process_manager.cloned(),
-                        effects.clone(),
-                        variables.clone(),
-                        span.clone(),
-                    ),
-                );
-
-                let output = AsyncDataGetter::new(syntax.clone(), target.clone()).await;
-                let mut temp = vec![];
-                mem::swap(&mut temp, effects);
-                let output =
-                    CodelessFinalizedFunction::degeneric(output, process_manager.cloned(), &temp, &syntax, variables, None)
-                        .await?;
-                *self = Self::VirtualCall(*index, output, temp);
-            }
-        }
-        return Ok(());
-    }*/
 }

@@ -152,14 +152,6 @@ pub async fn degeneric_effect(
             }
             degeneric_type(types, &type_generics, syntax).await;
         }
-        FinalizedEffectType::CreateArray(types, effects) => {
-            if let Some(found) = types {
-                degeneric_type(found, process_manager.generics(), syntax).await;
-            }
-            for effect in effects {
-                degeneric_effect(&mut effect.types, syntax, process_manager, variables, span).await?;
-            }
-        }
         FinalizedEffectType::VirtualCall(_, function, calling, arguments) => {
             arguments.insert(0, *calling.clone());
             // TODO figure out generic virtual functions
@@ -470,7 +462,6 @@ pub async fn degeneric_type(
             }
         }
         FinalizedTypes::Reference(inner) => degeneric_type(inner, generics, syntax).await,
-        FinalizedTypes::Array(inner) => degeneric_type(inner, generics, syntax).await,
         FinalizedTypes::Struct(inner) => {
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {
@@ -503,7 +494,6 @@ pub async fn degeneric_type_no_generic_types(
             }
         }
         FinalizedTypes::Reference(inner) => degeneric_type_no_generic_types(inner, generics, syntax).await,
-        FinalizedTypes::Array(inner) => degeneric_type_no_generic_types(inner, generics, syntax).await,
         FinalizedTypes::Struct(inner) => {
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {
@@ -543,7 +533,6 @@ pub async fn degeneric_type_fields(
             }
         }
         FinalizedTypes::Reference(inner) => degeneric_type_fields(inner, generics, syntax).await,
-        FinalizedTypes::Array(inner) => degeneric_type_fields(inner, generics, syntax).await,
         FinalizedTypes::Struct(inner) => {
             let mut temp = FinalizedStruct::clone(inner);
             for field in &mut temp.fields {

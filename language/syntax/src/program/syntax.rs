@@ -264,19 +264,6 @@ impl Syntax {
                 }
                 Some(true)
             }
-            FinalizedTypes::Array(inner) => {
-                let mut checking = checking;
-                // Unwrap references because references don't matter for type checking.
-                if let FinalizedTypes::Reference(inner_type) = checking {
-                    checking = inner_type;
-                }
-                if let FinalizedTypes::Array(other) = checking {
-                    // Check the inner type if both are generics
-                    self.solve_nonstruct_types(inner, other)
-                } else {
-                    Some(false)
-                }
-            }
             FinalizedTypes::Reference(inner) => {
                 // References are unwrapped and the inner is checked.
                 self.solve_nonstruct_types(inner, checking)
@@ -426,14 +413,6 @@ impl Syntax {
         name_resolver: Box<dyn NameResolver>,
         mut resolved_generics: Vec<String>,
     ) -> Result<Types, ParsingError> {
-        // Handles arrays by removing the brackets and getting the inner type
-        if getting.as_bytes()[0] == b'[' {
-            return Ok(Types::Array(Box::new(
-                Self::get_struct(syntax, error, getting[1..getting.len() - 1].to_string(), name_resolver, resolved_generics)
-                    .await?,
-            )));
-        }
-
         // Checks if the type is a generic type
         if let Some(generic_bounds) = name_resolver.generic(&getting) {
             if resolved_generics.contains(&getting) {
