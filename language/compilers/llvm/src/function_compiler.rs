@@ -412,12 +412,13 @@ fn compile_virtual_call<'ctx>(
         .unwrap();
     type_getter.id += 1;
     let function_type = type_getter.get_function(function).get_type();
+    let function_pointer = get_func_from_vtable(type_getter, vtable.into_pointer_value(), *func_offset);
     return type_getter
         .compiler
         .builder
         .build_indirect_call(
             function_type,
-            get_func_from_vtable(type_getter, vtable.into_pointer_value(), *func_offset),
+            function_pointer,
             compiled_args.into_boxed_slice().deref(),
             &(type_getter.id - 1).to_string(),
         )
@@ -433,7 +434,7 @@ fn get_func_from_vtable<'ctx>(
     func_offset: usize,
 ) -> PointerValue<'ctx> {
     let mut struct_type = Vec::default();
-    for _ in 0..=*func_offset {
+    for _ in 0..=func_offset {
         struct_type.push(type_getter.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum());
     }
     let struct_type = type_getter.compiler.context.struct_type(struct_type.as_slice(), false);
@@ -441,7 +442,7 @@ fn get_func_from_vtable<'ctx>(
     let function_pointer = type_getter
         .compiler
         .builder
-        .build_struct_gep(struct_type, vtable, *func_offset as u32, &type_getter.id.to_string())
+        .build_struct_gep(struct_type, vtable, func_offset as u32, &type_getter.id.to_string())
         .unwrap();
     type_getter.id += 1;
 

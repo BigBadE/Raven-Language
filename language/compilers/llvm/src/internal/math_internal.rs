@@ -1,7 +1,8 @@
 use crate::compiler::CompilerImpl;
 use crate::internal::instructions::malloc_type;
 use crate::type_getter::CompilerTypeGetter;
-use inkwell::values::{BasicValueEnum, FunctionValue};
+use inkwell::builder::{Builder, BuilderError};
+use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use inkwell::IntPredicate;
 
 /// Compiles internal math functions
@@ -13,135 +14,23 @@ pub fn math_internal<'ctx>(
 ) -> bool {
     let params = value.get_params();
     if name.starts_with("math::Add") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_int_add(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
+        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_add);
     } else if name.starts_with("math::Subtract") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-        let returning = compiler
-            .builder
-            .build_int_sub(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
+        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_sub);
     } else if name.starts_with("math::Multiply") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-        let returning = compiler
-            .builder
-            .build_int_mul(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
+        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_mul);
     } else if name.starts_with("math::Divide") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-        let returning = if name.ends_with("u64") {
-            compiler.builder.build_int_unsigned_div(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
+        if name.ends_with("u64") {
+            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_unsigned_div);
         } else {
-            compiler.builder.build_int_signed_div(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
+            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_signed_div);
         }
-        .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Remainder") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-        let returning = if name.ends_with("u64") {
-            compiler.builder.build_int_unsigned_rem(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
+        if name.ends_with("u64") {
+            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_unsigned_rem);
         } else {
-            compiler.builder.build_int_signed_rem(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
+            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_signed_rem);
         }
-        .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
     } else if name.starts_with("math::Equal") {
         compile_relational_op(IntPredicate::EQ, compiler, &params, type_getter);
     } else if name.starts_with("math::GreaterThan") {
@@ -156,194 +45,63 @@ pub fn math_internal<'ctx>(
         } else {
             compile_relational_op(IntPredicate::SLT, compiler, &params, type_getter)
         };
-    } else if name.starts_with("math::Not") {
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
-        let returning = compiler
-            .builder
-            .build_not(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "1")
-                    .unwrap()
-                    .into_int_value(),
-                "0",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::BitInvert") {
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-        let returning = compiler
-            .builder
-            .build_not(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "1")
-                    .unwrap()
-                    .into_int_value(),
-                "0",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::BitXOR") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_xor(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::BitOr") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_or(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::BitAnd") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_and(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::BitXOR") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_xor(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::And") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_and(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::XOR") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_xor(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::Or") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_or(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
+    } else if name.starts_with("math::Not") || name.starts_with("math::BitInvert") {
+        compile_one_arg_func(type_getter, compiler, &params, &Builder::build_not);
+    } else if name.starts_with("math::BitXOR") || name.starts_with("math::XOR") {
+        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_xor);
+    } else if name.starts_with("math::BitOr") || name.starts_with("math::Or") {
+        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_or);
+    } else if name.starts_with("math::BitAnd") || name.starts_with("math::And") {
+        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_and);
     } else {
         return false;
     }
     return true;
+}
+
+/// Creates a two-argument internal function, calling the function on both arguments
+fn compile_two_arg_func<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    compiler: &CompilerImpl<'ctx>,
+    params: &Vec<BasicValueEnum<'ctx>>,
+    function: &dyn Fn(&Builder<'ctx>, IntValue<'ctx>, IntValue<'ctx>, &str) -> Result<IntValue<'ctx>, BuilderError>,
+) {
+    let pointer_type = params.first().unwrap().into_pointer_value();
+    let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
+
+    let returning = function(
+        &compiler.builder,
+        compiler.builder.build_load(type_getter.compiler.context.i64_type(), pointer_type, "2").unwrap().into_int_value(),
+        compiler
+            .builder
+            .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
+            .unwrap()
+            .into_int_value(),
+        "1",
+    )
+        .unwrap();
+    compiler.builder.build_store(malloc, returning).unwrap();
+    compiler.builder.build_return(Some(&malloc)).unwrap();
+}
+
+/// Creates a one-argument internal function, calling the function on one argument
+fn compile_one_arg_func<'ctx>(
+    type_getter: &mut CompilerTypeGetter<'ctx>,
+    compiler: &CompilerImpl<'ctx>,
+    params: &Vec<BasicValueEnum<'ctx>>,
+    function: &dyn Fn(&Builder<'ctx>, IntValue<'ctx>, &str) -> Result<IntValue<'ctx>, BuilderError>,
+) {
+    let pointer_type = params.first().unwrap().into_pointer_value();
+    let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
+
+    let returning = function(
+        &compiler.builder,
+        compiler.builder.build_load(type_getter.compiler.context.i64_type(), pointer_type, "2").unwrap().into_int_value(),
+        "1",
+    )
+        .unwrap();
+    compiler.builder.build_store(malloc, returning).unwrap();
+    compiler.builder.build_return(Some(&malloc)).unwrap();
 }
 
 /// Compiles relational operators
@@ -378,8 +136,11 @@ fn compile_relational_op(
 
 /// Returns true if a number is unsigned
 fn is_unsigned(name: &String) -> bool {
-    if name.ends_with("u64") || name.ends_with("u32") || name.ends_with("u16") || name.ends_with("u8") {
-        return true;
-    }
-    return false;
+    return match name {
+        _ if name.ends_with("u64") => true,
+        _ if name.ends_with("u32") => true,
+        _ if name.ends_with("u16") => true,
+        _ if name.ends_with("u8") => true,
+        _ => false,
+    };
 }
