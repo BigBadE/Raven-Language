@@ -36,6 +36,10 @@ pub struct CompilerTypeGetter<'ctx> {
     pub current_block: Option<BasicBlock<'ctx>>,
     /// Current function's variables
     pub variables: HashMap<String, (FinalizedTypes, BasicValueEnum<'ctx>)>,
+    /// Current ID
+    pub id: u64,
+    /// Current function, None if a function isn't currently being compiled
+    pub function: Option<FunctionValue<'ctx>>,
 }
 
 impl<'ctx> CompilerTypeGetter<'ctx> {
@@ -49,6 +53,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             blocks: HashMap::default(),
             current_block: None,
             variables: HashMap::default(),
+            id: 0,
+            function: None,
         };
     }
 
@@ -68,6 +74,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
             blocks: self.blocks.clone(),
             current_block: self.current_block.clone(),
             variables,
+            id: 0,
+            function: Some(llvm_function),
         };
     }
 
@@ -93,8 +101,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
         }
         .as_basic_type_enum();
         return match types {
-            FinalizedTypes::Struct(_) | FinalizedTypes::Array(_) => found,
-            FinalizedTypes::Reference(_, _) => self.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+            FinalizedTypes::Struct(_) => found,
+            FinalizedTypes::Reference(_) => self.compiler.context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
             _ => panic!("Can't compile a generic! {:?}", found),
         };
     }
@@ -111,7 +119,7 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
 
     pub fn fix_generic_struct(&self, types: &mut FinalizedTypes) {
         match types {
-            FinalizedTypes::Reference(inner, _) | FinalizedTypes::Array(inner) => self.fix_generic_struct(inner),
+            FinalizedTypes::Reference(inner) => self.fix_generic_struct(inner),
             FinalizedTypes::GenericType(base, bounds) => {
                 let base = base.inner_struct();
                 if bounds.is_empty() {
@@ -125,8 +133,8 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
                     let base;
                     {
                         let locked = self.syntax.lock();
-                        // skipcq: RS-W1070 Initialization of a value can't use clone_from
                         let data = locked.structures.types.get(&name).unwrap().clone();
+                        // skipcq: RS-W1070 Initialization of a value can't use clone_from
                         base = locked.structures.data.get(&data).unwrap().clone();
                     }
                     *types = FinalizedTypes::Struct(base);
@@ -177,10 +185,11 @@ impl<'ctx> CompilerTypeGetter<'ctx> {
     pub fn simple_degeneric(&self, degenericing: &mut FinalizedTypes, generics: &HashMap<String, FinalizedTypes>) {
         match degenericing {
             FinalizedTypes::Generic(name, _bounds) => {
+                // skipcq: RS-W1070 Can't use clone_from due to borrow checking
                 *degenericing = generics.get(name).unwrap().clone();
             }
             FinalizedTypes::Struct(_) => {}
-            FinalizedTypes::Array(inner) | FinalizedTypes::Reference(inner, _) => {
+            FinalizedTypes::Reference(inner) => {
                 self.simple_degeneric(inner, generics);
             }
             FinalizedTypes::GenericType(_, _) => self.fix_generic_struct(degenericing),

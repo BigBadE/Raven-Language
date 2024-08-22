@@ -7,6 +7,8 @@ use magpie_derive::RavenExtern;
 pub struct RavenProject {
     /// Project name
     pub name: String,
+    /// Project dependencies
+    pub dependencies: Vec<Dependency>,
 }
 
 /// A Raven project dependency

@@ -50,7 +50,7 @@ fn main() {
         panic!("Source folder (src) not found!");
     }
 
-    println!("Building and running");
+    println!("Building and running {}...", project.name);
     match build_project::<()>(&mut arguments, &mut vec![Box::new(FileSourceSet { root: source })], true) {
         _ => {}
     }

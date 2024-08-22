@@ -18,7 +18,7 @@ use crate::{get_compiler, JoinWaiter};
 
 pub fn create_syntax(settings: &Arguments) -> Arc<Mutex<Syntax>> {
     let handle = Arc::new(Mutex::new(HandleWrapper::new(settings.cpu_runtime.handle().clone())));
-    let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone())));
+    let mut syntax = Syntax::new(Box::new(TypesChecker::new(handle.clone(), settings.runner_settings.include_references())));
     syntax.async_manager.target.clone_from(&settings.runner_settings.compiler_arguments.target);
     return Arc::new(Mutex::new(syntax));
 }
@@ -66,12 +66,11 @@ pub async fn build(syntax: Arc<Mutex<Syntax>>, settings: &Arguments) -> Result<(
     let mut errors = vec![];
     let waiter = JoinWaiter { handle: handle.clone() };
     match time::timeout(Duration::from_secs(60), waiter).await {
-        Ok(error) => match error {
-            Err(error) => {
+        Ok(error) => {
+            if let Err(error) = error {
                 errors.push(error);
             }
-            _ => {}
-        },
+        }
         Err(_) => {
             eprintln!("Detected infinite loops:");
             for (name, _) in &handle.lock().names {

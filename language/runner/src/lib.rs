@@ -43,22 +43,18 @@ impl Future for JoinWaiter {
 
         let mut i = 0;
         for handle in &mut locked.joining {
-            match Pin::new(handle).poll(cx) {
-                Poll::Ready(inner) => match inner {
+            if let Poll::Ready(inner) = Pin::new(handle).poll(cx) {
+                match inner {
                     Ok(result) => {
-                        match result {
-                            Err(error) => {
-                                return Poll::Ready(Err(error));
-                            }
-                            _ => {}
+                        if let Err(error) = result {
+                            return Poll::Ready(Err(error));
                         }
                         removing.push(i);
                     }
                     Err(error) => {
                         panic!("{}", error);
                     }
-                },
-                Poll::Pending => {}
+                }
             }
             i += 1;
         }

@@ -40,7 +40,7 @@ pub mod output;
 /// Finalizes an IndexMap of generics into FinalizedEffectType
 pub async fn finalize_generics(
     syntax: &Arc<Mutex<Syntax>>,
-    resolver: &Box<dyn NameResolver>,
+    resolver: &dyn NameResolver,
     generics: &IndexMap<String, Vec<UnparsedType>>,
 ) -> Result<IndexMap<String, FinalizedTypes>, ParsingError> {
     let mut output = IndexMap::default();
@@ -76,7 +76,7 @@ pub async fn get_return(
     syntax: &Arc<Mutex<Syntax>>,
 ) -> Option<FinalizedTypes> {
     return match types {
-        FinalizedEffectType::MethodCall(calling, function, _, returning) => match function.return_type.as_ref().cloned() {
+        FinalizedEffectType::FunctionCall(calling, function, _, returning) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
                 if !returning.is_empty() {
                     let generics = function
@@ -101,7 +101,7 @@ pub async fn get_return(
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
-                Some(inner)
+                Some(FinalizedTypes::Reference(Box::new(inner)))
             }
             None => None,
         },
@@ -123,7 +123,7 @@ pub async fn get_return(
                         degeneric_type_no_generic_types(&mut inner, &generics, syntax).await;
                     }
                 }
-                Some(inner)
+                Some(FinalizedTypes::Reference(Box::new(inner)))
             }
             None => None,
         },
@@ -133,7 +133,7 @@ pub async fn get_return(
         | FinalizedEffectType::Set(_, inner) => get_return(&inner.types, variables, syntax).await,
         // References return their inner type as well.
         FinalizedEffectType::ReferenceLoad(inner) => match get_return(&inner.types, variables, syntax).await.unwrap() {
-            FinalizedTypes::Reference(inner, _) => Some(*inner),
+            FinalizedTypes::Reference(inner) => Some(*inner),
             _ => panic!("Tried to load non-reference!"),
         },
         // Gets the type of the field in the program with that name.

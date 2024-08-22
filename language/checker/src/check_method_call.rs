@@ -97,8 +97,7 @@ pub async fn check_method_call(
         if is_modifier(return_type.inner_struct().data.modifiers, Modifier::Trait) {
             let method = Syntax::get_function(
                 code_verifier.syntax.clone(),
-                effect.span.clone(),
-                format!("{}::{}", return_type.inner_struct().data.name, function),
+                (format!("{}::{}", return_type.inner_struct().data.name, function), effect.span.clone()),
                 code_verifier.resolver.boxed_clone(),
                 false,
             )
@@ -119,8 +118,7 @@ pub async fn check_method_call(
         // Try to find the function with that name
         if let Ok(value) = Syntax::get_function(
             code_verifier.syntax.clone(),
-            Span::default(),
-            function.clone(),
+            (function.clone(), Span::default()),
             code_verifier.resolver.boxed_clone(),
             true,
         )
@@ -151,7 +149,7 @@ pub async fn check_method_call(
             };
 
             // Try and see if it's a trait method call
-            match (TraitImplWaiter {
+            if let Ok(found) = (TraitImplWaiter {
                 syntax: code_verifier.syntax.clone(),
                 resolver: code_verifier.resolver.boxed_clone(),
                 function: function.clone(),
@@ -161,8 +159,7 @@ pub async fn check_method_call(
             }
             .await)
             {
-                Ok(found) => return Ok(found),
-                _ => {}
+                return Ok(found);
             }
 
             // If it's not a trait method call, try to find a self-impl method call
@@ -196,8 +193,7 @@ pub async fn check_method_call(
 
             if let Ok(structure) = Syntax::get_struct(
                 code_verifier.syntax.clone(),
-                Span::default(),
-                structure.to_string(),
+                (structure.to_string(), Span::default()),
                 code_verifier.resolver.boxed_clone(),
                 vec![],
             )
@@ -234,8 +230,7 @@ pub async fn check_method_call(
 
         Syntax::get_function(
             code_verifier.syntax.clone(),
-            effect.span.clone(),
-            function,
+            (function, effect.span.clone()),
             code_verifier.resolver.boxed_clone(),
             true,
         )
@@ -270,7 +265,7 @@ pub async fn check_function(
 
     return Ok(FinalizedEffects::new(
         span.clone(),
-        FinalizedEffectType::MethodCall(calling, function, effects, explicit_generics),
+        FinalizedEffectType::FunctionCall(calling, function, effects, explicit_generics),
     ));
 }
 
@@ -303,7 +298,7 @@ pub async fn check_args(
         };
         let mut arg_return_type = get_return(&types.types, variables, syntax).await;
         if !arg_return_type.is_some() {
-            return Err(span.make_error(ParsingMessage::UnexpectedVoid()));
+            return Err(span.make_error(ParsingMessage::UnexpectedVoid));
         }
         let arg_return_type = arg_return_type.as_mut().unwrap();
         let base_field_type = &function.arguments[i].field.field_type;

@@ -36,7 +36,8 @@ fn second(owner: Owner) {
 ```
 
 This is called a "linear type", it's created once and used once. Loans are one way to get around this restriction, which
-are denoted with the & symbol:
+are denoted with the & symbol. Loans allow "loaning" parts of the object to other functions, which the compiler
+auto-detects:
 
 ```rust
 fn first() {
@@ -50,15 +51,17 @@ fn first() {
 }
 
 // The Owner object is loaned
-fn second(owner: &Owner) {
-    // Doesn't matter
+fn second(owner: &mut Owner) {
+    // Doesn't matter, as long as the loan is dropped by the end of the function.
+    // This function can use any field of owner, mutably
 }
 ```
 
 Now, this does come with two caveats:
 
 - A loan can not exist after the original object is dropped (objects drop when their parents drop)
-- Two mutable loans can not be made to the same piece of data
+- Only one mutable loan can be made to a piece of data, there can't be a mutable and immutable loan, or multiple mutable
+  loans.
 
 Now, if you use Rust, you may notice that a loan is to specific fields instead of to the entire object, like a borrow.
 This is a unique difference between Rust and Raven, allowing for code like this:
@@ -76,6 +79,7 @@ impl MyStruct {
 fn example(my_struct: MyStruct) {
     for element in &my_struct.objects {
         // Allowed, as long as requires_mut doesn't require a loan on my_struct.objects
+        // Rust wouldn't allow this, since my_struct would be borrowed immutably by loop
         my_struct.requires_mut();
     }
 }
@@ -90,7 +94,7 @@ struct ExampleMap {
 }
 ```
 
-This would require anything adding a value to map be a reference to the data field.
+This would require anything adding a value to map be a reference to the data field, so Raven can copy/move it correctly.
 
 # Generational References
 
@@ -99,7 +103,7 @@ difference:
 Generational references are completely safe. The method is pretty simple, all references have a "generation" number,
 and the data they point to has a generation number at the start. If they don't match, then it must have been dropped.
 
-Of course, there's a chance it just happens to match, but it's a 1 / 2^64 chance, which is low enough to be
+There's a chance it just happens to match, but it's a 1 / 2^64 chance, which is low enough to be
 statistically impossible.
 
 This is denoted with the * symbol:

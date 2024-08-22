@@ -24,12 +24,14 @@ pub struct TypesChecker {
     runtime: Arc<Mutex<HandleWrapper>>,
     /// Generics in the current type
     pub generics: HashMap<String, FinalizedTypes>,
+    /// Whether to include references
+    include_refs: bool,
 }
 
 impl TypesChecker {
     /// Makes a new TypesChecker
-    pub fn new(runtime: Arc<Mutex<HandleWrapper>>) -> Self {
-        return Self { runtime, generics: HashMap::default() };
+    pub fn new(runtime: Arc<Mutex<HandleWrapper>>, include_refs: bool) -> Self {
+        return Self { runtime, generics: HashMap::default(), include_refs };
     }
 }
 
@@ -42,10 +44,10 @@ impl ProcessManager for TypesChecker {
     async fn verify_func(
         &self,
         function: UnfinalizedFunction,
-        resolver: &Box<dyn NameResolver>,
+        resolver: &dyn NameResolver,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> (CodelessFinalizedFunction, CodeBody) {
-        return verify_function(function, resolver, syntax).await.unwrap_or_else(|error| {
+        return verify_function(function, resolver, syntax, self.include_refs).await.unwrap_or_else(|error| {
             syntax.lock().errors.push(error.clone());
             (
                 CodelessFinalizedFunction {
@@ -91,10 +93,10 @@ impl ProcessManager for TypesChecker {
     async fn verify_struct(
         &self,
         structure: UnfinalizedStruct,
-        resolver: &Box<dyn NameResolver>,
+        resolver: &dyn NameResolver,
         syntax: &Arc<Mutex<Syntax>>,
     ) -> FinalizedStruct {
-        match verify_struct(self, structure, resolver, &syntax).await {
+        match verify_struct(self, structure, resolver, &syntax, self.include_refs).await {
             Ok(output) => return output,
             Err(error) => {
                 syntax.lock().errors.push(error.clone());

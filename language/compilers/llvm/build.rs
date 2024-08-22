@@ -195,7 +195,7 @@ fn llvm_config_binary_names() -> impl Iterator<Item = String> {
 /// Check whether the given version of LLVM is blocklisted,
 /// returning `Some(reason)` if it is.
 fn is_blocklisted_llvm(llvm_version: &Version) -> Option<&'static str> {
-    static BLOCKLIST: &'static [(u64, u64, u64, &'static str)] = &[];
+    static BLOCKLIST: &[(u64, u64, u64, &str)] = &[];
 
     if let Some(x) = env::var_os(&*ENV_IGNORE_BLOCKLIST) {
         if &x == "YES" {
@@ -207,13 +207,8 @@ fn is_blocklisted_llvm(llvm_version: &Version) -> Option<&'static str> {
     }
 
     for &(major, minor, patch, reason) in BLOCKLIST.iter() {
-        let bad_version = Version {
-            major: major,
-            minor: minor,
-            patch: patch,
-            pre: semver::Prerelease::EMPTY,
-            build: semver::BuildMetadata::EMPTY,
-        };
+        let bad_version =
+            Version { major, minor, patch, pre: semver::Prerelease::EMPTY, build: semver::BuildMetadata::EMPTY };
 
         if &bad_version == llvm_version {
             return Some(reason);
@@ -582,7 +577,6 @@ fn build(llvm_path: PathBuf) {
 
     let preferences = LinkingPreferences::init();
 
-    
     if let Ok(found) = env::var("ZSTD_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", found);
     }

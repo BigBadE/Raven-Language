@@ -1,6 +1,7 @@
 use parking_lot::Mutex;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -169,7 +170,8 @@ impl PartialEq for StructData {
 
 impl PartialEq for FinalizedStruct {
     fn eq(&self, other: &Self) -> bool {
-        return self.data.name.splitn(2, '$').next().unwrap() == other.data.name.splitn(2, '$').next().unwrap();
+        return self.data.name.split_once('$').unwrap_or((&self.data.name, &"")).0
+            == other.data.name.split_once('$').unwrap_or((&other.data.name, &"")).0;
     }
 }
 
@@ -287,7 +289,7 @@ impl TopElement for StructData {
             chalk_data: Self::get_chalk_data(id, 0),
             id,
             name: "empty".to_string(),
-            span: Default::default(),
+            span: Span::default(),
             attributes: vec![],
             functions: vec![],
             poisoned: vec![],
@@ -320,7 +322,7 @@ impl TopElement for StructData {
         let data = current.data.clone();
         let functions = current.functions;
         current.functions = Vec::default();
-        let structure = Arc::new(process_manager.verify_struct(current, &resolver, &syntax).await);
+        let structure = Arc::new(process_manager.verify_struct(current, resolver.deref(), &syntax).await);
         {
             let mut locked = syntax.lock();
             locked.structures.add_data(data.clone(), structure.clone());

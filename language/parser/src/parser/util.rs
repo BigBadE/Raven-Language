@@ -47,8 +47,7 @@ impl<'a> ParserUtils<'a> {
 
         return Box::pin(Syntax::get_struct(
             self.syntax.clone(),
-            span.clone(),
-            name,
+            (name, span.clone()),
             Box::new(self.imports.clone()),
             vec![],
         ));

@@ -113,15 +113,14 @@ impl<T: TopElement> AsyncTypesGetter<T> {
     /// Creates a new types getter
     pub fn new(
         syntax: Arc<Mutex<Syntax>>,
-        error: Span,
-        getting: String,
+        getting: (String, Span),
         name_resolver: Box<dyn NameResolver>,
         not_trait: bool,
     ) -> Self {
         return Self {
             syntax,
-            error: error.make_error(ParsingMessage::FailedToFind(getting.clone())),
-            getting,
+            error: getting.1.make_error(ParsingMessage::FailedToFind(getting.0.clone())),
+            getting: getting.0,
             name_resolver,
             finished: None,
             not_trait,
@@ -250,13 +249,12 @@ pub enum UnparsedType {
 impl UnparsedType {
     pub fn get_span(&self) -> Span {
         return match self {
-            UnparsedType::Basic(span, _) => span.clone(),
+            UnparsedType::Basic(span, _) => *span,
             UnparsedType::Generic(base, bounds) => {
-                let mut output = base.get_span().clone();
+                let mut output = base.get_span();
                 if !bounds.is_empty() {
                     output.extend_span(bounds.last().as_ref().unwrap().get_span().end + 1);
                 }
-                
                 output
             }
         };

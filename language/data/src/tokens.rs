@@ -3,7 +3,7 @@ use std::ops::{ControlFlow, FromResidual, Try};
 
 /// A token is a single string of characters in the file.
 /// For example, keywords, variables, etc... are a single token.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Token {
     /// The type of the token
     pub token_type: TokenTypes,
@@ -70,7 +70,7 @@ impl FromResidual<Result<Infallible, Token>> for Token {
 }
 
 /// A span is a span of tokens in a file. This allows errors to show exactly what went wrong in the code
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Span {
     /// The hash of the file this token is in
     pub file: u64,
@@ -101,7 +101,7 @@ impl Span {
 /// The numerical value assigned is arbitrary and used
 /// for deriving functions like equals
 /// and some IDEs require a numerical id for each token.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TokenTypes {
     /// The start of a file
     Start = 0,

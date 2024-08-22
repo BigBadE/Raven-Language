@@ -5,5 +5,10 @@ import array;
 pub fn project() -> RavenProject {
     return new RavenProject {
         name: "Test",
+        dependencies: [
+            new Dependency {
+                name: "Test Dependency",
+            }
+        ],
     };
 }

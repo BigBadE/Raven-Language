@@ -7,18 +7,23 @@ use syntax::errors::ParsingError;
 use syntax::program::code::{FinalizedField, FinalizedMemberField};
 use syntax::program::r#struct::{FinalizedStruct, UnfinalizedStruct};
 use syntax::program::syntax::Syntax;
+use syntax::program::types::FinalizedTypes;
 
 /// Verifies if a struct is valid
 pub async fn verify_struct(
     _process_manager: &TypesChecker,
     structure: UnfinalizedStruct,
-    resolver: &Box<dyn NameResolver>,
+    resolver: &dyn NameResolver,
     syntax: &Arc<Mutex<Syntax>>,
+    include_refs: bool,
 ) -> Result<FinalizedStruct, ParsingError> {
     let mut finalized_fields = Vec::default();
     for field in structure.fields {
         let field = field.await?;
-        let field_type = field.field.field_type.finalize(syntax.clone()).await;
+        let mut field_type = field.field.field_type.finalize(syntax.clone()).await;
+        if include_refs {
+            field_type = FinalizedTypes::Reference(Box::new(field_type));
+        }
         finalized_fields.push(FinalizedMemberField {
             modifiers: field.modifiers,
             attributes: field.attributes,

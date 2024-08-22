@@ -48,12 +48,11 @@ impl<'ctx> CompilerImpl<'ctx> {
     ) -> Option<Arc<CodelessFinalizedFunction>> {
         match Syntax::get_function(
             syntax.clone(),
-            Span::default(),
-            arguments.target.clone(),
+            (arguments.target.clone(), Span::default()),
             Box::new(EmptyNameResolver {}),
             false,
         )
-        .await
+            .await
         {
             Ok(_) => {}
             Err(_) => return None,
@@ -109,12 +108,7 @@ impl<'ctx> CompilerImpl<'ctx> {
                 continue;
             }
 
-            compile_block(
-                &finalized_function.code,
-                function_type,
-                &mut type_getter.for_function(&finalized_function, function_type),
-                &mut 0,
-            );
+            compile_block(&finalized_function.code, &mut type_getter.for_function(&finalized_function, function_type));
         }
 
         //let pass_manager = PassManager::create(&self.compiler.module);
