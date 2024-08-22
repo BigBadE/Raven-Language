@@ -20,6 +20,7 @@ use syntax::SimpleVariableManager;
 
 use crate::output::TypesChecker;
 
+mod check_borrows;
 /// Checks code to perform internal linking and find any errors
 pub mod check_code;
 /// Checks functions

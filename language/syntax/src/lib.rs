@@ -215,7 +215,7 @@ pub trait ProcessManager: Send + Sync {
 }
 
 /// A simple manager for variables in a function
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SimpleVariableManager {
     /// The variables and their type
     pub variables: HashMap<String, FinalizedTypes>,

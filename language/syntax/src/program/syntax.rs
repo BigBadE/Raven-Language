@@ -245,7 +245,7 @@ impl Syntax {
                 }
                 Some(true)
             }
-            FinalizedTypes::Reference(inner) => {
+            FinalizedTypes::Reference(inner, _) => {
                 // References are unwrapped and the inner is checked.
                 self.solve_nonstruct_types(inner, checking)
             }

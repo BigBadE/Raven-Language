@@ -10,8 +10,7 @@ mod test;
 fn main() {
     let args = env::args().collect::<Vec<_>>();
 
-    if args.len() == 2 {
-    } else if args.len() > 2 {
+    if args.len() == 2 {} else if args.len() > 2 {
         panic!("Unknown extra arguments! {:?}", args);
     }
 
@@ -35,7 +34,7 @@ fn main() {
     );
 
     println!("Setting up build...");
-    let project = match build_project_file(&mut arguments, build_path) {
+    let _project = match build_project_file(&mut arguments, build_path) {
         Ok(project) => project,
         Err(error) => {
             println!("{}", error);

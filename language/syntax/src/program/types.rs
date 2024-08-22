@@ -247,7 +247,7 @@ impl FinalizedTypes {
     /// Checks if a type is generic
     pub fn is_generic(&self) -> bool {
         return match self {
-            FinalizedTypes::Reference(inner, _) | FinalizedTypes::Array(inner) => inner.is_generic(),
+            FinalizedTypes::Reference(inner, _) => inner.is_generic(),
             FinalizedTypes::Generic(_, _) => true,
             FinalizedTypes::Struct(_) => false,
             FinalizedTypes::GenericType(base, bounds) => base.is_generic() || bounds.iter().any(|found| found.is_generic()),
@@ -398,7 +398,7 @@ impl FinalizedTypes {
                     (true, None)
                 }
                 FinalizedTypes::Reference(inner, _) => self.of_type_sync(inner, syntax),
-                FinalizedTypes::Struct(_) | FinalizedTypes::GenericType(_, _) | FinalizedTypes::Array(_) => {
+                FinalizedTypes::Struct(_) | FinalizedTypes::GenericType(_, _) => {
                     if bounds.is_empty() {
                         return (true, None);
                     }
@@ -576,14 +576,11 @@ fn recursive_eq(first: &FinalizedTypes, second: &FinalizedTypes) -> bool {
     return match first {
         FinalizedTypes::Struct(first) => match second {
             FinalizedTypes::Struct(second) => {
-                first.data.name.splitn(2, '$').next().unwrap() == second.data.name.splitn(2, '$').next().unwrap()
-            }
-            _ => false,
-        },
-            FinalizedTypes::Struct(second) => {
                 first.data.name.split_once('$').unwrap_or((&first.data.name, &"")).0
                     == second.data.name.split_once('$').unwrap_or((&second.data.name, &"")).0
             }
+            _ => false,
+        },
         FinalizedTypes::Generic(name, _) => match second {
             FinalizedTypes::Generic(other_name, _) => name == other_name,
             _ => false,
