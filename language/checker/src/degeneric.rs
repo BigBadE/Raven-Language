@@ -99,7 +99,7 @@ pub async fn degeneric_effect(
 
             degeneric_arguments(&before_arguments, arguments, syntax, variables, process_manager).await?;
         }
-        FinalizedEffectType::GenericMethodCall(function, types, arguments) => {
+        FinalizedEffectType::GenericFunctionCall(function, types, arguments) => {
             let mut calling = arguments.remove(0);
             degeneric_effect(&mut calling.types, syntax, process_manager, variables, span).await?;
 
@@ -134,10 +134,7 @@ pub async fn degeneric_effect(
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
             degeneric_type(types, process_manager.generics(), syntax).await;
         }
-        FinalizedEffectType::CreateStruct(storing, types, effects) => {
-            if let Some(found) = storing {
-                degeneric_effect(&mut found.types, syntax, process_manager, variables, span).await?;
-            }
+        FinalizedEffectType::CreateStruct(types, effects) => {
             let fields = types.get_fields();
             let mut type_generics = process_manager.generics().clone();
             for i in 0..fields.len() {
@@ -209,10 +206,6 @@ pub async fn degeneric_effect(
             degeneric_type(target, process_manager.generics(), syntax).await;
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?;
         }
-        FinalizedEffectType::HeapStore(storing) => {
-            degeneric_effect(&mut storing.types, syntax, process_manager, variables, span).await?
-        }
-        FinalizedEffectType::HeapAllocate(types) => degeneric_type(types, process_manager.generics(), syntax).await,
         FinalizedEffectType::ReferenceLoad(base) => {
             degeneric_effect(&mut base.types, syntax, process_manager, variables, span).await?
         }

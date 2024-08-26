@@ -43,8 +43,8 @@ pub fn setup_arguments(arguments: &mut Arguments, source: &mut Vec<Box<dyn Sourc
         _ => panic!("Unsupported platform {}!", env::consts::OS),
     };
 
-    source.push(Box::new(InnerSourceSet { set: &STD_UNIVERSAL }));
-    source.push(Box::new(InnerSourceSet { set: platform_std }));
+    /*source.push(Box::new(InnerSourceSet { set: &STD_UNIVERSAL }));
+    source.push(Box::new(InnerSourceSet { set: platform_std }));*/
     source.push(Box::new(InnerSourceSet { set: &CORE }));
 
     arguments.runner_settings.sources = source.iter().map(|inner| inner.cloned()).collect::<Vec<_>>();

@@ -1,58 +1,58 @@
 use crate::compiler::CompilerImpl;
-use crate::internal::instructions::malloc_type;
-use crate::type_getter::CompilerTypeGetter;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use inkwell::IntPredicate;
+use std::fmt::Debug;
 
 /// Compiles internal math functions
-pub fn math_internal<'ctx>(
-    type_getter: &mut CompilerTypeGetter<'ctx>,
-    compiler: &CompilerImpl<'ctx>,
-    name: &String,
-    value: &FunctionValue<'ctx>,
-) -> bool {
+pub fn math_internal<'ctx>(compiler: &CompilerImpl<'ctx>, name: &String, value: &FunctionValue<'ctx>) -> bool {
     let params = value.get_params();
     if name.starts_with("math::Add") {
-        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_add);
+        compile_two_arg_func(compiler, &params, &Builder::build_int_add);
     } else if name.starts_with("math::Subtract") {
-        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_sub);
+        compile_two_arg_func(compiler, &params, &Builder::build_int_sub);
     } else if name.starts_with("math::Multiply") {
-        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_mul);
+        compile_two_arg_func(compiler, &params, &Builder::build_int_mul);
     } else if name.starts_with("math::Divide") {
         if name.ends_with("u64") {
-            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_unsigned_div);
+            compile_two_arg_func(compiler, &params, &Builder::build_int_unsigned_div);
         } else {
-            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_signed_div);
+            compile_two_arg_func(compiler, &params, &Builder::build_int_signed_div);
         }
     } else if name.starts_with("math::Remainder") {
         if name.ends_with("u64") {
-            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_unsigned_rem);
+            compile_two_arg_func(compiler, &params, &Builder::build_int_unsigned_rem);
         } else {
-            compile_two_arg_func(type_getter, compiler, &params, &Builder::build_int_signed_rem);
+            compile_two_arg_func(compiler, &params, &Builder::build_int_signed_rem);
         }
     } else if name.starts_with("math::Equal") {
-        compile_relational_op(IntPredicate::EQ, compiler, &params, type_getter);
+        compile_relational_op(IntPredicate::EQ, compiler, &params);
     } else if name.starts_with("math::GreaterThan") {
         if is_unsigned(name) {
-            compile_relational_op(IntPredicate::UGT, compiler, &params, type_getter)
+            compile_relational_op(IntPredicate::UGT, compiler, &params)
         } else {
-            compile_relational_op(IntPredicate::SGT, compiler, &params, type_getter)
+            compile_relational_op(IntPredicate::SGT, compiler, &params)
         };
     } else if name.starts_with("math::LessThan") {
         if is_unsigned(name) {
-            compile_relational_op(IntPredicate::ULT, compiler, &params, type_getter)
+            compile_relational_op(IntPredicate::ULT, compiler, &params)
         } else {
-            compile_relational_op(IntPredicate::SLT, compiler, &params, type_getter)
+            compile_relational_op(IntPredicate::SLT, compiler, &params)
         };
     } else if name.starts_with("math::Not") || name.starts_with("math::BitInvert") {
-        compile_one_arg_func(type_getter, compiler, &params, &Builder::build_not);
+        compile_one_arg_func(compiler, &params, &Builder::build_not);
     } else if name.starts_with("math::BitXOR") || name.starts_with("math::XOR") {
-        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_xor);
+        compile_two_arg_func(compiler, &params, &Builder::build_xor);
     } else if name.starts_with("math::BitOr") || name.starts_with("math::Or") {
-        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_or);
+        compile_two_arg_func(compiler, &params, &Builder::build_or);
     } else if name.starts_with("math::BitAnd") || name.starts_with("math::And") {
-        compile_two_arg_func(type_getter, compiler, &params, &Builder::build_and);
+        compile_two_arg_func(compiler, &params, &Builder::build_and);
+    } else if name.starts_with("math::RightShift") {
+        compile_two_arg_func(compiler, &params, &|builder, lhs, rhs, name| builder.build_right_shift(lhs, rhs, false, name));
+    } else if name.starts_with("math::LogicRightShift") {
+        compile_two_arg_func(compiler, &params, &|builder, lhs, rhs, name| builder.build_right_shift(lhs, rhs, true, name));
+    } else if name.starts_with("math::LeftShift") {
+        compile_two_arg_func(compiler, &params, &Builder::build_left_shift);
     } else {
         return false;
     }
@@ -61,77 +61,29 @@ pub fn math_internal<'ctx>(
 
 /// Creates a two-argument internal function, calling the function on both arguments
 fn compile_two_arg_func<'ctx>(
-    type_getter: &mut CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
     params: &Vec<BasicValueEnum<'ctx>>,
     function: &dyn Fn(&Builder<'ctx>, IntValue<'ctx>, IntValue<'ctx>, &str) -> Result<IntValue<'ctx>, BuilderError>,
 ) {
-    let pointer_type = params.first().unwrap().into_pointer_value();
-    let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-    let returning = function(
-        &compiler.builder,
-        compiler.builder.build_load(type_getter.compiler.context.i64_type(), pointer_type, "2").unwrap().into_int_value(),
-        compiler
-            .builder
-            .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-            .unwrap()
-            .into_int_value(),
-        "1",
-    )
-    .unwrap();
-    compiler.builder.build_store(malloc, returning).unwrap();
-    compiler.builder.build_return(Some(&malloc)).unwrap();
+    let returning = function(&compiler.builder, params[0].into_int_value(), params[1].into_int_value(), "1").unwrap();
+    compiler.builder.build_return(Some(&returning)).unwrap();
 }
 
 /// Creates a one-argument internal function, calling the function on one argument
 fn compile_one_arg_func<'ctx>(
-    type_getter: &mut CompilerTypeGetter<'ctx>,
     compiler: &CompilerImpl<'ctx>,
     params: &Vec<BasicValueEnum<'ctx>>,
     function: &dyn Fn(&Builder<'ctx>, IntValue<'ctx>, &str) -> Result<IntValue<'ctx>, BuilderError>,
 ) {
-    let pointer_type = params.first().unwrap().into_pointer_value();
-    let malloc = malloc_type(type_getter, compiler.context.i64_type().size_of());
-
-    let returning = function(
-        &compiler.builder,
-        compiler.builder.build_load(type_getter.compiler.context.i64_type(), pointer_type, "2").unwrap().into_int_value(),
-        "1",
-    )
-    .unwrap();
-    compiler.builder.build_store(malloc, returning).unwrap();
-    compiler.builder.build_return(Some(&malloc)).unwrap();
+    let returning = function(&compiler.builder, params[0].into_int_value(), "1").unwrap();
+    compiler.builder.build_return(Some(&returning)).unwrap();
 }
 
 /// Compiles relational operators
-fn compile_relational_op(
-    op: IntPredicate,
-    compiler: &CompilerImpl,
-    params: &Vec<BasicValueEnum>,
-    type_getter: &mut CompilerTypeGetter,
-) {
-    let malloc = malloc_type(type_getter, type_getter.compiler.context.bool_type().size_of());
-
-    let returning = compiler
-        .builder
-        .build_int_compare(
-            op,
-            compiler
-                .builder
-                .build_load(type_getter.compiler.context.i64_type(), params.first().unwrap().into_pointer_value(), "2")
-                .unwrap()
-                .into_int_value(),
-            compiler
-                .builder
-                .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                .unwrap()
-                .into_int_value(),
-            "1",
-        )
-        .unwrap();
-    compiler.builder.build_store(malloc, returning).unwrap();
-    compiler.builder.build_return(Some(&malloc)).unwrap();
+fn compile_relational_op(op: IntPredicate, compiler: &CompilerImpl, params: &Vec<BasicValueEnum>) {
+    let returning =
+        compiler.builder.build_int_compare(op, params[0].into_int_value(), params[1].into_int_value(), "1").unwrap();
+    compiler.builder.build_return(Some(&returning)).unwrap();
 }
 
 /// Returns true if a number is unsigned

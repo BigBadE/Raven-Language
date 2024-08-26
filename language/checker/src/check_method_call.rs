@@ -88,7 +88,7 @@ pub async fn check_method_call(
 
                 return Ok(FinalizedEffects::new(
                     effect.span.clone(),
-                    FinalizedEffectType::GenericMethodCall(found, found_trait.clone(), finalized_effects),
+                    FinalizedEffectType::GenericFunctionCall(found, found_trait.clone(), finalized_effects),
                 ));
             }
         }

@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
 use crate::compiler::CompilerImpl;
-use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::internal::math_internal::math_internal;
-use crate::internal::string_internal::string_internal;
 use crate::type_getter::CompilerTypeGetter;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
 use syntax::program::function::CodelessFinalizedFunction;
 
@@ -22,7 +20,7 @@ pub fn compile_internal<'ctx>(
     let block = compiler.context.append_basic_block(value, "0");
     compiler.builder.position_at_end(block);
     let params = value.get_params();
-    if string_internal(type_getter, &compiler, name, &value) || math_internal(type_getter, &compiler, name, &value) {
+    if math_internal(&compiler, name, &value) {
         return;
     }
     if name.starts_with("types::pointer::Pointer<T>::get_ptr_data") {
@@ -37,7 +35,7 @@ pub fn compile_internal<'ctx>(
             .builder
             .build_load(compiler.context.i64_type(), params.get(0).unwrap().into_pointer_value(), "0")
             .unwrap();
-        compiler.builder.build_return(Some(&malloc_type(type_getter, size.into_int_value()))).unwrap();
+        compiler.builder.build_return(Some(&size)).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::write_ptr_data$") {
         let data = compiler
             .builder
@@ -46,161 +44,15 @@ pub fn compile_internal<'ctx>(
         compiler.builder.build_store(params.get(0).unwrap().into_pointer_value(), data).unwrap();
         compiler.builder.build_return(None).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::get_size$") {
-        let storing = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
         let target_type = type_getter.get_type(function.generics.iter().next().unwrap().1);
-        compiler.builder.build_store(storing, target_type.size_of().unwrap().as_basic_value_enum()).unwrap();
-        compiler.builder.build_return(Some(&storing)).unwrap();
+        compiler.builder.build_return(Some(&target_type.size_of().unwrap().as_basic_value_enum())).unwrap();
     } else if name.starts_with("types::pointer::Pointer<T>::read_ptr_data$") {
         compiler.builder.build_return(Some(&params[0].into_pointer_value())).unwrap();
     } else if name.starts_with("numbers::Cast") {
         build_cast(value.get_params().first().unwrap(), value.get_type().get_return_type().unwrap(), &compiler);
-    } else if name.starts_with("math::RightShift") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_right_shift(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                true,
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::LogicRightShift") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_right_shift(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                false,
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("math::LeftShift") {
-        let pointer_type = params.first().unwrap().into_pointer_value();
-        let malloc = malloc_type(type_getter, type_getter.compiler.context.i64_type().size_of());
-
-        let returning = compiler
-            .builder
-            .build_left_shift(
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), pointer_type, "2")
-                    .unwrap()
-                    .into_int_value(),
-                compiler
-                    .builder
-                    .build_load(type_getter.compiler.context.i64_type(), params.get(1).unwrap().into_pointer_value(), "3")
-                    .unwrap()
-                    .into_int_value(),
-                "1",
-            )
-            .unwrap();
-        compiler.builder.build_store(malloc, returning).unwrap();
-        compiler.builder.build_return(Some(&malloc)).unwrap();
-    } else if name.starts_with("array::Index") {
-        let offset = get_loaded(&compiler, compiler.context.i64_type(), params.get(1).unwrap()).into_int_value();
-        let offset = compiler.builder.build_int_add(offset, compiler.context.i64_type().const_int(1, false), "3").unwrap();
-
-        let gep;
-        unsafe {
-            gep = compiler
-                .builder
-                .build_in_bounds_gep(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    params.first().unwrap().into_pointer_value(),
-                    &[offset],
-                    "1",
-                )
-                .unwrap();
-        }
-
-        let gep =
-            compiler.builder.build_load(type_getter.compiler.context.ptr_type(AddressSpace::default()), gep, "2").unwrap();
-        compiler.builder.build_return(Some(&gep)).unwrap();
-    } else if name.starts_with("array::Empty") {
-        let size = unsafe {
-            type_getter
-                .compiler
-                .builder
-                .build_gep(
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()),
-                    type_getter.compiler.context.ptr_type(AddressSpace::default()).const_zero(),
-                    &[type_getter.compiler.context.i64_type().const_int(1, false)],
-                    "0",
-                )
-                .unwrap()
-        };
-
-        let malloc = compiler
-            .builder
-            .build_call(
-                compiler.module.get_function("malloc").unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
-                &[BasicMetadataValueEnum::PointerValue(size)],
-                "1",
-            )
-            .unwrap()
-            .try_as_basic_value()
-            .unwrap_left()
-            .into_pointer_value();
-
-        compiler.builder.build_store(malloc, compiler.context.i64_type().const_zero()).unwrap();
-        compiler.builder.build_return(Some(&malloc.as_basic_value_enum())).unwrap();
     } else {
         panic!("Unknown internal operation: {}", name)
     }
-}
-
-/// Creates a malloc for the type
-pub fn malloc_type<'a>(type_getter: &mut CompilerTypeGetter<'a>, size: IntValue<'a>) -> PointerValue<'a> {
-    let size = type_getter
-        .compiler
-        .builder
-        .build_int_to_ptr(size, type_getter.compiler.context.ptr_type(AddressSpace::default()), &type_getter.id.to_string())
-        .unwrap();
-    type_getter.id += 1;
-    let malloc = type_getter
-        .compiler
-        .builder
-        .build_call(
-            type_getter
-                .compiler
-                .module
-                .get_function("malloc")
-                .unwrap_or_else(|| compile_llvm_intrinsics("malloc", type_getter)),
-            &[BasicMetadataValueEnum::PointerValue(size)],
-            &type_getter.id.to_string(),
-        )
-        .unwrap()
-        .try_as_basic_value()
-        .unwrap_left()
-        .into_pointer_value();
-    type_getter.id += 1;
-    return malloc;
 }
 
 /// Loads the type if it's a pointer

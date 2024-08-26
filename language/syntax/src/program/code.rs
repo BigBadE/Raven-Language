@@ -217,15 +217,15 @@ pub enum FinalizedEffectType {
         Vec<(FinalizedTypes, Span)>,
     ),
     /// Calls the trait's function with the given arguments.
-    GenericMethodCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
+    GenericFunctionCall(Arc<CodelessFinalizedFunction>, FinalizedTypes, Vec<FinalizedEffects>),
     /// Sets given reference to given value.
     Set(Box<FinalizedEffects>, Box<FinalizedEffects>),
     /// Loads variable with the given name.
     LoadVariable(String),
     /// Loads a field reference from the given struct with the given type.
     Load(Box<FinalizedEffects>, String, FinalizedTypes),
-    /// Creates a struct at the given reference, of the given type with a tuple of the index of the argument and the argument.
-    CreateStruct(Option<Box<FinalizedEffects>>, FinalizedTypes, Vec<(usize, FinalizedEffects)>),
+    /// Creates a struct of the given type with a tuple of the index of the argument and the argument.
+    CreateStruct(FinalizedTypes, Vec<(usize, FinalizedEffects)>),
     /// Creates a float
     Float(f64),
     /// Creates an unsigned int
@@ -244,10 +244,6 @@ pub enum FinalizedEffectType {
     /// Downcasts a program into its trait (with the given functions), which can only be used in a VirtualCall.
     /// The functions are empty until after degenericing
     Downcast(Box<FinalizedEffects>, FinalizedTypes, Vec<Arc<CodelessFinalizedFunction>>),
-    /// Internally used by low-level verifier to store a type on the heap.
-    HeapStore(Box<FinalizedEffects>),
-    /// Allocates space on the heap.
-    HeapAllocate(FinalizedTypes),
     /// Loads from the given reference.
     ReferenceLoad(Box<FinalizedEffects>),
     /// Stores an effect on the stack.
@@ -263,7 +259,7 @@ impl FinalizedEffectType {
             // Downcasts simply return the downcasting target.
             Self::CreateVariable(_, _, types) | Self::Downcast(_, types, _) => Some(types.clone()),
             Self::FunctionCall(_, function, _, _)
-            | Self::GenericMethodCall(function, _, _)
+            | Self::GenericFunctionCall(function, _, _)
             | Self::VirtualCall(_, function, _, _)
             | Self::GenericVirtualCall(_, _, function, _) => function.return_type.clone(),
             Self::LoadVariable(name) => {
@@ -282,7 +278,7 @@ impl FinalizedEffectType {
                 .find(|field| &field.field.name == name)
                 .map(|field| field.field.field_type.clone()),
             // Returns the program type.
-            Self::CreateStruct(_, types, _) => Some(types.clone()),
+            Self::CreateStruct(types, _) => Some(types.clone()),
             // Returns the internal constant type.
             Self::Float(_) => Some(FinalizedTypes::Struct(F64.clone())),
             Self::UInt(_) => Some(FinalizedTypes::Struct(U64.clone())),
@@ -290,16 +286,12 @@ impl FinalizedEffectType {
             Self::String(_) => Some(FinalizedTypes::Struct(STR.clone())),
             Self::Char(_) => Some(FinalizedTypes::Struct(CHAR.clone())),
             // Stores just return their inner type.
-            Self::HeapStore(inner) | Self::StackStore(inner) | Self::Set(_, inner) => {
-                inner.types.get_nongeneric_return(variables)
-            }
+            Self::StackStore(inner) | Self::Set(_, inner) => inner.types.get_nongeneric_return(variables),
             // References return their inner type as well.
             Self::ReferenceLoad(inner) => match inner.types.get_nongeneric_return(variables).unwrap() {
                 FinalizedTypes::Reference(inner, _) => Some(*inner),
                 _ => panic!("Tried to load non-reference!"),
             },
-            // Heap allocations shouldn't get return type checked, even though they have a type.
-            Self::HeapAllocate(_) => panic!("Tried to get a type from a heap alloc!"),
         };
     }
 }

@@ -1,7 +1,7 @@
 use std::env;
 
 use data::{Arguments, CompilerArguments, RunnerSettings};
-use magpie_lib::{build_project, build_project_file};
+use magpie_lib::build_project;
 use parser::FileSourceSet;
 
 mod test;
@@ -35,13 +35,13 @@ fn main() {
     );
 
     println!("Setting up build...");
-    let _project = match build_project_file(&mut arguments, build_path) {
+    /*let project = match build_project_file(&mut arguments, build_path) {
         Ok(project) => project,
         Err(error) => {
             println!("{}", error);
             return;
         }
-    };
+    };*/
     arguments.runner_settings.compiler_arguments.target = "main::main".to_string();
 
     let source = env::current_dir().unwrap().join("src");

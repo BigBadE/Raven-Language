@@ -106,7 +106,7 @@ pub async fn get_return(
             }
             None => None,
         },
-        FinalizedEffectType::GenericMethodCall(function, _, args)
+        FinalizedEffectType::GenericFunctionCall(function, _, args)
         | FinalizedEffectType::VirtualCall(_, function, _, args)
         | FinalizedEffectType::GenericVirtualCall(_, _, function, args) => match function.return_type.as_ref().cloned() {
             Some(mut inner) => {
@@ -129,9 +129,9 @@ pub async fn get_return(
             None => None,
         },
         // Stores just return their inner type.
-        FinalizedEffectType::HeapStore(inner)
-        | FinalizedEffectType::StackStore(inner)
-        | FinalizedEffectType::Set(_, inner) => get_return(&inner.types, variables, syntax).await,
+        FinalizedEffectType::StackStore(inner) | FinalizedEffectType::Set(_, inner) => {
+            get_return(&inner.types, variables, syntax).await
+        }
         // References return their inner type as well.
         FinalizedEffectType::ReferenceLoad(inner) => match get_return(&inner.types, variables, syntax).await.unwrap() {
             FinalizedTypes::Reference(inner, _) => Some(*inner),

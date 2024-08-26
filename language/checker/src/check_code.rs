@@ -188,12 +188,12 @@ async fn finalize_basic(effects: &Effects) -> Option<FinalizedEffects> {
             EffectType::NOP => panic!("Tried to compile a NOP!"),
             EffectType::Jump(jumping) => FinalizedEffectType::Jump(jumping.clone()),
             EffectType::LoadVariable(variable) => FinalizedEffectType::LoadVariable(variable.clone()),
-            EffectType::Float(float) => store(FinalizedEffectType::Float(*float)),
-            EffectType::Int(int) => store(FinalizedEffectType::UInt(*int as u64)),
-            EffectType::UInt(uint) => store(FinalizedEffectType::UInt(*uint)),
-            EffectType::Bool(bool) => store(FinalizedEffectType::Bool(*bool)),
-            EffectType::String(string) => store(FinalizedEffectType::String(string.clone())),
-            EffectType::Char(char) => store(FinalizedEffectType::Char(*char)),
+            EffectType::Float(float) => FinalizedEffectType::Float(*float),
+            EffectType::Int(int) => FinalizedEffectType::UInt(*int as u64),
+            EffectType::UInt(uint) => FinalizedEffectType::UInt(*uint),
+            EffectType::Bool(bool) => FinalizedEffectType::Bool(*bool),
+            EffectType::String(string) => FinalizedEffectType::String(string.clone()),
+            EffectType::Char(char) => FinalizedEffectType::Char(*char),
             _ => return None,
         },
     ));
@@ -238,14 +238,7 @@ async fn verify_create_struct(
     }
 
     //degeneric_type_fields(&mut target, &mut generics, &code_verifier.syntax).await;
-    return Ok(FinalizedEffects::new(
-        Span::default(),
-        FinalizedEffectType::CreateStruct(
-            Some(Box::new(FinalizedEffects::new(Span::default(), FinalizedEffectType::HeapAllocate(target.clone())))),
-            target,
-            final_effects,
-        ),
-    ));
+    return Ok(FinalizedEffects::new(Span::default(), FinalizedEffectType::CreateStruct(target, final_effects)));
 }
 
 /// Checks if two types are the same
@@ -265,9 +258,4 @@ async fn check_type(
         }
     }
     return Ok(());
-}
-
-/// Shorthand for storing an effect on the heap
-fn store(effect: FinalizedEffectType) -> FinalizedEffectType {
-    return FinalizedEffectType::HeapStore(Box::new(FinalizedEffects::new(Span::default(), effect)));
 }

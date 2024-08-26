@@ -34,6 +34,12 @@ pub struct Loan {
     pub target: Vec<String>,
 }
 
+impl Loan {
+    pub fn new(mutable: bool, target: Vec<String>) -> Loan {
+        return Self { mutable, target };
+    }
+}
+
 impl Display for Loan {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let target = self.target.join(".");

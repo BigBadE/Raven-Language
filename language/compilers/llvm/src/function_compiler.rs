@@ -13,7 +13,7 @@ use syntax::program::function::{CodelessFinalizedFunction, FinalizedCodeBody};
 use syntax::program::types::FinalizedTypes;
 use syntax::{is_modifier, Attribute, Modifier};
 
-use crate::internal::instructions::{compile_internal, malloc_type};
+use crate::internal::instructions::compile_internal;
 use crate::internal::intrinsics::compile_llvm_intrinsics;
 use crate::type_getter::CompilerTypeGetter;
 use crate::util::create_function_value;
@@ -209,21 +209,6 @@ pub fn compile_effect<'ctx>(
             type_getter.compiler.builder.build_store(output.into_pointer_value(), storing).unwrap();
             Some(output)
         }
-        FinalizedEffectType::HeapStore(inner) => {
-            let output = compile_effect(type_getter, inner).unwrap();
-
-            let pointer_type = if output.get_type().is_pointer_type() {
-                return Some(output);
-            } else {
-                output.get_type()
-            };
-
-            let malloc = malloc_type(type_getter, pointer_type.size_of().unwrap());
-            let output =
-                load_if_pointer(type_getter, type_getter.compiler.context.ptr_type(AddressSpace::default()), output);
-            type_getter.compiler.builder.build_store(malloc, output).unwrap();
-            Some(malloc.as_basic_value_enum())
-        }
         FinalizedEffectType::StackStore(inner) => {
             let output = compile_effect(type_getter, inner).unwrap();
             if !output.is_pointer_value() {
@@ -246,12 +231,6 @@ pub fn compile_effect<'ctx>(
             type_getter.id += 1;
             Some(output)
         }
-        FinalizedEffectType::HeapAllocate(types) => {
-            let output = type_getter.get_type(types);
-            let malloc = malloc_type(type_getter, output.size_of().unwrap());
-
-            Some(malloc.as_basic_value_enum())
-        }
         _ => unreachable!(),
     };
 }
@@ -265,7 +244,7 @@ fn compile_simple_effects<'ctx>(
         FinalizedEffectType::NOP => {
             panic!("Tried to compile a NOP! For {}", type_getter.function.unwrap().get_name().to_str().unwrap())
         }
-        FinalizedEffectType::GenericMethodCall(func, types, _args) => {
+        FinalizedEffectType::GenericFunctionCall(func, types, _args) => {
             panic!("Tried to compile generic method call! {} and {}", func.data.name, types)
         }
         FinalizedEffectType::GenericVirtualCall(_, _, _, _) => {
@@ -282,7 +261,7 @@ fn compile_simple_effects<'ctx>(
         //Loads variable/field pointer from program, or self if program is None
         FinalizedEffectType::Load(loading_from, field, _) => compile_load(type_getter, loading_from, field),
         //Struct to create and a tuple of the index of the argument and the argument
-        FinalizedEffectType::CreateStruct(effect, _, arguments) => compile_create_struct(type_getter, effect, arguments),
+        FinalizedEffectType::CreateStruct(_, arguments) => compile_create_struct(type_getter, arguments),
         FinalizedEffectType::Float(float) => {
             Some(type_getter.compiler.context.f64_type().const_float(*float).as_basic_value_enum())
         }
@@ -304,7 +283,6 @@ fn compile_simple_effects<'ctx>(
 }
 fn compile_create_struct<'ctx>(
     type_getter: &mut CompilerTypeGetter<'ctx>,
-    effect: &Option<Box<FinalizedEffects>>,
     arguments: &Vec<(usize, FinalizedEffects)>,
 ) -> Option<BasicValueEnum<'ctx>> {
     let mut out_arguments = vec![MaybeUninit::uninit(); arguments.len()];
@@ -314,24 +292,21 @@ fn compile_create_struct<'ctx>(
         *out_arguments.get_mut(*index).unwrap() = MaybeUninit::new(returned);
     }
 
-    let pointer = compile_effect(type_getter, effect.as_ref().unwrap()).unwrap().into_pointer_value();
-    type_getter.id += 1;
-
     let fields = out_arguments.iter().map(|argument| unsafe { argument.assume_init() }.get_type()).collect::<Vec<_>>();
     let structure = type_getter.compiler.context.struct_type(fields.as_slice(), false);
 
     let mut offset = 0;
+    let structure = structure.const_zero();
+
     for argument in out_arguments {
         let value = unsafe { argument.assume_init() };
 
-        let pointer =
-            type_getter.compiler.builder.build_struct_gep(structure, pointer, offset, &type_getter.id.to_string()).unwrap();
+        type_getter.compiler.builder.build_insert_value(structure, value, offset, &type_getter.id.to_string()).unwrap();
         type_getter.id += 1;
-        type_getter.compiler.builder.build_store(pointer, value).unwrap();
         offset += 1;
     }
 
-    return Some(pointer.as_basic_value_enum());
+    return Some(structure.as_basic_value_enum());
 }
 
 /// Compiles a load effect
@@ -486,18 +461,7 @@ fn compile_function_call<'ctx>(
         .try_as_basic_value()
         .left();
     type_getter.id += 1;
-    return match call {
-        Some(inner) => {
-            if inner.is_pointer_value() {
-                Some(inner)
-            } else {
-                let pointer = malloc_type(type_getter, inner.get_type().size_of().unwrap());
-                type_getter.compiler.builder.build_store(pointer, inner).unwrap();
-                Some(pointer.as_basic_value_enum())
-            }
-        }
-        None => None,
-    };
+    return call;
 }
 
 fn reference_struct<'ctx>(type_getter: &mut CompilerTypeGetter<'ctx>) -> StructType<'ctx> {
@@ -534,15 +498,13 @@ fn compile_downcast<'ctx>(
             .context
             .struct_type(&[base.get_type(), table.as_pointer_value().get_type().as_basic_type_enum()], false);
 
-        let malloc = malloc_type(type_getter, structure.size_of().unwrap());
-        type_getter.compiler.builder.build_store(malloc, base).unwrap();
-
-        let reference_struct = reference_struct(type_getter);
-        let offset =
-            type_getter.compiler.builder.build_struct_gep(reference_struct, malloc, 1, &type_getter.id.to_string()).unwrap();
+        let structure = structure.const_zero();
+        type_getter.compiler.builder.build_insert_value(structure, base, 0, &type_getter.id.to_string()).unwrap();
         type_getter.id += 1;
-        type_getter.compiler.builder.build_store(offset, table.as_basic_value_enum()).unwrap();
-        return Some(malloc.as_basic_value_enum());
+        type_getter.compiler.builder.build_insert_value(structure, table, 1, &type_getter.id.to_string()).unwrap();
+        type_getter.id += 1;
+
+        return Some(structure.as_basic_value_enum());
     }
 }
 

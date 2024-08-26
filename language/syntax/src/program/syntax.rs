@@ -395,6 +395,13 @@ impl Syntax {
         mut resolved_generics: Vec<String>,
     ) -> Result<Types, ParsingError> {
         let (name, span) = getting;
+
+        if name.starts_with('&') {
+            return Ok(Types::Reference(
+                Box::new(Self::get_struct(syntax, (name[1..].to_string(), span), name_resolver, resolved_generics).await?),
+                vec![],
+            ));
+        }
         // Checks if the type is a generic type
         if let Some(generic_bounds) = name_resolver.generic(&name) {
             if resolved_generics.contains(&name) {

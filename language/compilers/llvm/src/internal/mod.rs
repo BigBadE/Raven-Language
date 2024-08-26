@@ -6,7 +6,5 @@ pub mod instructions;
 pub mod intrinsics;
 /// Internal math instructions
 pub mod math_internal;
-/// Internal string instructions
-pub mod string_internal;
 /// Internal structs
 pub mod structs;

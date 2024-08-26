@@ -1,5 +1,5 @@
 import stdio;
 
 fn main() {
-    printf("Hello, world!");
+    printf("Hello, World!");
 }
