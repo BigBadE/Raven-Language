@@ -10,7 +10,8 @@ mod test;
 fn main() {
     let args = env::args().collect::<Vec<_>>();
 
-    if args.len() == 2 {} else if args.len() > 2 {
+    if args.len() == 2 {
+    } else if args.len() > 2 {
         panic!("Unknown extra arguments! {:?}", args);
     }
 

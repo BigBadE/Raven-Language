@@ -116,7 +116,7 @@ impl Syntax {
                 // Prevent duplicates from empty trait methods
                 if function.code.expressions.len() == 0
                     && ((locked.compiling.contains_key(&function.data.name) && !generic)
-                    || (locked.generics.contains_key(&function.data.name) && generic))
+                        || (locked.generics.contains_key(&function.data.name) && generic))
                 {
                     return;
                 }
@@ -440,7 +440,7 @@ impl Syntax {
                         name_resolver.boxed_clone(),
                         vec![],
                     )
-                        .await?;
+                    .await?;
                     found.push(Types::GenericType(Box::new(first), bounds));
                     return Ok(found);
                 }
@@ -453,7 +453,7 @@ impl Syntax {
                             name_resolver.boxed_clone(),
                             vec![],
                         )
-                            .await?,
+                        .await?,
                     );
                     last = i + 1;
                 }
@@ -466,7 +466,7 @@ impl Syntax {
                             name_resolver.boxed_clone(),
                             vec![],
                         )
-                            .await?,
+                        .await?,
                     );
                     return Ok(found);
                 }

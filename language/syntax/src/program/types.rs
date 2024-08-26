@@ -65,7 +65,7 @@ pub enum Types {
     /// A generic with bounds
     Generic(String, Vec<Types>),
     /// A reference with the given loans
-    Reference(Box<Types>, Loan),
+    Reference(Box<Types>, Vec<Loan>),
 }
 
 ///A type with a reference to the finalized program instead of the data.
@@ -76,7 +76,7 @@ pub enum FinalizedTypes {
     /// A type with generic types
     GenericType(Box<FinalizedTypes>, Vec<FinalizedTypes>),
     /// A reference to a type with the specified loan
-    Reference(Box<FinalizedTypes>, Loan),
+    Reference(Box<FinalizedTypes>, Vec<Loan>),
     /// A generic with bounds
     Generic(String, Vec<FinalizedTypes>),
 }
@@ -536,7 +536,7 @@ impl Display for Types {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Types::Struct(structure) => write!(f, "{}", structure.name),
-            Types::Reference(base, loan) => write!(f, "&{} {}", loan, base),
+            Types::Reference(base, loans) => write!(f, "&{{{}}} {}", display_parenless(loans, ", "), base),
             Types::Generic(name, bounds) => write!(f, "{}: {}", name, display(bounds, " + ")),
             Types::GenericType(types, generics) => {
                 write!(f, "{}<{}>", types, display_parenless(generics, ", "))
@@ -549,7 +549,9 @@ impl Display for FinalizedTypes {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             FinalizedTypes::Struct(structure) => write!(f, "{}", structure.data.name),
-            FinalizedTypes::Reference(structure, loan) => write!(f, "&{} {}", loan, structure),
+            FinalizedTypes::Reference(structure, loans) => {
+                write!(f, "&{{{}}} {}", display_parenless(loans, ", "), structure)
+            }
             FinalizedTypes::Generic(name, bounds) => {
                 write!(f, "{}: {}", name, display(bounds, " + "))
             }

@@ -1,8 +1,9 @@
-use crate::program::types::FinalizedTypes;
+use crate::program::types::{FinalizedTypes, Loan};
 use data::tokens::Span;
 use data::SourceSet;
 use std::fmt::{Display, Formatter};
 
+use crate::program::function::display_parenless;
 use colored::Colorize;
 
 #[derive(Debug, Clone)]
@@ -41,6 +42,7 @@ pub enum ParsingMessage {
     NoMethod(String, FinalizedTypes),
     NoImpl(FinalizedTypes, String),
     NoTraitImpl(FinalizedTypes, FinalizedTypes),
+    IllegalLoan(Vec<Loan>),
 }
 
 impl Display for ParsingMessage {
@@ -89,6 +91,9 @@ impl Display for ParsingMessage {
             }
             ParsingMessage::NoTraitImpl(base, traits) => {
                 write!(f, "No implementation of {} for {}", fix_type(traits), fix_type(base))
+            }
+            ParsingMessage::IllegalLoan(loans) => {
+                write!(f, "Illegal loans: {}", display_parenless(loans, ", "))
             }
         };
     }
