@@ -168,16 +168,25 @@ pub enum EffectType {
     CreateArray(Vec<Effects>),
     /// A float
     Float(f64),
-    /// An integer
-    Int(i64),
-    /// An unsigned integer
-    UInt(u64),
+                                        // /// An integer
+                                        // Int(i64),
+                                        // Int(i32),
+                                        // /// An unsigned integer
+                                        // UInt(u64),
+    /// Integer types
+    Int(u64, IntType),
     /// A boolean
     Bool(bool),
     /// A character
     Char(char),
     /// A string
     String(String),
+}
+
+#[derive(Clone, Debug)]
+pub enum IntType {
+    I8, I16, I32, I64,
+    U8, U16, U32, U64,
 }
 
 /// Effects that have been finalized and are ready for compilation

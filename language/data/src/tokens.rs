@@ -177,8 +177,16 @@ pub enum TokenTypes {
     CodeEnd = 35,
     /// A variable name
     Variable = 36,
-    /// An integer
-    Integer = 37,
+    /// Integers
+    IntegerI8 = 37,
+    IntegerI16 = 72,  // Note number pattern break
+    IntegerI32 = 73,
+    IntegerI64 = 74,
+
+    IntegerU8 = 75,
+    IntegerU16 = 76,
+    IntegerU32 = 77,
+    IntegerU64 = 78,
     /// A float
     Float = 38,
     /// A type being called, always comes after a period (like variable.method())
@@ -250,4 +258,6 @@ pub enum TokenTypes {
     Char = 70,
     /// A blank line
     BlankLine = 71,
+                // Added Integer Types take 72 - 78
+    
 }
