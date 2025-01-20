@@ -13,7 +13,7 @@ colored = "2.1.0"
 
 chalk-solve = "0.98.0"
 chalk-ir = "0.98.0"
-chalk-recursive = "0.98.0"
+chalk-recursive = "0.99.0"
 
 dashmap = "6.0.1"
 
