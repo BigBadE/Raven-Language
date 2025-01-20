@@ -11,7 +11,7 @@ lazy_static = "1.5.0"
 indexmap = "2.4.0"
 colored = "2.1.0"
 
-chalk-solve = "0.98.0"
+chalk-solve = "0.99.0"
 chalk-ir = "0.98.0"
 chalk-recursive = "0.98.0"
 
